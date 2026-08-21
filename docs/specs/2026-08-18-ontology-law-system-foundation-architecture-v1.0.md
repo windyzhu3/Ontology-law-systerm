@@ -2,6 +2,7 @@
 
 > 状态：正式冻结版；已通过领域、安全与质量门禁复核，并经用户确认  
 > 日期：2026-08-18  
+> 兼容修订：2026-08-19，随已冻结的PostgreSQL物理模型总纲将ReleaseManifest显式升级为Schema v2并绑定DatabaseContractBundle  
 > 范围：销售至转案MVP的技术基础框架，以及后MVP模块接入所需的稳定扩展契约  
 > 明确不包含：数据库逐表DDL、API逐字段Schema、迭代排期、工作量估算和实施计划
 
@@ -283,7 +284,7 @@ infrastructure   jOOQ、Provider Adapter、投影实现
 | contract/transfer/matter-core | `contract`/`transfer`/`matter_core` | 各自聚合当前状态；MatterRef仅在`matter_core`，MatterLink仅在`transfer` |
 | workbench | `workbench` | CurrentCard、ActionDraft及强一致操作投影；不拥有业务事实 |
 
-Event Payload的业务语义归生产它的事实Owner模块；`execution-runtime`只拥有不可变Event Envelope和投递状态，不解释或改写业务事实。Audit不是DomainEvent，DomainEvent也不是Audit。ExternalDispatch不进入通用DomainEvent Outbox。
+Event Payload的业务语义归生产它的事实Owner模块；`execution-runtime`只拥有不可变Event Envelope和投递状态，不解释或改写业务事实。Audit不是DomainEvent，DomainEvent也不是Audit。ExternalDispatchOutbox不进入通用DomainEvent Outbox。
 
 规则：
 
@@ -415,11 +416,14 @@ NormalizedCommandContext {
   causationId,
   payloadDigest,
   subjectBindings[],
-  appliedPolicyRefs[]
+  appliedPolicyRefs[],
+  deploymentSecurityGeneration,
+  securityVerificationGeneration,
+  securityVerifiedUntil
 }
 ```
 
-`tenantId`不接受请求Body或自由Header值，而是从认证绑定、CustomerGrant、权威WorkItem、ProviderAccount或Service Trigger派生。`appliedPolicyRefs[]`保存本次实际参与校验或计算的Temporal、Jurisdiction、Material、Disclosure及其他政策代码/版本；它与规范化Context摘要一并进入CommandReceipt和Audit。请求可以携带用于匹配的公开CommandId和因果引用，但最终上下文只能由服务端构造。
+`tenantId`不接受请求Body或自由Header值，而是从认证绑定、CustomerGrant、权威WorkItem、ProviderAccount或Service Trigger派生。三个Deployment Security字段只能由数据库Rank 5门禁在本次事务中返回，证明当前安全图与新鲜验证状态；客户端、Host或AI不能提交或覆盖。它们进入Audit/CommandReceipt执行依据，但不改变客户端Payload Digest，也不能让同一CommandId在探针刷新后变成“不同请求”。`appliedPolicyRefs[]`保存本次实际参与校验或计算的Temporal、Jurisdiction、Material、Disclosure及其他政策代码/版本；它与规范化Context摘要一并进入CommandReceipt和Audit。请求可以携带用于匹配的公开CommandId和因果引用，但最终上下文只能由服务端构造。
 
 `SubjectBinding`是封闭判别联合：
 
@@ -784,8 +788,8 @@ Scope组成值使用规范化类型和长度边界后生成Digest；实现不得
 | scoped commandId，另行比较payloadDigest | 防止双击和命令重放 |
 | aggregate version / digest | 防止并发覆盖当前事实 |
 | temporal milestone key | 防止重复触发时效 |
-| tenantId + providerAccountRef + providerEventId，另行比较payloadHash | 防止回调重放或篡改 |
-| ProviderIngress Definition冻结的business identity key，另行比较businessPayloadHash | 防止Provider更换EventId后重复创建同一线索或交易输入 |
+| tenantId + providerAccountRef + providerEventId，另行比较`canonicalPayloadDigestRef` | 防止回调重放或篡改 |
+| ProviderIngress Definition冻结的business identity key，另行比较`businessPayloadDigestRef` | 防止Provider更换EventId后重复创建同一线索或交易输入 |
 | tenantId + providerAccountRef + effectKey + attemptNo | 防止外部效果重复派发 |
 
 相同CommandId、相同Payload返回原Receipt；相同CommandId、不同Payload永久冲突。客户端不确定请求是否送达时先查询Receipt，不能盲目重试。
@@ -843,7 +847,7 @@ MVP所有后台工作保存在PostgreSQL：
 普通InternalWorkItem：
   租约过期 → 可以重新领取；旧Generation提交被拒绝
 
-ExternalDispatch：
+ExternalDispatchOutbox：
   PENDING只能领取一个Attempt
   DISPATCHING租约过期 → UNKNOWN
   永不因租约过期回到PENDING
@@ -852,7 +856,7 @@ ExternalProbe：
   只读查询工作，可以按幂等策略安全重试
 ```
 
-Worker统一使用可见时间、有限批量和Fencing Token，但通用队列框架不得覆盖ExternalDispatch的特殊一次派发语义。
+Worker统一使用可见时间、有限批量和Fencing Token，但通用队列框架不得覆盖ExternalDispatchOutbox的特殊一次派发语义。
 
 Kafka仅在PostgreSQL队列经过索引、批量、Worker池和分区优化后仍持续无法满足C1 SLO时评估。
 
@@ -896,12 +900,12 @@ ProviderInboxKind =
 - 签名或mTLS校验。
 - timestamp、nonce和重放窗口校验。
 - 从已验证证书、签名Key或受信路由派生ProviderAccount，再映射Tenant；禁止信任Payload中的Provider Account。
-- 以`(tenantId, providerAccountRef, providerEventId)`唯一持久化，另行保存和比较`canonicalPayloadHash`。
+- 以`(tenantId, providerAccountRef, providerEventId)`唯一持久化，另行保存和比较`canonicalPayloadDigestRef`。
 - 保存实际验签Key/Certificate、Payload Schema和Canonicalization的代码/版本。
 
 `ACTION_CALLBACK`还必须绑定已有ExternalAction、准确Subject和合法状态迁移；无法关联时进入隔离，不得猜测最新Action或Subject。
 
-`REGISTERED_INGRESS`用于合法但没有既有ExternalAction、接收时也可能没有Subject的外部输入。它必须绑定代码注册的`ProviderIngressDefinition/version`、ProviderAccount、Tenant、Payload Schema/Canonicalization版本、外部事件唯一键、Payload Hash以及不可变的`businessIdentityKeyDeriver/version`。MVP正向登记范围仅包括实际启用渠道的`LEAD_CAPTURE`，以及确需自动接收时的`TRUSTED_BANK_TRANSACTION`；未登记Ingress类型默认隔离。
+`REGISTERED_INGRESS`用于合法但没有既有ExternalAction、接收时也可能没有Subject的外部输入。它必须绑定代码注册的`ProviderIngressDefinition/version`、ProviderAccount、Tenant、Payload Schema/Canonicalization版本、外部事件唯一键、`canonicalPayloadDigestRef`以及不可变的`businessIdentityKeyDeriver/version`。MVP正向登记范围仅包括实际启用渠道的`LEAD_CAPTURE`，以及确需自动接收时的`TRUSTED_BANK_TRANSACTION`；未登记Ingress类型默认隔离。
 
 业务身份键最小契约固定为：
 
@@ -911,15 +915,15 @@ LEAD_CAPTURE = tenantId + providerAccountRef + stableSourceLeadId
 TRUSTED_BANK_TRANSACTION = tenantId + trustedSourceAccountRef + externalTransactionId
 ```
 
-具名用例在创建新Subject前必须在同一事务声明唯一`IngressBusinessIdentitySlot`。同业务键、同业务Payload Hash返回原Receipt/Subject；同业务键、不同Hash只能按Definition进入新Revision、人工核验或隔离，不能创建第二个独立Lead或交易输入。传输EventId幂等与业务身份幂等是两层不同约束。
+具名用例在创建新Subject前必须在同一事务声明唯一`IngressBusinessIdentitySlot`。同业务键、同`businessPayloadDigestRef`返回原Receipt/Subject；同业务键、不同Digest只能按Definition进入新Revision、人工核验或隔离，不能创建第二个独立Lead或交易输入。传输EventId幂等与业务身份幂等是两层不同约束。
 
 Ingress接收事务只持久化Inbox，不创建Lead、Payment、Task或领域事实。Worker只能由Definition选择固定的ServiceActorCommand Handler，不能由Payload、Provider或后台配置选择命令。去重、主体创建/匹配、`LeadCaptured`或受信流水输入由后续具名用例重新校验后形成；Definition及其历史Decoder必须进入RegistryManifest。
 
-Provider只作为`ProviderTransportPrincipal`止步Inbox。伪造、跨Tenant、同EventId异Hash或无法关联的回调进入隔离审计，不调用领域命令。
+Provider只作为`ProviderTransportPrincipal`止步Inbox。伪造、跨Tenant、同EventId异Digest或无法关联的回调进入隔离审计，不调用领域命令。
 
-签名必须针对原始请求字节验证，Canonical Hash不能替代签名验证。`canonicalPayloadHash`绑定明确的Canonicalization版本；只允许排除签名、nonce、timestamp等已注册传输字段，业务字段不得被排除。若TLS在受信代理终止，身份Header必须由代理重建、在公网入口清除且后端链路受保护。Provider入口永远只写Inbox或隔离记录，不同步调用领域用例。
+签名必须针对原始请求字节验证，Canonical Digest不能替代签名验证。`canonicalPayloadDigestRef`绑定明确的算法与Canonicalization Profile代码/版本；只允许排除签名、nonce、timestamp等已注册传输字段，业务字段不得被排除，数据库不得将其退化为裸Hash列。若TLS在受信代理终止，身份Header必须由代理重建、在公网入口清除且后端链路受保护。Provider入口永远只写Inbox或隔离记录，不同步调用领域用例。
 
-未通过身份验证或尚不能从受信路由映射Tenant的请求，不得创建Tenant级Inbox；只允许向部署级`SecurityIngressAttempt`追加最小Digest、来源类别、失败代码和时间，不能保存未经批准的原始敏感Payload。已存在的`ProviderInboxRecord`状态只能单调推进；同EventId异Hash的后续请求不得修改、回退或覆盖原记录，而是追加独立`ProviderInboxConflictAttempt`和安全Audit。
+未通过身份验证或尚不能从受信路由映射Tenant的请求，不得创建Tenant级Inbox；只允许向部署级`SecurityIngressAttempt`追加最小Digest、来源类别、失败代码和时间，不能保存未经批准的原始敏感Payload。已存在的`ProviderInboxRecord`状态只能单调推进；同EventId异Digest Ref的后续请求不得修改、回退或覆盖原记录，而是追加独立`ProviderInboxConflictAttempt`和安全Audit。
 
 ProviderInbox状态固定为：
 
@@ -1323,7 +1327,7 @@ Trace用于运行诊断，不是法律审计或业务事实源。
 | 本地确定性命令 | P95 ≤ 2秒，P99 ≤ 5秒；不含上传、AI和Provider等待 |
 | PostgreSQL类型化搜索 | P95 ≤ 2秒 |
 | DomainEvent Outbox | 99% ≤ 60秒，99.9% ≤ 5分钟 |
-| ExternalDispatch首次领取 | 99% ≤ 2分钟 |
+| ExternalDispatchOutbox首次领取 | 99% ≤ 2分钟 |
 | Temporal触发 | 99.9%在scheduledAt后2分钟内 |
 | Provider Inbox合法回调处理 | 99% ≤ 60秒，99.9% ≤ 5分钟 |
 | Evidence验证 | 按文件大小档位和冻结扫描器版本，P95 ≤ 2分钟，P99 ≤ 10分钟 |
@@ -1362,6 +1366,8 @@ Trace用于运行诊断，不是法律审计或业务事实源。
 - AICapability、Tool、Prompt和OutputSchema。
 - DataElementDefinition与DisclosureProfile。
 - ConfigurationDefinition。
+- BackfillDefinition；由被迁移数据的事实Owner拥有，Execution Runtime只拥有Run、Lease和Receipt元模型。
+- DerivationDefinition与CompletenessGuard Definition；由派生事实的唯一Owner拥有，不构成通用推理引擎。
 - Observation/Metric Definition。
 - Presenter Contract。
 
@@ -1384,7 +1390,7 @@ MVP不物理删除发布版本。旧Task继续使用原TaskDefinition、Completi
 
 仍被OPEN/WAITING Task、Draft、PENDING/DISPATCHING/DISPATCHED/UNKNOWN ExternalAction、未处理Inbox、Backfill或有效配置引用的版本只能处于`LEGACY_EXECUTABLE`。进入`HISTORICAL_READ_ONLY`后仍必须保留历史Event Decoder和Presenter。
 
-构建生成不可编辑`RegistryManifest`。第二次及后续发布的比较基线必须来自上一已激活发布的不可变`previousReleaseBundle`，其中包含ReleaseManifest、RegistryManifest、OpenAPI、Event Fixture摘要和Flyway摘要；首次发布使用§26.1的`GENESIS_BASELINE`。任何发布都不能只与当前工作树比较。CI检查：
+构建生成不可编辑`RegistryManifest`。第二次及后续发布的比较基线必须来自上一已激活发布的不可变`previousReleaseBundle`，其中包含ReleaseManifest、RegistryManifest、DatabaseContractBundle、OpenAPI、Event Fixture摘要、Flyway摘要以及上一版准确Jar/Image引用；首次发布使用§26.1的`GENESIS_BASELINE`。N构建兼容冒烟必须运行该封存工件，不得用当前源码重新构建所谓旧版本。任何发布都不能只与当前工作树比较。CI检查：
 
 - 同版本Digest未漂移。
 - 历史版本未删除。
@@ -1399,21 +1405,25 @@ MVP不物理删除发布版本。旧Task继续使用原TaskDefinition、Completi
 
 ## 26. 单版本发布与数据库演进
 
-### 26.1 ReleaseManifest
+### 26.1 ReleaseManifest Schema v2
 
 每个构建包含：
 
 ```text
+releaseManifestSchemaVersion = 2
 releaseId
 applicationBuildDigest
+registryManifestDigest
+openApiDigest
+flywayMigrationDigest
+databaseContractBundleDigest
 databaseExpandEpoch
 databaseContractFloor
-OpenAPIDigest
-FlywayMigrationDigest
-RegistryManifestDigest
 ```
 
-首次发布没有上一版N，使用项目内封存且不可变的`GENESIS_BASELINE`作为比较起点：只允许对空库初始化，执行完整ChangeGate、ReleaseGate和首次CapacityGate，并建立第一个`previousReleaseBundle`。`N → N+1`迁移、N构建兼容冒烟和旧Registry引用检查从第二次发布开始强制；Genesis不是跳过安全、Tenant、审计或黄金路径测试的豁免。
+以上字段与项目结构规格中的同一规范Payload完全相同，字段名大小写不可变。`databaseContractBundleDigest`绑定当前发布的Flyway集合、Physical Schema、jOOQ机械快照、期望`DatabaseSecurityManifest`、实际`CanonicalCapabilityAclSnapshot`、Ontology Physical Mapping和Query–Index Catalog。它不进入Jar或RegistryManifest摘要计算，避免摘要自引用。数据库仍只有`execution_runtime.ReleaseState`一个发布激活权威点。
+
+首次发布没有上一版N，使用项目内封存且不可变的`GENESIS_BASELINE`作为比较起点：先由临时基础设施Provisioning Principal在Genesis Fence内按冻结`DatabaseSecurityManifest`完成唯一Database Security Bootstrap，再撤销原始Provisioner；如它同时承担Genesis Infra Principal，则只能缩限为已登记`INFRA_ADMIN`槽且`activationPurpose=GENESIS_BOOTSTRAP`的一次性身份。随后由Migrator对空业务库执行Flyway，并完成Object ACL协调；临时Genesis Infra Principal仅建立首次实际LOGIN/Binding，之后必须禁止新连接、终止存量会话、撤销Membership/网络/Secret并签发`GenesisSecurityClosureReceipt`，才可提取最终`PrincipalBindingSnapshot`、CAS激活Binding并运行用于Unfence的MATCH Security Probe。只有随后完整ChangeGate、ReleaseGate和首次CapacityGate通过，才可激活发布、解除Fence并建立第一个`previousReleaseBundle`。该Bootstrap不是应用内Installation Bootstrap或第三个APP_ROLE。`N → N+1`迁移、N构建兼容冒烟和旧Registry引用检查从第二次发布开始强制；Genesis不是跳过安全、Tenant、审计或黄金路径测试的豁免。
 
 ### 26.2 Expand–Migrate–Contract
 
@@ -1457,7 +1467,7 @@ RegistryManifestDigest
 
 ReleaseActivator使用同一构建产物的一次性受控命令，不增加第三种常驻运行角色。
 
-维护期间停止新的ExternalDispatch，但必须处理在途Provider现实：Provider入口可以保持“验签并持久化Inbox、禁止领域处理”的传输模式；若部署方式无法保持入口，则对应Provider必须支持可靠回调重试或权威主动查询。两者都不具备的Provider，在维护前不得保留未决自动外发，只能进入受控人工模式。
+维护期间停止新的ExternalDispatchOutbox领取，但必须处理在途Provider现实：Provider入口可以保持“验签并持久化Inbox、禁止领域处理”的传输模式；若部署方式无法保持入口，则对应Provider必须支持可靠回调重试或权威主动查询。两者都不具备的Provider，在维护前不得保留未决自动外发，只能进入受控人工模式。
 
 启动硬门禁至少验证：Flyway无Checksum漂移或失败迁移、Schema Epoch兼容、ReleaseManifest获准、Registry Digest一致、历史Decoder/Executor齐全、所有可领取工作均有兼容Handler。
 
@@ -1465,8 +1475,9 @@ MVP不支持N/N-1后端长期混跑。缓存的旧SPA提交不兼容命令时返
 
 ### 26.4 回退
 
-- 从第二次发布开始，只执行Expand且尚未产生新版本专属事实时，只有`N数据库 → N+1 Expand → N构建关键读写冒烟`通过后，才可以保留扩展结构并回退应用；Genesis没有旧构建可回退，只能修复后重新发布或重新初始化尚未承载正式事实的环境。
+- 从第二次发布开始，只执行Expand且Candidate从未激活、尚未产生新版本专属事实或外部效果时，只有`N数据库 → N+1 Expand → N构建关键读写冒烟`通过后，才可以保留兼容扩展结构并恢复N应用。若Candidate已应用新的Role Graph或Object ACL契约，必须先在部署Fence内按《PostgreSQL物理模型总纲 v1.0》执行`SECURITY_ABORT`：只逆转准确Candidate Receipt引入且从未激活的权限增量，使实际Capability Snapshot恢复为上一Release Bundle，签发Abort Receipt并完成新鲜安全探针；不得把N+1权限留给N运行，也不得用Down Migration回滚Schema。Genesis没有旧构建可回退，只能修复后重新发布或重新初始化尚未承载正式事实的环境。
 - 已产生新Event、Task、Decision或外部效果后，禁止回退到无法解释它们的旧处理器，只能向前修复。
+- Candidate一旦激活，不再使用`SECURITY_ABORT`回退ReleaseState或权限图；即使尚未观察到业务流量也只能向前修复。
 - 业务事实不得通过反向SQL或删除Event回滚。
 - 发布导致外部效果不确定时进入UNKNOWN，不能因应用回退而重发。
 
@@ -1600,7 +1611,7 @@ Profile任何资源、数据分布或测量口径变化都形成新版本，不�
 - 受影响模块真实PostgreSQL集成测试通过。
 - 当前版本可以从空数据库初始化。
 - Secret和高敏原文未进入Event、Receipt、日志或Trace。
-- 与上一已激活`previousReleaseBundle`比较Registry、OpenAPI、Event Fixture和Flyway摘要，而不是只比较当前分支文件；首次发布改与不可变`GENESIS_BASELINE`比较。
+- 与上一已激活`previousReleaseBundle`比较Registry、DatabaseContractBundle、OpenAPI、Event Fixture和Flyway摘要，并运行其中封存的准确Jar/Image兼容冒烟，而不是只比较当前分支文件；首次发布改与不可变`GENESIS_BASELINE`比较。
 - DataElementDefinition覆盖所有DTO/Event/Search/AI/Notification/Provider/Export字段；任何安全等级降低或披露扩大均触发显式安全评审。
 - 源代码Secret扫描、SBOM生成和已知严重漏洞检查通过；限时例外必须具名审批。
 - 三个SPA各自的OpenAPI生成客户端均可编译；Internal、Admin、Customer、Provider四条API安全链的隔离及跨Tenant负向测试通过。
@@ -1658,7 +1669,7 @@ Registry版本切换为`ACTIVE_FOR_NEW`必须同时满足ChangeGate、ReleaseGat
 
 1. Tenant A与B使用相同CommandId互不碰撞，也不能探测对方Receipt。
 2. 同一作用域、同一CommandId、不同Payload只能得到永久冲突。
-3. 不同ProviderAccount使用相同EventId可独立处理；同账户同EventId异Hash只能隔离。
+3. 不同ProviderAccount使用相同EventId可独立处理；同账户同EventId异Digest Ref只能隔离。
 4. CustomerGrant撤销后，旧会话、旧确认Token和未提交命令全部失败。
 5. Internal Token不能调用Admin API；Admin Token不能代替业务Task。
 6. API角色尝试构造ServiceActorCommand必须失败。
@@ -1670,11 +1681,11 @@ Registry版本切换为`ACTIVE_FOR_NEW`必须同时满足ChangeGate、ReleaseGat
 12. SecretStore或KMS不可用时，系统不会使用默认Secret或明文继续运行。
 13. 客户端伪造`commandScope、tenantId、policyRef`或另一类信封字段时，在创建执行槽前被拒绝。
 14. 浏览器跨Origin、缺失/错误CSRF Token、Internal Cookie调用Admin以及Admin Step-up复用到Internal时全部失败。
-15. 同一Provider EventId异Hash不会改写原Inbox，只追加ConflictAttempt且不产生领域副作用；未验真请求不能创建Tenant Inbox。
+15. 同一Provider EventId异Digest Ref不会改写原Inbox，只追加ConflictAttempt且不产生领域副作用；未验真请求不能创建Tenant Inbox。
 16. REGISTERED_INGRESS的Payload不能选择ServiceActor或Command；未登记Ingress和未知Decoder只能隔离。
 17. CustomerGrant/Actor在上传后、UploadSession进入FINALIZED前撤销时，该UploadSession只能REJECTED，原始字节不能形成可引用EvidenceSubmission。
 18. API/Worker执行Audit UPDATE/DELETE/TRUNCATE被数据库拒绝；规定Audit追加失败时业务事务整体回滚。
-19. 同一Ingress业务身份使用不同Provider EventId重放时不能创建第二个Subject；同业务键异Hash只能走Definition登记的Revision、人工核验或隔离路径。
+19. 同一Ingress业务身份使用不同Provider EventId重放时不能创建第二个Subject；同业务键异Digest Ref只能走Definition登记的Revision、人工核验或隔离路径。
 
 ### 28.7 MVP不建设的测试平台
 

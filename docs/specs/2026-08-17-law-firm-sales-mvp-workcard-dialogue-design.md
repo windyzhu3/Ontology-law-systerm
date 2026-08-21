@@ -275,7 +275,7 @@ ActionDraft至少包含：
 
 - 有效期五分钟。
 - 只能使用一次。
-- 绑定Actor、Task、subjectVersion、primaryCommand和payloadHash。
+- 绑定Actor、Task、subjectVersion、primaryCommand和`payloadDigestRef`；该Digest Ref带算法与规范化Profile版本。
 - 对象版本、权限或载荷变化后立即失效。
 - 令牌失效只返回差异，不丢失Draft。
 
@@ -827,11 +827,11 @@ ADJUST_FOLLOW_UP在意图确定后创建，单个Task只固定RECORD_CHANGED_COM
 - 把用户送到通用后台首页。
 - 要求用户重新选择客户。
 
-ExternalAction固定保存PENDING、DISPATCHED、SUCCEEDED、FAILED和UNKNOWN，并记录providerRef、nextProbeAt、resolutionDueAt和probeCount。超过resolutionDueAt仍无法确定时，系统生成RESOLVE_EXTERNAL_ACTION运营Task；普通用户仍只看到WaitReceipt，不承担核验SLA。
+ExternalAction固定使用`PENDING → DISPATCHING → DISPATCHED | FAILED | UNKNOWN`、`DISPATCHED → SUCCEEDED | FAILED | UNKNOWN`和`UNKNOWN → SUCCEEDED | FAILED`状态转移，并记录dispatchAttemptId、attemptNo、providerAccountRef、providerRef、dispatchLeaseUntil、effectKey、nextProbeAt、resolutionDueAt和probeCount。`DISPATCHING`租约过期必须转入`UNKNOWN`并核验，不得回到`PENDING`重派。超过resolutionDueAt仍无法确定时，系统生成RESOLVE_EXTERNAL_ACTION运营Task；普通用户仍只看到WaitReceipt，不承担核验SLA。
 
 报价、联系消息、签署提醒、催款消息和电子签章只要由供应商执行，都必须先写ExternalActionRequested并完成当前人工Task；QuoteIssued、ContactMessageSent、SignatureReminderSent、PaymentReminderSent或ElectronicSignatureInitiated只能由供应商权威结果产生。用户点击后不得直接显示“已发送”，失败时由回执或新的修正责任承接。
 
-供应商回调必须先进入Provider Inbox并完成：供应商签名或双向认证、timestamp/nonce与重放窗口、providerAccount到tenant映射校验；以`provider + providerAccount + providerEventId`全局唯一持久化payloadHash和验证结果。随后才能关联`externalActionId + providerRef + subjectRef/revision`及合法事件转换。伪造、重放、跨租户或无法关联的回调只进入隔离审计，不得修改ExternalAction、领域事实或WaitReceipt。
+供应商回调必须先进入Provider Inbox并完成：供应商签名或双向认证、timestamp/nonce与重放窗口、providerAccount到tenant映射校验；以`provider + providerAccount + providerEventId`全局唯一持久化`canonicalPayloadDigestRef`和验证结果。该Digest Ref必须包含算法与Canonicalization Profile代码/版本，不得退化为裸Hash列。随后才能关联`externalActionId + providerRef + subjectRef/revision`及合法事件转换。伪造、重放、跨租户或无法关联的回调只进入隔离审计，不得修改ExternalAction、领域事实或WaitReceipt。
 
 通过验证的回调和Worker受信主动查询调用同一幂等内部命令，并在一个事务中锁定ExternalAction、校验providerRef、subjectRef/revision与当前状态、更新终态、写权威领域Event、创建/关闭/取消后续Task、刷新WaitReceipt并写Audit与CommandReceipt。重复或乱序回调不得使终态倒退；UNKNOWN只能由权威回调、主动查询或有权运营处置解除。故障注入时，只要领域Event或Task写入失败，ExternalAction状态和回执也必须一起回滚。
 

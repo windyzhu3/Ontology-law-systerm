@@ -852,7 +852,7 @@ RECEIVED | QUARANTINED | PROCESSED
 - Provider签名或双向认证。
 - timestamp、nonce和重放窗口。
 - ProviderAccount到Tenant的预登记映射。
-- providerEventId、payloadHash和关联ExternalAction。
+- providerEventId、`canonicalPayloadDigestRef`和关联ExternalAction；Digest Ref必须带算法与Canonicalization Profile代码/版本。
 - subjectRef及准确revision/hash。
 
 伪造、重放、跨租户或无法关联的回调只进入隔离审计，不得修改业务事实或WaitReceipt。
@@ -870,7 +870,7 @@ RECEIVED | QUARANTINED | PROCESSED
 → 原子提交
 ```
 
-任一步失败均不得把Inbox标为PROCESSED。只有“相同事件唯一键 + 相同canonicalPayloadHash”才是合法重放并返回原处理结果；相同事件唯一键携带不同canonicalPayloadHash必须标记QUARANTINED、告警且不产生任何领域副作用。canonicalPayloadHash基于规范化业务载荷计算，排除每次可变的传输签名、nonce、timestamp及等价包装字段。乱序事件只能补齐尚未确定的事实，不能使终态回退，也不能再次生成Task、Receipt或领域事件。
+任一步失败均不得把Inbox标为PROCESSED。只有“相同事件唯一键 + 相同`canonicalPayloadDigestRef`”才是合法重放并返回原处理结果；相同事件唯一键携带不同`canonicalPayloadDigestRef`必须标记QUARANTINED、告警且不产生任何领域副作用。该Digest Ref基于规范化业务载荷计算，包含算法与Canonicalization Profile代码/版本，且只排除每次可变的传输签名、nonce、timestamp及等价包装字段；数据库不得保存裸Hash列。乱序事件只能补齐尚未确定的事实，不能使终态回退，也不能再次生成Task、Receipt或领域事件。
 
 ### 13.4 人工证据兜底
 
@@ -888,7 +888,7 @@ ManualEvidenceSubmitted
 
 | 层次 | 幂等口径 |
 |---|---|
-| 所有可变命令 | tenantId + commandScope + commandId，并保存payloadHash |
+| 所有可变命令 | tenantId + commandScope + commandId，并保存带算法与规范化Profile版本的`payloadDigestRef` |
 | Task完成 | taskId只能有一个终态完成事实 |
 | Task创建 | 领域责任槽responsibilitySlotKey唯一 |
 | 聚合写入 | expectedSubjectVersion/revision/hash乐观锁 |
@@ -900,7 +900,7 @@ ManualEvidenceSubmitted
 
 相同commandId携带不同payload必须拒绝。并发终态命令只允许一个成功；失败方返回最新工作卡或原CommandReceipt。
 
-内部工作卡命令的`commandScope`绑定内部Actor与taskId；客户入口命令绑定CustomerAccessGrant、入口会话、准确Subject、allowedCommand、payloadHash和一次性确认Token。确认Token重放必须返回同一结果，不能重复上传、回复、签署或产生领域事实。
+内部工作卡命令的`commandScope`绑定内部Actor与taskId；客户入口命令绑定CustomerAccessGrant、入口会话、准确Subject、allowedCommand、`payloadDigestRef`和一次性确认Token。确认Token重放必须返回同一结果，不能重复上传、回复、签署或产生领域事实。
 
 ## 15. 逻辑多租户、权限与客户入口
 

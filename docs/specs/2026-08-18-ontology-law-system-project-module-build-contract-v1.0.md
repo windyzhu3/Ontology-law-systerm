@@ -2,6 +2,7 @@
 
 > 状态：正式冻结版；九个设计章节已经用户逐节确认
 > 日期：2026-08-18
+> 兼容修订：2026-08-19，随已冻结的PostgreSQL物理模型总纲加入DatabaseContractBundle生成链并升级ReleaseManifest Schema v2
 > 范围：销售至转案MVP的项目组织、Java包边界、模块依赖、运行角色、持久化、前端工作区、代码注册表、测试与构建门禁
 > 明确不包含：实施计划、逐表DDL、逐接口字段Schema、工期估算、后MVP案件办理实现及备份与灾难恢复框架
 
@@ -94,13 +95,18 @@ Maven Wrapper
 ├── packages/
 │   └── ui/
 ├── contracts/
-│   └── openapi/
-│       ├── internal.yaml
-│       ├── admin.yaml
-│       ├── customer.yaml
-│       └── provider.yaml
+│   ├── openapi/
+│   │   ├── internal.yaml
+│   │   ├── admin.yaml
+│   │   ├── customer.yaml
+│   │   └── provider.yaml
+│   └── database-security/
+│       ├── manifest.yaml
+│       └── manifest.schema.json
 ├── ci/
-│   └── change-gate
+│   ├── change-gate
+│   ├── database-security-bootstrap
+│   └── database-security-reconcile
 └── docs/
 ~~~
 
@@ -131,6 +137,7 @@ Java根包的最终反向域名由实施ADR锁定；根包之下固定为：
 ~~~text
 <base>
 ├── bootstrap
+├── controlcli
 ├── apihost
 ├── workerhost
 ├── sharedkernel
@@ -344,12 +351,13 @@ Named Interface白名单至少为：
 
 | 调用方 | 允许访问 |
 |---|---|
-| lead | party::query、opportunity::integration |
-| opportunity | party::query、conflict::integration |
-| conflict | party::query |
-| contract | opportunity::query、conflict::query |
-| transfer | contract::query、contract::transfer-initialization-spi、conflict::query、conflict::integration、matter-core::integration |
-| mattercore | 无业务模块API |
+| party | execution-runtime::deployment-fence-runtime |
+| lead | execution-runtime::deployment-fence-runtime、party::query、opportunity::integration |
+| opportunity | execution-runtime::deployment-fence-runtime、party::query、conflict::integration |
+| conflict | execution-runtime::deployment-fence-runtime、party::query |
+| contract | execution-runtime::deployment-fence-runtime、opportunity::query、conflict::query |
+| transfer | execution-runtime::deployment-fence-runtime、contract::query、contract::transfer-initialization-spi、conflict::query、conflict::integration、matter-core::integration |
+| mattercore | execution-runtime::deployment-fence-runtime |
 
 ### 7.2 端口归属
 
@@ -432,11 +440,14 @@ Execution Runtime在api.integration下进一步暴露最窄Named Interface：
 - responsibility-runtime-spi：仅供Responsibility实现。
 - audit-runtime-spi：仅供Audit实现。
 - operational-projection-runtime-spi：仅供WorkBench实现。
+- deployment-fence-runtime：由Execution Runtime拥有并实现，只向所有会开启API/Worker数据库事务的模块暴露`DeploymentFenceRuntimePort`；调用必须以MANDATORY语义加入当前事务，在任何Tenant/业务SQL前取得Rank 5门禁并返回冻结的Security/Verification Generation。调用方不得直接读取`platform_meta`，不得提供Noop、缓存或本地替代实现。
 - internal-task-gateway：仅Internal Channel调用。
 - internal-admin-gateway：仅Admin Channel调用。
 - customer-grant-gateway：仅Customer Channel调用。
 - service-actor-gateway：仅Worker Host调用。
 - receipt-query位于api.query，仅供准确CommandId结果查询。
+- release-control：仅一次性controlcli的ReleaseActivator与PrincipalBindingActivator调用，暴露类型化ReleaseControlPort和PrincipalBindingControlPort。
+- security-verification：仅一次性controlcli的SecurityProbe调用，暴露类型化SecurityVerificationPort。
 
 供Worker Host领取技术工作而暴露的接口全部是各Owner在api.integration下进一步缩窄的Named Interface，固定为：
 
@@ -456,19 +467,19 @@ Execution Runtime在api.integration下进一步暴露最窄Named Interface：
 | 模块 | 允许依赖的Named Interface |
 |---|---|
 | executionruntime | observability-contract::integration |
-| configuration | execution-runtime::handler-spi |
+| configuration | execution-runtime::handler-spi、execution-runtime::deployment-fence-runtime |
 | observabilitycontract | 无 |
-| jurisdictionpolicy | execution-runtime::handler-spi |
-| audit | execution-runtime::audit-runtime-spi |
-| identityaccess | execution-runtime::handler-spi、execution-runtime::actor-resolution-runtime-spi、execution-runtime::authorization-runtime-spi、configuration::query |
-| temporal | execution-runtime::handler-spi、jurisdiction-policy::query |
-| responsibility | execution-runtime::handler-spi、execution-runtime::responsibility-runtime-spi、identity-access::query、temporal::query、temporal::integration |
-| evidence | execution-runtime::handler-spi、identity-access::query、audit::typed-append、configuration::query |
-| externalaction | execution-runtime::handler-spi、evidence::query、configuration::query、observability-contract::integration |
-| aigateway | identity-access::query、evidence::query、audit::typed-append、configuration::query、observability-contract::integration |
-| legalcontentgovernance | execution-runtime::handler-spi、evidence::query、jurisdiction-policy::query |
-| workbench | execution-runtime::handler-spi、execution-runtime::operational-projection-runtime-spi、party::query、lead::query、opportunity::query、conflict::query、contract::query、transfer::query、matter-core::query、responsibility::query、identity-access::query、evidence::query、ai-gateway::query、ai-gateway::integration |
-| admin | execution-runtime::handler-spi、identity-access::admin-query、configuration::admin-query、audit::query、evidence::retention-admin |
+| jurisdictionpolicy | execution-runtime::handler-spi、execution-runtime::deployment-fence-runtime |
+| audit | execution-runtime::audit-runtime-spi、execution-runtime::deployment-fence-runtime |
+| identityaccess | execution-runtime::handler-spi、execution-runtime::actor-resolution-runtime-spi、execution-runtime::authorization-runtime-spi、execution-runtime::deployment-fence-runtime、configuration::query |
+| temporal | execution-runtime::handler-spi、execution-runtime::deployment-fence-runtime、jurisdiction-policy::query |
+| responsibility | execution-runtime::handler-spi、execution-runtime::responsibility-runtime-spi、execution-runtime::deployment-fence-runtime、identity-access::query、temporal::query、temporal::integration |
+| evidence | execution-runtime::handler-spi、execution-runtime::deployment-fence-runtime、identity-access::query、audit::typed-append、configuration::query |
+| externalaction | execution-runtime::handler-spi、execution-runtime::deployment-fence-runtime、evidence::query、configuration::query、observability-contract::integration |
+| aigateway | execution-runtime::deployment-fence-runtime、identity-access::query、evidence::query、audit::typed-append、configuration::query、observability-contract::integration |
+| legalcontentgovernance | execution-runtime::handler-spi、execution-runtime::deployment-fence-runtime、evidence::query、jurisdiction-policy::query |
+| workbench | execution-runtime::handler-spi、execution-runtime::operational-projection-runtime-spi、execution-runtime::deployment-fence-runtime、party::query、lead::query、opportunity::query、conflict::query、contract::query、transfer::query、matter-core::query、responsibility::query、identity-access::query、evidence::query、ai-gateway::query、ai-gateway::integration |
+| admin | execution-runtime::handler-spi、execution-runtime::deployment-fence-runtime、identity-access::admin-query、configuration::admin-query、audit::query、evidence::retention-admin |
 
 audit::typed-append只能接收封闭的类型化审计输入，禁止通用JSON、Map或任意文本事件。ai-gateway::integration只允许创建、读取或处理Candidate技术生命周期，不能暴露任何业务Command或Write Port。
 
@@ -479,6 +490,7 @@ audit::typed-append只能接收封闭的类型化审计输入，禁止通用JSON
 业务模块可按已登记用途依赖：
 
 - execution-runtime::handler-spi，实现类型化Command Handler；业务Command模型仍由对应事实Owner的api.command拥有。
+- execution-runtime::deployment-fence-runtime，仅由登记的Command、Query、Worker或技术Ingress事务入口以MANDATORY语义在首条Tenant/业务SQL前取得Rank 5门禁；不得用于读取发布控制数据或绕过Owner Port。
 - responsibility::integration，创建Task、Decision和WaitReceipt。
 - evidence::query/integration，引用准确Evidence版本。
 - external-action::integration，创建外部动作意图。
@@ -518,12 +530,21 @@ APP_ROLE=worker
 
 APP_ROLE没有默认值。缺失、未知或同时装配两种角色时必须启动失败。
 
+唯一例外是一次性控制命令启动：`CONTROL_COMMAND=release-activate | principal-binding-activate | security-probe`时必须没有`APP_ROLE`，且进程执行完即退出；`APP_ROLE`与`CONTROL_COMMAND`同时存在、均缺失或值不在封闭枚举中都启动失败。控制命令不是常驻运行角色。
+
 ~~~text
 <base>
 ├── bootstrap/
 │   ├── AppRole
 │   ├── RoleImportSelector
+│   ├── ControlCommandImportSelector
 │   └── RoleStartupGuard
+├── controlcli/
+│   ├── wiring/
+│   │   └── ControlCliWiring
+│   ├── releaseactivation/
+│   ├── principalbinding/
+│   └── securityprobe/
 ├── apihost/
 │   ├── wiring/
 │   │   └── ApiHostWiring
@@ -544,13 +565,15 @@ APP_ROLE没有默认值。缺失、未知或同时装配两种角色时必须启
     └── projection/
 ~~~
 
-bootstrap、apihost和workerhost是装配与传输Host，不属于领域Application Module Catalog；Spring Modulith的CLOSED模块发现只覆盖sharedkernel、业务模块和平台模块。三类Host由ArchUnit与ApplicationContext测试管理，不能被业务或平台模块反向依赖。
+bootstrap、controlcli、apihost和workerhost是装配与传输Host，不属于领域Application Module Catalog；Spring Modulith的CLOSED模块发现只覆盖sharedkernel、业务模块和平台模块。四类Host由ArchUnit与ApplicationContext测试管理，不能被业务或平台模块反向依赖。
 
 根应用禁止扫描整个base package后再排除Bean。RoleImportSelector必须按唯一APP_ROLE正向导入：
 
 - 每个实际提供运行Bean的模块所暴露的module::wiring Named Interface；sharedkernel等无运行Bean模块不得伪造空Wiring。
 - API角色需要的模块ApiAdapterWiring与唯一`apihost.wiring.ApiHostWiring`；后者只正向导入四个Channel的封闭配置。
 - Worker角色需要的模块WorkerAdapterWiring与唯一`workerhost.wiring.WorkerHostWiring`；后者只正向导入登记的后台领取器。
+
+`ControlCommandImportSelector`必须按唯一CONTROL_COMMAND正向导入最小`controlcli.wiring.ControlCliWiring`和准确Command Adapter；它不得导入ApiHostWiring、WorkerHostWiring、业务Controller、Worker Claim或四类业务Command Gateway。
 
 除Wiring所属模块自身外，Bootstrap是唯一允许访问module::wiring的包。`ApiHostWiring`与`WorkerHostWiring`是Host唯一对Bootstrap公开的装配类型，不是业务API，也不得访问对方Host。公开Wiring只包装本模块Internal Bean，不暴露领域实现类型。需要角色差异的模块分别提供ApiAdapterWiring和WorkerAdapterWiring。Bootstrap只装配模块、选择准确Host并执行启动校验，不能包含业务条件。
 
@@ -587,7 +610,8 @@ Host依赖白名单固定为：
   - execution-runtime::service-actor-gateway、execution-runtime::receipt-query、execution-runtime::worker。
   - temporal::worker、external-action::worker、evidence::worker、ai-gateway::worker、workbench::projection-worker。
   - lead::service-actor-command-model、opportunity::service-actor-command-model、conflict::service-actor-command-model、contract::service-actor-command-model、transfer::service-actor-command-model、responsibility::service-actor-command-model、temporal::service-actor-command-model、evidence::service-actor-command-model、external-action::service-actor-command-model、ai-gateway::service-actor-command-model。
-- bootstrap：仅各运行模块::wiring，以及按唯一APP_ROLE二选一访问`apihost.wiring.ApiHostWiring`或`workerhost.wiring.WorkerHostWiring`。
+- controlcli：仅`execution-runtime::release-control`或`execution-runtime::security-verification`中与准确CONTROL_COMMAND对应的一个接口，不得访问业务Query/Command Facet。
+- bootstrap：仅各运行模块::wiring，以及按唯一APP_ROLE二选一访问`apihost.wiring.ApiHostWiring`或`workerhost.wiring.WorkerHostWiring`；CONTROL_COMMAND路径只访问`controlcli.wiring.ControlCliWiring`。
 
 未来新增任何Host依赖、Command Owner或Query Named Interface都必须升级本白名单和架构契约，不能靠“登记的其他接口”自动放行。任何Host都不得访问execution-runtime::handler-spi、任一execution-runtime::*-runtime-spi、业务internal、Repository或jOOQ类型。
 
@@ -625,6 +649,7 @@ API和Worker必须使用不同数据库账号、Secret Scope和网络入口，�
 
 ~~~text
 开启唯一PostgreSQL外层事务
+→ 通过execution-runtime::deployment-fence-runtime取得Rank 5并冻结Deployment Security/Verification Generation；失败时在任何Tenant/业务SQL前回滚
 → 从当前权威绑定重新派生Tenant、Principal与Actor
 → 锁定或比较User / Grant / ServiceActor Activation及撤销Generation
 → 声明或锁定CommandExecutionSlot并比较PayloadDigest
@@ -663,7 +688,7 @@ Provider Inbox接收、UploadSession隔离入库和Installation Bootstrap使用�
 
 | Owner模块 | Schema |
 |---|---|
-| executionruntime | execution_runtime |
+| executionruntime | execution_runtime；另唯一拥有部署级platform_meta Schema及`internal.platformmeta`技术包 |
 | identityaccess | identity_access |
 | responsibility | responsibility |
 | temporal | temporal |
@@ -705,6 +730,8 @@ V<global-version>__<module>__<phase>__<description>.sql
 ~~~
 
 所有模块共享一个全局单调版本序列和一套Flyway History。SQL必须显式指定Schema。
+
+`platform_meta`不新增Spring Modulith业务模块。其迁移目录使用稳定`platform-meta` module-id，但`MigrationDescriptor.ownerModule=executionruntime`；jOOQ生成到`executionruntime.internal.platformmeta.persistence.jooq.generated`。Execution Runtime以`release-control`和`security-verification` Named Interface向一次性控制CLI/探针暴露类型化`ReleaseControlPort、PrincipalBindingControlPort、SecurityVerificationPort`；另以`deployment-fence-runtime`向所有登记事务Owner暴露唯一`DeploymentFenceRuntimePort`，只执行MANDATORY Rank 5门禁并返回冻结Generation。API/Worker Controller及其他模块不得直接访问该Schema、Repository或jOOQ类型。
 
 所有模块迁移目录必须由一次Flyway调用同时加载，locations按稳定Module Catalog排序；全库唯一History固定为部署级platform_meta.flyway_schema_history。禁止模块独立启动Flyway、维护自己的History或只迁移“当前模块”。ChangeGate与发布迁移的固定调用入口为：
 
@@ -781,7 +808,7 @@ contracts/openapi/
 | customer.yaml | apps/customer-entry/src/generated/api私有TS客户端＋backend/target/generated-sources/openapi/customer服务端接口/DTO |
 | provider.yaml | backend/target/generated-sources/openapi/provider服务端接口/DTO |
 
-OpenAPI生成物不提交Git。三个src/generated/api目录是gitignored的生成源码目录，不得放手写文件。ChangeGate固定Generator、Canonicalizer和兼容比较器版本，执行lint、operationId检查、生成、编译和破坏性变更比较；四份规范先分别规范化，再按internal、admin、customer、provider固定顺序计算组合OpenAPIDigest。
+OpenAPI生成物不提交Git。三个src/generated/api目录是gitignored的生成源码目录，不得放手写文件。ChangeGate固定Generator、Canonicalizer和兼容比较器版本，执行lint、operationId检查、生成、编译和破坏性变更比较；四份规范先分别规范化，再按internal、admin、customer、provider固定顺序计算规范字段`openApiDigest`。
 
 ### 12.2 三个自治SPA
 
@@ -823,7 +850,7 @@ packages/ui只允许设计Token、无业务语义Primitive、可访问性、格�
 - 敏感Draft、客户材料、Token和Grant秘密不进入localStorage、sessionStorage或普通IndexedDB。
 - 正式提交不乐观修改业务状态，以CommandReceipt和重新读取CurrentCard为准。
 - 请求结果不确定时先按原CommandId查询Receipt，禁止盲目重发。
-- 登出、撤权、会话代次变化或客户端版本不兼容时清空对应Query Cache；服务端Draft继续保留。
+- 登出、撤权、会话代次变化、部署安全围栏/`deploymentSecurityGeneration`变化或客户端版本不兼容时清空对应Query Cache；服务端Draft继续保留。任何缓存响应只有在本次服务端请求已重验当前Deployment Security Fence、Security Verification和Generation后才可披露，SPA不得在FENCED或Generation未知时用旧缓存兜底。
 
 ## 13. RegistryManifest与版本兼容
 
@@ -842,6 +869,8 @@ packages/ui只允许设计Token、无业务语义Primitive、可访问性、格�
 | Permission、Scope与Authority Slot | identityaccess |
 | ExternalActionDefinition | externalaction |
 | AICapabilityDefinition | aigateway |
+| BackfillDefinition | 被迁移数据的唯一Owner；executionruntime只拥有Run、Lease与Receipt元模型 |
+| DerivationDefinition与CompletenessGuard Definition | 派生事实的唯一Owner |
 | DataClassification | 数据Owner |
 | Observation与SLO定义 | observabilitycontract |
 
@@ -874,17 +903,21 @@ releaseId和applicationBuildDigest不属于RegistryManifest，而属于构建完
 
 ~~~text
 ReleaseManifest {
+  releaseManifestSchemaVersion = 2,
   releaseId,
   applicationBuildDigest,
   registryManifestDigest,
   openApiDigest,
   flywayMigrationDigest,
+  databaseContractBundleDigest,
   databaseExpandEpoch,
   databaseContractFloor
 }
 ~~~
 
 RegistryManifest嵌入Jar；applicationBuildDigest是最终Jar的SHA-256。ReleaseManifest作为Jar旁的独立发布工件生成并封存，因此不参与自身或Jar摘要计算，避免摘要自引用。数据库激活记录保存ReleaseManifest Digest。
+
+`databaseContractBundleDigest`绑定Flyway、Physical Schema、jOOQ机械快照、期望`DatabaseSecurityManifest`、实际`CanonicalCapabilityAclSnapshot`、Ontology Physical Mapping和Query–Index Catalog的不可变数据库契约工件。该字段属于ReleaseManifest Schema v2；全库仍只有`execution_runtime.ReleaseState`一个发布激活权威点，不新增第二份兼容状态源。
 
 实际生命周期保存在execution_runtime.RegistryActivationState，以tenant/activationScope、definitionCode和version为键，并绑定激活它的ReleaseManifest Digest：
 
@@ -905,7 +938,7 @@ REGISTERED
 
 ### 13.3 构建与启动门禁
 
-ChangeGate与不可变previousReleaseBundle比较：
+ChangeGate与不可变previousReleaseBundle比较；该Bundle必须包含上一已激活ReleaseManifest、RegistryManifest、DatabaseContractBundle及准确Jar/Image引用，N构建兼容冒烟必须运行封存工件而不是从当前源码重建：
 
 - 同键Digest未变。
 - 历史版本未删除。
@@ -948,7 +981,7 @@ GateReceipt {
 
 GateReceipt只能由受信CI或发布控制面签发，本地文件、布尔参数或手工数据库标记不能替代。CapacityGate认证还必须绑定准确容量包络版本、兼容范围、资源、Profile、Fixture、Corpus及依赖Digest，以及会使认证失效的精确变更条件；单纯时间流逝不得使容量认证失效。
 
-ReleaseActivator是同一Jar的一次性、显式CLI子命令，不是第三个APP_ROLE，也不启动常驻API或Worker Context。正常服务启动才进入APP_ROLE二选一门禁；Activator子命令只装配最小发布控制面、使用独立激活凭据并在成功或失败后退出。它必须以expectedPreviousReleaseId执行数据库CAS，并重新校验：
+`ReleaseActivator`、`PrincipalBindingActivator`与`SecurityProbe`是同一Jar的三个一次性、显式控制CLI子命令，不是第三个APP_ROLE，也不启动常驻API或Worker Context。正常服务启动才进入APP_ROLE二选一门禁；三个子命令只装配`executionruntime::integration`的最小控制面及各自允许的Outbound Adapter，使用相互隔离的限时凭据并在成功或失败后退出。ReleaseActivator必须以expectedPreviousReleaseId执行数据库CAS，并重新校验：
 
 - 当前ReleaseManifest和Jar Digest。
 - ChangeGateReceipt。
@@ -957,6 +990,10 @@ ReleaseActivator是同一Jar的一次性、显式CLI子命令，不是第三个A
 - 当前数据库Expand Epoch与Contract Floor。
 
 任一引用、Digest或CAS不匹配都不得激活。ReleaseGate继续继承基础框架v1.0的N→N+1迁移、Schema/Manifest一致性、API/Worker启动、销售黄金路径、历史版本解释和N构建兼容冒烟要求。
+
+PrincipalBindingActivator只允许以`expectedPrincipalBindingVersion`激活签名的PrincipalBindingManifest、校验当前PrincipalBindingSnapshot并追加Transition；它不能执行CREATE ROLE、GRANT或修改业务数据。高权槽扩展必须满足PostgreSQL物理模型总纲的双人复核，普通凭据轮换也不能扩大权限图。
+
+SecurityProbe只允许读取Database Security系统目录并通过`SecurityVerificationPort`写入当前Verification State及追加Probe Receipt；它不能调用业务Command Gateway、Query Facade或读取Subject。三个控制CLI的ApplicationContext边界必须由Context测试和ArchUnit规则单独验证。
 
 ## 14. 测试组织
 
@@ -1002,7 +1039,7 @@ API与Worker分别启动ApplicationContext，验证对方Bean不存在。
 
 Spring Modulith是模块DAG唯一权威：
 
-- 每个业务与平台Application Module为CLOSED；bootstrap、apihost和workerhost按第9章排除在Module Catalog之外。
+- 每个业务与平台Application Module为CLOSED；bootstrap、controlcli、apihost和workerhost按第9章排除在Module Catalog之外。
 - API Facet为Named Interface。
 - allowedDependencies逐模块、逐Facet显式列出。
 - 禁止通配依赖。
@@ -1033,9 +1070,10 @@ Spring Modulith只用于模块模型、结构验证和模块测试。禁止启�
 | CHANNEL-004 | 四个Channel包之间双向零依赖 | ArchUnit |
 | ROLE-001 | apihost与workerhost互相不得依赖 | ArchUnit |
 | ROLE-002 | ServiceActor Gateway只能由workerhost调用；executionruntime.internal可实现，业务模块只能实现handler-spi | ArchUnit（Custom ArchCondition） |
-| HOST-001 | 业务与平台模块不得依赖bootstrap、apihost或workerhost | ArchUnit |
+| HOST-001 | 业务与平台模块不得依赖bootstrap、controlcli、apihost或workerhost | ArchUnit |
 | HOST-DEP-001 | 精确执行第9.2节的Host到Named Interface白名单；Host不得访问handler-spi或任一Runtime SPI | ArchUnit（Custom ArchCondition） |
 | RUNTIME-SPI-001 | 五个Runtime SPI只能由executionruntime及各自登记的Provider Owner引用，只能由对应Provider Owner实现；每个生产Context各恰有一个实现，Runtime不得提供Default、Noop或降级实现 | ArchUnit（Custom ArchCondition）＋ApplicationContext Test |
+| FENCE-001 | 每个登记的API/Worker事务入口必须在首条Tenant/业务SQL前调用execution-runtime::deployment-fence-runtime；该Port只能由Execution Runtime实现且必须加入当前事务 | ArchUnit＋Transaction Protocol Test＋SQL Trace Assertion |
 | WIRING-001 | 除Wiring所属模块自身外，只有bootstrap可访问module::wiring；bootstrap访问Host时只允许两个准确HostWiring类型 | ArchUnit（Custom ArchCondition） |
 | WIRING-002 | 根应用禁止全base扫描，角色必须通过正向Import装配 | Source Scan＋Configuration Registry Scan＋Context Test |
 | IDENTITY-001 | Raw Jwt与OIDC SDK只在Internal/Admin OIDC包 | ArchUnit |
@@ -1080,10 +1118,18 @@ ci/change-gate
 ~~~text
 工具链、Lock与可信基线校验
 → 四份OpenAPI规范化、兼容检查及Java/TS生成
+→ 校验规范化DatabaseSecurityManifest并计算Digest
+→ 临时INFRA Provisioning Principal执行Database Security Bootstrap，签发BootstrapReceipt；撤销原始Provisioner或将其缩限为INFRA_ADMIN槽中activationPurpose=GENESIS_BOOTSTRAP的临时Principal
 → Flyway空库migrate/validate
+→ 提取并校验PhysicalSchemaSnapshot与Digest
+→ 由DatabaseSecurityReconcile按Manifest＋真实Schema＋可信Before Bundle机械生成并应用ObjectAclApplyPlan，签发SecurityApplyReceipt
+→ 复验PhysicalSchemaDigest未变并提取CanonicalCapabilityAclSnapshot
+→ 在Genesis Fence内由临时Genesis Infra Principal完成测试LOGIN/Binding后先撤销该身份并签发GenesisSecurityClosureReceipt，再提取最终PrincipalBindingSnapshot、激活Binding并运行Security Probe
 → jOOQ按Owner重生成并校验机械快照零差异
-→ Java编译、Spring Modulith与ArchUnit
-→ RegistryManifest生成、依赖闭包及历史兼容校验
+→ Java编译并生成最终RegistryManifest
+→ 生成OntologyPhysicalMappingCatalog与QueryIndexCatalog，核对最终Registry、真实Schema及生产Query闭包
+→ 生成DatabaseContractBundle并与可信基线/仓库机械快照零漂移比较
+→ Spring Modulith、ArchUnit及Registry历史兼容校验
 → 自动化测试和API/Worker Context测试
 → 单一Spring Boot Jar打包
 → 计算Jar Digest并生成外置ReleaseManifest
@@ -1100,11 +1146,20 @@ ci/change-gate
    - JDK、Maven Wrapper、Node、npm、插件及依赖版本固定。
    - Lockfile完整，无SNAPSHOT和动态版本。
    - previousReleaseBundle或GENESIS_BASELINE来源及Digest可信。
+   - DatabaseSecurityManifest Schema、Canonical Digest和Bootstrap工具Digest固定；BootstrapReceipt绑定准确Manifest、PostgreSQL镜像、空库、双控制批准、Genesis Control Principal Manifest和Provisioning Identity，GenesisSecurityClosureReceipt证明临时高权身份已撤销或转入已登记INFRA_ADMIN Slot。
 
 2. 契约、Schema与机械生成物
    - 四份OpenAPI lint、operation绑定、Digest、兼容性和生成物编译。
    - Flyway空库migrate与validate。
+   - Flyway前已按DatabaseSecurityManifest创建准确NOLOGIN Owner/Capability角色、环境无关Membership/SET/Default/PUBLIC基线；原始Provisioner在Bootstrap后撤销或缩限为`INFRA_ADMIN + activationPurpose=GENESIS_BOOTSTRAP`的临时Principal，且该限时身份在最终Principal Snapshot/Probe前先撤销并形成Closure Receipt。
+   - 普通Flyway文件不含手写Role/Grant/Default Privilege DDL；Role Graph操作只由受控INFRA工具执行，对象/列权限由DatabaseSecurityReconcile从唯一Manifest机械生成ObjectAclApplyPlan，计划不可编辑且Receipt绑定Manifest、真实Schema、previousReleaseBundle/GENESIS和工具Digest。
+   - CanonicalCapabilityAclSnapshot只能在SecurityApplyReceipt成功后提取，并与Manifest Effective Security Set精确一致；计划性REVOKE在ContractGate前失败关闭。
+   - 未激活Candidate中止时，`SECURITY_ABORT`只能从previousReleaseBundle＋准确Candidate Expand/Apply Receipt机械生成，恢复上一Capability Snapshot并签发Abort Receipt；Candidate已激活、存在专属事实/外部效果或恢复快照不精确时拒绝回退并保持Fence。
    - jOOQ重生成零漂移。
+   - PhysicalSchemaSnapshot覆盖对象Owner、约束/索引有效性、Reloptions、Collation及分区边界。
+   - CanonicalCapabilityAclSnapshot的实际安全集合必须与DatabaseSecurityManifest中`ACTIVE | LEGACY_COMPAT`条目的有效安全集合并集精确一致；Snapshot覆盖能力/Owner角色属性、角色间Membership及其ADMIN/INHERIT/SET选项、SET Option、Ownership、全部Grant、Default Privilege、PUBLIC和`search_path`，只排除部署环境的实际LOGIN绑定。Lifecycle是Manifest元数据，不伪造为`pg_catalog`可观测字段，其转换由previousReleaseBundle与ContractGate另行校验。
+   - OntologyPhysicalMappingCatalog与QueryIndexCatalog引用闭合且匹配真实Schema和生产Query定义。
+   - DatabaseContractBundle生成、Digest固定，并与previousReleaseBundle或GENESIS_BASELINE比较。
    - RegistryManifest闭包、历史版本兼容和Event历史Fixture。
 
 3. 编译与结构

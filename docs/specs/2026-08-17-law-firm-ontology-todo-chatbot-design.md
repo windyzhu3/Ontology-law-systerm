@@ -111,9 +111,9 @@
 
 外部签章、消息或支付不得在该事务中直接调用。事务先持久化ExternalAction意图，由Worker调用供应商；回调和主动查询按供应商幂等键更新结果。
 
-ExternalAction固定使用PENDING、DISPATCHED、SUCCEEDED、FAILED和UNKNOWN状态，并保存providerRef、nextProbeAt、resolutionDueAt和probeCount。人工Owner成功提交外部动作意图后，其Task由ExternalActionRequested完成；用户只看到WaitReceipt。Worker负责主动核验，超过resolutionDueAt时生成运营异常责任。
+ExternalAction固定使用`PENDING → DISPATCHING → DISPATCHED | FAILED | UNKNOWN`、`DISPATCHED → SUCCEEDED | FAILED | UNKNOWN`和`UNKNOWN → SUCCEEDED | FAILED`状态转移，并保存dispatchAttemptId、attemptNo、providerAccountRef、providerRef、dispatchLeaseUntil、effectKey、nextProbeAt、resolutionDueAt和probeCount。`DISPATCHING`租约过期必须转入`UNKNOWN`并核验，不得回到`PENDING`重派。人工Owner成功提交外部动作意图后，其Task由ExternalActionRequested完成；用户只看到WaitReceipt。Worker负责主动核验，超过resolutionDueAt时生成运营异常责任。
 
-供应商回调先进入Provider Inbox：验证供应商签名或双向认证、timestamp/nonce与重放窗口、providerAccount到tenant的绑定；以`provider + providerAccount + providerEventId`全局唯一持久化payloadHash和验证结果。通过后才能关联`externalActionId + providerRef + subjectRef/revision`并检查合法事件转换。验证失败、跨租户或无法关联的回调只进入隔离审计，不得调用领域命令或修改WaitReceipt。
+供应商回调先进入Provider Inbox：验证供应商签名或双向认证、timestamp/nonce与重放窗口、providerAccount到tenant的绑定；以`provider + providerAccount + providerEventId`全局唯一持久化`canonicalPayloadDigestRef`和验证结果。该Digest Ref必须包含算法与Canonicalization Profile代码/版本，不得退化为裸Hash列。通过后才能关联`externalActionId + providerRef + subjectRef/revision`并检查合法事件转换。验证失败、跨租户或无法关联的回调只进入隔离审计，不得调用领域命令或修改WaitReceipt。
 
 通过验证的供应商回调和受信主动查询必须进入同一个幂等内部命令，并在单一事务中完成：锁定ExternalAction → 校验providerRef、subjectRef/revision与当前状态 → 更新终态 → 写权威领域Event → 创建、关闭或取消后续Task → 更新WaitReceipt → 写Audit与CommandReceipt。重复或乱序回调不得使终态倒退；UNKNOWN只能由权威回调、主动查询或有权运营处置解除。任一步失败时整笔事务回滚。
 
@@ -405,7 +405,7 @@ Event追加保存，不承担通用事件溯源平台职责。
 
 - 模型、Prompt、工具Schema和提取策略独立版本化。
 - 工具只允许固定命令，不提供任意SQL、任意HTTP或通用实体更新。
-- 确认令牌绑定Actor、Task、SubjectRevision、Command和PayloadHash，并一次性使用。
+- 确认令牌绑定Actor、Task、SubjectRevision、Command和`payloadDigestRef`，并一次性使用。`payloadDigestRef`必须带算法与规范化Profile版本。
 - AI遥测与业务审计分离；不将完整案情、证件信息或合同正文写入普通模型日志。
 - 模型失败、越权、Prompt注入或质量退化时，可独立关闭AI辅助能力而不影响结构化WorkCard；MVP中的AI没有正式业务命令写权。
 
