@@ -1,0 +1,2 @@
+# 生成器与单元测试使用 Python 标准库；pglast 只用于静态解析生成的 PostgreSQL SQL。
+pglast==7.10

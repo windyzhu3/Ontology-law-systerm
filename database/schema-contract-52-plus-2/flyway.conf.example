@@ -1,0 +1,31 @@
+# 待办驱动律所系统 52＋2 Schema 合同：Flyway 示例配置。
+#
+# 本文件可以提交；真实密码不得写入本文件。部署时使用 FLYWAY_PASSWORD
+# 或 Secret Manager 注入凭据。Flyway CLI 版本应由构建镜像固定。
+
+flyway.url=jdbc:postgresql://localhost:5432/law_firm
+flyway.user=law_schema_migrator
+
+# Flyway 自身的第二张技术表必须位于 platform_meta。
+flyway.defaultSchema=platform_meta
+flyway.table=flyway_schema_history
+flyway.schemas=platform_meta,identity,audit,responsibility,execution,external_action,evidence,party,lead,opportunity,conflict,contract,transfer
+flyway.createSchemas=true
+
+# 迁移是静态合同的机械生成物。
+flyway.locations=filesystem:generated/db/migration
+flyway.encoding=UTF-8
+flyway.placeholderReplacement=true
+flyway.validateMigrationNaming=true
+flyway.validateOnMigrate=true
+flyway.outOfOrder=false
+flyway.baselineOnMigrate=false
+flyway.cleanDisabled=true
+
+# 这些占位符只指向 IaC 预创建的 NOLOGIN 能力角色，且不得是 Schema/Table Owner。
+# API/Worker LOGIN NOINHERIT 角色不作为占位符；IaC 只向它们直授目标数据库 CONNECT。
+# 值按未加引号 SQL 标识符替换，只允许 [a-z][a-z0-9_]{0,62}。
+flyway.placeholders.app_command_role=law_app_command
+flyway.placeholders.app_worker_role=law_app_worker
+flyway.placeholders.app_query_role=law_app_query
+flyway.placeholders.audit_append_role=law_audit_append
