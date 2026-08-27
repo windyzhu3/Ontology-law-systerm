@@ -1298,3 +1298,12 @@ RESERVED  保留未来模块或端口边界
 - 迭代、工作量和部署实施计划。
 
 上述内容只能在本规格复核通过后进入下一阶段，并应按模块和风险边界拆分为多份实施规格，不能把本总体设计直接当成一个超大实施任务。本轮不输出实施计划。
+
+## 2026-08-27 P0一致性补充
+
+- TaskOccurrence只以OPEN创建；WAITING是Query Facade根据四类权威来源形成的只读WaitingProjection。
+- QuoteIssued只触发报价审批；授权事实触发报价发送责任，外部发送结果由ProviderInbox收敛。
+- 每个TransferSnapshot独占一个PRE_TRANSFER Review；RETURN和补正重提均创建新责任/新实例。
+- PaymentGate必须携带due_at、业务时区和准确付款条款来源。
+- 同一冲突审查中BLOCK决定必须取消其他OPEN决定槽。
+- P0-01至P0-15及视觉证据是销售主链架构验收门槛。

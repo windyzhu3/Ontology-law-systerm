@@ -1917,3 +1917,7 @@ CapacityGate继续保持触发式，不成为每次发布都运行的第三个�
 - 任何升级都必须先证明当前结构在C1范围内无法满足目标，而不是因预期复杂性提前引入基础设施。
 
 除非形成新版本规格和明确迁移契约，后续模块细册、DDL、代码和实施计划不得改变以上规则。
+
+## 2026-08-27 P0一致性补充
+
+本节取代早期“可变WaitReceipt”与“Task可直接初始WAITING”的表述：WaitReceipt只追加不可变事实；TaskOccurrence只以OPEN创建；WaitingProjection是查询投影且不新增表。PaymentGate需准确保存due_at、业务时区及付款条款来源。TransferSnapshot与PRE_TRANSFER Review为一对一实例关系，补正重提创建新Snapshot和新Review。冲突BLOCK需以条件唯一性和事务测试保证同审查其他OPEN槽被取消。已执行Flyway迁移不得改写，物理变更必须使用新的前向迁移。

@@ -1062,3 +1062,11 @@ AI降级成功率必须按五种销售卡片模式分别验收，不得用CONTAC
 - 把事项交给下一位责任人。
 
 WorkCard负责确定性和安全，Chat负责表达，AI负责减少输入。任何新增能力若不能保持“一张卡、一个Owner、一个主命令、一个明确结果”，必须拆分责任或后置，而不能继续向当前卡添加字段和按钮。
+
+## 2026-08-27 P0一致性补充（v1.2）
+
+销售主链必须机械覆盖P0-01至P0-15，编号、主命令和结果边界以目标产品基线同名表为准。报价版本被生成后只创建审批责任；只有授权事实到达后才可创建发送责任。外部发送先形成请求，ProviderInbox权威确认前不得显示已发送；失败修正创建新的ExternalAction，UNKNOWN只能通过人工处置收敛。
+
+每次TransferSnapshot都必须绑定一个独立的PRE_TRANSFER Review实例。RETURN追加Decision、TransferReturned和逐项ReturnItem，并创建新的FIX_TRANSFER；补正重提必须追加新Snapshot和新Review，旧Task、旧Snapshot、旧Review均不重开、不覆盖、不复用。等待展示只由Query Facade投影，不更新既有WaitReceipt。
+
+视觉证据及文件映射见 `docs/design/sales-mvp-workcards/README.md`；此前冻结的正常责任态与本次15张P0异常/分支态共同构成端到端验收集。

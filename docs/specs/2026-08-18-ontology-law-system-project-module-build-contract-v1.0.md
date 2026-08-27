@@ -1250,3 +1250,7 @@ previousReleaseBundle由CI注入并验证Digest，不能作为开发分支可编
 - 已明确搁置的备份与灾难恢复框架。
 
 在这些内容被后续规格冻结前，不得以“预留字段”、extensions JSON、EAV、空模块、通用Handler或动态配置绕过本规格。
+
+## 2026-08-27 P0一致性补充
+
+构建契约必须为报价观察、每Snapshot独立Review、不可变WaitReceipt和只读WaitingProjection保留明确模块边界。Task类型注册表必须机械包含P0-01至P0-15的固定变体、主命令和完成Fact；禁止用通用审批Handler或同一Task重开实现退回、修正和补正重提。

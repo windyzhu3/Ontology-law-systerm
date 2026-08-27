@@ -312,3 +312,7 @@ teamVersion
 - 让能力包直接依赖或修改Matter Core私有表。
 
 新增后MVP模块、能力包或只读投影，只要遵守本契约，可在各自版本中独立演进，无需修改v1.0。
+
+## 2026-08-27 P0一致性补充
+
+当前MVP以TransferAccepted＋MatterRef闭环，不提前创建Matter页面或Matter业务表。每个新TransferSnapshot必须创建独立PRE_TRANSFER Review；不得复用旧scopeHash对应的Review。等待由Query Facade只读投影，不更新销售侧WaitReceipt或已完成Task。Matter扩展只能消费已接受转案事实，不得反向改写销售链历史。

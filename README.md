@@ -4,6 +4,8 @@
 
 本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。当前最新基线已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同和 Flyway DDL；尚未开始生产应用代码建设。
 
+> 2026-08-27 设计一致性说明：销售MVP从线索接入到案管接收的当前闭环终点是 `TransferAccepted + MatterRef`；`Matter` 仍属于Post-MVP。工作卡视觉基准及P0覆盖证据位于 [销售MVP工作卡高保真](docs/design/sales-mvp-workcards/README.md)。如历史设计段落存在冲突，以各规格末尾的“2026-08-27 P0一致性补充”为准。
+
 ## 1. 当前正式冻结基线
 
 最新权威交付物：

@@ -1773,3 +1773,7 @@ RESERVED只表示端口和依赖方向稳定，不表示提前建表、建服务
 10. 销售黄金路径的测试Fixture与验收清单。
 
 每一分册都必须引用本规格和领域本体，不得重新发明通用状态、工作流或授权模型。
+
+## 2026-08-27 P0一致性补充
+
+WaitReceipt是不可变等待事实，不是可变当前状态；TaskOccurrence初始状态只允许OPEN。WaitingProjection不建新表，由Query Facade从权威事实计算。Quote观察、Snapshot独占Review、PaymentGate的due_at/业务时区/付款条款来源、冲突兄弟槽取消及P0-01至P0-15必须进入基础框架的注册表、Fixture和契约测试。
