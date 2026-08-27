@@ -4,7 +4,7 @@
 
 本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。当前最新基线已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同和 Flyway DDL；尚未开始生产应用代码建设。
 
-> 2026-08-27 设计一致性说明：销售MVP从线索接入到案管接收的当前闭环终点是 `TransferAccepted + MatterRef`；`Matter` 仍属于Post-MVP。工作卡视觉基准及P0覆盖证据位于 [销售MVP工作卡高保真](docs/design/sales-mvp-workcards/README.md)。如历史设计段落存在冲突，以各规格末尾的“2026-08-27 P0一致性补充”为准。
+> 2026-08-27 设计一致性说明：销售MVP从线索接入到案管接收的当前闭环终点是 `TransferAccepted + MatterRef`；`Matter` 仍属于Post-MVP。工作卡视觉基准及P0覆盖证据位于[销售MVP工作卡高保真](docs/design/sales-mvp-workcards/README.md)。身份、授权与审计管理的三批冻结视觉基线位于[身份与组织管理MVP高保真](docs/design/identity-admin-mvp/README.md)。如历史设计段落存在冲突，以各规格末尾的“2026-08-27 P0一致性补充”和52＋2字段合同为准。
 
 ## 1. 当前正式冻结基线
 
@@ -16,6 +16,7 @@
 - [19 个 Flyway 迁移](database/schema-contract-52-plus-2/generated/db/migration/)
 - [运行时提交前重验合同](database/schema-contract-52-plus-2/docs/runtime-validation-contract.md)
 - [验证记录](database/schema-contract-52-plus-2/VERIFICATION.md)
+- [身份与组织管理MVP高保真基线](docs/design/identity-admin-mvp/README.md)
 
 如历史设计稿与上述合同发生冲突，以 **2026-08-26 的52＋2冻结合同**为准。历史设计稿继续保留，用于说明设计演进，不再作为DDL生成来源。
 
@@ -99,6 +100,7 @@ Lead接入 → Assignment分配 → ContactResult联系结果
 .
 ├── README.md
 ├── docs/
+│   ├── design/                        # 已确认高保真视觉证据索引
 │   └── specs/                         # 产品、架构及物理模型历史规格
 ├── database/
 │   └── schema-contract-52-plus-2/
@@ -144,4 +146,4 @@ python3 scripts/verify_generated_sql.py
 6. [项目结构、模块边界与构建契约 v1.0](docs/specs/2026-08-18-ontology-law-system-project-module-build-contract-v1.0.md)
 7. [PostgreSQL物理模型总纲 v1.0](docs/specs/2026-08-19-ontology-law-system-postgresql-physical-model-guideline-v1.0.md)
 
-最后更新：2026-08-26。
+最后更新：2026-08-27。
