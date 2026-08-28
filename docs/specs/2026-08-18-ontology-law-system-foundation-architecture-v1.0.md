@@ -1,6 +1,10 @@
 # Ontology Law System 基础框架设计规格 v1.0
 
-> 状态：正式冻结版；已通过领域、安全与质量门禁复核，并经用户确认  
+> [!WARNING]
+> 历史规格（HISTORICAL_SUPERSEDED）。本文仅保留设计演进证据；与[当前MVP基线](../baseline/CURRENT-MVP-BASELINE.md)冲突时，当前基线及52＋2合同优先。本文不得作为新实现或DDL生成依据。
+
+> 历史元数据（原版本）：v1.0
+> 历史元数据（原状态）：正式冻结版；已通过领域、安全与质量门禁复核，并经用户确认
 > 日期：2026-08-18  
 > 兼容修订：2026-08-19，随已冻结的PostgreSQL物理模型总纲将ReleaseManifest显式升级为Schema v2并绑定DatabaseContractBundle  
 > 范围：销售至转案MVP的技术基础框架，以及后MVP模块接入所需的稳定扩展契约  
@@ -39,6 +43,8 @@
 7. 不为尚未进入MVP的案件办理、完整财务、零停机、多区域或大规模SaaS提前建设平台。
 
 ## 3. 已冻结的总体方案
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: application-topology
 
 ```text
 逻辑多租户，初期单律所部署
@@ -66,6 +72,8 @@ MVP不引入：
 - 多数据库分布式事务。
 
 ## 4. 目标技术基线
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: application-topology
 
 | 层次 | 冻结选择 |
 |---|---|
@@ -86,6 +94,8 @@ MVP不引入：
 确切补丁版本、容器基础镜像、OIDC产品、对象存储产品、SecretStore产品和部署平台由实施ADR锁定，但不得改变本规格的端口和安全边界。
 
 ## 5. 运行拓扑
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: application-topology
 
 ```text
 ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
@@ -125,6 +135,8 @@ MVP不引入：
 - 初期可以各运行一个实例；扩容优先增加同版本API或Worker实例，不改变领域模型。
 
 ## 6. 前端与通道边界
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: application-topology
 
 同一仓库保存三个独立SPA：
 
@@ -611,6 +623,8 @@ Responsibility模块只管理人类责任，不拥有业务流程。
 - `RecoveryEpisode`
 
 ### 12.1 Task不变量
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: task-waiting-contract
 
 - 一个Task只有一个具体Owner。
 - 一个Task只有一个固定`commandVariant`。
@@ -680,6 +694,8 @@ separationOfDutiesPolicy
 Decision提交后不可修改或覆盖。Decision Task的唯一完成事实是准确的`DecisionRecorded`；由该决定派生的TransferAccepted、返工Task或其他领域事实不能反过来充当Task完成事实。执行旧Decision Task时仍必须在线校验Actor、当前授权、Restriction和职责分离。
 
 ### 12.4 WAITING与WaitReceipt
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: task-waiting-contract
 
 `WAITING Task`只用于：
 
@@ -1599,6 +1615,8 @@ Profile任何资源、数据分布或测量口径变化都形成新版本，不�
 ```
 
 ### 28.2 ChangeGate
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: application-topology
 
 每次合并必须验证：
 
@@ -1758,6 +1776,8 @@ RESERVED只表示端口和依赖方向稳定，不表示提前建表、建服务
 28. 任何Registration、Classification、Allocation、Handling或能力包模块都不得修改Matter Core或销售六聚合的私有事实。
 
 ## 31. 下一层详细设计边界
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: application-topology
 
 本规格通过后，可以按独立分册继续设计，但仍不应一次性形成超大实施计划：
 
@@ -1773,3 +1793,7 @@ RESERVED只表示端口和依赖方向稳定，不表示提前建表、建服务
 10. 销售黄金路径的测试Fixture与验收清单。
 
 每一分册都必须引用本规格和领域本体，不得重新发明通用状态、工作流或授权模型。
+
+## 历史修订记录（已被当前基线替代）
+
+该历史修订曾规定WaitReceipt为不可变等待事实而非可变当前状态，并规定TaskOccurrence初始状态只允许OPEN。WaitingProjection不建新表，由Query Facade从权威事实计算。Quote观察、Snapshot独占Review、PaymentGate的due_at/业务时区/付款条款来源、冲突兄弟槽取消及P0-01至P0-15曾被要求进入基础框架的注册表、Fixture和契约测试；当前规则以当前MVP基线为准。

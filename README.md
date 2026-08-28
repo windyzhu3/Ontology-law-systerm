@@ -4,18 +4,22 @@
 
 本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。当前最新基线已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同和 Flyway DDL；尚未开始生产应用代码建设。
 
+> 当前权威以当前MVP基线为准；历史规格仅保留为设计演进证据。销售MVP终点、P0验收映射及52＋2边界均由该基线统一解释。
+
 ## 1. 当前正式冻结基线
 
 最新权威交付物：
 
+- [当前MVP基线](docs/baseline/CURRENT-MVP-BASELINE.md)
 - [52＋2 Schema 合同说明](database/schema-contract-52-plus-2/README.md)
 - [完整字段合同](database/schema-contract-52-plus-2/generated/field-contract.md)
 - [机器可读合同清单](database/schema-contract-52-plus-2/generated/schema-contract-manifest.json)
-- [19 个 Flyway 迁移](database/schema-contract-52-plus-2/generated/db/migration/)
+- [19 个 Flyway 迁移（以V840为链尾）](database/schema-contract-52-plus-2/generated/db/migration/V840__schema_contract_validation.sql)
 - [运行时提交前重验合同](database/schema-contract-52-plus-2/docs/runtime-validation-contract.md)
 - [验证记录](database/schema-contract-52-plus-2/VERIFICATION.md)
+- [身份与组织管理MVP高保真基线](docs/design/identity-admin-mvp/README.md)
 
-如历史设计稿与上述合同发生冲突，以 **2026-08-26 的52＋2冻结合同**为准。历史设计稿继续保留，用于说明设计演进，不再作为DDL生成来源。
+如历史设计稿与上述交付物发生冲突，以当前MVP基线及52＋2合同为准。历史设计稿继续保留，用于说明设计演进，不再作为DDL生成来源。
 
 ## 2. 产品与交互原则
 
@@ -97,6 +101,7 @@ Lead接入 → Assignment分配 → ContactResult联系结果
 .
 ├── README.md
 ├── docs/
+│   ├── design/                        # 已确认高保真视觉证据索引
 │   └── specs/                         # 产品、架构及物理模型历史规格
 ├── database/
 │   └── schema-contract-52-plus-2/
@@ -126,20 +131,21 @@ python3 -m unittest discover -s tests -v
 python3 scripts/verify_generated_sql.py
 ```
 
-当前冻结版本验证口径：43项合同测试、19个迁移、23个PL/pgSQL函数、206个复合外键、22类类型化准确引用和25项跨行守卫合同。生成物摘要记录在[验证报告](database/schema-contract-52-plus-2/VERIFICATION.md)中。
+当前冻结版本验证口径：50项合同测试、19个迁移、23个PL/pgSQL函数、206个复合外键、22类类型化准确引用和25项跨行守卫合同。生成物摘要记录在[验证报告](database/schema-contract-52-plus-2/VERIFICATION.md)中。
 
 当前构建环境未提供真实PostgreSQL/Flyway运行时，因此上线前必须在专用PostgreSQL 15＋数据库以固定Flyway版本执行`validate`和`migrate`。只有`V840__schema_contract_validation.sql`通过，并且应用制品摘要与manifest完全匹配，发布作业才可将`deployment_state`从`BLOCKED`切换为`ACTIVE`。
 
 ## 8. 历史规格阅读顺序
 
-以下文档保留为设计演进背景；其中表名、数量或能力边界如与52＋2合同不同，均视为已被最新合同替代：
+阅读必须先从 `docs/baseline/CURRENT-MVP-BASELINE.md` 开始，再按下列顺序查阅历史设计演进；不得依赖历史规格末尾补丁推导当前规则。与当前MVP基线或52＋2合同冲突的历史内容均已被替代：
 
-1. [目标产品基线 v2.0](docs/specs/2026-08-17-law-firm-ontology-todo-chatbot-design.md)
-2. [总体架构与本体完整设计 v1.0](docs/specs/2026-08-18-law-firm-overall-architecture-ontology-design.md)
-3. [销售MVP工作卡与对话状态设计 v1.0](docs/specs/2026-08-17-law-firm-sales-mvp-workcard-dialogue-design.md)
-4. [最小Matter身份与后MVP扩展契约 v1.0](docs/specs/2026-08-18-minimal-matter-identity-post-mvp-extension-contract-v1.0.md)
-5. [基础框架设计规格 v1.0](docs/specs/2026-08-18-ontology-law-system-foundation-architecture-v1.0.md)
-6. [项目结构、模块边界与构建契约 v1.0](docs/specs/2026-08-18-ontology-law-system-project-module-build-contract-v1.0.md)
-7. [PostgreSQL物理模型总纲 v1.0](docs/specs/2026-08-19-ontology-law-system-postgresql-physical-model-guideline-v1.0.md)
+1. 当前MVP基线（以上路径）
+2. [目标产品基线 v2.0](docs/specs/2026-08-17-law-firm-ontology-todo-chatbot-design.md)
+3. [总体架构与本体完整设计 v1.0](docs/specs/2026-08-18-law-firm-overall-architecture-ontology-design.md)
+4. [销售MVP工作卡与对话状态设计 v1.0](docs/specs/2026-08-17-law-firm-sales-mvp-workcard-dialogue-design.md)
+5. [最小Matter身份与后MVP扩展契约 v1.0](docs/specs/2026-08-18-minimal-matter-identity-post-mvp-extension-contract-v1.0.md)
+6. [基础框架设计规格 v1.0](docs/specs/2026-08-18-ontology-law-system-foundation-architecture-v1.0.md)
+7. [项目结构、模块边界与构建契约 v1.0](docs/specs/2026-08-18-ontology-law-system-project-module-build-contract-v1.0.md)
+8. [PostgreSQL物理模型总纲 v1.0](docs/specs/2026-08-19-ontology-law-system-postgresql-physical-model-guideline-v1.0.md)
 
-最后更新：2026-08-26。
+最后更新：2026-08-28。

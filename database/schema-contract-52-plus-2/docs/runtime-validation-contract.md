@@ -2,7 +2,7 @@
 
 ## 1. 目的与适用范围
 
-本文件规定数据库结构合同之外，API、CommandRuntime、各 Fact Owner、Query Facade、Dispatcher、ProviderIngress 与 DeploymentRuntime 必须共同执行的验证。这里的“必须”“不得”是规范要求。
+本文件是[当前MVP语义基线](../../../docs/baseline/CURRENT-MVP-BASELINE.md)与52＋2结构/物理合同的从属运行时补充，规定API、CommandRuntime、各 Fact Owner、Query Facade、Dispatcher、ProviderIngress 与 DeploymentRuntime共同执行的验证。这里的“必须”“不得”只在上位基线已定义的边界内构成运行时要求；如与上位基线冲突，验证必须失败关闭，不得据此放宽或改写上位规则。
 
 物理 DDL 可以证明字段形态、复合外键、唯一性、状态转换、CAS 修订号、不可变/允许更新列以及少量稳定跨行关系；它不能证明当前授权、远端系统真实结果、对象存储内容、自然时间是否仍有效或跨领域业务结论。运行时不得把“数据库允许提交”解释为“业务条件成立”。
 

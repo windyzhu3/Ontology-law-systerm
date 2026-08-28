@@ -1,4 +1,72 @@
+import hashlib
+import json
+import re
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
+
+
+CONTRACT_ROOT = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+EXPECTED_MIGRATIONS = (
+    "V001__bootstrap_schemas.sql",
+    "V002__deployment_state.sql",
+    "V010__identity_tables.sql",
+    "V020__audit_tables.sql",
+    "V030__responsibility_tables.sql",
+    "V040__execution_tables.sql",
+    "V050__external_action_tables.sql",
+    "V060__evidence_tables.sql",
+    "V070__party_tables.sql",
+    "V080__lead_tables.sql",
+    "V090__opportunity_tables.sql",
+    "V100__conflict_tables.sql",
+    "V110__contract_tables.sql",
+    "V120__transfer_tables.sql",
+    "V800__cross_domain_foreign_keys.sql",
+    "V810__update_guards.sql",
+    "V820__indexes.sql",
+    "V830__application_privileges.sql",
+    "V840__schema_contract_validation.sql",
+)
+EXPECTED_MIGRATION_SHA256 = {
+    "V001__bootstrap_schemas.sql": "5f0b866c7f9f4adcfc1e658053859b068b88cca6f476f376deec50f283c816e7",
+    "V002__deployment_state.sql": "66fee9505dc4f5a0e9d4d180d0979867e00321af57c37c76376fbe49df635833",
+    "V010__identity_tables.sql": "7d8de2e97a8cb20ce7242262989b4648d03baddb49cf5d5c21b91ddf5a3bd222",
+    "V020__audit_tables.sql": "921cb77c29279ebe21be27db29f3843858bb3b980b345010efec18e5c4619d27",
+    "V030__responsibility_tables.sql": "81656311fabaa2cd591ea25365bda5e7f95af30d0d08776ff66004ef6b7f3cb7",
+    "V040__execution_tables.sql": "408f0c066aabec3e9b8c45765c1723464db894dee1e290708bd3732638abe67d",
+    "V050__external_action_tables.sql": "bf9b80bfa3825856eb738a4c8b78491bccdc825436a4769b41e6c2d590ff0f23",
+    "V060__evidence_tables.sql": "a42a5cc0f09274e3ab7e34192324de94ee0344bdbd7906d1efbfefc5792e31fa",
+    "V070__party_tables.sql": "56716e2b519629f2d7311c8dd58609462b9dce444adbf998146851553a15e75f",
+    "V080__lead_tables.sql": "5e096ecbb6a72f0a25fe380edbb80ce3fb7024c93d0d360c7841eac84e1198b8",
+    "V090__opportunity_tables.sql": "b33f5a6abaebc387249b534acb10f8569da808adaa673543a409ae23bf51bc9a",
+    "V100__conflict_tables.sql": "91810fee670d380e31582400441e4985f3ec0056441d546dec4a35389741d22e",
+    "V110__contract_tables.sql": "8badb97821333736aea2dfff16a7fc95de9d5df9136d4f0064052bc4626c23b4",
+    "V120__transfer_tables.sql": "9ee22813c4e71312f94a0762084989a5e0aea9a78ae47168a677e762bd325128",
+    "V800__cross_domain_foreign_keys.sql": "6e4d2b23c33179e03b801cf17a5b83be3709be55d0047cde9e8c48cad4a14cde",
+    "V810__update_guards.sql": "bc95f1b0a80924848162388f9e9162d8a628091e93c5112579bd33f7ebeab0b7",
+    "V820__indexes.sql": "1c6968f012d5085fae5fcb0dbcee17cd9225034b9c81e8ef9de717d96e5f820f",
+    "V830__application_privileges.sql": "4292e7294b40211b3d141cf7b0b1d5c1e09582056bf27b9c3bde39bacb34e821",
+    "V840__schema_contract_validation.sql": "0919a6047fdb94879aa2fce18ce3df8d22eaf2de5d27f9cbb26f04c27dd2b2ad",
+}
+EXPECTED_CONTRACT_SHA256 = (
+    "a9c53d0126b7997e0aac511d3a4baf1da02a5f10d829ca5113458be51813034a"
+)
+EXPECTED_FIELD_CONTRACT_SHA256 = (
+    "be79d991fa9e13e3f0af1c682333b6a063201387b78f7c9ec32a03bad51096ed"
+)
+EXPECTED_TRANSFER_ACCEPTANCE_CONSTRAINT = (
+    "(accepted_snapshot_id IS NULL AND accept_decision_record_id IS NULL AND "
+    "matter_id IS NULL AND matter_no IS NULL AND matter_type_code IS NULL AND "
+    "matter_capability_pack_code IS NULL AND matter_capability_pack_version IS "
+    "NULL AND matter_created_at IS NULL) OR (accepted_snapshot_id IS NOT NULL "
+    "AND accept_decision_record_id IS NOT NULL AND matter_id IS NOT NULL AND "
+    "matter_no IS NOT NULL AND matter_type_code IS NOT NULL AND "
+    "matter_capability_pack_code IS NOT NULL AND matter_capability_pack_version "
+    "> 0 AND matter_created_at IS NOT NULL)"
+)
 
 
 class FrozenDomainSemanticsTest(unittest.TestCase):
@@ -16,6 +84,192 @@ class FrozenDomainSemanticsTest(unittest.TestCase):
 
     def constraint(self, qualified: str, name: str):
         return next(item for item in self.tables[qualified].constraints if item.name == name)
+
+    def assert_frozen_migration_contract(
+        self, contract_root: Path, baseline_path: Path
+    ) -> None:
+        migration_root = contract_root / "generated/db/migration"
+        actual_migrations = tuple(
+            path.name for path in sorted(migration_root.glob("*.sql"))
+        )
+        manifest = json.loads(
+            (contract_root / "generated/schema-contract-manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        baseline = baseline_path.read_text(encoding="utf-8")
+        actual_hashes = {
+            path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(migration_root.glob("*.sql"))
+        }
+        expected_manifest_hashes = {
+            f"db/migration/{name}": digest
+            for name, digest in EXPECTED_MIGRATION_SHA256.items()
+        }
+
+        self.assertEqual(EXPECTED_MIGRATIONS, actual_migrations)
+        self.assertEqual(
+            EXPECTED_MIGRATION_SHA256,
+            actual_hashes,
+        )
+        self.assertEqual(
+            expected_manifest_hashes,
+            manifest["generatedArtifactSha256"],
+        )
+        self.assertEqual(EXPECTED_CONTRACT_SHA256, manifest["contractSha256"])
+        self.assertEqual(
+            EXPECTED_FIELD_CONTRACT_SHA256,
+            manifest["fieldContractSha256"],
+        )
+        self.assertIn(
+            f"当前52＋2合同摘要：`{EXPECTED_CONTRACT_SHA256}`",
+            baseline,
+        )
+        self.assertIn(
+            f"字段合同摘要：`{EXPECTED_FIELD_CONTRACT_SHA256}`",
+            baseline,
+        )
+
+    def assert_complete_transfer_acceptance_constraint(self, expression: str) -> None:
+        def normalize(value: str) -> str:
+            return re.sub(r"\s+", " ", value).strip()
+
+        self.assertEqual(
+            normalize(EXPECTED_TRANSFER_ACCEPTANCE_CONSTRAINT),
+            normalize(expression),
+        )
+
+    def test_task_occurrence_initial_state_is_open(self):
+        task = self.tables["responsibility.task_occurrence"]
+
+        self.assertEqual("state", task.state_column)
+        self.assertEqual("OPEN", task.initial_state)
+
+    def test_complete_migration_set_matches_current_baseline_contract_hashes(self):
+        self.assert_frozen_migration_contract(
+            CONTRACT_ROOT,
+            REPOSITORY_ROOT / "docs/baseline/CURRENT-MVP-BASELINE.md",
+        )
+
+    def test_migration_bytes_and_manifest_digest_cannot_move_together(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            contract_root = root / "database/schema-contract-52-plus-2"
+            shutil.copytree(
+                CONTRACT_ROOT / "generated/db/migration",
+                contract_root / "generated/db/migration",
+            )
+            shutil.copy2(
+                CONTRACT_ROOT / "generated/schema-contract-manifest.json",
+                contract_root / "generated/schema-contract-manifest.json",
+            )
+            baseline_path = root / "docs/baseline/CURRENT-MVP-BASELINE.md"
+            baseline_path.parent.mkdir(parents=True)
+            shutil.copy2(
+                REPOSITORY_ROOT / "docs/baseline/CURRENT-MVP-BASELINE.md",
+                baseline_path,
+            )
+            migration_path = (
+                contract_root
+                / "generated/db/migration/V120__transfer_tables.sql"
+            )
+            migration_path.write_bytes(
+                migration_path.read_bytes() + b"\n-- arbitrary mutation\n"
+            )
+            mutated_digest = hashlib.sha256(migration_path.read_bytes()).hexdigest()
+            manifest_path = (
+                contract_root / "generated/schema-contract-manifest.json"
+            )
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["generatedArtifactSha256"][
+                "db/migration/V120__transfer_tables.sql"
+            ] = mutated_digest
+            manifest["contractSha256"] = "0" * 64
+            manifest_path.write_text(
+                json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            baseline_path.write_text(
+                baseline_path.read_text(encoding="utf-8").replace(
+                    EXPECTED_CONTRACT_SHA256,
+                    "0" * 64,
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(AssertionError):
+                self.assert_frozen_migration_contract(contract_root, baseline_path)
+
+    def test_wait_receipt_is_immutable_and_unique_per_positive_task_revision(self):
+        wait_receipt = self.tables["responsibility.wait_receipt"]
+        task_revision_unique = self.constraint(
+            "responsibility.wait_receipt",
+            "uq_wait_receipt__task_revision",
+        )
+        positive_revision = self.constraint(
+            "responsibility.wait_receipt",
+            "ck_wait_receipt__positive_task_revision",
+        )
+
+        self.assertEqual("IMMUTABLE", wait_receipt.update_policy)
+        self.assertEqual((), wait_receipt.mutable_columns)
+        self.assertEqual("UNIQUE", task_revision_unique.kind)
+        self.assertEqual(
+            "tenant_id, task_occurrence_id, task_revision",
+            task_revision_unique.expression,
+        )
+        self.assertEqual("task_revision > 0", positive_revision.expression)
+
+    def test_matter_core_schema_and_table_are_absent(self):
+        from contract.schema_contract import SCHEMAS
+
+        self.assertNotIn("matter_core", {schema.name for schema in SCHEMAS})
+        self.assertNotIn(
+            "matter_core",
+            {table.name for schema in SCHEMAS for table in schema.tables},
+        )
+
+    def test_transfer_request_matter_ref_is_complete_all_or_none_and_write_once(self):
+        transfer_request = self.tables["transfer.transfer_request"]
+        matter_ref_columns = {
+            "matter_id",
+            "matter_no",
+            "matter_type_code",
+            "matter_capability_pack_code",
+            "matter_capability_pack_version",
+            "matter_created_at",
+        }
+        acceptance = self.constraint(
+            "transfer.transfer_request",
+            "ck_transfer_request__accept_complete",
+        ).expression
+        positive_snapshot_no = self.constraint(
+            "transfer.transfer_snapshot",
+            "ck_transfer_snapshot__snapshot_no",
+        ).expression
+
+        self.assertTrue(matter_ref_columns <= self.columns("transfer.transfer_request"))
+        self.assertTrue(
+            matter_ref_columns <= set(transfer_request.write_once_columns)
+        )
+        self.assert_complete_transfer_acceptance_constraint(acceptance)
+        self.assertEqual("snapshot_no > 0", positive_snapshot_no)
+
+    def test_transfer_acceptance_fragments_in_wrong_composition_are_rejected(self):
+        wrong_constraint = (
+            "accepted_snapshot_id IS NULL OR accept_decision_record_id IS NULL OR "
+            "matter_id IS NULL OR matter_no IS NULL OR matter_type_code IS NULL OR "
+            "matter_capability_pack_code IS NULL OR "
+            "matter_capability_pack_version IS NULL OR matter_created_at IS NULL OR "
+            "accepted_snapshot_id IS NOT NULL OR accept_decision_record_id IS NOT "
+            "NULL OR matter_id IS NOT NULL OR matter_no IS NOT NULL OR "
+            "matter_type_code IS NOT NULL OR matter_capability_pack_code IS NOT "
+            "NULL OR matter_capability_pack_version > 0 OR matter_created_at IS NOT "
+            "NULL"
+        )
+
+        with self.assertRaises(AssertionError):
+            self.assert_complete_transfer_acceptance_constraint(wrong_constraint)
 
     def test_identity_uses_current_org_scope_and_principal_object_limit(self):
         self.assertIn("scope_organization_unit_id", self.columns("identity.authority_grant"))

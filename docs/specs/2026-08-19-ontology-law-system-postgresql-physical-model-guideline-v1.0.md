@@ -1,6 +1,10 @@
 # Ontology Law System PostgreSQL物理模型总纲 v1.0
 
-> 状态：正式冻结版；八个设计章节已经用户逐节确认  
+> [!WARNING]
+> 历史规格（HISTORICAL_SUPERSEDED）。本文仅保留设计演进证据；与[当前MVP基线](../baseline/CURRENT-MVP-BASELINE.md)冲突时，当前基线及52＋2合同优先。本文不得作为新实现或DDL生成依据。
+
+> 历史元数据（原版本）：v1.0
+> 历史元数据（原状态）：正式冻结版；八个设计章节已经用户逐节确认
 > 日期：2026-08-19  
 > 范围：销售至转案MVP的PostgreSQL物理建模、事务、隔离、安全、迁移、生成和容量演进总契约  
 > 明确不包含：逐表DDL、实施计划、工期估算、后MVP案件办理表、备份与灾难恢复方案、物理破坏性Contract实施
@@ -22,6 +26,8 @@
 本规格是“物理模型的总约束”，不是全库逐表设计。后续每个模块的Schema细册必须遵守本规格，但不能从本规格推导出一个通用Repository、万能事实表或运行时本体平台。
 
 ### 1.2 适用优先级
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: application-topology
 
 发生冲突时，解释顺序固定为：
 
@@ -59,6 +65,8 @@
 ```
 
 ### 1.4 六种表形态
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: task-waiting-contract
 
 六种表形态是建模模式，不是六张通用基表，也不得通过PostgreSQL继承实现：
 
@@ -455,6 +463,8 @@ MVP不引入：
 - 数据库动态本体编辑器。
 
 ### 5.2 SemanticKind
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: task-waiting-contract
 
 每个物理对象必须登记一个封闭语义类型：
 
@@ -782,6 +792,8 @@ REJECTED
 数据库提交结果未知不属于Receipt状态。客户端必须使用相同Command ID和Payload查询/重入，禁止生成新Command ID。
 
 ### 6.7 Task与唯一完成事实
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: task-waiting-contract
 
 - 每个Task绑定一个准确`TaskDefinition`、一个`commandVariant`和一个`CompletionContract`。
 - Task只能由匹配当前Task、SubjectBinding、Completion Contract和事实版本的唯一Event完成。
@@ -1906,6 +1918,8 @@ CapacityGate继续保持触发式，不成为每次发布都运行的第三个�
 这些细册必须逐个冻结，不得一次性生成全库DDL，也不得提前进入实施计划。
 
 ## 11. 冻结声明
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: application-topology
 
 本规格固定以下边界：
 
@@ -1917,3 +1931,7 @@ CapacityGate继续保持触发式，不成为每次发布都运行的第三个�
 - 任何升级都必须先证明当前结构在C1范围内无法满足目标，而不是因预期复杂性提前引入基础设施。
 
 除非形成新版本规格和明确迁移契约，后续模块细册、DDL、代码和实施计划不得改变以上规则。
+
+## 历史修订记录（已被当前基线替代）
+
+该历史修订曾更正早期“可变WaitReceipt”与“Task可直接初始WAITING”的表述：WaitReceipt只追加不可变事实；TaskOccurrence只以OPEN创建；WaitingProjection是查询投影且不新增表。PaymentGate需准确保存due_at、业务时区及付款条款来源。TransferSnapshot与PRE_TRANSFER Review为一对一实例关系，补正重提创建新Snapshot和新Review。冲突BLOCK需以条件唯一性和事务测试保证同审查其他OPEN槽被取消。已执行Flyway迁移不得改写，物理变更必须使用新的前向迁移；当前语义规则以当前MVP基线为准。
