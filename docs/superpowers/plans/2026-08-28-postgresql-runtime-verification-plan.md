@@ -227,7 +227,7 @@ python3 -m unittest runtime.tests.test_runtime_harness -v
 python3 runtime/verify_runtime.py verify --runs 2 --evidence-dir ../../.artifacts/schema-runtime
 ```
 
-- [ ] 仅在本地和CI两者成功、证据已入库后，创建或推进`DB-52P2-PG18-RUNTIME`台账行为`RUNTIME_VERIFIED`；数据库合同设计保持其原有`MERGED`状态，两类状态不得合并。
+- [ ] 仅在本地和CI两者成功、证据已入库后，创建或推进`DB-52P2-PG18-RUNTIME`台账行为`RUNTIME_VERIFIED`；`DB-52P2-CONTRACT`和`DB-52P2-MIGRATIONS`都保持原有`MERGED`状态，三类交付状态不得合并。
 
 - [ ] 运行`git diff --check`、检查无生成漂移和Secret，再提交：
 

@@ -1,8 +1,11 @@
 # 律所销售MVP：工作卡与对话状态设计
 
-版本：1.0  
+> [!WARNING]
+> 历史规格（HISTORICAL_SUPERSEDED）。本文仅保留设计演进证据；与[当前MVP基线](../baseline/CURRENT-MVP-BASELINE.md)冲突时，当前基线及52＋2合同优先。本文不得作为新实现或DDL生成依据。
+
+历史元数据（原版本）：1.0
 日期：2026-08-17  
-状态：评审稿  
+历史元数据（原状态）：评审稿
 上位规格：《律所待办驱动智能管理系统：目标产品基线》2.0
 
 ## 1. 设计目标
@@ -1063,9 +1066,9 @@ AI降级成功率必须按五种销售卡片模式分别验收，不得用CONTAC
 
 WorkCard负责确定性和安全，Chat负责表达，AI负责减少输入。任何新增能力若不能保持“一张卡、一个Owner、一个主命令、一个明确结果”，必须拆分责任或后置，而不能继续向当前卡添加字段和按钮。
 
-## 2026-08-27 P0一致性补充（v1.2）
+## 历史修订记录（已被当前基线替代）
 
-销售主链必须机械覆盖P0-01至P0-15，编号、主命令和结果边界以目标产品基线同名表为准。报价版本被生成后只创建审批责任；只有授权事实到达后才可创建发送责任。外部发送先形成请求，ProviderInbox权威确认前不得显示已发送；失败修正创建新的ExternalAction，UNKNOWN只能通过人工处置收敛。
+该历史修订曾要求销售主链机械覆盖P0-01至P0-15；编号、主命令和结果边界现由当前MVP基线P0映射统一裁决。报价版本被生成后只创建审批责任；只有授权事实到达后才可创建发送责任。外部发送先形成请求，ProviderInbox确认前不得显示已发送；失败修正创建新的ExternalAction，UNKNOWN只能通过人工处置收敛。
 
 每次TransferSnapshot都必须绑定一个独立的PRE_TRANSFER Review实例。RETURN追加Decision、TransferReturned和逐项ReturnItem，并创建新的FIX_TRANSFER；补正重提必须追加新Snapshot和新Review，旧Task、旧Snapshot、旧Review均不重开、不覆盖、不复用。等待展示只由Query Facade投影，不更新既有WaitReceipt。
 

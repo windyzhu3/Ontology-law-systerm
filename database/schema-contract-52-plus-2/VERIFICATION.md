@@ -2,7 +2,9 @@
 
 验证日期：2026-08-26
 
-## 已完成验证
+本记录仅保存静态校验证据，不是领域、拓扑、生命周期或运行时规范；真实PostgreSQL尚未运行。
+
+## 静态校验证据（非规范）
 
 - `python3 generate.py --check`：通过；静态合同与生成物逐字节一致。
 - `python3 -m unittest discover -s tests -v`：43/43 通过。
@@ -13,7 +15,7 @@
 - 跨行关系：25 个守卫合同已进入 manifest；更新、权限、注释和第 55 张表由生成测试及 `V840` 失败式验证。
 - 禁止项扫描：未出现级联删除、`SET NULL`、`SET DEFAULT`、业务原生 enum 或手工创建 Flyway 历史表。
 
-## 冻结摘要
+## 静态摘要（非规范）
 
 - `contractSha256`：`a9c53d0126b7997e0aac511d3a4baf1da02a5f10d829ca5113458be51813034a`
 - `fieldContractSha256`：`be79d991fa9e13e3f0af1c682333b6a063201387b78f7c9ec32a03bad51096ed`

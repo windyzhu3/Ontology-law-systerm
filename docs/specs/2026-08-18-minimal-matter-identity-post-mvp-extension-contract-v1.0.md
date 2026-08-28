@@ -1,8 +1,11 @@
 # 最小Matter身份与后MVP扩展契约 v1.0
 
-版本：1.0  
+> [!WARNING]
+> 历史规格（HISTORICAL_SUPERSEDED）。本文仅保留设计演进证据；与[当前MVP基线](../baseline/CURRENT-MVP-BASELINE.md)冲突时，当前基线及52＋2合同优先。本文不得作为新实现或DDL生成依据。
+
+历史元数据（原版本）：1.0
 日期：2026-08-18  
-状态：FROZEN  
+历史元数据（原状态）：FROZEN
 方案：B——最小Matter身份 + 不可变TransferSnapshot采纳引用
 
 ## 1. 契约目的
@@ -41,6 +44,8 @@ Matter不复制：
 ## 3. MVP边界
 
 ### 3.1 MVP终点
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: matter-endpoint
 
 ```text
 DecisionRecorded(TRANSFER_REVIEW, ACCEPT)
@@ -65,6 +70,8 @@ DecisionRecorded(TRANSFER_REVIEW, ACCEPT)
 `MatterCreated`之后，销售MVP不得生成任何登记、分配或办理Task。
 
 ## 4. 最小Matter本体
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: matter-endpoint
 
 ```text
 Matter
@@ -111,6 +118,8 @@ getAcceptedSnapshot(
 读取仍须经过当前用途、Matter关系和字段级权限校验；Matter引用不等于任意用户获得源数据访问权。
 
 ## 5. MatterOpeningPort
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: matter-endpoint
 
 ```text
 openFromAcceptedTransfer(
@@ -136,6 +145,8 @@ openFromAcceptedTransfer(
 - MVP端口是模块化单体内、参与同一UnitOfWork的本地事务端口，不是网络调用。
 
 ## 6. 接收事务与因果顺序
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: matter-endpoint
 
 ```text
 校验当前案管Task、唯一completionContract和TRANSFER_REVIEW Authority
@@ -163,6 +174,8 @@ openFromAcceptedTransfer(
 案管Task的唯一完成事实是与当前Task和completionContract匹配的`DecisionRecorded(TRANSFER_REVIEW)`；`TransferAccepted`、`MatterCreated`和`MatterLink`是同事务派生结果，不能反向代替Task完成事实。
 
 ## 7. MatterLink
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: matter-endpoint
 
 TransferRequest拥有write-once MatterLink：
 
@@ -285,6 +298,8 @@ teamVersion
 - 迁移不能修改Matter origin、MatterRef或原TransferSnapshot引用。
 
 ## 13. 验收级不变量
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: matter-endpoint
 
 1. MatterRef只能由Matter Identity Core签发且永不复用。
 2. Matter必须准确引用被采纳TransferSnapshot的版本和摘要。
@@ -300,6 +315,8 @@ teamVersion
 12. 关闭或未部署任何后MVP消费者不影响销售MVP完成转案。
 
 ## 14. 版本治理
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: matter-endpoint
 
 以下变化必须升级本契约主版本，不能作为实现细节处理：
 
@@ -313,6 +330,6 @@ teamVersion
 
 新增后MVP模块、能力包或只读投影，只要遵守本契约，可在各自版本中独立演进，无需修改v1.0。
 
-## 2026-08-27 P0一致性补充
+## 历史修订记录（已被当前基线替代）
 
-当前MVP以TransferAccepted＋MatterRef闭环，不提前创建Matter页面或Matter业务表。每个新TransferSnapshot必须创建独立PRE_TRANSFER Review；不得复用旧scopeHash对应的Review。等待由Query Facade只读投影，不更新销售侧WaitReceipt或已完成Task。Matter扩展只能消费已接受转案事实，不得反向改写销售链历史。
+该历史修订曾以TransferAccepted＋MatterRef描述MVP闭环，不提前创建Matter页面或Matter业务表；现由当前MVP基线统一裁决。每个新TransferSnapshot必须创建独立PRE_TRANSFER Review；不得复用旧scopeHash对应的Review。等待由Query Facade只读投影，不更新销售侧WaitReceipt或已完成Task。Matter扩展只能消费已接受转案事实，不得反向改写销售链历史。

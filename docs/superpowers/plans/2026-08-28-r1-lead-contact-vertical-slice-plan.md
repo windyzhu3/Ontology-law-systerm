@@ -27,7 +27,7 @@
 
 **Files:**
 
-- Create: `docs/adr/ADR-0001-lead-ingress-completion-slot.md`
+- Create: `docs/adr/ADR-0002-lead-ingress-completion-slot.md`
 - Create: `database/schema-contract-52-plus-2/contract/evolutions/__init__.py`
 - Create: `database/schema-contract-52-plus-2/contract/evolutions/v850_lead_ingress_completion.py`
 - Modify: `database/schema-contract-52-plus-2/contract/model.py`

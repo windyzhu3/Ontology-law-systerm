@@ -1,8 +1,11 @@
 # 待办驱动律所管理系统：总体架构与本体完整设计
 
-版本：1.0  
+> [!WARNING]
+> 历史规格（HISTORICAL_SUPERSEDED）。本文仅保留设计演进证据；与[当前MVP基线](../baseline/CURRENT-MVP-BASELINE.md)冲突时，当前基线及52＋2合同优先。本文不得作为新实现或DDL生成依据。
+
+历史元数据（原版本）：1.0
 日期：2026-08-18  
-状态：已冻结设计汇总，待用户复核文档  
+历史元数据（原状态）：已冻结设计汇总，待用户复核文档
 产品基线：六个销售至转案业务聚合 + 最小责任内核 + 一卡多态交互
 
 ## 1. 文档定位与适用顺序
@@ -61,6 +64,8 @@
 - 销售、主管、部长、报价审批人、合伙人、行政/签章人员、财务、案管和运营的必要垂直协作。
 
 ### 3.2 MVP终点
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: matter-endpoint
 
 ```text
 DecisionRecorded(TRANSFER_REVIEW, ACCEPT)
@@ -314,6 +319,8 @@ Task是当前人工责任投影，不是业务事实源。
 下游OpportunityOpened、QuoteAuthorized、ContractExecuted、DealActivated、TransferAccepted或MatterCreated均不能替代前置Task自己的完成事实。
 
 ### 7.2 Task状态机
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: task-waiting-contract
 
 ```text
 新建WAITING ──nextCheckAt到达──> OPEN
@@ -482,6 +489,8 @@ auditRef
 - 模糊客户承诺无法确定日期、时区或准确时刻时，不得生成带精确SLA的WAITING Task，只能创建澄清责任。
 
 ## 9. WAITING、WaitReceipt与Chat状态
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: task-waiting-contract
 
 ### 9.1 WAITING Task
 
@@ -1051,6 +1060,8 @@ startedAt / completedAt / failureCode
 - 必须提供Tenant级AI关闭开关。关闭、超时或模型不可用时，用户仍能通过同一工作卡手工完成全部MVP责任，时效和排序不变。
 
 ## 17. 《最小Matter身份与后MVP扩展契约 v1.0》（冻结）
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: matter-endpoint
 
 本章与第18章共同构成已冻结契约。正式采用方案B：最小Matter保存身份和对被采纳不可变TransferSnapshot的准确引用；不复制销售域客户、合同、需求、材料或冲突快照。任何破坏该边界的变更必须升级契约版本，不得以实现便利静默加入字段。
 
@@ -1120,6 +1131,8 @@ Matter模块签发MatterRef；调用方不能指定matterId或matterRef。`tenan
 中间写入在提交前对其他事务不可见，任一步失败全部回滚；不能出现“已接收但无Matter”或“有Matter但未接收”。MVP的MatterOpeningPort是模块化单体内的本地事务端口，不是网络调用。MatterCreated提交后，经持久化Outbox供未来模块幂等消费；下游消费失败不得撤销已合法完成的接收。
 
 ## 18. 后MVP Matter扩展契约
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: matter-endpoint
 
 ### 18.1 后MVP责任链
 
@@ -1299,11 +1312,11 @@ RESERVED  保留未来模块或端口边界
 
 上述内容只能在本规格复核通过后进入下一阶段，并应按模块和风险边界拆分为多份实施规格，不能把本总体设计直接当成一个超大实施任务。本轮不输出实施计划。
 
-## 2026-08-27 P0一致性补充
+## 历史修订记录（已被当前基线替代）
 
 - TaskOccurrence只以OPEN创建；WAITING是Query Facade根据四类权威来源形成的只读WaitingProjection。
 - QuoteIssued只触发报价审批；授权事实触发报价发送责任，外部发送结果由ProviderInbox收敛。
 - 每个TransferSnapshot独占一个PRE_TRANSFER Review；RETURN和补正重提均创建新责任/新实例。
 - PaymentGate必须携带due_at、业务时区和准确付款条款来源。
 - 同一冲突审查中BLOCK决定必须取消其他OPEN决定槽。
-- P0-01至P0-15及视觉证据是销售主链架构验收门槛。
+- P0-01至P0-15及视觉证据曾被列为销售主链架构验收门槛；当前验收映射以当前MVP基线为准。

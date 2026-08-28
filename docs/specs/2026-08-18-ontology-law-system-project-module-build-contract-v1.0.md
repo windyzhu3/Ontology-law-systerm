@@ -1,6 +1,10 @@
 # Ontology Law System 项目结构、模块边界与构建契约 v1.0
 
-> 状态：正式冻结版；九个设计章节已经用户逐节确认
+> [!WARNING]
+> 历史规格（HISTORICAL_SUPERSEDED）。本文仅保留设计演进证据；与[当前MVP基线](../baseline/CURRENT-MVP-BASELINE.md)冲突时，当前基线及52＋2合同优先。本文不得作为新实现或DDL生成依据。
+
+> 历史元数据（原版本）：v1.0
+> 历史元数据（原状态）：正式冻结版；九个设计章节已经用户逐节确认
 > 日期：2026-08-18
 > 兼容修订：2026-08-19，随已冻结的PostgreSQL物理模型总纲加入DatabaseContractBundle生成链并升级ReleaseManifest Schema v2
 > 范围：销售至转案MVP的项目组织、Java包边界、模块依赖、运行角色、持久化、前端工作区、代码注册表、测试与构建门禁
@@ -33,6 +37,8 @@
 - 旧代码仓库和高保真原型都不是兼容性基线。原型只作为交互参考资产。
 
 ## 2. 冻结决策摘要
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: application-topology
 
 本规格冻结以下方案：
 
@@ -377,6 +383,8 @@ contract.api.integration.transferinitialization.InitializeTransferForActivatedDe
 contract::transfer-initialization-spi是专用于此原子边界的窄Named Interface。运行时由Contract用例调用Transfer实现；Java依赖仍只有 transfer → contract.api。该Port只能有一个固定实现，不得动态选择Handler。
 
 ### 7.3 五个跨模块原子边界
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: matter-endpoint
 
 | 具名用例与Owner | 同一事务的最低结果 |
 |---|---|
@@ -769,6 +777,8 @@ backend/src/generated/java/<base>/<owner>/internal/persistence/jooq/generated/
 - ChangeGate重生成后必须对src/generated/java执行零差异检查。
 
 ## 12. OpenAPI与前端工作区
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: application-topology
 
 ### 12.1 四份契约
 
@@ -1112,6 +1122,8 @@ ci/change-gate
 ~~~
 
 ### 16.1 固定检查组
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: application-topology
 
 执行可以在依赖满足后并行，但逻辑DAG固定为：
 
@@ -1215,6 +1227,8 @@ previousReleaseBundle由CI注入并验证Digest，不能作为开发分支可编
 | ChangeGate/ReleaseGate分层 | 16 |
 
 ## 18. 完成判据
+superseded-by: docs/baseline/CURRENT-MVP-BASELINE.md
+replacement-section: application-topology
 
 本规格的实现只有同时满足以下条件才可认为基础骨架成立：
 
@@ -1251,6 +1265,6 @@ previousReleaseBundle由CI注入并验证Digest，不能作为开发分支可编
 
 在这些内容被后续规格冻结前，不得以“预留字段”、extensions JSON、EAV、空模块、通用Handler或动态配置绕过本规格。
 
-## 2026-08-27 P0一致性补充
+## 历史修订记录（已被当前基线替代）
 
-构建契约必须为报价观察、每Snapshot独立Review、不可变WaitReceipt和只读WaitingProjection保留明确模块边界。Task类型注册表必须机械包含P0-01至P0-15的固定变体、主命令和完成Fact；禁止用通用审批Handler或同一Task重开实现退回、修正和补正重提。
+该历史修订曾要求构建契约为报价观察、每Snapshot独立Review、不可变WaitReceipt和只读WaitingProjection保留明确模块边界。Task类型注册表曾被要求机械包含P0-01至P0-15的固定变体、主命令和完成Fact；禁止用通用审批Handler或同一Task重开实现退回、修正和补正重提。当前规则以当前MVP基线为准。

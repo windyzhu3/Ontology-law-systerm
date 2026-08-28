@@ -1,0 +1,43 @@
+name: Baseline consistency
+
+on:
+  pull_request:
+    paths:
+      - README.md
+      - docs/**
+      - database/schema-contract-52-plus-2/**
+      - scripts/baseline/**
+      - .github/workflows/baseline-consistency.yml
+  push:
+    paths:
+      - README.md
+      - docs/**
+      - database/schema-contract-52-plus-2/**
+      - scripts/baseline/**
+      - .github/workflows/baseline-consistency.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test baseline verifier
+        run: python3 -m unittest scripts.baseline.tests.test_verify_baseline -v
+      - name: Verify repository baseline
+        run: python3 scripts/baseline/verify_baseline.py
+      - name: Check generated schema contract
+        working-directory: database/schema-contract-52-plus-2
+        run: python3 generate.py --check
+      - name: Test schema contract
+        working-directory: database/schema-contract-52-plus-2
+        run: python3 -m unittest discover -s tests -v

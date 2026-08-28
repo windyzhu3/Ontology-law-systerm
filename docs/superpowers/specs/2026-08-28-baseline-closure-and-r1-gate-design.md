@@ -6,11 +6,13 @@
 
 确认日期：2026-08-28
 
+派生基线：`MVP-2026-08-28.1`
+
 适用范围：销售 MVP、责任内核、前后端拓扑、Matter 终点、52＋2数据库合同及 R1 实施门禁
 
 ## 1. 目的
 
-本设计将已经冻结但散落在历史规格、52＋2合同和高保真补充中的决定收口为一套可实施、可验证的当前基线。收口完成前不合并 PR #2，不开始 R1 生产代码，也不继续扩展页面、表或后续业务范围。
+本设计将已经冻结但散落在历史规格、52＋2合同和高保真补充中的决定收口为一套可实施、可验证的当前基线。收口完成前不合并 PR #2，不开始 R1 生产代码，也不继续扩展页面、表或后续业务范围；真实PostgreSQL运行时验证按[ADR-0001](../../adr/ADR-0001-pr2-runtime-gate-order.md)在PR #2合并后独立执行。
 
 本次只解决六件事：
 
@@ -18,7 +20,7 @@
 2. 统一为一个 SPA、一份 OpenAPI 和 API/Worker 两种后端启动角色。
 3. 统一销售 MVP 终点为 `TransferAccepted + MatterRef`。
 4. 建立草案、冻结、合并、实现、实库验证五态台账。
-5. 在真实 PostgreSQL 18（合同兼容下限15＋）验证 52＋2迁移与部署门禁。
+5. 冻结PR #2合并后在真实 PostgreSQL 18（合同兼容下限15＋）验证52＋2迁移与部署门禁的独立顺序和交付行。
 6. 以 R1 线索接入至首联结果作为第一个生产垂直切片，阻止 R2/R3 提前实现。
 
 ## 2. 权威性与适用顺序
@@ -161,7 +163,9 @@ MatterRef表示正式稳定身份已被分配，不表示完整Matter聚合或�
 
 ## 9. PostgreSQL真实验证门禁
 
-开始R1生产代码前，必须在一次性、专用、空的PostgreSQL 18数据库执行；当前合同的兼容下限仍为PostgreSQL 15＋：
+PR #2在当前基线、历史降级、五态台账、静态数据库验证和只读CI通过后即可合并，不以本节的真实运行时证据作为合并前置。合并后必须创建或推进独立`DB-52P2-PG18-RUNTIME`交付行；`DB-52P2-CONTRACT`和`DB-52P2-MIGRATIONS`保持`MERGED`。
+
+开始R1计划前，独立运行时行必须在一次性、专用、空的PostgreSQL 18数据库完成以下验证并达到`RUNTIME_VERIFIED`；当前合同的兼容下限仍为PostgreSQL 15＋：
 
 1. 使用固定Flyway版本执行`migrate`（启用`validateOnMigrate`）→严格`validate`→`info`；空库不得先运行strict validate；
 2. 19个迁移全部成功；
@@ -217,7 +221,7 @@ R1必须使用现有52＋2合同，不新增表。第一版不调用LLM；先实
 
 ### 10.3 R1实施前置缺口
 
-52＋2合同当前没有P0-02“补全联系方式”的权威持久化目标：`Lead.captured_*`是不可覆盖的原始接入值，Party不拥有联系信息，ActionDraft、AuditEntry、DomainEvent和CommandReceipt也都不能充当业务真相。已确认的收口方案是在`lead.lead`增加类型化、一次写入的Ingress Completion槽，保持52＋2表数；在新ADR、合同版本`52-plus-2-v1.1`和V850前向迁移完成并重新通过真实PostgreSQL门禁前，R1生产代码门禁保持未满足。
+52＋2合同当前没有P0-02“补全联系方式”的权威持久化目标：`Lead.captured_*`是不可覆盖的原始接入值，Party不拥有联系信息，ActionDraft、AuditEntry、DomainEvent和CommandReceipt也都不能充当业务真相。已确认的收口方案是在`lead.lead`增加类型化、一次写入的Ingress Completion槽，保持52＋2表数；在未来`docs/adr/ADR-0002-lead-ingress-completion-slot.md`、合同版本`52-plus-2-v1.1`和V850前向迁移完成并重新通过真实PostgreSQL门禁前，R1生产代码门禁保持未满足。
 
 该槽固定包含phone/email密文与HMAC配对、静态来源代码、加密来源说明、完成Appointment、完成时间和32字节完成摘要。只允许在原始phone/email均缺失且整槽为空时一次写入至少一组联系方式；原始渠道捕获值永久不改。成功命令以更新后的准确`lead.lead` revision作为完成Fact，在同一事务完成Lead CAS、Task DONE、Audit、Event、Outbox和CommandReceipt；失败事务不得遗留候选值。不得把联系方式塞入通用JSON、审计摘要或事件载荷，也不得改写V001至V840。
 
@@ -246,18 +250,18 @@ R1采用测试驱动开发。每个行为必须先有失败测试，再写最小
 
 只有同时满足以下条件才能开始R2：
 
-1. 本收口设计和实施计划已合并；
+1. 本收口设计、实施计划和当前基线已合并；
 2. PR #2的视觉资产与权威基线无冲突并已合并；
-3. 52＋2合同已真实PostgreSQL验证；
-4. R1后端、SPA和OpenAPI均达到`IMPLEMENTED`；
-5. R1黄金路径及关键失败路径达到`RUNTIME_VERIFIED`；
+3. 独立`DB-52P2-PG18-RUNTIME`行为`RUNTIME_VERIFIED`，而数据库合同和迁移行保持`MERGED`；
+4. `R1-OPENAPI`、`R1-BACKEND`和`R1-SPA`均达到`IMPLEMENTED`；
+5. `R1-E2E-GOLDEN`和`R1-E2E-FAILURES`均达到`RUNTIME_VERIFIED`；
 6. 没有通过新增通用平台能力绕过冻结边界。
 
 R3只能在R2以同样标准完成后开始。后续页面设计可以作为DRAFT存在，但不得被标记为已实现，也不得驱动R1扩大范围。
 
 ## 13. 仓库变更策略
 
-第一阶段继续使用`fix/p0-workcard-design-consistency`收口PR #2，只修改文档、视觉索引和必要的合同测试，不引入生产应用代码。完成并合并后，再从最新`main`创建独立R1实现分支。
+第一阶段继续使用`fix/p0-workcard-design-consistency`收口PR #2，只修改文档、视觉索引和必要的合同测试，不引入生产应用代码。完成并合并后，先从最新`main`执行独立PostgreSQL运行时验证计划并推进`DB-52P2-PG18-RUNTIME`；只有该行达到`RUNTIME_VERIFIED`后，才创建独立R1实现分支。
 
 已生成Flyway迁移不在PR #2中重写。若真实PostgreSQL验证证明物理合同需要修正，先记录失败证据，再通过独立前向迁移和合同版本处理。
 
@@ -269,6 +273,6 @@ R3只能在R2以同样标准完成后开始。后续页面设计可以作为DRAF
 - 历史冲突段落被明确标为已替代；
 - 五态台账准确反映设计与实现差距；
 - PR #2通过文档和合同一致性检查；
-- 真实PostgreSQL迁移证据可复验；
+- PR #2合并后取得真实PostgreSQL迁移证据的独立计划、交付行和失败关闭顺序可复验；
 - R1实现计划只覆盖线索至首联垂直切片；
 - R2/R3门禁可由CI或验收清单机械判断。
