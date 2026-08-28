@@ -2,7 +2,9 @@
 
 日期：2026-08-28
 
-状态：待用户复核
+状态：已确认（`FROZEN`）
+
+确认日期：2026-08-28
 
 适用范围：销售 MVP、责任内核、前后端拓扑、Matter 终点、52＋2数据库合同及 R1 实施门禁
 
@@ -16,7 +18,7 @@
 2. 统一为一个 SPA、一份 OpenAPI 和 API/Worker 两种后端启动角色。
 3. 统一销售 MVP 终点为 `TransferAccepted + MatterRef`。
 4. 建立草案、冻结、合并、实现、实库验证五态台账。
-5. 在真实 PostgreSQL 15＋验证 52＋2迁移与部署门禁。
+5. 在真实 PostgreSQL 18（合同兼容下限15＋）验证 52＋2迁移与部署门禁。
 6. 以 R1 线索接入至首联结果作为第一个生产垂直切片，阻止 R2/R3 提前实现。
 
 ## 2. 权威性与适用顺序
@@ -30,6 +32,8 @@
 5. `docs/progress/MVP-DELIVERY-LEDGER.md`：交付状态，不改变产品或数据库语义。
 6. `docs/design/`：视觉验收证据，不产生领域规则。
 7. `docs/specs/`：设计演进历史；与当前基线冲突的段落必须显式标为已被替代，不再依靠文末补丁隐式覆盖。
+
+本文件是已冻结的收口决策记录，也是创建`CURRENT-MVP-BASELINE.md`的实施输入；当前基线建立后，本文件只保留决策依据和门禁说明，不高于或替代当前基线。两者出现差异时必须停止实施，通过新ADR和新基线版本显式解决。
 
 任何高保真、OpenAPI、应用代码、测试或部署脚本与前四项冲突时，必须停止实施并通过新的 ADR 或基线版本处理，不能在局部代码中自行选择解释。
 
@@ -56,6 +60,8 @@
 - `CANCELLED`
 
 `DONE`和`CANCELLED`为永久终态。
+
+允许的完整迁移集合固定为：`OPEN → WAITING | DONE | CANCELLED`以及`WAITING → OPEN | DONE | CANCELLED`。`WAITING → DONE`只允许准确Fact Owner在同一事务写入该Task冻结的完成Fact时发生；它不能由到期、用户点击、ActionDraft确认、CommandReceipt或WaitReceipt直接触发。仍需由Owner执行交互式行动时，Task必须先从`WAITING`恢复为`OPEN`。
 
 ### 4.2 创建与进入等待
 
@@ -155,9 +161,9 @@ MatterRef表示正式稳定身份已被分配，不表示完整Matter聚合或�
 
 ## 9. PostgreSQL真实验证门禁
 
-开始R1生产代码前，必须在一次性、专用、空的PostgreSQL 15＋数据库执行：
+开始R1生产代码前，必须在一次性、专用、空的PostgreSQL 18数据库执行；当前合同的兼容下限仍为PostgreSQL 15＋：
 
-1. 固定Flyway版本的`validate`与`migrate`；
+1. 使用固定Flyway版本执行`migrate`（启用`validateOnMigrate`）→严格`validate`→`info`；空库不得先运行strict validate；
 2. 19个迁移全部成功；
 3. `V840__schema_contract_validation.sql`通过；
 4. 52张应用事实表、`deployment_state`和Flyway历史表总数准确；
@@ -181,7 +187,7 @@ Lead接入
 → 写ContactResult准确事实
 → 同事务写DomainEvent、AuditEntry、CommandReceipt
 → 原Task DONE
-→ 按结果创建重试、主管复核或商机推进责任
+→ 按结果创建重试或主管复核责任；有效接通形成R2可消费的OpportunityOpened边界
 ```
 
 R1必须使用现有52＋2合同，不新增表。第一版不调用LLM；先实现确定性问答和固定选项，AI只在R1确定性验收后作为候选提取增强。
@@ -206,6 +212,16 @@ R1必须使用现有52＋2合同，不新增表。第一版不调用LLM；先实
 - 客户入口；
 - Provider真实发送；
 - 新表、Kafka、Redis、搜索引擎或通用流程组件。
+
+`CONNECTED_VALID`仍须按52＋2运行时合同在同一事务创建唯一Opportunity锚点并发布`OpportunityOpened`，但R1不创建没有Handler的R2 Task；R2启用后只消费该边界事实创建首个商机推进责任。
+
+### 10.3 R1实施前置缺口
+
+52＋2合同当前没有P0-02“补全联系方式”的权威持久化目标：`Lead.captured_*`是不可覆盖的原始接入值，Party不拥有联系信息，ActionDraft、AuditEntry、DomainEvent和CommandReceipt也都不能充当业务真相。已确认的收口方案是在`lead.lead`增加类型化、一次写入的Ingress Completion槽，保持52＋2表数；在新ADR、合同版本`52-plus-2-v1.1`和V850前向迁移完成并重新通过真实PostgreSQL门禁前，R1生产代码门禁保持未满足。
+
+该槽固定包含phone/email密文与HMAC配对、静态来源代码、加密来源说明、完成Appointment、完成时间和32字节完成摘要。只允许在原始phone/email均缺失且整槽为空时一次写入至少一组联系方式；原始渠道捕获值永久不改。成功命令以更新后的准确`lead.lead` revision作为完成Fact，在同一事务完成Lead CAS、Task DONE、Audit、Event、Outbox和CommandReceipt；失败事务不得遗留候选值。不得把联系方式塞入通用JSON、审计摘要或事件载荷，也不得改写V001至V840。
+
+P0-04在R1只形成绑定准确Lead和Task的`DecisionRecord(LEAD_ROUTING_DISPOSITION)`及后续责任，不证明来源账号已被停用；视觉稿中的“停止本来源受理”在新增准确SourceAccount控制Fact前只能解释为`REQUEST_SOURCE_INTAKE_STOP`请求，不能显示为已停用。
 
 ## 11. R1测试和验收
 
