@@ -32,6 +32,7 @@ PARSER_STATE_DIAGNOSTIC_CODES = (
     "verifier_parser_phase_conflict",
 )
 FINGERPRINT_SQLSTATE_DIAGNOSTICS = {
+    "42725": "verifier_fingerprint_sqlstate_ambiguous_function_operator",
     "42883": "verifier_fingerprint_sqlstate_undefined_function_operator",
     "42804": "verifier_fingerprint_sqlstate_datatype_mismatch",
     "42846": "verifier_fingerprint_sqlstate_cannot_coerce",
@@ -1014,6 +1015,50 @@ class RuntimeHarnessTests(unittest.TestCase):
                     self.assertEqual(diagnostic, expected_code)
                     for secret in ("hunter2", "db.internal", "/private/tmp", "top-secret"):
                         self.assertNotIn(secret, diagnostic)
+
+    def test_fingerprint_sql_normalizes_the_union_key_and_internal_char_operand(self) -> None:
+        """Break caught: PostgreSQL resolves a fingerprint UNION/concat to lossy or ambiguous types."""
+        fingerprint_path = PROJECT_ROOT / "runtime" / "sql" / "schema_fingerprint.sql"
+        fingerprint_sql = fingerprint_path.read_text(encoding="utf-8")
+
+        def assert_required_normalization(sql: str) -> None:
+            statement_endings = [
+                (line_number, line.strip())
+                for line_number, line in enumerate(sql.splitlines(), start=1)
+                if line.strip() and line.rstrip().endswith(";")
+            ]
+            self.assertEqual(statement_endings, [(98, "FROM stable_catalog;")])
+
+            first_nonunknown_object_key = re.search(
+                r"UNION ALL\s+SELECT '10-schema', (?P<object_key>[^,\r\n]+),",
+                sql,
+            )
+            self.assertIsNotNone(first_nonunknown_object_key)
+            assert first_nonunknown_object_key is not None
+            self.assertEqual(
+                first_nonunknown_object_key.group("object_key").strip(),
+                "namespace_record.nspname::text",
+            )
+            self.assertRegex(
+                sql,
+                r"table_record\.relkind::text\s*\|\|\s*'\|'",
+            )
+
+        assert_required_normalization(fingerprint_sql)
+        mutations = (
+            (
+                "namespace_record.nspname::text",
+                "namespace_record.nspname",
+            ),
+            (
+                "table_record.relkind::text || '|'",
+                "table_record.relkind || '|'",
+            ),
+        )
+        for normalized, unsafe in mutations:
+            self.assertEqual(fingerprint_sql.count(normalized), 1)
+            with self.subTest(removed_cast=normalized), self.assertRaises(AssertionError):
+                assert_required_normalization(fingerprint_sql.replace(normalized, unsafe, 1))
 
     def test_exact_set_gate_rejects_case_hidden_controlled_mutations(self) -> None:
         """Break caught: reviewer casing variants introduce drift without breaking the exact-set test."""

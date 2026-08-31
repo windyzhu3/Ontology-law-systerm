@@ -1,7 +1,7 @@
 WITH catalog_lines(section_name, object_key, definition) AS (
     SELECT '00-server', 'server_version', current_setting('server_version')
     UNION ALL
-    SELECT '10-schema', namespace_record.nspname, coalesce(pg_catalog.obj_description(namespace_record.oid, 'pg_namespace'), '')
+    SELECT '10-schema', namespace_record.nspname::text, coalesce(pg_catalog.obj_description(namespace_record.oid, 'pg_namespace'), '')
     FROM pg_catalog.pg_namespace namespace_record
     WHERE namespace_record.nspname IN (
         'identity', 'audit', 'responsibility', 'execution', 'external_action',
@@ -10,7 +10,7 @@ WITH catalog_lines(section_name, object_key, definition) AS (
     )
     UNION ALL
     SELECT '20-table', namespace_record.nspname || '.' || table_record.relname,
-           table_record.relkind || '|' || coalesce(pg_catalog.obj_description(table_record.oid, 'pg_class'), '')
+           table_record.relkind::text || '|' || coalesce(pg_catalog.obj_description(table_record.oid, 'pg_class'), '')
     FROM pg_catalog.pg_class table_record
     JOIN pg_catalog.pg_namespace namespace_record ON namespace_record.oid = table_record.relnamespace
     WHERE namespace_record.nspname IN (

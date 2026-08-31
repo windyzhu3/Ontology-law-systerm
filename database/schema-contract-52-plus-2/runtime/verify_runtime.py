@@ -522,6 +522,7 @@ _VERIFIER_PHASE_DIAGNOSTICS = {
 # claim that line 98 identifies the failing source section inside the statement.
 _VERIFIER_FINGERPRINT_STATEMENT_END_LINE = 98
 _VERIFIER_FINGERPRINT_SQLSTATE_DIAGNOSTICS = {
+    "42725": "verifier_fingerprint_sqlstate_ambiguous_function_operator",
     "42883": "verifier_fingerprint_sqlstate_undefined_function_operator",
     "42804": "verifier_fingerprint_sqlstate_datatype_mismatch",
     "42846": "verifier_fingerprint_sqlstate_cannot_coerce",

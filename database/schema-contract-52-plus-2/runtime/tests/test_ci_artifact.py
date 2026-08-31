@@ -1511,6 +1511,7 @@ class HostedCiOnlyVerificationTests(unittest.TestCase):
         safe_codes = (
             "verifier_capability_query_insert",
             "verifier_fingerprint_error",
+            "verifier_fingerprint_sqlstate_ambiguous_function_operator",
             "verifier_fingerprint_sqlstate_undefined_function_operator",
             "verifier_fingerprint_sqlstate_datatype_mismatch",
             "verifier_fingerprint_sqlstate_cannot_coerce",
