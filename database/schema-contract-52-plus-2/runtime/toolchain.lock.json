@@ -1,0 +1,16 @@
+{
+  "images": [
+    {
+      "image": "postgres",
+      "tag": "18",
+      "digest": "sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280",
+      "resolvedAt": "2026-08-28T15:59:34Z"
+    },
+    {
+      "image": "redgate/flyway",
+      "tag": "13.4.0",
+      "digest": "sha256:c093a247b19ff09a6a72774569171ee355fff2ae44ceba4a4aa4b23235d99c93",
+      "resolvedAt": "2026-08-28T15:59:34Z"
+    }
+  ]
+}

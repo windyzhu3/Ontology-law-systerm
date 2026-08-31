@@ -102,8 +102,9 @@ Flyway迁移角色必须是当前数据库及全部受管Schema/对象的固定O
 ```bash
 cp flyway.conf.example flyway.conf
 export FLYWAY_PASSWORD='由部署环境注入'
-flyway -configFiles=flyway.conf validate
-flyway -configFiles=flyway.conf migrate
+flyway -configFiles=flyway.conf -validateOnMigrate=true migrate
+flyway -configFiles=flyway.conf -ignoreMigrationPatterns= validate
+flyway -configFiles=flyway.conf info
 ```
 
 不要把真实口令写入配置、迁移、日志或仓库。`flyway clean` 必须保持禁用；不得对已迁移数据库使用 `baselineOnMigrate` 绕过合同。

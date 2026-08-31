@@ -1,0 +1,59 @@
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?rendered from runtime/toolchain.lock.json}
+    environment:
+      POSTGRES_DB: law_contract_runtime
+      POSTGRES_PASSWORD: ${RUNTIME_POSTGRES_PASSWORD:?provided only by the runtime harness}
+      POSTGRES_USER: postgres
+      RUNTIME_MIGRATOR_PASSWORD: ${RUNTIME_MIGRATOR_PASSWORD:?provided only by the runtime harness}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d law_contract_runtime"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 2s
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./bootstrap/001-create-capability-roles.sql:/docker-entrypoint-initdb.d/001-create-capability-roles.sql:ro
+      - ./sql:/runtime/sql:ro
+
+  flyway:
+    image: ${FLYWAY_IMAGE:?rendered from runtime/toolchain.lock.json}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      FLYWAY_PASSWORD: ${RUNTIME_MIGRATOR_PASSWORD:?provided only by the runtime harness}
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/law_contract_runtime
+      FLYWAY_USER: law_schema_migrator
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        flyway -connectRetries=30 -validateMigrationNaming=true -cleanDisabled=true -baselineOnMigrate=false -defaultSchema=platform_meta -schemas=identity,audit,responsibility,execution,external_action,evidence,party,lead,opportunity,conflict,contract,transfer,platform_meta -locations=filesystem:/flyway/sql -placeholders.app_command_role=law_app_command -placeholders.app_worker_role=law_app_worker -placeholders.app_query_role=law_app_query -placeholders.audit_append_role=law_audit_append -validateOnMigrate=true migrate
+        flyway -connectRetries=30 -validateMigrationNaming=true -cleanDisabled=true -baselineOnMigrate=false -defaultSchema=platform_meta -schemas=identity,audit,responsibility,execution,external_action,evidence,party,lead,opportunity,conflict,contract,transfer,platform_meta -locations=filesystem:/flyway/sql -placeholders.app_command_role=law_app_command -placeholders.app_worker_role=law_app_worker -placeholders.app_query_role=law_app_query -placeholders.audit_append_role=law_audit_append -ignoreMigrationPatterns= validate
+        flyway -connectRetries=30 -validateMigrationNaming=true -cleanDisabled=true -baselineOnMigrate=false -defaultSchema=platform_meta -schemas=identity,audit,responsibility,execution,external_action,evidence,party,lead,opportunity,conflict,contract,transfer,platform_meta -locations=filesystem:/flyway/sql -placeholders.app_command_role=law_app_command -placeholders.app_worker_role=law_app_worker -placeholders.app_query_role=law_app_query -placeholders.audit_append_role=law_audit_append info
+    volumes:
+      - ../generated/db/migration:/flyway/sql:ro
+
+  verifier:
+    image: ${POSTGRES_IMAGE:?rendered from runtime/toolchain.lock.json}
+    depends_on:
+      flyway:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/sh", "-ec"]
+    environment:
+      PGDATABASE: law_contract_runtime
+      PGHOST: postgres
+      PGPASSWORD: ${RUNTIME_POSTGRES_PASSWORD:?provided only by the runtime harness}
+      PGUSER: postgres
+    command:
+      - |
+        psql -X -v ON_ERROR_STOP=1 -qAt -f /runtime/sql/assert_schema_contract.sql >/dev/null
+        psql -X -v ON_ERROR_STOP=1 -qAt -f /runtime/sql/assert_capabilities.sql >/dev/null
+        fingerprint="$$(psql -X -v ON_ERROR_STOP=1 -qAt -f /runtime/sql/schema_fingerprint.sql)"
+        printf '%s\n' "$${fingerprint}"
+    volumes:
+      - ./sql:/runtime/sql:ro
+
+volumes:
+  postgres-data:

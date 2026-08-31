@@ -25,8 +25,9 @@
 当前构建环境没有 `postgres`、`psql`、Flyway CLI 或 Docker，因此未声称已在真实 PostgreSQL 实例执行迁移。发布前必须在专用 PostgreSQL 15＋数据库中，以固定 Flyway 版本依次执行：
 
 ```bash
-flyway -configFiles=flyway.conf validate
-flyway -configFiles=flyway.conf migrate
+flyway -configFiles=flyway.conf -validateOnMigrate=true migrate
+flyway -configFiles=flyway.conf -ignoreMigrationPatterns= validate
+flyway -configFiles=flyway.conf info
 ```
 
 只有 `V840__schema_contract_validation.sql` 成功、应用制品与 manifest 摘要匹配，受控发布作业才可将 `deployment_state` 从 `BLOCKED` CAS 切换为 `ACTIVE`。

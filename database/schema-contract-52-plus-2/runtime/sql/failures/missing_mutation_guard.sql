@@ -1,0 +1,1 @@
+DROP TRIGGER trg_lead_contact_result__mutation_guard ON lead.lead_contact_result;
