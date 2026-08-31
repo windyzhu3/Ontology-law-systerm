@@ -7,6 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -377,6 +378,44 @@ class RuntimeHarnessTests(unittest.TestCase):
         self.assertIn("'postgresVersion', pg_catalog.version()", fingerprint)
         for unstable in ("oid::text", "installed_on", "execution_time", "current_database()"):
             self.assertNotIn(unstable, fingerprint)
+
+    def test_successful_migration_count_includes_only_versioned_sql_migrations(self) -> None:
+        """Break caught: Flyway SCHEMA or BASELINE markers inflate the 19-migration count."""
+        schema_contract = (PROJECT_ROOT / "runtime" / "sql" / "assert_schema_contract.sql").read_text(
+            encoding="utf-8"
+        )
+        count_query = re.search(
+            r"SELECT\s+count\(\*\)\s+INTO\s+actual_count\s+"
+            r"FROM\s+platform_meta\.flyway_schema_history\s+WHERE\s+(?P<predicate>[^;]+);",
+            schema_contract,
+            flags=re.IGNORECASE,
+        )
+        self.assertIsNotNone(count_query, "the runtime contract must count Flyway history rows")
+        predicate = count_query.group("predicate")
+
+        rows = [(f"{version:03d}", "SQL", 1) for version in range(1, 20)]
+        rows.extend(
+            [
+                (None, "SCHEMA", 1),
+                ("000", "BASELINE", 1),
+                ("999", "SQL", 0),
+            ]
+        )
+        with sqlite3.connect(":memory:") as database:
+            database.execute("ATTACH DATABASE ':memory:' AS platform_meta")
+            database.execute(
+                "CREATE TABLE platform_meta.flyway_schema_history "
+                "(version TEXT, type TEXT, success INTEGER)"
+            )
+            database.executemany(
+                "INSERT INTO platform_meta.flyway_schema_history (version, type, success) VALUES (?, ?, ?)",
+                rows,
+            )
+            actual_count = database.execute(
+                f"SELECT count(*) FROM platform_meta.flyway_schema_history WHERE {predicate}"
+            ).fetchone()[0]
+
+        self.assertEqual(actual_count, 19)
 
     def test_success_result_captures_runtime_identity_and_normalizes_for_publication(self) -> None:
         """Break caught: a real PASS cannot prove exact images/versions or enter the closed evidence schema."""

@@ -59,7 +59,9 @@ BEGIN
 
     SELECT count(*) INTO actual_count
     FROM platform_meta.flyway_schema_history
-    WHERE success;
+    WHERE success
+      AND version IS NOT NULL
+      AND type = 'SQL';
     IF actual_count <> 19 THEN
         RAISE EXCEPTION 'assertion=19 successful migrations expected=19 actual=%', actual_count;
     END IF;
