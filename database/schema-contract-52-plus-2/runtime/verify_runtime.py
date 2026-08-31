@@ -517,6 +517,18 @@ _VERIFIER_PHASE_DIAGNOSTICS = {
     "schema": ("assert_schema_contract.sql", "verifier_schema_assertion_unknown"),
     "capability": ("assert_capabilities.sql", "verifier_capability_assertion_unknown"),
 }
+_VERIFIER_PARSER_DIAGNOSTIC_CODES = frozenset(
+    {
+        "verifier_parser_evidence_invalid",
+        "verifier_parser_error_missing",
+        "verifier_parser_error_multiple",
+        "verifier_parser_record_missing",
+        "verifier_parser_record_multiple",
+        "verifier_parser_assertion_multiple",
+        "verifier_parser_assertion_malformed",
+        "verifier_parser_phase_conflict",
+    }
+)
 _VERIFIER_ERROR_RECORD_PATTERN = re.compile(
     r"^(?:[A-Za-z0-9][A-Za-z0-9_.-]{0,127}[ \t]+\|[ \t]+)?"
     r"psql:/runtime/sql/"
@@ -534,6 +546,7 @@ _VERIFIER_DIAGNOSTIC_CODES = frozenset(
     {
         *(code for _, code in _VERIFIER_ASSERTION_DIAGNOSTICS.values()),
         *(code for _, code in _VERIFIER_PHASE_DIAGNOSTICS.values()),
+        *_VERIFIER_PARSER_DIAGNOSTIC_CODES,
         "verifier_diagnostic_unknown",
         "verifier_logs_unavailable",
     }
@@ -3490,9 +3503,9 @@ def classify_verifier_log(evidence_path: Path) -> str:
     try:
         recorded = json.loads(Path(evidence_path).read_text(encoding="utf-8"))
     except (OSError, TypeError, UnicodeError, json.JSONDecodeError):
-        return "verifier_diagnostic_unknown"
+        return "verifier_parser_evidence_invalid"
     if not isinstance(recorded, Mapping):
-        return "verifier_diagnostic_unknown"
+        return "verifier_parser_evidence_invalid"
     return_code = recorded.get("returncode")
     stdout = recorded.get("stdout")
     stderr = recorded.get("stderr")
@@ -3502,16 +3515,21 @@ def classify_verifier_log(evidence_path: Path) -> str:
         or not isinstance(stdout, str)
         or not isinstance(stderr, str)
     ):
-        return "verifier_diagnostic_unknown"
+        return "verifier_parser_evidence_invalid"
     if return_code != 0:
         return "verifier_logs_unavailable"
 
     output = "\n".join((stdout, stderr))
-    if output.count("ERROR:") != 1:
-        return "verifier_diagnostic_unknown"
+    error_count = output.count("ERROR:")
     records = list(_VERIFIER_ERROR_RECORD_PATTERN.finditer(output))
-    if len(records) != 1:
-        return "verifier_diagnostic_unknown"
+    if error_count == 0:
+        return "verifier_parser_error_missing"
+    if len(records) > 1:
+        return "verifier_parser_record_multiple"
+    if error_count > 1:
+        return "verifier_parser_error_multiple"
+    if not records:
+        return "verifier_parser_record_missing"
     record = records[0]
     phase = next(
         (
@@ -3528,15 +3546,15 @@ def classify_verifier_log(evidence_path: Path) -> str:
     if assertion_occurrences == 0:
         return _VERIFIER_PHASE_DIAGNOSTICS[phase][1]
     if assertion_occurrences != 1:
-        return "verifier_diagnostic_unknown"
+        return "verifier_parser_assertion_multiple"
     assertion_record = _VERIFIER_ASSERTION_MESSAGE_PATTERN.fullmatch(record.group("message"))
     if assertion_record is None:
-        return "verifier_diagnostic_unknown"
+        return "verifier_parser_assertion_malformed"
     assertion = _VERIFIER_ASSERTION_DIAGNOSTICS.get(assertion_record.group("label"))
     if assertion is None:
         return _VERIFIER_PHASE_DIAGNOSTICS[phase][1]
     assertion_phase, diagnostic = assertion
-    return diagnostic if assertion_phase == phase else "verifier_diagnostic_unknown"
+    return diagnostic if assertion_phase == phase else "verifier_parser_phase_conflict"
 
 
 def _recorded_stdout(evidence_path: Path) -> str | None:
@@ -3791,7 +3809,7 @@ def _capture_verifier_summary(
     stage_runner: Callable[..., int],
 ) -> str:
     result["logsReturnCode"] = stage_runner(
-        [*command_prefix, "logs", "--no-color", "verifier"],
+        [*command_prefix, "logs", "--no-color", "--no-log-prefix", "verifier"],
         evidence_path=evidence_path,
         cwd=schema_root,
         timeout_seconds=_VERIFIER_TIMEOUT_SECONDS,

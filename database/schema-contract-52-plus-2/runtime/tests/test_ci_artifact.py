@@ -404,7 +404,7 @@ class CiArtifactTests(unittest.TestCase):
 
     def test_verifier_diagnostics_are_finite_position_bound_and_failure_only(self) -> None:
         """Break caught: a safe verifier code is accepted on an unrelated or non-failed stage."""
-        safe_code = "verifier_schema_migration_count"
+        safe_code = "verifier_parser_record_missing"
 
         def verifier_failure_summary(stage_name: str = "verifier-wait") -> dict[str, object]:
             summary = _passed_summary()
@@ -1508,49 +1508,73 @@ class HostedCiOnlyVerificationTests(unittest.TestCase):
             "password=hunter2 postgresql://user:secret@db.internal/law "
             "/private/tmp/runtime token=top-secret"
         )
-        result = verify_runtime.RuntimeVerificationResult(
-            {
-                "status": "FAILED",
-                "reason": "compose_up_failed",
-                "failureScenarios": [],
-                "runs": [{"stderr": hostile, "stdout": hostile, "project": hostile}],
-            },
-            ci_stage_results=captured,
-            ci_locked_images=verify_runtime._ci_locked_images_from_lock(_locked_toolchain()),
-            ci_stage_diagnostics={
-                "run-01/verifier-wait.json": "verifier_capability_query_insert",
-            },
+        safe_codes = (
+            "verifier_capability_query_insert",
+            "verifier_parser_evidence_invalid",
+            "verifier_parser_error_missing",
+            "verifier_parser_error_multiple",
+            "verifier_parser_record_missing",
+            "verifier_parser_record_multiple",
+            "verifier_parser_assertion_multiple",
+            "verifier_parser_assertion_malformed",
+            "verifier_parser_phase_conflict",
         )
+        for safe_code in safe_codes:
+            with self.subTest(safe_code=safe_code):
+                result = verify_runtime.RuntimeVerificationResult(
+                    {
+                        "status": "FAILED",
+                        "reason": "compose_up_failed",
+                        "failureScenarios": [],
+                        "runs": [{"stderr": hostile, "stdout": hostile, "project": hostile}],
+                    },
+                    ci_stage_results=captured,
+                    ci_locked_images=verify_runtime._ci_locked_images_from_lock(_locked_toolchain()),
+                    ci_stage_diagnostics={
+                        "run-01/verifier-wait.json": safe_code,
+                    },
+                )
 
-        summary = verify_runtime.build_ci_runtime_summary(
-            result,
-            git_commit="d" * 40,
-            manifest={},
-        )
-        failed_wait = next(
-            stage
-            for stage in summary["runs"][0]["stages"]
-            if stage["stageName"] == "verifier-wait"
-        )
-        verifier_logs = next(
-            stage
-            for stage in summary["runs"][0]["stages"]
-            if stage["stageName"] == "verifier-logs"
-        )
-        self.assertEqual(failed_wait["diagnosticCode"], "verifier_capability_query_insert")
-        self.assertEqual(verifier_logs["diagnosticCode"], "ok")
-        self.assertEqual(set(summary), TOP_LEVEL_FIELDS)
-        self.assertEqual(set(failed_wait), STAGE_FIELDS)
+                summary = verify_runtime.build_ci_runtime_summary(
+                    result,
+                    git_commit="d" * 40,
+                    manifest={},
+                )
+                failed_wait = next(
+                    stage
+                    for stage in summary["runs"][0]["stages"]
+                    if stage["stageName"] == "verifier-wait"
+                )
+                verifier_logs = next(
+                    stage
+                    for stage in summary["runs"][0]["stages"]
+                    if stage["stageName"] == "verifier-logs"
+                )
+                self.assertEqual(failed_wait["diagnosticCode"], safe_code)
+                self.assertEqual(verifier_logs["diagnosticCode"], "ok")
+                self.assertEqual(set(summary), TOP_LEVEL_FIELDS)
+                self.assertEqual(set(failed_wait), STAGE_FIELDS)
 
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            targets = verify_runtime.export_ci_runtime_artifact(
-                summary,
-                Path(temporary_directory) / "schema-runtime-ci",
-            )
-            artifact_text = "\n".join(path.read_text(encoding="utf-8") for path in targets)
-        self.assertIn("verifier_capability_query_insert", artifact_text)
-        for secret in ("hunter2", "db.internal", "/private/tmp", "top-secret"):
-            self.assertNotIn(secret, artifact_text)
+                with tempfile.TemporaryDirectory() as temporary_directory:
+                    targets = verify_runtime.export_ci_runtime_artifact(
+                        summary,
+                        Path(temporary_directory) / "schema-runtime-ci",
+                    )
+                    validated = verify_runtime.validate_ci_runtime_artifact(
+                        Path(temporary_directory) / "schema-runtime-ci"
+                    )
+                    artifact_text = "\n".join(
+                        path.read_text(encoding="utf-8") for path in targets
+                    )
+                validated_wait = next(
+                    stage
+                    for stage in validated["runs"][0]["stages"]
+                    if stage["stageName"] == "verifier-wait"
+                )
+                self.assertEqual(validated_wait["diagnosticCode"], safe_code)
+                self.assertIn(safe_code, artifact_text)
+                for secret in ("hunter2", "db.internal", "/private/tmp", "top-secret"):
+                    self.assertNotIn(secret, artifact_text)
 
     def test_builder_requires_bound_valid_fingerprints_for_pass_and_mismatch(self) -> None:
         """Break caught: typed controller results can claim PASS/mismatch with inconsistent fingerprints."""

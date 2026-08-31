@@ -21,6 +21,16 @@ from pglast.visitors import Visitor
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PARSER_STATE_DIAGNOSTIC_CODES = (
+    "verifier_parser_evidence_invalid",
+    "verifier_parser_error_missing",
+    "verifier_parser_error_multiple",
+    "verifier_parser_record_missing",
+    "verifier_parser_record_multiple",
+    "verifier_parser_assertion_multiple",
+    "verifier_parser_assertion_malformed",
+    "verifier_parser_phase_conflict",
+)
 
 _ASSERTION_START_PATTERN = re.compile(r"assertion=", re.IGNORECASE)
 _STATIC_ASSERTION_PATTERN = re.compile(
@@ -491,7 +501,18 @@ class RuntimeHarnessTests(unittest.TestCase):
         self.assertEqual(2, sum(command[-1:] == ["flyway"] and "wait" in command for command in commands))
         self.assertEqual(2, sum(command[-1:] == ["flyway"] and "ps" in command for command in commands))
         self.assertTrue(any("migrate" in command and "--entrypoint" in command for command in commands))
-        self.assertTrue(any(command[-3:] == ["logs", "--no-color", "verifier"] for command in commands))
+        verifier_log_commands = [
+            command
+            for command in commands
+            if "logs" in command and command[-1:] == ["verifier"]
+        ]
+        self.assertEqual(len(verifier_log_commands), 3)
+        self.assertTrue(
+            all(
+                command[-4:] == ["logs", "--no-color", "--no-log-prefix", "verifier"]
+                for command in verifier_log_commands
+            )
+        )
         self.assertFalse(any("--abort-on-container-exit" in command for command in commands))
         self.assertTrue(all(timeout != verify_runtime._DEFAULT_TIMEOUT_SECONDS for _, timeout in calls))
         self.assertTrue(all(0 < timeout <= 300 for _, timeout in calls))
@@ -664,76 +685,137 @@ class RuntimeHarnessTests(unittest.TestCase):
                 "psql:/runtime/sql/assert_schema_contract.sql:1: ERROR:  "
                 "assertion=13 managed schemas expected=13 actual=12"
             )
-            fail_closed_outputs = {
+            parser_state_outputs = {
                 "unstructured-forgery.json": (
-                    "narrative assert_capabilities.sql says "
-                    "assertion=query role INSERT expected SQLSTATE=42501 actual=00000"
+                    (
+                        "narrative assert_capabilities.sql says "
+                        "assertion=query role INSERT expected SQLSTATE=42501 actual=00000"
+                        + hostile
+                    ),
+                    "verifier_parser_error_missing",
                 ),
-                "duplicate-record.json": f"{capability_record}\n{capability_record}",
-                "multiple-records.json": f"{schema_record}\n{capability_record}",
+                "duplicate-record.json": (
+                    f"{capability_record}\n{capability_record}{hostile}",
+                    "verifier_parser_record_multiple",
+                ),
+                "multiple-records.json": (
+                    f"{schema_record}\n{capability_record}{hostile}",
+                    "verifier_parser_record_multiple",
+                ),
                 "known-plus-error.json": (
-                    f"{capability_record}\n"
-                    "psql:/runtime/sql/assert_capabilities.sql:3: ERROR: unexpected failure"
+                    (
+                        f"{capability_record}\n"
+                        "psql:/runtime/sql/assert_capabilities.sql:3: ERROR: unexpected failure"
+                        + hostile
+                    ),
+                    "verifier_parser_record_multiple",
                 ),
                 "phase-conflict.json": (
-                    "psql:/runtime/sql/assert_schema_contract.sql:4: ERROR:  "
-                    "assertion=query role INSERT expected SQLSTATE=42501 actual=00000"
+                    (
+                        "psql:/runtime/sql/assert_schema_contract.sql:4: ERROR:  "
+                        "assertion=query role INSERT expected SQLSTATE=42501 actual=00000"
+                        + hostile
+                    ),
+                    "verifier_parser_phase_conflict",
                 ),
-                "zero-line.json": capability_record.replace(":2:", ":0:"),
-                "missing-error-token.json": capability_record.replace(": ERROR:", ": NOTICE:"),
-                "known-plus-bare-error.json": f"{capability_record}\nERROR: second failure",
-                "same-line-second-error.json": f"{capability_record} ERROR: second failure",
-                "embedded-near-prefix.json": f"not{capability_record}",
+                "zero-line.json": (
+                    capability_record.replace(":2:", ":0:") + hostile,
+                    "verifier_parser_record_missing",
+                ),
+                "missing-error-token.json": (
+                    capability_record.replace(": ERROR:", ": NOTICE:") + hostile,
+                    "verifier_parser_error_missing",
+                ),
+                "known-plus-bare-error.json": (
+                    f"{capability_record}\nERROR: second failure{hostile}",
+                    "verifier_parser_error_multiple",
+                ),
+                "same-line-second-error.json": (
+                    f"{capability_record} ERROR: second failure{hostile}",
+                    "verifier_parser_error_multiple",
+                ),
+                "embedded-near-prefix.json": (
+                    f"not{capability_record}{hostile}",
+                    "verifier_parser_record_missing",
+                ),
                 "empty-expected.json": (
-                    "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
-                    "assertion=query role INSERT expected="
+                    (
+                        "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                        "assertion=query role INSERT expected=" + hostile
+                    ),
+                    "verifier_parser_assertion_malformed",
                 ),
                 "whitespace-expected.json": (
-                    "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
-                    "assertion=query role INSERT expected=   "
+                    (
+                        "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                        "assertion=query role INSERT expected=   " + hostile
+                    ),
+                    "verifier_parser_assertion_malformed",
                 ),
                 "missing-actual-field.json": (
-                    "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
-                    "assertion=query role INSERT expected=42501 detail=failed"
+                    (
+                        "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                        "assertion=query role INSERT expected=42501 detail=failed" + hostile
+                    ),
+                    "verifier_parser_assertion_malformed",
                 ),
                 "empty-actual.json": (
-                    "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
-                    "assertion=query role INSERT expected=42501 actual="
+                    (
+                        "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                        "assertion=query role INSERT expected=42501 actual=" + hostile
+                    ),
+                    "verifier_parser_assertion_malformed",
                 ),
                 "whitespace-actual.json": (
-                    "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
-                    "assertion=query role INSERT expected=42501 actual=   "
+                    (
+                        "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                        "assertion=query role INSERT expected=42501 actual=   " + hostile
+                    ),
+                    "verifier_parser_assertion_malformed",
                 ),
                 "expected-only.json": (
-                    "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
-                    "assertion=query role INSERT expected=42501"
+                    (
+                        "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                        "assertion=query role INSERT expected=42501" + hostile
+                    ),
+                    "verifier_parser_assertion_malformed",
                 ),
                 "duplicate-assertion-without-prefix.json": (
-                    f"{capability_record}\n"
-                    "assertion=query role INSERT expected SQLSTATE=42501 actual=00000"
+                    (
+                        f"{capability_record}\n"
+                        "assertion=query role INSERT expected SQLSTATE=42501 actual=00000"
+                        + hostile
+                    ),
+                    "verifier_parser_assertion_multiple",
                 ),
             }
-            fail_closed_paths: list[Path] = []
-            for name, output in fail_closed_outputs.items():
+            for name, (output, expected_code) in parser_state_outputs.items():
                 evidence_path = evidence_directory / name
                 evidence_path.write_text(
                     json.dumps({"returncode": 0, "stderr": "", "stdout": output}),
                     encoding="utf-8",
                 )
-                fail_closed_paths.append(evidence_path)
+                with self.subTest(parser_state=name):
+                    code = verify_runtime.classify_verifier_log(evidence_path)
+                    self.assertEqual(code, expected_code)
+                    for secret in ("hunter2", "db.internal", "/private/tmp", "top-secret"):
+                        self.assertNotIn(secret, code)
+
             for evidence_path in (
                 malformed,
                 invalid_utf8,
                 non_string,
-                unknown,
-                *fail_closed_paths,
                 evidence_directory / "missing.json",
             ):
-                with self.subTest(fail_closed=evidence_path.name):
+                with self.subTest(invalid_evidence=evidence_path.name):
                     self.assertEqual(
                         verify_runtime.classify_verifier_log(evidence_path),
-                        "verifier_diagnostic_unknown",
+                        "verifier_parser_evidence_invalid",
                     )
+            self.assertEqual(
+                verify_runtime.classify_verifier_log(unknown),
+                "verifier_parser_error_missing",
+            )
 
     def test_verifier_assertion_map_exactly_tracks_production_sql(self) -> None:
         """Break caught: a SQL assertion and its closed diagnostic map drift independently."""
@@ -753,11 +835,17 @@ class RuntimeHarnessTests(unittest.TestCase):
         all_closed_codes = [
             *diagnostic_codes,
             *(code for _, code in verify_runtime._VERIFIER_PHASE_DIAGNOSTICS.values()),
+            *PARSER_STATE_DIAGNOSTIC_CODES,
             "verifier_diagnostic_unknown",
             "verifier_logs_unavailable",
         ]
         self.assertEqual(len(diagnostic_codes), len(set(diagnostic_codes)))
         self.assertEqual(len(all_closed_codes), len(set(all_closed_codes)))
+        self.assertEqual(
+            getattr(verify_runtime, "_VERIFIER_PARSER_DIAGNOSTIC_CODES", frozenset()),
+            frozenset(PARSER_STATE_DIAGNOSTIC_CODES),
+        )
+        self.assertEqual(verify_runtime._VERIFIER_DIAGNOSTIC_CODES, frozenset(all_closed_codes))
 
     def test_exact_set_gate_rejects_case_hidden_controlled_mutations(self) -> None:
         """Break caught: reviewer casing variants introduce drift without breaking the exact-set test."""
