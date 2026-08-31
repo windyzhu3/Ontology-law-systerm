@@ -516,6 +516,7 @@ _VERIFIER_ASSERTION_DIAGNOSTICS = {
 _VERIFIER_PHASE_DIAGNOSTICS = {
     "schema": ("assert_schema_contract.sql", "verifier_schema_assertion_unknown"),
     "capability": ("assert_capabilities.sql", "verifier_capability_assertion_unknown"),
+    "fingerprint": ("schema_fingerprint.sql", "verifier_fingerprint_error"),
 }
 _VERIFIER_PARSER_DIAGNOSTIC_CODES = frozenset(
     {
@@ -532,7 +533,7 @@ _VERIFIER_PARSER_DIAGNOSTIC_CODES = frozenset(
 _VERIFIER_ERROR_RECORD_PATTERN = re.compile(
     r"^(?:[A-Za-z0-9][A-Za-z0-9_.-]{0,127}[ \t]+\|[ \t]+)?"
     r"psql:/runtime/sql/"
-    r"(?P<script>assert_schema_contract\.sql|assert_capabilities\.sql):"
+    r"(?P<script>assert_schema_contract\.sql|assert_capabilities\.sql|schema_fingerprint\.sql):"
     r"(?P<line>[1-9][0-9]*): ERROR:[ \t]*"
     r"(?P<message>[^\r\n]*)$",
     re.MULTILINE,

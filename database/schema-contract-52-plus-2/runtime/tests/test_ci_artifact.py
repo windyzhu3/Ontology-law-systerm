@@ -404,7 +404,7 @@ class CiArtifactTests(unittest.TestCase):
 
     def test_verifier_diagnostics_are_finite_position_bound_and_failure_only(self) -> None:
         """Break caught: a safe verifier code is accepted on an unrelated or non-failed stage."""
-        safe_code = "verifier_parser_record_missing"
+        safe_code = "verifier_fingerprint_error"
 
         def verifier_failure_summary(stage_name: str = "verifier-wait") -> dict[str, object]:
             summary = _passed_summary()
@@ -1510,6 +1510,7 @@ class HostedCiOnlyVerificationTests(unittest.TestCase):
         )
         safe_codes = (
             "verifier_capability_query_insert",
+            "verifier_fingerprint_error",
             "verifier_parser_evidence_invalid",
             "verifier_parser_error_missing",
             "verifier_parser_error_multiple",

@@ -644,6 +644,16 @@ class RuntimeHarnessTests(unittest.TestCase):
                     + "\nlaw-verifier-1 | CONTEXT: PL/pgSQL function inline_code_block line 4 at RAISE",
                     "verifier_capability_query_insert",
                 ),
+                "canonical-fingerprint-error.json": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:37: ERROR: "
+                    "fingerprint query failed" + hostile,
+                    "verifier_fingerprint_error",
+                ),
+                "prefixed-fingerprint-error.json": (
+                    "law-verifier-1 | psql:/runtime/sql/schema_fingerprint.sql:37: ERROR: "
+                    "fingerprint query failed" + hostile,
+                    "verifier_fingerprint_error",
+                ),
             }
             for name, (output, expected_code) in accepted_record_shapes.items():
                 evidence_path = evidence_directory / name
@@ -652,10 +662,10 @@ class RuntimeHarnessTests(unittest.TestCase):
                     encoding="utf-8",
                 )
                 with self.subTest(accepted=name):
-                    self.assertEqual(
-                        verify_runtime.classify_verifier_log(evidence_path),
-                        expected_code,
-                    )
+                    code = verify_runtime.classify_verifier_log(evidence_path)
+                    self.assertEqual(code, expected_code)
+                    for secret in ("hunter2", "db.internal", "/private/tmp", "top-secret"):
+                        self.assertNotIn(secret, code)
 
             unavailable = evidence_directory / "unavailable.json"
             unavailable.write_text(
@@ -737,6 +747,40 @@ class RuntimeHarnessTests(unittest.TestCase):
                 "embedded-near-prefix.json": (
                     f"not{capability_record}{hostile}",
                     "verifier_parser_record_missing",
+                ),
+                "fingerprint-suffix.json": (
+                    "psql:/runtime/sql/schema_fingerprint.sql.bak:7: ERROR: failed" + hostile,
+                    "verifier_parser_record_missing",
+                ),
+                "fingerprint-nested-path.json": (
+                    "psql:/runtime/sql/private/schema_fingerprint.sql:7: ERROR: failed" + hostile,
+                    "verifier_parser_record_missing",
+                ),
+                "fingerprint-zero-line.json": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:0: ERROR: failed" + hostile,
+                    "verifier_parser_record_missing",
+                ),
+                "fingerprint-multiple-records.json": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:7: ERROR: first\n"
+                    "psql:/runtime/sql/schema_fingerprint.sql:8: ERROR: second" + hostile,
+                    "verifier_parser_record_multiple",
+                ),
+                "fingerprint-phase-conflict.json": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:7: ERROR: "
+                    "assertion=query role INSERT expected SQLSTATE=42501 actual=00000"
+                    + hostile,
+                    "verifier_parser_phase_conflict",
+                ),
+                "fingerprint-malformed-assertion.json": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:7: ERROR: "
+                    "assertion=query role INSERT expected=" + hostile,
+                    "verifier_parser_assertion_malformed",
+                ),
+                "fingerprint-multiple-assertions.json": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:7: ERROR: "
+                    "assertion=query role INSERT expected SQLSTATE=42501 actual=00000\n"
+                    "assertion=unmapped expected=1 actual=2" + hostile,
+                    "verifier_parser_assertion_multiple",
                 ),
                 "empty-expected.json": (
                     (
@@ -831,6 +875,18 @@ class RuntimeHarnessTests(unittest.TestCase):
         }
         diagnostic_map = verify_runtime._VERIFIER_ASSERTION_DIAGNOSTICS
         self._assert_verifier_inventory_matches_map(sql_by_script, diagnostic_map)
+        self.assertNotIn("fingerprint", {phase for phase, _ in diagnostic_map.values()})
+        self.assertEqual(
+            verify_runtime._VERIFIER_PHASE_DIAGNOSTICS,
+            {
+                "schema": ("assert_schema_contract.sql", "verifier_schema_assertion_unknown"),
+                "capability": (
+                    "assert_capabilities.sql",
+                    "verifier_capability_assertion_unknown",
+                ),
+                "fingerprint": ("schema_fingerprint.sql", "verifier_fingerprint_error"),
+            },
+        )
         diagnostic_codes = [code for _, code in diagnostic_map.values()]
         all_closed_codes = [
             *diagnostic_codes,
@@ -1270,6 +1326,64 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
                     dict(result.ci_stage_diagnostics)[diagnostic_path],
                     "verifier_capability_query_insert",
                 )
+
+    def test_fingerprint_script_failure_binds_to_the_failed_verifier_wait(self) -> None:
+        """Break caught: an exact fingerprint-script error remains a generic record-missing code."""
+        from runtime import verify_runtime
+
+        hostile = (
+            "password=hunter2 postgresql://user:secret@db.internal/law "
+            "/private/tmp/runtime token=top-secret"
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output_directory = Path(temporary_directory) / "evidence"
+
+            def failing_fingerprint_stage(
+                command: list[str],
+                *,
+                evidence_path: Path,
+                cwd: Path,
+                timeout_seconds: float,
+            ) -> int:
+                return_code = self._successful_runtime_stage(
+                    command,
+                    evidence_path=evidence_path,
+                    cwd=cwd,
+                    timeout_seconds=timeout_seconds,
+                )
+                is_initial_wait = (
+                    evidence_path.name == "verifier-wait.json"
+                    and evidence_path.parent.name == "run-01"
+                )
+                if is_initial_wait:
+                    recorded = json.loads(evidence_path.read_text(encoding="utf-8"))
+                    recorded.update({"returncode": 3, "status": "failed", "timedOut": False})
+                    evidence_path.write_text(json.dumps(recorded), encoding="utf-8")
+                    return 3
+                if evidence_path.name == "verifier-logs.json" and evidence_path.parent.name == "run-01":
+                    recorded = json.loads(evidence_path.read_text(encoding="utf-8"))
+                    recorded["stdout"] = (
+                        "psql:/runtime/sql/schema_fingerprint.sql:37: ERROR: "
+                        "fingerprint query failed " + hostile
+                    )
+                    evidence_path.write_text(json.dumps(recorded), encoding="utf-8")
+                return return_code
+
+            result = verify_runtime.run_runtime_verification(
+                PROJECT_ROOT,
+                output_directory,
+                runs=2,
+                stage_runner=failing_fingerprint_stage,
+            )
+
+        self.assertEqual(result["status"], "FAILED")
+        self.assertEqual(result["reason"], "compose_up_failed")
+        diagnostics = dict(result.ci_stage_diagnostics)
+        diagnostic = diagnostics["run-01/verifier-wait.json"]
+        self.assertEqual(diagnostic, "verifier_fingerprint_error")
+        self.assertEqual(set(diagnostics), {"run-01/verifier-wait.json"})
+        for secret in ("hunter2", "db.internal", "/private/tmp", "top-secret"):
+            self.assertNotIn(secret, diagnostic)
 
     def test_typed_producer_distinguishes_exit_124_from_a_real_timeout(self) -> None:
         """Break caught: an ordinary verifier exit 124 is mislabeled as a subprocess timeout."""
