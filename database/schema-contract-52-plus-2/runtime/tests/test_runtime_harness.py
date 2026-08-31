@@ -31,6 +31,20 @@ PARSER_STATE_DIAGNOSTIC_CODES = (
     "verifier_parser_assertion_malformed",
     "verifier_parser_phase_conflict",
 )
+FINGERPRINT_SQLSTATE_DIAGNOSTICS = {
+    "42883": "verifier_fingerprint_sqlstate_undefined_function_operator",
+    "42804": "verifier_fingerprint_sqlstate_datatype_mismatch",
+    "42846": "verifier_fingerprint_sqlstate_cannot_coerce",
+    "42P18": "verifier_fingerprint_sqlstate_indeterminate_datatype",
+    "42703": "verifier_fingerprint_sqlstate_undefined_column",
+    "42P01": "verifier_fingerprint_sqlstate_undefined_table",
+    "42704": "verifier_fingerprint_sqlstate_undefined_object",
+    "42501": "verifier_fingerprint_sqlstate_insufficient_privilege",
+    "42601": "verifier_fingerprint_sqlstate_syntax_error",
+    "0A000": "verifier_fingerprint_sqlstate_feature_not_supported",
+    "XX000": "verifier_fingerprint_sqlstate_internal_error",
+}
+FINGERPRINT_SQLSTATE_UNMAPPED_DIAGNOSTIC = "verifier_fingerprint_sqlstate_unmapped"
 
 _ASSERTION_START_PATTERN = re.compile(r"assertion=", re.IGNORECASE)
 _STATIC_ASSERTION_PATTERN = re.compile(
@@ -891,6 +905,8 @@ class RuntimeHarnessTests(unittest.TestCase):
         all_closed_codes = [
             *diagnostic_codes,
             *(code for _, code in verify_runtime._VERIFIER_PHASE_DIAGNOSTICS.values()),
+            *FINGERPRINT_SQLSTATE_DIAGNOSTICS.values(),
+            FINGERPRINT_SQLSTATE_UNMAPPED_DIAGNOSTIC,
             *PARSER_STATE_DIAGNOSTIC_CODES,
             "verifier_diagnostic_unknown",
             "verifier_logs_unavailable",
@@ -901,7 +917,103 @@ class RuntimeHarnessTests(unittest.TestCase):
             getattr(verify_runtime, "_VERIFIER_PARSER_DIAGNOSTIC_CODES", frozenset()),
             frozenset(PARSER_STATE_DIAGNOSTIC_CODES),
         )
+        self.assertEqual(
+            getattr(verify_runtime, "_VERIFIER_FINGERPRINT_SQLSTATE_DIAGNOSTICS", {}),
+            FINGERPRINT_SQLSTATE_DIAGNOSTICS,
+        )
+        self.assertEqual(
+            getattr(verify_runtime, "_VERIFIER_FINGERPRINT_SQLSTATE_UNMAPPED_DIAGNOSTIC", None),
+            FINGERPRINT_SQLSTATE_UNMAPPED_DIAGNOSTIC,
+        )
         self.assertEqual(verify_runtime._VERIFIER_DIAGNOSTIC_CODES, frozenset(all_closed_codes))
+
+    def test_fingerprint_sqlstate_classifier_is_line_bound_closed_and_secret_safe(self) -> None:
+        """Break caught: dynamic fingerprint SQL errors escape or lose their finite classification."""
+        from runtime import verify_runtime
+
+        fingerprint_path = PROJECT_ROOT / "runtime" / "sql" / "schema_fingerprint.sql"
+        fingerprint_lines = fingerprint_path.read_text(encoding="utf-8").splitlines()
+        # This locks psql's SendQuery statement-end location, not a source section.
+        statement_endings = [
+            (line_number, line.strip())
+            for line_number, line in enumerate(fingerprint_lines, start=1)
+            if line.strip() and line.rstrip().endswith(";")
+        ]
+        self.assertEqual(statement_endings, [(98, "FROM stable_catalog;")])
+        self.assertEqual(verify_runtime._VERIFIER_FINGERPRINT_STATEMENT_END_LINE, 98)
+
+        hostile = (
+            " password=hunter2 postgresql://user:secret@db.internal/law "
+            "/private/tmp/runtime token=top-secret"
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            evidence_directory = Path(temporary_directory)
+
+            for prefix in ("", "law-verifier-1 | "):
+                for sqlstate, expected_code in FINGERPRINT_SQLSTATE_DIAGNOSTICS.items():
+                    evidence_path = evidence_directory / f"mapped-{prefix != ''}-{sqlstate}.json"
+                    evidence_path.write_text(
+                        json.dumps(
+                            {
+                                "returncode": 0,
+                                "stderr": "",
+                                "stdout": (
+                                    f"{prefix}psql:/runtime/sql/schema_fingerprint.sql:98: "
+                                    f"ERROR:  {sqlstate}"
+                                ),
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    with self.subTest(prefix=prefix, sqlstate=sqlstate):
+                        diagnostic = verify_runtime.classify_verifier_log(evidence_path)
+                        self.assertEqual(diagnostic, expected_code)
+
+            cases = {
+                "unmapped": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: ZZZZZ",
+                    FINGERPRINT_SQLSTATE_UNMAPPED_DIAGNOSTIC,
+                ),
+                "wrong-line": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:97: ERROR: 42883",
+                    "verifier_fingerprint_error",
+                ),
+                "lowercase": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: 42p18",
+                    "verifier_fingerprint_error",
+                ),
+                "payload": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: 42883" + hostile,
+                    "verifier_fingerprint_error",
+                ),
+                "multiple-records": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: 42883\n"
+                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: 42804",
+                    "verifier_parser_record_multiple",
+                ),
+                "assertion-payload": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: 42883\n"
+                    "CONTEXT: assertion=forged expected=1 actual=2",
+                    "verifier_parser_assertion_malformed",
+                ),
+                "multiple-assertions": (
+                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: 42883\n"
+                    "CONTEXT: assertion=first expected=1 actual=2\n"
+                    "CONTEXT: assertion=second expected=1 actual=2",
+                    "verifier_parser_assertion_multiple",
+                ),
+            }
+            for name, (output, expected_code) in cases.items():
+                evidence_path = evidence_directory / f"{name}.json"
+                evidence_path.write_text(
+                    json.dumps({"returncode": 0, "stderr": "", "stdout": output}),
+                    encoding="utf-8",
+                )
+                with self.subTest(case=name):
+                    diagnostic = verify_runtime.classify_verifier_log(evidence_path)
+                    self.assertEqual(diagnostic, expected_code)
+                    for secret in ("hunter2", "db.internal", "/private/tmp", "top-secret"):
+                        self.assertNotIn(secret, diagnostic)
 
     def test_exact_set_gate_rejects_case_hidden_controlled_mutations(self) -> None:
         """Break caught: reviewer casing variants introduce drift without breaking the exact-set test."""
@@ -1618,6 +1730,14 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
         self.assertIn("/runtime/sql/assert_capabilities.sql", compose_text)
         self.assertIn("/runtime/sql/schema_fingerprint.sql", compose_text)
         self.assertGreaterEqual(compose_text.count("psql -X -v ON_ERROR_STOP=1"), 3)
+        verifier_psql_lines = [
+            line.strip() for line in compose_text.splitlines() if "psql -X" in line
+        ]
+        self.assertEqual(len(verifier_psql_lines), 3)
+        self.assertNotIn("VERBOSITY=sqlstate", verifier_psql_lines[0])
+        self.assertNotIn("VERBOSITY=sqlstate", verifier_psql_lines[1])
+        self.assertIn("-v VERBOSITY=sqlstate", verifier_psql_lines[2])
+        self.assertEqual(compose_text.count("-v VERBOSITY=sqlstate"), 1)
         self.assertIn("PGPASSWORD: ${RUNTIME_POSTGRES_PASSWORD", compose_text)
         self.assertIn("PGUSER: postgres", compose_text)
         self.assertIn("postgres-data:/var/lib/postgresql", compose_text)

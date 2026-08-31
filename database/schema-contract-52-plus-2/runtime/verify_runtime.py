@@ -518,6 +518,26 @@ _VERIFIER_PHASE_DIAGNOSTICS = {
     "capability": ("assert_capabilities.sql", "verifier_capability_assertion_unknown"),
     "fingerprint": ("schema_fingerprint.sql", "verifier_fingerprint_error"),
 }
+# psql attributes SendQuery failures to the statement terminator; this is not a
+# claim that line 98 identifies the failing source section inside the statement.
+_VERIFIER_FINGERPRINT_STATEMENT_END_LINE = 98
+_VERIFIER_FINGERPRINT_SQLSTATE_DIAGNOSTICS = {
+    "42883": "verifier_fingerprint_sqlstate_undefined_function_operator",
+    "42804": "verifier_fingerprint_sqlstate_datatype_mismatch",
+    "42846": "verifier_fingerprint_sqlstate_cannot_coerce",
+    "42P18": "verifier_fingerprint_sqlstate_indeterminate_datatype",
+    "42703": "verifier_fingerprint_sqlstate_undefined_column",
+    "42P01": "verifier_fingerprint_sqlstate_undefined_table",
+    "42704": "verifier_fingerprint_sqlstate_undefined_object",
+    "42501": "verifier_fingerprint_sqlstate_insufficient_privilege",
+    "42601": "verifier_fingerprint_sqlstate_syntax_error",
+    "0A000": "verifier_fingerprint_sqlstate_feature_not_supported",
+    "XX000": "verifier_fingerprint_sqlstate_internal_error",
+}
+_VERIFIER_FINGERPRINT_SQLSTATE_UNMAPPED_DIAGNOSTIC = (
+    "verifier_fingerprint_sqlstate_unmapped"
+)
+_VERIFIER_SQLSTATE_PATTERN = re.compile(r"[0-9A-Z]{5}")
 _VERIFIER_PARSER_DIAGNOSTIC_CODES = frozenset(
     {
         "verifier_parser_evidence_invalid",
@@ -547,6 +567,8 @@ _VERIFIER_DIAGNOSTIC_CODES = frozenset(
     {
         *(code for _, code in _VERIFIER_ASSERTION_DIAGNOSTICS.values()),
         *(code for _, code in _VERIFIER_PHASE_DIAGNOSTICS.values()),
+        *_VERIFIER_FINGERPRINT_SQLSTATE_DIAGNOSTICS.values(),
+        _VERIFIER_FINGERPRINT_SQLSTATE_UNMAPPED_DIAGNOSTIC,
         *_VERIFIER_PARSER_DIAGNOSTIC_CODES,
         "verifier_diagnostic_unknown",
         "verifier_logs_unavailable",
@@ -3545,6 +3567,15 @@ def classify_verifier_log(evidence_path: Path) -> str:
 
     assertion_occurrences = output.count("assertion=")
     if assertion_occurrences == 0:
+        if (
+            phase == "fingerprint"
+            and int(record.group("line")) == _VERIFIER_FINGERPRINT_STATEMENT_END_LINE
+            and _VERIFIER_SQLSTATE_PATTERN.fullmatch(record.group("message")) is not None
+        ):
+            return _VERIFIER_FINGERPRINT_SQLSTATE_DIAGNOSTICS.get(
+                record.group("message"),
+                _VERIFIER_FINGERPRINT_SQLSTATE_UNMAPPED_DIAGNOSTIC,
+            )
         return _VERIFIER_PHASE_DIAGNOSTICS[phase][1]
     if assertion_occurrences != 1:
         return "verifier_parser_assertion_multiple"

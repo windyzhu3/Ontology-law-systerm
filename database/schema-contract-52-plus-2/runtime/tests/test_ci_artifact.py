@@ -404,7 +404,7 @@ class CiArtifactTests(unittest.TestCase):
 
     def test_verifier_diagnostics_are_finite_position_bound_and_failure_only(self) -> None:
         """Break caught: a safe verifier code is accepted on an unrelated or non-failed stage."""
-        safe_code = "verifier_fingerprint_error"
+        safe_code = "verifier_fingerprint_sqlstate_undefined_function_operator"
 
         def verifier_failure_summary(stage_name: str = "verifier-wait") -> dict[str, object]:
             summary = _passed_summary()
@@ -1511,6 +1511,18 @@ class HostedCiOnlyVerificationTests(unittest.TestCase):
         safe_codes = (
             "verifier_capability_query_insert",
             "verifier_fingerprint_error",
+            "verifier_fingerprint_sqlstate_undefined_function_operator",
+            "verifier_fingerprint_sqlstate_datatype_mismatch",
+            "verifier_fingerprint_sqlstate_cannot_coerce",
+            "verifier_fingerprint_sqlstate_indeterminate_datatype",
+            "verifier_fingerprint_sqlstate_undefined_column",
+            "verifier_fingerprint_sqlstate_undefined_table",
+            "verifier_fingerprint_sqlstate_undefined_object",
+            "verifier_fingerprint_sqlstate_insufficient_privilege",
+            "verifier_fingerprint_sqlstate_syntax_error",
+            "verifier_fingerprint_sqlstate_feature_not_supported",
+            "verifier_fingerprint_sqlstate_internal_error",
+            "verifier_fingerprint_sqlstate_unmapped",
             "verifier_parser_evidence_invalid",
             "verifier_parser_error_missing",
             "verifier_parser_error_multiple",

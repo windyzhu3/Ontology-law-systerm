@@ -50,7 +50,7 @@ services:
       - |
         psql -X -v ON_ERROR_STOP=1 -qAt -f /runtime/sql/assert_schema_contract.sql >/dev/null
         psql -X -v ON_ERROR_STOP=1 -qAt -f /runtime/sql/assert_capabilities.sql >/dev/null
-        fingerprint="$$(psql -X -v ON_ERROR_STOP=1 -qAt -f /runtime/sql/schema_fingerprint.sql)"
+        fingerprint="$$(psql -X -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate -qAt -f /runtime/sql/schema_fingerprint.sql)"
         printf '%s\n' "$${fingerprint}"
     volumes:
       - ./sql:/runtime/sql:ro
