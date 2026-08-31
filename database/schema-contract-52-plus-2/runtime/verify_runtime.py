@@ -413,6 +413,141 @@ _CI_FALLBACK_OUTCOMES = {
     "success": ("FAILED", "ci_artifact_missing"),
 }
 _CI_FALLBACK_REASONS = frozenset(reason for _, reason in _CI_FALLBACK_OUTCOMES.values())
+_VERIFIER_ASSERTION_DIAGNOSTICS = {
+    "13 managed schemas": ("schema", "verifier_schema_managed_schema_count"),
+    "managed schema allowlist": ("schema", "verifier_schema_managed_schema_allowlist"),
+    "52 application tables": ("schema", "verifier_schema_application_table_count"),
+    "2 platform_meta tables": ("schema", "verifier_schema_platform_meta_table_set"),
+    "public schema table count": ("schema", "verifier_schema_public_table_count"),
+    "19 successful migrations": ("schema", "verifier_schema_migration_count"),
+    "all migrations successful": ("schema", "verifier_schema_migration_success"),
+    "maximum migration version": ("schema", "verifier_schema_max_migration_version"),
+    "V840 successful": ("schema", "verifier_schema_v840_success"),
+    "206 composite foreign keys": ("schema", "verifier_schema_foreign_key_count"),
+    "application foreign keys NO ACTION": ("schema", "verifier_schema_foreign_key_actions"),
+    "validated MATCH SIMPLE foreign keys": ("schema", "verifier_schema_foreign_key_validation"),
+    "tenant_id first in tenant foreign keys": ("schema", "verifier_schema_foreign_key_tenant_prefix"),
+    "53 mutation guards": ("schema", "verifier_schema_mutation_guard_count"),
+    "four distinct capability roles": ("schema", "verifier_schema_capability_role_count"),
+    "capability roles NOLOGIN": ("schema", "verifier_schema_capability_roles_nologin"),
+    "capability parent role memberships": ("schema", "verifier_schema_capability_parent_membership"),
+    "capability roles cannot obtain migration owner": (
+        "schema",
+        "verifier_schema_capability_migrator_isolation",
+    ),
+    "deployment_state PRIMARY/BLOCKED/52-plus-2-v1/revision=0 with 32 zero bytes": (
+        "schema",
+        "verifier_schema_deployment_state_seed",
+    ),
+    "cross-tenant organization parent": (
+        "capability",
+        "verifier_capability_cross_tenant_parent",
+    ),
+    "deployment no-op update": ("capability", "verifier_capability_deployment_noop_guard"),
+    "deployment revision must increment exactly once": (
+        "capability",
+        "verifier_capability_deployment_revision_guard",
+    ),
+    "query role INSERT": ("capability", "verifier_capability_query_insert"),
+    "query role UPDATE": ("capability", "verifier_capability_query_update"),
+    "query role DELETE": ("capability", "verifier_capability_query_delete"),
+    "query role direct audit read": ("capability", "verifier_capability_query_audit_read"),
+    "query role CREATE SCHEMA": ("capability", "verifier_capability_query_create_schema"),
+    "query role CREATE TABLE": ("capability", "verifier_capability_query_create_table"),
+    "query role migration owner": (
+        "capability",
+        "verifier_capability_query_migrator_isolation",
+    ),
+    "audit append role SELECT": ("capability", "verifier_capability_audit_select"),
+    "audit append role UPDATE": ("capability", "verifier_capability_audit_update"),
+    "audit append role CREATE SCHEMA": (
+        "capability",
+        "verifier_capability_audit_create_schema",
+    ),
+    "audit append role CREATE TABLE": (
+        "capability",
+        "verifier_capability_audit_create_table",
+    ),
+    "audit append role migration owner": (
+        "capability",
+        "verifier_capability_audit_migrator_isolation",
+    ),
+    "worker frozen outbox column": (
+        "capability",
+        "verifier_capability_worker_frozen_column",
+    ),
+    "worker outbox INSERT": ("capability", "verifier_capability_worker_outbox_insert"),
+    "worker domain write": ("capability", "verifier_capability_worker_domain_write"),
+    "worker role CREATE SCHEMA": (
+        "capability",
+        "verifier_capability_worker_create_schema",
+    ),
+    "worker role CREATE TABLE": (
+        "capability",
+        "verifier_capability_worker_create_table",
+    ),
+    "worker role migration owner": (
+        "capability",
+        "verifier_capability_worker_migrator_isolation",
+    ),
+    "command role DELETE": ("capability", "verifier_capability_command_delete"),
+    "command role TRUNCATE": ("capability", "verifier_capability_command_truncate"),
+    "command role frozen column": (
+        "capability",
+        "verifier_capability_command_frozen_column",
+    ),
+    "command role platform_meta write": (
+        "capability",
+        "verifier_capability_command_platform_meta_write",
+    ),
+    "command role CREATE SCHEMA": (
+        "capability",
+        "verifier_capability_command_create_schema",
+    ),
+    "command role CREATE TABLE": (
+        "capability",
+        "verifier_capability_command_create_table",
+    ),
+    "command role migration owner": (
+        "capability",
+        "verifier_capability_command_migrator_isolation",
+    ),
+}
+_VERIFIER_PHASE_DIAGNOSTICS = {
+    "schema": ("assert_schema_contract.sql", "verifier_schema_assertion_unknown"),
+    "capability": ("assert_capabilities.sql", "verifier_capability_assertion_unknown"),
+}
+_VERIFIER_ERROR_RECORD_PATTERN = re.compile(
+    r"^(?:[A-Za-z0-9][A-Za-z0-9_.-]{0,127}[ \t]+\|[ \t]+)?"
+    r"psql:/runtime/sql/"
+    r"(?P<script>assert_schema_contract\.sql|assert_capabilities\.sql):"
+    r"(?P<line>[1-9][0-9]*): ERROR:[ \t]*"
+    r"(?P<message>[^\r\n]*)$",
+    re.MULTILINE,
+)
+_VERIFIER_ASSERTION_MESSAGE_PATTERN = re.compile(
+    r"^assertion=(?P<label>[A-Za-z0-9][A-Za-z0-9 _./=+-]{0,159}?)[ \t]+"
+    r"expected(?:[ \t]+SQLSTATE)?=(?P<expected>\S(?:[^\r\n]*?\S)?)[ \t]+"
+    r"actual=(?P<actual>\S[^\r\n]*)$",
+)
+_VERIFIER_DIAGNOSTIC_CODES = frozenset(
+    {
+        *(code for _, code in _VERIFIER_ASSERTION_DIAGNOSTICS.values()),
+        *(code for _, code in _VERIFIER_PHASE_DIAGNOSTICS.values()),
+        "verifier_diagnostic_unknown",
+        "verifier_logs_unavailable",
+    }
+)
+_CI_VERIFIER_DIAGNOSTIC_STAGE_PATHS = frozenset(
+    {
+        "run-01/verifier-wait.json",
+        "run-01/noop/verifier-wait.json",
+        "run-02/verifier-wait.json",
+    }
+)
+_CI_VERIFIER_DIAGNOSTIC_STAGE_NAMES = frozenset(
+    {"verifier-wait", "noop-verifier-wait"}
+)
 
 
 class EvidenceIOError(ValueError):
@@ -473,10 +608,21 @@ class RuntimeVerificationResult(dict[str, object]):
         *,
         ci_stage_results: Mapping[str, CapturedStageResult],
         ci_locked_images: Sequence[_CiLockedImage],
+        ci_stage_diagnostics: Mapping[str, str] | None = None,
     ) -> None:
         super().__init__(result)
         self.ci_stage_results = tuple(sorted(ci_stage_results.items()))
         self.ci_locked_images = tuple(ci_locked_images)
+        diagnostics = {} if ci_stage_diagnostics is None else dict(ci_stage_diagnostics)
+        if (
+            not set(diagnostics) <= _CI_VERIFIER_DIAGNOSTIC_STAGE_PATHS
+            or any(
+                not isinstance(code, str) or code not in _VERIFIER_DIAGNOSTIC_CODES
+                for code in diagnostics.values()
+            )
+        ):
+            raise ValueError("runtime controller returned an invalid verifier diagnostic")
+        self.ci_stage_diagnostics = tuple(sorted(diagnostics.items()))
 
 
 @dataclass(frozen=True)
@@ -635,6 +781,8 @@ def _run_runtime_verification_impl(
     output_directory = Path(output_directory)
     output_directory.mkdir(parents=True, exist_ok=True)
     ci_stage_results: dict[str, CapturedStageResult] = {}
+    ci_stage_diagnostics: dict[str, str] = {}
+    allow_injected_stage_evidence_fallback = stage_runner is not None
     if stage_runner is None:
         def capture_stage(
             command: Sequence[str],
@@ -673,6 +821,9 @@ def _run_runtime_verification_impl(
                 compose_command=compose_command,
                 stage_runner=stage_runner,
                 verify_noop=index == 1,
+                ci_stage_results=ci_stage_results,
+                ci_stage_diagnostics=ci_stage_diagnostics,
+                allow_injected_stage_evidence_fallback=allow_injected_stage_evidence_fallback,
             )
         )
 
@@ -750,6 +901,7 @@ def _run_runtime_verification_impl(
         result,
         ci_stage_results=ci_stage_results,
         ci_locked_images=locked_images,
+        ci_stage_diagnostics=ci_stage_diagnostics,
     )
 
 
@@ -1773,6 +1925,7 @@ def build_ci_runtime_summary(
         )
 
     captured = dict(result.ci_stage_results)
+    diagnostics = dict(result.ci_stage_diagnostics)
     known_stage_paths = {
         path
         for _, definitions in _CI_RUN_STAGE_DEFINITIONS
@@ -1784,11 +1937,18 @@ def build_ci_runtime_summary(
     } | set(_CI_AUXILIARY_STAGE_PATHS)
     if not set(captured) <= known_stage_paths:
         raise ValueError("runtime controller returned an unknown CI stage")
+    if not set(diagnostics) <= _CI_VERIFIER_DIAGNOSTIC_STAGE_PATHS:
+        raise ValueError("runtime controller returned an unknown verifier diagnostic stage")
     runs = [
         {
             "runId": run_id,
             "stages": [
-                _ci_stage_record(stage_name, command_class, captured.get(path))
+                _ci_stage_record(
+                    stage_name,
+                    command_class,
+                    captured.get(path),
+                    verifier_diagnostic=diagnostics.get(path),
+                )
                 for stage_name, command_class, path in definitions
             ],
         }
@@ -1862,8 +2022,11 @@ def _ci_stage_record(
     captured: CapturedStageResult | None,
     *,
     expected_failure: bool = False,
+    verifier_diagnostic: str | None = None,
 ) -> dict[str, object]:
     if captured is None:
+        if verifier_diagnostic is not None:
+            raise ValueError("verifier diagnostic cannot target a not-started stage")
         return {
             "stageName": stage_name,
             "commandClass": command_class,
@@ -1873,7 +2036,16 @@ def _ci_stage_record(
             "stdoutSha256": None,
             "stderrSha256": None,
         }
-    if captured.timed_out:
+    if verifier_diagnostic is not None:
+        if (
+            stage_name not in _CI_VERIFIER_DIAGNOSTIC_STAGE_NAMES
+            or verifier_diagnostic not in _VERIFIER_DIAGNOSTIC_CODES
+            or captured.timed_out
+            or captured.exit_code in {0, 127}
+        ):
+            raise ValueError("verifier diagnostic is inconsistent with its failed wait stage")
+        diagnostic = verifier_diagnostic
+    elif captured.timed_out:
         diagnostic = "timed_out"
     elif captured.exit_code == 0:
         diagnostic = "ok"
@@ -2141,6 +2313,7 @@ def _validate_ci_runtime_summary(summary: Mapping[str, object]) -> dict[str, obj
         if run["runId"] != run_id:
             raise ValueError("CI runtime runs must be exactly run-01 then run-02")
         _validate_ci_stage_vector(run["stages"], definitions, expected_failure_stage=None)
+        _validate_ci_verifier_diagnostic_context(run["stages"])
 
     scenarios = summary["failureScenarios"]
     if not isinstance(scenarios, list) or len(scenarios) not in {0, 5}:
@@ -2190,6 +2363,27 @@ def _validate_ci_stage_vector(
         )
 
 
+def _validate_ci_verifier_diagnostic_context(stages: Sequence[Mapping[str, object]]) -> None:
+    by_name = {stage["stageName"]: stage for stage in stages}
+    for wait_name, logs_name in (
+        ("verifier-wait", "verifier-logs"),
+        ("noop-verifier-wait", "noop-verifier-logs"),
+    ):
+        wait_stage = by_name.get(wait_name)
+        logs_stage = by_name.get(logs_name)
+        if wait_stage is None or logs_stage is None:
+            continue
+        diagnostic = wait_stage["diagnosticCode"]
+        if diagnostic not in _VERIFIER_DIAGNOSTIC_CODES:
+            continue
+        logs_diagnostic = logs_stage["diagnosticCode"]
+        if diagnostic == "verifier_logs_unavailable":
+            if logs_diagnostic not in {"process_failed", "timed_out", "command_unavailable"}:
+                raise ValueError("CI unavailable verifier logs diagnostic is inconsistent")
+        elif logs_diagnostic != "ok":
+            raise ValueError("CI verifier diagnostic requires a successful log capture")
+
+
 def _validate_ci_stage_result(stage: Mapping[str, object], *, expected_failure: bool) -> None:
     exit_code = stage["exitCode"]
     timed_out = stage["timedOut"]
@@ -2228,6 +2422,9 @@ def _validate_ci_stage_result(stage: Mapping[str, object], *, expected_failure: 
     elif exit_code == 127:
         if diagnostic != "command_unavailable":
             raise ValueError("CI unavailable-command diagnostic is inconsistent")
+    elif diagnostic in _VERIFIER_DIAGNOSTIC_CODES:
+        if stage["stageName"] not in _CI_VERIFIER_DIAGNOSTIC_STAGE_NAMES:
+            raise ValueError("CI verifier diagnostic is used on the wrong stage")
     elif diagnostic != "process_failed":
         raise ValueError("CI failed stage diagnostic is inconsistent")
 
@@ -2336,7 +2533,7 @@ def _validate_ci_outcome_semantics(summary: Mapping[str, object]) -> None:
                 "process_failed",
                 "timed_out",
                 "command_unavailable",
-            }
+            } | _VERIFIER_DIAGNOSTIC_CODES
             for stage in run_stages
         ):
             raise ValueError("CI compose startup failure has no failed run stage")
@@ -3288,6 +3485,60 @@ def _capture_runtime_identity(
     return {"flywayVersion": flyway_version, "images": images}
 
 
+def classify_verifier_log(evidence_path: Path) -> str:
+    """Map redacted verifier-log evidence to one closed diagnostic code."""
+    try:
+        recorded = json.loads(Path(evidence_path).read_text(encoding="utf-8"))
+    except (OSError, TypeError, UnicodeError, json.JSONDecodeError):
+        return "verifier_diagnostic_unknown"
+    if not isinstance(recorded, Mapping):
+        return "verifier_diagnostic_unknown"
+    return_code = recorded.get("returncode")
+    stdout = recorded.get("stdout")
+    stderr = recorded.get("stderr")
+    if (
+        isinstance(return_code, bool)
+        or not isinstance(return_code, int)
+        or not isinstance(stdout, str)
+        or not isinstance(stderr, str)
+    ):
+        return "verifier_diagnostic_unknown"
+    if return_code != 0:
+        return "verifier_logs_unavailable"
+
+    output = "\n".join((stdout, stderr))
+    if output.count("ERROR:") != 1:
+        return "verifier_diagnostic_unknown"
+    records = list(_VERIFIER_ERROR_RECORD_PATTERN.finditer(output))
+    if len(records) != 1:
+        return "verifier_diagnostic_unknown"
+    record = records[0]
+    phase = next(
+        (
+            phase_name
+            for phase_name, (script_name, _) in _VERIFIER_PHASE_DIAGNOSTICS.items()
+            if script_name == record.group("script")
+        ),
+        None,
+    )
+    if phase is None:
+        return "verifier_diagnostic_unknown"
+
+    assertion_occurrences = output.count("assertion=")
+    if assertion_occurrences == 0:
+        return _VERIFIER_PHASE_DIAGNOSTICS[phase][1]
+    if assertion_occurrences != 1:
+        return "verifier_diagnostic_unknown"
+    assertion_record = _VERIFIER_ASSERTION_MESSAGE_PATTERN.fullmatch(record.group("message"))
+    if assertion_record is None:
+        return "verifier_diagnostic_unknown"
+    assertion = _VERIFIER_ASSERTION_DIAGNOSTICS.get(assertion_record.group("label"))
+    if assertion is None:
+        return _VERIFIER_PHASE_DIAGNOSTICS[phase][1]
+    assertion_phase, diagnostic = assertion
+    return diagnostic if assertion_phase == phase else "verifier_diagnostic_unknown"
+
+
 def _recorded_stdout(evidence_path: Path) -> str | None:
     try:
         recorded = json.loads(evidence_path.read_text(encoding="utf-8"))
@@ -3336,6 +3587,9 @@ def _run_compose_attempt(
     compose_command: Sequence[str],
     stage_runner: Callable[..., int],
     verify_noop: bool,
+    ci_stage_results: Mapping[str, CapturedStageResult],
+    ci_stage_diagnostics: dict[str, str],
+    allow_injected_stage_evidence_fallback: bool,
 ) -> dict[str, object]:
     run_directory.mkdir(parents=True, exist_ok=True)
     cleanup_return_code = 125
@@ -3413,14 +3667,23 @@ def _run_compose_attempt(
                                 verifier,
                                 stage_runner,
                             )
+                            verifier_diagnostic = _capture_verifier_summary(
+                                command_prefix,
+                                run_directory / "verifier-logs.json",
+                                schema_root,
+                                verifier,
+                                stage_runner,
+                            )
+                            _bind_verifier_wait_diagnostic(
+                                ci_stage_diagnostics,
+                                f"{run_directory.name}/verifier-wait.json",
+                                verifier,
+                                verifier_diagnostic,
+                                ci_stage_results=ci_stage_results,
+                                evidence_path=run_directory / "verifier-wait.json",
+                                allow_evidence_fallback=allow_injected_stage_evidence_fallback,
+                            )
                             if _service_succeeded(verifier):
-                                _capture_verifier_summary(
-                                    command_prefix,
-                                    run_directory / "verifier-logs.json",
-                                    schema_root,
-                                    verifier,
-                                    stage_runner,
-                                )
                                 initial_fingerprint = _summary_fingerprint(verifier)
                             if verify_noop and _verified_service_succeeded(verifier):
                                 noop_migrate_return_code = stage_runner(
@@ -3454,14 +3717,23 @@ def _run_compose_attempt(
                                             noop_verifier,
                                             stage_runner,
                                         )
+                                        noop_diagnostic = _capture_verifier_summary(
+                                            command_prefix,
+                                            run_directory / "noop-verifier-logs.json",
+                                            schema_root,
+                                            noop_verifier,
+                                            stage_runner,
+                                        )
+                                        _bind_verifier_wait_diagnostic(
+                                            ci_stage_diagnostics,
+                                            f"{run_directory.name}/noop/verifier-wait.json",
+                                            noop_verifier,
+                                            noop_diagnostic,
+                                            ci_stage_results=ci_stage_results,
+                                            evidence_path=run_directory / "noop" / "verifier-wait.json",
+                                            allow_evidence_fallback=allow_injected_stage_evidence_fallback,
+                                        )
                                         if _service_succeeded(noop_verifier):
-                                            _capture_verifier_summary(
-                                                command_prefix,
-                                                run_directory / "noop-verifier-logs.json",
-                                                schema_root,
-                                                noop_verifier,
-                                                stage_runner,
-                                            )
                                             noop_fingerprint = _summary_fingerprint(noop_verifier)
                                     if _verified_service_succeeded(noop_verifier) and initial_fingerprint == noop_fingerprint:
                                         checksum_scenario = _run_checksum_scenario(
@@ -3517,14 +3789,86 @@ def _capture_verifier_summary(
     schema_root: Path,
     result: dict[str, object],
     stage_runner: Callable[..., int],
-) -> None:
+) -> str:
     result["logsReturnCode"] = stage_runner(
         [*command_prefix, "logs", "--no-color", "verifier"],
         evidence_path=evidence_path,
         cwd=schema_root,
         timeout_seconds=_VERIFIER_TIMEOUT_SECONDS,
     )
-    result["summary"] = _read_single_json_summary(evidence_path) if result["logsReturnCode"] == 0 else None
+    result["summary"] = (
+        _read_single_json_summary(evidence_path)
+        if result["logsReturnCode"] == 0 and _service_succeeded(result)
+        else None
+    )
+    return classify_verifier_log(evidence_path)
+
+
+def _bind_verifier_wait_diagnostic(
+    diagnostics: dict[str, str],
+    wait_stage_path: str,
+    result: Mapping[str, object],
+    diagnostic: str,
+    *,
+    ci_stage_results: Mapping[str, CapturedStageResult],
+    evidence_path: Path,
+    allow_evidence_fallback: bool,
+) -> None:
+    wait_return_code = result.get("waitReturnCode")
+    wait_metadata = _verifier_wait_metadata(
+        ci_stage_results.get(wait_stage_path),
+        evidence_path=evidence_path,
+        expected_return_code=wait_return_code,
+        allow_evidence_fallback=allow_evidence_fallback,
+    )
+    if wait_metadata is None:
+        return
+    captured_return_code, timed_out = wait_metadata
+    if not timed_out and captured_return_code not in {0, 127}:
+        diagnostics[wait_stage_path] = diagnostic
+
+
+def _verifier_wait_metadata(
+    captured: CapturedStageResult | None,
+    *,
+    evidence_path: Path,
+    expected_return_code: object,
+    allow_evidence_fallback: bool,
+) -> tuple[int, bool] | None:
+    if isinstance(expected_return_code, bool) or not isinstance(expected_return_code, int):
+        return None
+    if captured is not None:
+        if (
+            not isinstance(captured, CapturedStageResult)
+            or isinstance(captured.exit_code, bool)
+            or not isinstance(captured.exit_code, int)
+            or not isinstance(captured.timed_out, bool)
+            or captured.exit_code != expected_return_code
+            or (captured.timed_out and captured.exit_code != 124)
+        ):
+            return None
+        return captured.exit_code, captured.timed_out
+    if not allow_evidence_fallback:
+        return None
+    try:
+        recorded = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(recorded, Mapping):
+        return None
+    return_code = recorded.get("returncode")
+    timed_out = recorded.get("timedOut")
+    status = recorded.get("status")
+    if (
+        isinstance(return_code, bool)
+        or not isinstance(return_code, int)
+        or not isinstance(timed_out, bool)
+        or return_code != expected_return_code
+        or (timed_out and (return_code != 124 or status != "timed_out"))
+        or (not timed_out and status != ("passed" if return_code == 0 else "failed"))
+    ):
+        return None
+    return return_code, timed_out
 
 
 def _read_single_json_summary(evidence_path: Path) -> dict[str, object] | None:

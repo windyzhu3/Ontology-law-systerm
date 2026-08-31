@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
@@ -13,12 +14,370 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
+
+from pglast import ast, parse_sql, parser
+from pglast.visitors import Visitor
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+_ASSERTION_START_PATTERN = re.compile(r"assertion=", re.IGNORECASE)
+_STATIC_ASSERTION_PATTERN = re.compile(
+    r"assertion=(?P<label>[^%'\r\n]+?)[ \t]+expected(?:[ \t]+SQLSTATE)?=",
+    re.IGNORECASE,
+)
+_GENERIC_ASSERTION_PATTERN = re.compile(
+    r"assertion=[^'\r\n]*%[^'\r\n]*?[ \t]+expected(?:[ \t]+SQLSTATE)?=",
+    re.IGNORECASE,
+)
+_REVIEWED_HELPER_TEMPLATES = (
+    "assertion=% expected SQLSTATE=% actual=success",
+    "assertion=% expected SQLSTATE=% actual=%",
+)
+
+
+@dataclass(frozen=True)
+class _VerifierAssertionInventory:
+    labels: set[str]
+    expect_call_count: int
+    helper_definition_count: int
+    unresolved_expect_calls: tuple[str, ...]
+    unresolved_assertions: tuple[str, ...]
+
+
+def _inventory_verifier_assertions(sql: str) -> _VerifierAssertionInventory:
+    """Inventory closed assertion labels from parsed SQL without formatting assumptions."""
+    labels: set[str] = set()
+    literal_values: list[tuple[str, str]] = []
+    plpgsql_bodies: list[tuple[str, str]] = []
+    unresolved_expect_calls: list[str] = []
+    unresolved_assertions: list[str] = []
+    expect_call_count = 0
+    helper_definition_count = 0
+    helper_body_scopes: list[str] = []
+    function_count = 0
+    do_count = 0
+
+    def body_values(options: object) -> tuple[str, ...] | None:
+        if not isinstance(options, tuple):
+            return None
+        as_options = tuple(
+            option
+            for option in options
+            if isinstance(option, ast.DefElem) and option.defname.casefold() == "as"
+        )
+        if len(as_options) != 1:
+            return None
+        argument = as_options[0].arg
+        if isinstance(argument, ast.String):
+            return (argument.sval,)
+        if (
+            isinstance(argument, tuple)
+            and argument
+            and all(isinstance(value, ast.String) for value in argument)
+        ):
+            return tuple(value.sval for value in argument)
+        return None
+
+    def decoded_string_token(body: str, start: int, end: int) -> str | None:
+        token_source = body[start : end + 1]
+        try:
+            statements = parse_sql("SELECT " + token_source)
+        except Exception:
+            return None
+        if len(statements) != 1 or not isinstance(statements[0].stmt, ast.SelectStmt):
+            return None
+        targets = tuple(statements[0].stmt.targetList or ())
+        if len(targets) != 1 or not isinstance(targets[0], ast.ResTarget):
+            return None
+        value = targets[0].val
+        if (
+            not isinstance(value, ast.A_Const)
+            or value.isnull
+            or not isinstance(value.val, ast.String)
+        ):
+            return None
+        return value.val.sval
+
+    def identifier_token_value(source: str, token: object) -> str | None:
+        if getattr(token, "name", None) not in {"IDENT", "UIDENT"}:
+            return None
+        value = source[token.start : token.end + 1]
+        if value[:2].casefold() == "u&":
+            value = value[2:]
+        if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
+            value = value[1:-1].replace('""', '"')
+        return value.casefold()
+
+    def contains_helper_reference(source: str, tokens: list[object]) -> bool:
+        significant = [
+            token for token in tokens if token.name not in {"C_COMMENT", "SQL_COMMENT"}
+        ]
+        for index in range(len(significant) - 2):
+            qualifier = significant[index]
+            separator = significant[index + 1]
+            function = significant[index + 2]
+            if separator.name != "ASCII_46":
+                continue
+            if (
+                identifier_token_value(source, qualifier) == "pg_temp"
+                and identifier_token_value(source, function) == "expect_sqlstate"
+            ):
+                return True
+        return False
+
+    class InventoryVisitor(Visitor):
+        def visit_FuncCall(self, ancestors: object, node: ast.FuncCall) -> None:
+            nonlocal expect_call_count
+            components = tuple(
+                component.sval if isinstance(component, ast.String) else None
+                for component in node.funcname
+            )
+            folded_components = tuple(
+                component.casefold() if isinstance(component, str) else None
+                for component in components
+            )
+            if not folded_components or folded_components[-1] != "expect_sqlstate":
+                return
+            call_name = (
+                f"expect-call-{expect_call_count + len(unresolved_expect_calls) + 1}"
+            )
+            if components != ("pg_temp", "expect_sqlstate"):
+                reason = (
+                    "helper-identity"
+                    if folded_components == ("pg_temp", "expect_sqlstate")
+                    else "qualified-name"
+                )
+                unresolved_expect_calls.append(f"{call_name}:{reason}")
+                return
+            raw_statement = ancestors.find_nearest(ast.RawStmt)
+            if raw_statement is None or not isinstance(
+                raw_statement.node.stmt, ast.SelectStmt
+            ):
+                unresolved_expect_calls.append(f"{call_name}:nested-body")
+                return
+            expect_call_count += 1
+            arguments = tuple(node.args or ())
+            if len(arguments) != 3:
+                unresolved_expect_calls.append(f"{call_name}:argument-count")
+                return
+            label_argument = arguments[2]
+            if (
+                not isinstance(label_argument, ast.A_Const)
+                or label_argument.isnull
+                or not isinstance(label_argument.val, ast.String)
+            ):
+                unresolved_expect_calls.append(f"{call_name}:non-text-label")
+                return
+            labels.add(label_argument.val.sval)
+
+        def visit_A_Const(self, ancestors: object, node: ast.A_Const) -> None:
+            del ancestors
+            if not node.isnull and isinstance(node.val, ast.String):
+                literal_values.append(("sql-literal", node.val.sval))
+
+        def visit_CreateFunctionStmt(
+            self,
+            ancestors: object,
+            node: ast.CreateFunctionStmt,
+        ) -> None:
+            del ancestors
+            nonlocal function_count, helper_definition_count
+            function_count += 1
+            components = tuple(
+                component.sval if isinstance(component, ast.String) else None
+                for component in node.funcname
+            )
+            folded_components = tuple(
+                component.casefold() if isinstance(component, str) else None
+                for component in components
+            )
+            is_helper = components == ("pg_temp", "expect_sqlstate")
+            if folded_components == ("pg_temp", "expect_sqlstate") and not is_helper:
+                unresolved_expect_calls.append(
+                    f"function-{function_count}:helper-identity"
+                )
+            if is_helper:
+                helper_definition_count += 1
+                scope = f"reviewed-helper-{helper_definition_count}"
+            else:
+                scope = f"function-body-{function_count}"
+            bodies = body_values(node.options)
+            if bodies is None or len(bodies) != 1:
+                if is_helper:
+                    unresolved_assertions.append(f"{scope}:invalid-as-body")
+                return
+            plpgsql_bodies.append((scope, bodies[0]))
+            if is_helper:
+                helper_body_scopes.append(scope)
+
+        def visit_DoStmt(self, ancestors: object, node: ast.DoStmt) -> None:
+            del ancestors
+            nonlocal do_count
+            do_count += 1
+            scope = f"do-body-{do_count}"
+            bodies = body_values(node.args)
+            if bodies is None or len(bodies) != 1:
+                unresolved_assertions.append(f"{scope}:invalid-as-body")
+                return
+            plpgsql_bodies.append((scope, bodies[0]))
+
+    InventoryVisitor()(parse_sql(sql))
+
+    for body_index, (scope, body) in enumerate(plpgsql_bodies, start=1):
+        try:
+            tokens = parser.scan(body)
+        except Exception:
+            unresolved_assertions.append(f"body-{body_index}:unscannable")
+            continue
+        for token_index, token in enumerate(tokens, start=1):
+            if token.name == "USCONST":
+                unresolved_expect_calls.append(
+                    f"body-{body_index}/string-{token_index}:unicode-string"
+                )
+                continue
+            if token.name != "SCONST":
+                continue
+            value = decoded_string_token(body, token.start, token.end)
+            if value is None:
+                unresolved_assertions.append(
+                    f"body-{body_index}/string-{token_index}:undecodable"
+                )
+                continue
+            literal_values.append((scope, value))
+
+    reference_sources = [*plpgsql_bodies, *literal_values]
+    for source_index, (_, source) in enumerate(reference_sources, start=1):
+        pending = [source]
+        scanned: set[str] = set()
+        while pending:
+            candidate = pending.pop()
+            if candidate in scanned:
+                continue
+            scanned.add(candidate)
+            if len(scanned) > 256:
+                unresolved_expect_calls.append(
+                    f"nested-source-{source_index}:scan-limit"
+                )
+                break
+            try:
+                tokens = parser.scan(candidate)
+            except Exception:
+                folded = candidate.casefold()
+                if "pg_temp" in folded or "expect_sqlstate" in folded:
+                    unresolved_expect_calls.append(
+                        f"nested-source-{source_index}:unscannable-reference"
+                    )
+                continue
+            has_unicode_identifier = any(token.name == "UIDENT" for token in tokens)
+            has_unicode_string = any(token.name == "USCONST" for token in tokens)
+            if has_unicode_identifier:
+                unresolved_expect_calls.append(
+                    f"nested-source-{source_index}:unicode-identifier"
+                )
+            if has_unicode_string:
+                unresolved_expect_calls.append(
+                    f"nested-source-{source_index}:unicode-string"
+                )
+            if (
+                not has_unicode_identifier
+                and not has_unicode_string
+                and contains_helper_reference(candidate, tokens)
+            ):
+                unresolved_expect_calls.append(
+                    f"nested-source-{source_index}:helper-reference"
+                )
+            for token in tokens:
+                if token.name != "SCONST":
+                    continue
+                nested = decoded_string_token(candidate, token.start, token.end)
+                if nested is None:
+                    token_source = candidate[token.start : token.end + 1].casefold()
+                    if "pg_temp" in token_source or "expect_sqlstate" in token_source:
+                        unresolved_expect_calls.append(
+                            f"nested-source-{source_index}:undecodable-reference"
+                        )
+                    continue
+                if nested not in scanned:
+                    pending.append(nested)
+
+    reviewed_helper_scope = (
+        helper_body_scopes[0]
+        if helper_definition_count == 1 and len(helper_body_scopes) == 1
+        else None
+    )
+    reviewed_template_counts = {template: 0 for template in _REVIEWED_HELPER_TEMPLATES}
+    for string_index, (scope, value) in enumerate(literal_values, start=1):
+        occurrences = list(_ASSERTION_START_PATTERN.finditer(value))
+        for assertion_index, occurrence in enumerate(occurrences, start=1):
+            next_start = (
+                occurrences[assertion_index].start()
+                if assertion_index < len(occurrences)
+                else len(value)
+            )
+            fragment = value[occurrence.start() : next_start]
+            static_assertion = _STATIC_ASSERTION_PATTERN.match(fragment)
+            if static_assertion is not None:
+                labels.add(static_assertion.group("label"))
+                continue
+            if _GENERIC_ASSERTION_PATTERN.match(fragment) is not None:
+                if scope == reviewed_helper_scope and value in reviewed_template_counts:
+                    reviewed_template_counts[value] += 1
+                    continue
+            unresolved_assertions.append(
+                f"string-{string_index}/assertion-{assertion_index}"
+            )
+
+    if helper_definition_count == 1:
+        for template_index, template in enumerate(_REVIEWED_HELPER_TEMPLATES, start=1):
+            if reviewed_template_counts[template] != 1:
+                unresolved_assertions.append(
+                    f"reviewed-helper-template-{template_index}:count"
+                )
+
+    return _VerifierAssertionInventory(
+        labels=labels,
+        expect_call_count=expect_call_count,
+        helper_definition_count=helper_definition_count,
+        unresolved_expect_calls=tuple(unresolved_expect_calls),
+        unresolved_assertions=tuple(unresolved_assertions),
+    )
+
 
 class RuntimeHarnessTests(unittest.TestCase):
+    def _assert_verifier_inventory_matches_map(
+        self,
+        sql_by_script: dict[str, str],
+        diagnostic_map: dict[str, tuple[str, str]],
+    ) -> None:
+        expected_phase_by_script = {
+            "assert_schema_contract.sql": "schema",
+            "assert_capabilities.sql": "capability",
+        }
+        self.assertEqual(set(sql_by_script), set(expected_phase_by_script))
+        labels_by_script: dict[str, set[str]] = {}
+        expect_call_count = 0
+        for script, expected_phase in expected_phase_by_script.items():
+            inventory = _inventory_verifier_assertions(sql_by_script[script])
+            self.assertEqual(inventory.unresolved_expect_calls, ())
+            self.assertEqual(inventory.unresolved_assertions, ())
+            self.assertEqual(
+                inventory.helper_definition_count,
+                1 if script == "assert_capabilities.sql" else 0,
+            )
+            self.assertTrue(inventory.labels)
+            labels_by_script[script] = inventory.labels
+            expect_call_count += inventory.expect_call_count
+            for label in inventory.labels:
+                self.assertIn(label, diagnostic_map)
+                self.assertEqual(diagnostic_map[label][0], expected_phase)
+
+        sql_labels = set().union(*labels_by_script.values())
+        self.assertEqual(expect_call_count, 23)
+        self.assertEqual(len(sql_labels), 47)
+        self.assertEqual(set(diagnostic_map), sql_labels)
+
     def _successful_runtime_stage(
         self,
         command: list[str],
@@ -70,7 +429,15 @@ class RuntimeHarnessTests(unittest.TestCase):
             stderr = "checksum mismatch for migration version 010"
         evidence_path.parent.mkdir(parents=True, exist_ok=True)
         evidence_path.write_text(
-            json.dumps({"returncode": return_code, "stderr": stderr, "stdout": stdout}),
+            json.dumps(
+                {
+                    "returncode": return_code,
+                    "status": "passed" if return_code == 0 else "failed",
+                    "stderr": stderr,
+                    "stdout": stdout,
+                    "timedOut": False,
+                }
+            ),
             encoding="utf-8",
         )
         return return_code
@@ -129,6 +496,857 @@ class RuntimeHarnessTests(unittest.TestCase):
         self.assertTrue(all(timeout != verify_runtime._DEFAULT_TIMEOUT_SECONDS for _, timeout in calls))
         self.assertTrue(all(0 < timeout <= 300 for _, timeout in calls))
         self.assertTrue(all(not path.is_relative_to(PROJECT_ROOT) and not path.exists() for path in temporary_paths))
+
+    def test_verifier_assertion_classifier_is_exhaustive_closed_and_secret_safe(self) -> None:
+        """Break caught: raw verifier output escapes or an existing assertion collapses to a generic failure."""
+        from runtime import verify_runtime
+
+        assertion_codes = (
+            ("assert_schema_contract.sql", "13 managed schemas", "verifier_schema_managed_schema_count"),
+            ("assert_schema_contract.sql", "managed schema allowlist", "verifier_schema_managed_schema_allowlist"),
+            ("assert_schema_contract.sql", "52 application tables", "verifier_schema_application_table_count"),
+            ("assert_schema_contract.sql", "2 platform_meta tables", "verifier_schema_platform_meta_table_set"),
+            ("assert_schema_contract.sql", "public schema table count", "verifier_schema_public_table_count"),
+            ("assert_schema_contract.sql", "19 successful migrations", "verifier_schema_migration_count"),
+            ("assert_schema_contract.sql", "all migrations successful", "verifier_schema_migration_success"),
+            ("assert_schema_contract.sql", "maximum migration version", "verifier_schema_max_migration_version"),
+            ("assert_schema_contract.sql", "V840 successful", "verifier_schema_v840_success"),
+            ("assert_schema_contract.sql", "206 composite foreign keys", "verifier_schema_foreign_key_count"),
+            ("assert_schema_contract.sql", "application foreign keys NO ACTION", "verifier_schema_foreign_key_actions"),
+            ("assert_schema_contract.sql", "validated MATCH SIMPLE foreign keys", "verifier_schema_foreign_key_validation"),
+            ("assert_schema_contract.sql", "tenant_id first in tenant foreign keys", "verifier_schema_foreign_key_tenant_prefix"),
+            ("assert_schema_contract.sql", "53 mutation guards", "verifier_schema_mutation_guard_count"),
+            ("assert_schema_contract.sql", "four distinct capability roles", "verifier_schema_capability_role_count"),
+            ("assert_schema_contract.sql", "capability roles NOLOGIN", "verifier_schema_capability_roles_nologin"),
+            ("assert_schema_contract.sql", "capability parent role memberships", "verifier_schema_capability_parent_membership"),
+            ("assert_schema_contract.sql", "capability roles cannot obtain migration owner", "verifier_schema_capability_migrator_isolation"),
+            ("assert_schema_contract.sql", "deployment_state PRIMARY/BLOCKED/52-plus-2-v1/revision=0 with 32 zero bytes", "verifier_schema_deployment_state_seed"),
+            ("assert_capabilities.sql", "cross-tenant organization parent", "verifier_capability_cross_tenant_parent"),
+            ("assert_capabilities.sql", "deployment no-op update", "verifier_capability_deployment_noop_guard"),
+            ("assert_capabilities.sql", "deployment revision must increment exactly once", "verifier_capability_deployment_revision_guard"),
+            ("assert_capabilities.sql", "query role INSERT", "verifier_capability_query_insert"),
+            ("assert_capabilities.sql", "query role UPDATE", "verifier_capability_query_update"),
+            ("assert_capabilities.sql", "query role DELETE", "verifier_capability_query_delete"),
+            ("assert_capabilities.sql", "query role direct audit read", "verifier_capability_query_audit_read"),
+            ("assert_capabilities.sql", "query role CREATE SCHEMA", "verifier_capability_query_create_schema"),
+            ("assert_capabilities.sql", "query role CREATE TABLE", "verifier_capability_query_create_table"),
+            ("assert_capabilities.sql", "query role migration owner", "verifier_capability_query_migrator_isolation"),
+            ("assert_capabilities.sql", "audit append role SELECT", "verifier_capability_audit_select"),
+            ("assert_capabilities.sql", "audit append role UPDATE", "verifier_capability_audit_update"),
+            ("assert_capabilities.sql", "audit append role CREATE SCHEMA", "verifier_capability_audit_create_schema"),
+            ("assert_capabilities.sql", "audit append role CREATE TABLE", "verifier_capability_audit_create_table"),
+            ("assert_capabilities.sql", "audit append role migration owner", "verifier_capability_audit_migrator_isolation"),
+            ("assert_capabilities.sql", "worker frozen outbox column", "verifier_capability_worker_frozen_column"),
+            ("assert_capabilities.sql", "worker outbox INSERT", "verifier_capability_worker_outbox_insert"),
+            ("assert_capabilities.sql", "worker domain write", "verifier_capability_worker_domain_write"),
+            ("assert_capabilities.sql", "worker role CREATE SCHEMA", "verifier_capability_worker_create_schema"),
+            ("assert_capabilities.sql", "worker role CREATE TABLE", "verifier_capability_worker_create_table"),
+            ("assert_capabilities.sql", "worker role migration owner", "verifier_capability_worker_migrator_isolation"),
+            ("assert_capabilities.sql", "command role DELETE", "verifier_capability_command_delete"),
+            ("assert_capabilities.sql", "command role TRUNCATE", "verifier_capability_command_truncate"),
+            ("assert_capabilities.sql", "command role frozen column", "verifier_capability_command_frozen_column"),
+            ("assert_capabilities.sql", "command role platform_meta write", "verifier_capability_command_platform_meta_write"),
+            ("assert_capabilities.sql", "command role CREATE SCHEMA", "verifier_capability_command_create_schema"),
+            ("assert_capabilities.sql", "command role CREATE TABLE", "verifier_capability_command_create_table"),
+            ("assert_capabilities.sql", "command role migration owner", "verifier_capability_command_migrator_isolation"),
+        )
+        hostile = (
+            " password=hunter2 postgresql://user:secret@db.internal/law "
+            "/private/tmp/runtime token=top-secret"
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            evidence_directory = Path(temporary_directory)
+            for index, (script, assertion, expected_code) in enumerate(assertion_codes):
+                evidence_path = evidence_directory / f"known-{index}.json"
+                evidence_path.write_text(
+                    json.dumps(
+                        {
+                            "returncode": 0,
+                            "stderr": "",
+                            "stdout": (
+                                f"verifier | psql:/runtime/sql/{script}:42: ERROR:  "
+                                f"assertion={assertion} expected=value actual=other{hostile}"
+                            ),
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                with self.subTest(assertion=assertion):
+                    code = verify_runtime.classify_verifier_log(evidence_path)
+                    self.assertEqual(code, expected_code)
+                    self.assertNotIn("hunter2", code)
+                    self.assertNotIn("db.internal", code)
+                    self.assertNotIn("/private/tmp", code)
+                    self.assertNotIn("top-secret", code)
+
+            phase_unknowns = (
+                ("assert_schema_contract.sql", "verifier_schema_assertion_unknown"),
+                ("assert_capabilities.sql", "verifier_capability_assertion_unknown"),
+            )
+            for index, (script, expected_code) in enumerate(phase_unknowns):
+                evidence_path = evidence_directory / f"phase-unknown-{index}.json"
+                evidence_path.write_text(
+                    json.dumps(
+                        {
+                            "returncode": 0,
+                            "stderr": "",
+                            "stdout": (
+                                f"psql:/runtime/sql/{script}:42: ERROR:  "
+                                "assertion=unmapped controlled assertion expected=value actual=other"
+                            ),
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                self.assertEqual(verify_runtime.classify_verifier_log(evidence_path), expected_code)
+
+            capability_record = (
+                "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                "assertion=query role INSERT expected SQLSTATE=42501 actual=00000"
+            )
+            accepted_record_shapes = {
+                "direct-psql.json": (
+                    capability_record,
+                    "verifier_capability_query_insert",
+                ),
+                "compose-prefix.json": (
+                    "law-verifier-1   |   " + capability_record,
+                    "verifier_capability_query_insert",
+                ),
+                "ordinary-schema-error.json": (
+                    "psql:/runtime/sql/assert_schema_contract.sql:9: ERROR: relation is unavailable",
+                    "verifier_schema_assertion_unknown",
+                ),
+                "known-with-context.json": (
+                    "law-verifier-1 | "
+                    + capability_record
+                    + "\nlaw-verifier-1 | CONTEXT: PL/pgSQL function inline_code_block line 4 at RAISE",
+                    "verifier_capability_query_insert",
+                ),
+            }
+            for name, (output, expected_code) in accepted_record_shapes.items():
+                evidence_path = evidence_directory / name
+                evidence_path.write_text(
+                    json.dumps({"returncode": 0, "stderr": "", "stdout": output}),
+                    encoding="utf-8",
+                )
+                with self.subTest(accepted=name):
+                    self.assertEqual(
+                        verify_runtime.classify_verifier_log(evidence_path),
+                        expected_code,
+                    )
+
+            unavailable = evidence_directory / "unavailable.json"
+            unavailable.write_text(
+                json.dumps({"returncode": 17, "stderr": hostile, "stdout": ""}),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                verify_runtime.classify_verifier_log(unavailable),
+                "verifier_logs_unavailable",
+            )
+
+            malformed = evidence_directory / "malformed.json"
+            malformed.write_text("{not-json", encoding="utf-8")
+            invalid_utf8 = evidence_directory / "invalid-utf8.json"
+            invalid_utf8.write_bytes(b"\xff\xfe")
+            non_string = evidence_directory / "non-string.json"
+            non_string.write_text(
+                json.dumps({"returncode": 0, "stderr": [], "stdout": ""}),
+                encoding="utf-8",
+            )
+            unknown = evidence_directory / "unknown.json"
+            unknown.write_text(
+                json.dumps({"returncode": 0, "stderr": "", "stdout": "unclassified failure"}),
+                encoding="utf-8",
+            )
+            schema_record = (
+                "psql:/runtime/sql/assert_schema_contract.sql:1: ERROR:  "
+                "assertion=13 managed schemas expected=13 actual=12"
+            )
+            fail_closed_outputs = {
+                "unstructured-forgery.json": (
+                    "narrative assert_capabilities.sql says "
+                    "assertion=query role INSERT expected SQLSTATE=42501 actual=00000"
+                ),
+                "duplicate-record.json": f"{capability_record}\n{capability_record}",
+                "multiple-records.json": f"{schema_record}\n{capability_record}",
+                "known-plus-error.json": (
+                    f"{capability_record}\n"
+                    "psql:/runtime/sql/assert_capabilities.sql:3: ERROR: unexpected failure"
+                ),
+                "phase-conflict.json": (
+                    "psql:/runtime/sql/assert_schema_contract.sql:4: ERROR:  "
+                    "assertion=query role INSERT expected SQLSTATE=42501 actual=00000"
+                ),
+                "zero-line.json": capability_record.replace(":2:", ":0:"),
+                "missing-error-token.json": capability_record.replace(": ERROR:", ": NOTICE:"),
+                "known-plus-bare-error.json": f"{capability_record}\nERROR: second failure",
+                "same-line-second-error.json": f"{capability_record} ERROR: second failure",
+                "embedded-near-prefix.json": f"not{capability_record}",
+                "empty-expected.json": (
+                    "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                    "assertion=query role INSERT expected="
+                ),
+                "whitespace-expected.json": (
+                    "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                    "assertion=query role INSERT expected=   "
+                ),
+                "missing-actual-field.json": (
+                    "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                    "assertion=query role INSERT expected=42501 detail=failed"
+                ),
+                "empty-actual.json": (
+                    "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                    "assertion=query role INSERT expected=42501 actual="
+                ),
+                "whitespace-actual.json": (
+                    "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                    "assertion=query role INSERT expected=42501 actual=   "
+                ),
+                "expected-only.json": (
+                    "psql:/runtime/sql/assert_capabilities.sql:2: ERROR:  "
+                    "assertion=query role INSERT expected=42501"
+                ),
+                "duplicate-assertion-without-prefix.json": (
+                    f"{capability_record}\n"
+                    "assertion=query role INSERT expected SQLSTATE=42501 actual=00000"
+                ),
+            }
+            fail_closed_paths: list[Path] = []
+            for name, output in fail_closed_outputs.items():
+                evidence_path = evidence_directory / name
+                evidence_path.write_text(
+                    json.dumps({"returncode": 0, "stderr": "", "stdout": output}),
+                    encoding="utf-8",
+                )
+                fail_closed_paths.append(evidence_path)
+            for evidence_path in (
+                malformed,
+                invalid_utf8,
+                non_string,
+                unknown,
+                *fail_closed_paths,
+                evidence_directory / "missing.json",
+            ):
+                with self.subTest(fail_closed=evidence_path.name):
+                    self.assertEqual(
+                        verify_runtime.classify_verifier_log(evidence_path),
+                        "verifier_diagnostic_unknown",
+                    )
+
+    def test_verifier_assertion_map_exactly_tracks_production_sql(self) -> None:
+        """Break caught: a SQL assertion and its closed diagnostic map drift independently."""
+        from runtime import verify_runtime
+
+        sql_directory = PROJECT_ROOT / "runtime" / "sql"
+        sql_by_script = {
+            script: (sql_directory / script).read_text(encoding="utf-8")
+            for script in (
+                "assert_schema_contract.sql",
+                "assert_capabilities.sql",
+            )
+        }
+        diagnostic_map = verify_runtime._VERIFIER_ASSERTION_DIAGNOSTICS
+        self._assert_verifier_inventory_matches_map(sql_by_script, diagnostic_map)
+        diagnostic_codes = [code for _, code in diagnostic_map.values()]
+        all_closed_codes = [
+            *diagnostic_codes,
+            *(code for _, code in verify_runtime._VERIFIER_PHASE_DIAGNOSTICS.values()),
+            "verifier_diagnostic_unknown",
+            "verifier_logs_unavailable",
+        ]
+        self.assertEqual(len(diagnostic_codes), len(set(diagnostic_codes)))
+        self.assertEqual(len(all_closed_codes), len(set(all_closed_codes)))
+
+    def test_exact_set_gate_rejects_case_hidden_controlled_mutations(self) -> None:
+        """Break caught: reviewer casing variants introduce drift without breaking the exact-set test."""
+        from runtime import verify_runtime
+
+        sql_directory = PROJECT_ROOT / "runtime" / "sql"
+        schema_sql = (sql_directory / "assert_schema_contract.sql").read_text(encoding="utf-8")
+        capability_sql = (sql_directory / "assert_capabilities.sql").read_text(encoding="utf-8")
+        function_source = (
+            "SELECT pg_temp.expect_sqlstate('42501', "
+            "'INSERT INTO lead.lead (tenant_id) SELECT NULL::uuid WHERE false', "
+            "'query role INSERT');"
+        )
+        function_mutation = (
+            "select PG_TEMP.ExPeCt_SqLsTaTe('42501', "
+            "'INSERT INTO lead.lead (tenant_id) SELECT NULL::uuid WHERE false', "
+            "'query role INSERT drift');"
+        )
+        message_source = (
+            "RAISE EXCEPTION 'assertion=query role migration owner "
+            "expected=false actual=true';"
+        )
+        message_mutation = (
+            "raise exception USING MESSAGE = 'AsSeRtIoN=query role migration owner drift "
+            "ExPeCtEd=false actual=true';"
+        )
+        mutations = (
+            capability_sql.replace(function_source, function_mutation, 1),
+            capability_sql.replace(message_source, message_mutation, 1),
+        )
+        self.assertTrue(all(mutated != capability_sql for mutated in mutations))
+        for mutation_name, mutated in zip(("function-call", "using-message"), mutations):
+            with self.subTest(mutation=mutation_name):
+                with self.assertRaises(AssertionError):
+                    self._assert_verifier_inventory_matches_map(
+                        {
+                            "assert_schema_contract.sql": schema_sql,
+                            "assert_capabilities.sql": mutated,
+                        },
+                        verify_runtime._VERIFIER_ASSERTION_DIAGNOSTICS,
+                    )
+
+    def test_exact_set_gate_rejects_generic_assertions_outside_the_helper(self) -> None:
+        """Break caught: a generic RAISE or format assertion is mistaken for the reviewed helper."""
+        from runtime import verify_runtime
+
+        sql_directory = PROJECT_ROOT / "runtime" / "sql"
+        schema_sql = (sql_directory / "assert_schema_contract.sql").read_text(encoding="utf-8")
+        capability_sql = (sql_directory / "assert_capabilities.sql").read_text(encoding="utf-8")
+        helper_start = capability_sql.index("CREATE FUNCTION pg_temp.expect_sqlstate")
+        helper_end = capability_sql.index("$expect_sqlstate$;", helper_start) + len(
+            "$expect_sqlstate$;"
+        )
+        helper_definition = capability_sql[helper_start:helper_end]
+        reviewed_raise = (
+            "RAISE EXCEPTION 'assertion=% expected SQLSTATE=% actual=success', "
+            "assertion_name, expected_state;"
+        )
+        mutations = {
+            "generic-raise-in-do": (
+                schema_sql,
+                capability_sql
+                + """
+DO $unreviewed_generic_raise$
+BEGIN
+    RAISE EXCEPTION 'assertion=% expected SQLSTATE=% actual=success', 'drift', '42501';
+END
+$unreviewed_generic_raise$;
+""",
+            ),
+            "generic-format-in-do": (
+                schema_sql,
+                capability_sql
+                + """
+DO $unreviewed_generic_format$
+BEGIN
+    PERFORM format(
+        'assertion=%s expected SQLSTATE=%s actual=%s',
+        'drift',
+        '42501',
+        '00000'
+    );
+END
+$unreviewed_generic_format$;
+""",
+            ),
+            "generic-in-schema-script": (
+                schema_sql
+                + """
+DO $schema_generic$
+BEGIN
+    RAISE EXCEPTION 'assertion=% expected SQLSTATE=% actual=%', 'drift', '1', '2';
+END
+$schema_generic$;
+""",
+                capability_sql,
+            ),
+            "duplicate-reviewed-template": (
+                schema_sql,
+                capability_sql.replace(
+                    reviewed_raise,
+                    reviewed_raise + "\n        " + reviewed_raise,
+                    1,
+                ),
+            ),
+            "duplicate-helper-definition": (
+                schema_sql,
+                capability_sql + "\n" + helper_definition + "\n",
+            ),
+        }
+        for mutation_name, (mutated_schema, mutated_capability) in mutations.items():
+            with self.subTest(mutation=mutation_name):
+                with self.assertRaises(AssertionError):
+                    self._assert_verifier_inventory_matches_map(
+                        {
+                            "assert_schema_contract.sql": mutated_schema,
+                            "assert_capabilities.sql": mutated_capability,
+                        },
+                        verify_runtime._VERIFIER_ASSERTION_DIAGNOSTICS,
+                    )
+
+    def test_exact_set_gate_rejects_nested_helper_calls(self) -> None:
+        """Break caught: a helper call hidden in a PL/pgSQL body escapes the top-level AST inventory."""
+        from runtime import verify_runtime
+
+        sql_directory = PROJECT_ROOT / "runtime" / "sql"
+        schema_sql = (sql_directory / "assert_schema_contract.sql").read_text(encoding="utf-8")
+        capability_sql = (sql_directory / "assert_capabilities.sql").read_text(encoding="utf-8")
+        moved_call = (
+            "SELECT pg_temp.expect_sqlstate('42501', "
+            "'INSERT INTO lead.lead (tenant_id) SELECT NULL::uuid WHERE false', "
+            "'query role INSERT');"
+        )
+        mutations = {
+            "direct-do-call": capability_sql
+            + """
+DO $hidden_helper_call$
+BEGIN
+    PERFORM pg_temp.expect_sqlstate('42501', 'SELECT 1', 'hidden body assertion');
+END
+$hidden_helper_call$;
+""",
+            "dynamic-sql-string": capability_sql
+            + """
+DO $hidden_dynamic_helper_call$
+BEGIN
+    EXECUTE 'SELECT pg_temp.expect_sqlstate(''42501'', ''SELECT 1'', ''hidden dynamic assertion'')';
+END
+$hidden_dynamic_helper_call$;
+""",
+            "dollar-quoted-dynamic-sql": capability_sql
+            + """
+DO $hidden_dollar_helper_call$
+BEGIN
+    EXECUTE $dynamic_sql$
+        SELECT pg_temp.expect_sqlstate('42501', 'SELECT 1', 'hidden dollar assertion')
+    $dynamic_sql$;
+END
+$hidden_dollar_helper_call$;
+""",
+            "quoted-case-and-whitespace": capability_sql
+            + """
+DO $hidden_quoted_helper_call$
+BEGIN
+    PERFORM "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
+        '42501', 'SELECT 1', 'hidden quoted assertion'
+    );
+END
+$hidden_quoted_helper_call$;
+""",
+            "begin-atomic-function-body": capability_sql.replace(
+                moved_call,
+                """CREATE FUNCTION pg_temp.hidden_verifier_probe()
+RETURNS void
+LANGUAGE SQL
+BEGIN ATOMIC
+    SELECT pg_temp.expect_sqlstate(
+        '42501',
+        'INSERT INTO lead.lead (tenant_id) SELECT NULL::uuid WHERE false',
+        'query role INSERT'
+    );
+END;""",
+                1,
+            ),
+            "unicode-escaped-body-call": capability_sql
+            + r"""
+DO $hidden_unicode_helper_call$
+BEGIN
+    PERFORM U&"pg\005Ftemp" . U&"expect\005Fsqlstate"(
+        '42501', 'SELECT 1', 'hidden unicode assertion'
+    );
+END
+$hidden_unicode_helper_call$;
+""",
+            "custom-uescape-qualifier-body-call": capability_sql
+            + r"""
+DO $hidden_custom_escape_helper_call$
+BEGIN
+    PERFORM U&"pg!005Ftemp" UESCAPE '!' . expect_sqlstate(
+        '42501', 'SELECT 1', 'hidden custom escape assertion'
+    );
+END
+$hidden_custom_escape_helper_call$;
+""",
+            "custom-uescape-qualifier-recursive-string": capability_sql
+            + r"""
+DO $hidden_custom_escape_dynamic_call$
+BEGIN
+    EXECUTE $hidden_custom_escape_sql$
+        SELECT U&"pg!005Ftemp" UESCAPE '!' . expect_sqlstate(
+            '42501', 'SELECT 1', 'hidden custom escape dynamic assertion'
+        )
+    $hidden_custom_escape_sql$;
+END
+$hidden_custom_escape_dynamic_call$;
+""",
+            "custom-uescape-function-body-call": capability_sql
+            + r"""
+DO $hidden_custom_function_escape_call$
+BEGIN
+    PERFORM pg_temp . U&"expect!005Fsqlstate" UESCAPE '!'(
+        '42501', 'SELECT 1', 'hidden custom function escape assertion'
+    );
+END
+$hidden_custom_function_escape_call$;
+""",
+            "unicode-escaped-sql-string-body": capability_sql
+            + r"""
+DO $hidden_unicode_sql_string$
+BEGIN
+    EXECUTE U&'SELECT pg!005Ftemp.expect!005Fsqlstate(''42501'', ''SELECT 1'', ''query role INSERT'')' UESCAPE '!';
+END
+$hidden_unicode_sql_string$;
+""",
+            "unicode-escaped-sql-string-recursive": capability_sql
+            + r"""
+DO $hidden_recursive_unicode_sql_string$
+BEGIN
+    EXECUTE $hidden_outer_sql$
+        SELECT U&'SELECT pg!005Ftemp.expect!005Fsqlstate(''42501'', ''SELECT 1'', ''query role INSERT'')' UESCAPE '!'
+    $hidden_outer_sql$;
+END
+$hidden_recursive_unicode_sql_string$;
+""",
+        }
+        self.assertTrue(all(mutated != capability_sql for mutated in mutations.values()))
+        for mutation_name, mutated in mutations.items():
+            with self.subTest(mutation=mutation_name):
+                inventory = _inventory_verifier_assertions(mutated)
+                self.assertTrue(inventory.unresolved_expect_calls)
+                with self.assertRaises(AssertionError):
+                    self._assert_verifier_inventory_matches_map(
+                        {
+                            "assert_schema_contract.sql": schema_sql,
+                            "assert_capabilities.sql": mutated,
+                        },
+                        verify_runtime._VERIFIER_ASSERTION_DIAGNOSTICS,
+                    )
+
+    def test_exact_set_gate_rejects_quoted_helper_identity(self) -> None:
+        """Break caught: quoted uppercase names impersonate the exact temporary helper."""
+        from runtime import verify_runtime
+
+        sql_directory = PROJECT_ROOT / "runtime" / "sql"
+        schema_sql = (sql_directory / "assert_schema_contract.sql").read_text(
+            encoding="utf-8"
+        )
+        capability_sql = (sql_directory / "assert_capabilities.sql").read_text(
+            encoding="utf-8"
+        )
+        existing_call = (
+            "SELECT pg_temp.expect_sqlstate('42501', "
+            "'INSERT INTO lead.lead (tenant_id) SELECT NULL::uuid WHERE false', "
+            "'query role INSERT');"
+        )
+        quoted_call = existing_call.replace(
+            "pg_temp.expect_sqlstate",
+            '"PG_TEMP"."EXPECT_SQLSTATE"',
+            1,
+        )
+        mutations = {
+            "replaced-call": capability_sql.replace(existing_call, quoted_call, 1),
+            "replaced-helper-definition": capability_sql.replace(
+                "CREATE FUNCTION pg_temp.expect_sqlstate(",
+                'CREATE FUNCTION "PG_TEMP"."EXPECT_SQLSTATE"(',
+                1,
+            ),
+            "additional-call": capability_sql
+            + """
+SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
+    '42501', 'SELECT 1', 'query role INSERT'
+);
+""",
+        }
+        self.assertTrue(all(mutated != capability_sql for mutated in mutations.values()))
+        for mutation_name, mutated in mutations.items():
+            with self.subTest(mutation=mutation_name):
+                inventory = _inventory_verifier_assertions(mutated)
+                self.assertTrue(inventory.unresolved_expect_calls)
+                with self.assertRaises(AssertionError):
+                    self._assert_verifier_inventory_matches_map(
+                        {
+                            "assert_schema_contract.sql": schema_sql,
+                            "assert_capabilities.sql": mutated,
+                        },
+                        verify_runtime._VERIFIER_ASSERTION_DIAGNOSTICS,
+                    )
+
+    def test_verifier_assertion_inventory_is_case_and_layout_independent(self) -> None:
+        """Break caught: case changes or USING MESSAGE hide a new assertion from the exact-set gate."""
+        function_inventory = _inventory_verifier_assertions(
+            "select PG_TEMP.ExPeCt_SqLsTaTe('42501', 'SELECT 1', 'case-hidden function drift');"
+        )
+        self.assertEqual(function_inventory.labels, {"case-hidden function drift"})
+        self.assertEqual(function_inventory.expect_call_count, 1)
+        self.assertEqual(function_inventory.unresolved_expect_calls, ())
+        self.assertEqual(function_inventory.unresolved_assertions, ())
+
+        message_inventory = _inventory_verifier_assertions(
+            """
+            DO $body$
+            BEGIN
+                raise exception using message =
+                    'AsSeRtIoN=case-hidden message drift ExPeCtEd=1 actual=2';
+            END
+            $body$;
+            """
+        )
+        self.assertEqual(message_inventory.labels, {"case-hidden message drift"})
+        self.assertEqual(message_inventory.expect_call_count, 0)
+        self.assertEqual(message_inventory.unresolved_expect_calls, ())
+        self.assertEqual(message_inventory.unresolved_assertions, ())
+
+    def test_verifier_assertion_inventory_rejects_unresolved_calls_and_literals(self) -> None:
+        """Break caught: a dynamic diagnostic source silently escapes the closed assertion inventory."""
+        invalid_sql = (
+            "SELECT pg_temp.expect_sqlstate('42501', 'SELECT 1');"
+            "SELECT pg_temp.expect_sqlstate('42501', 'SELECT 1', 42);"
+            "SELECT pg_temp.expect_sqlstate('42501', 'SELECT 1', 'dynamic ' || current_user);"
+            "DO $$ BEGIN RAISE EXCEPTION USING MESSAGE = 'assertion=missing expected marker'; END $$;"
+        )
+        inventory = _inventory_verifier_assertions(invalid_sql)
+        self.assertEqual(inventory.expect_call_count, 3)
+        self.assertEqual(len(inventory.unresolved_expect_calls), 3)
+        self.assertEqual(len(inventory.unresolved_assertions), 1)
+
+        generic_template = _inventory_verifier_assertions(
+            "DO $$ BEGIN RAISE EXCEPTION 'assertion=% expected SQLSTATE=% actual=%', 'x', '1', '2'; END $$;"
+        )
+        self.assertEqual(generic_template.labels, set())
+        self.assertEqual(len(generic_template.unresolved_assertions), 1)
+
+    def test_failed_initial_and_noop_verifiers_capture_logs_before_cleanup_without_summary(self) -> None:
+        """Break caught: a failed verifier skips its only safe diagnostic capture or parses a false PASS."""
+        from runtime import verify_runtime
+
+        for failed_phase in ("initial", "noop"):
+            with self.subTest(failed_phase=failed_phase), tempfile.TemporaryDirectory() as temporary_directory:
+                calls: list[Path] = []
+                output_directory = Path(temporary_directory) / "evidence"
+
+                def failing_verifier_stage(
+                    command: list[str],
+                    *,
+                    evidence_path: Path,
+                    cwd: Path,
+                    timeout_seconds: float,
+                ) -> int:
+                    calls.append(evidence_path)
+                    return_code = self._successful_runtime_stage(
+                        command,
+                        evidence_path=evidence_path,
+                        cwd=cwd,
+                        timeout_seconds=timeout_seconds,
+                    )
+                    is_noop_wait = evidence_path.name == "verifier-wait.json" and evidence_path.parent.name == "noop"
+                    is_initial_wait = evidence_path.name == "verifier-wait.json" and evidence_path.parent.name != "noop"
+                    should_fail = is_noop_wait if failed_phase == "noop" else is_initial_wait
+                    if should_fail:
+                        recorded = json.loads(evidence_path.read_text(encoding="utf-8"))
+                        recorded.update({"returncode": 3, "status": "failed", "timedOut": False})
+                        evidence_path.write_text(json.dumps(recorded), encoding="utf-8")
+                        return 3
+                    if "logs" in command and command[-1] == "verifier":
+                        is_noop_logs = evidence_path.name == "noop-verifier-logs.json"
+                        should_emit_failure = is_noop_logs if failed_phase == "noop" else not is_noop_logs
+                        if should_emit_failure:
+                            recorded = json.loads(evidence_path.read_text(encoding="utf-8"))
+                            recorded["stdout"] = (
+                                "verifier | psql:/runtime/sql/assert_capabilities.sql:77: ERROR: "
+                                "assertion=query role INSERT expected SQLSTATE=42501 actual=success "
+                                "password=hunter2 postgresql://user:secret@db.internal/law "
+                                "/private/tmp/runtime token=top-secret"
+                            )
+                            evidence_path.write_text(json.dumps(recorded), encoding="utf-8")
+                    return return_code
+
+                result = verify_runtime.run_runtime_verification(
+                    PROJECT_ROOT,
+                    output_directory,
+                    runs=2,
+                    stage_runner=failing_verifier_stage,
+                )
+
+                failed_run = result["runs"][0]
+                failed_service = failed_run["noopVerifier"] if failed_phase == "noop" else failed_run["verifier"]
+                self.assertEqual(result["status"], "FAILED")
+                self.assertEqual(result["reason"], "compose_up_failed")
+                self.assertEqual(failed_service["waitReturnCode"], 3)
+                self.assertEqual(failed_service["logsReturnCode"], 0)
+                self.assertIsNone(failed_service["summary"])
+                logs_name = "noop-verifier-logs.json" if failed_phase == "noop" else "verifier-logs.json"
+                logs_index = next(index for index, path in enumerate(calls) if path.name == logs_name)
+                cleanup_index = next(index for index, path in enumerate(calls) if path.name == "compose-down.json")
+                self.assertLess(logs_index, cleanup_index)
+                diagnostic_path = (
+                    "run-01/noop/verifier-wait.json"
+                    if failed_phase == "noop"
+                    else "run-01/verifier-wait.json"
+                )
+                self.assertEqual(
+                    dict(result.ci_stage_diagnostics)[diagnostic_path],
+                    "verifier_capability_query_insert",
+                )
+
+    def test_typed_producer_distinguishes_exit_124_from_a_real_timeout(self) -> None:
+        """Break caught: an ordinary verifier exit 124 is mislabeled as a subprocess timeout."""
+        from runtime import verify_runtime
+
+        wait_path = "run-01/verifier-wait.json"
+        hostile = (
+            "password=hunter2 postgresql://user:secret@db.internal/law "
+            "/private/tmp/runtime token=top-secret"
+        )
+        for timed_out, expected_diagnostic in (
+            (False, "verifier_capability_query_insert"),
+            (True, None),
+        ):
+            with self.subTest(timed_out=timed_out), tempfile.TemporaryDirectory() as temporary_directory:
+                output_directory = Path(temporary_directory) / "evidence"
+
+                def captured_stage(
+                    command: list[str],
+                    *,
+                    evidence_path: Path,
+                    cwd: Path,
+                    timeout_seconds: float,
+                ) -> verify_runtime.CapturedStageResult:
+                    return_code = self._successful_runtime_stage(
+                        command,
+                        evidence_path=evidence_path,
+                        cwd=cwd,
+                        timeout_seconds=timeout_seconds,
+                    )
+                    recorded = json.loads(evidence_path.read_text(encoding="utf-8"))
+                    stage_timed_out = False
+                    is_failed_wait = (
+                        evidence_path.name == "verifier-wait.json"
+                        and evidence_path.parent.name == "run-01"
+                    )
+                    if is_failed_wait:
+                        return_code = 124
+                        stage_timed_out = timed_out
+                        recorded.update(
+                            {
+                                "returncode": return_code,
+                                "status": "timed_out" if timed_out else "failed",
+                                "timedOut": timed_out,
+                            }
+                        )
+                    elif (
+                        evidence_path.name == "verifier-logs.json"
+                        and evidence_path.parent.name == "run-01"
+                    ):
+                        recorded["stdout"] = (
+                            "verifier | psql:/runtime/sql/assert_capabilities.sql:77: ERROR:  "
+                            "assertion=query role INSERT expected SQLSTATE=42501 actual=success "
+                            + hostile
+                        )
+                        recorded["timedOut"] = False
+                    else:
+                        recorded["timedOut"] = False
+                    evidence_path.write_text(json.dumps(recorded), encoding="utf-8")
+                    stdout_bytes = str(recorded.get("stdout", "")).encode("utf-8")
+                    stderr_bytes = str(recorded.get("stderr", "")).encode("utf-8")
+                    return verify_runtime.CapturedStageResult(
+                        exit_code=return_code,
+                        timed_out=stage_timed_out,
+                        stdout_sha256=hashlib.sha256(stdout_bytes).hexdigest(),
+                        stderr_sha256=hashlib.sha256(stderr_bytes).hexdigest(),
+                    )
+
+                with mock.patch.object(
+                    verify_runtime,
+                    "run_checked_result",
+                    side_effect=captured_stage,
+                ):
+                    result = verify_runtime.run_runtime_verification(
+                        PROJECT_ROOT,
+                        output_directory,
+                        runs=2,
+                    )
+
+                diagnostics = dict(result.ci_stage_diagnostics)
+                self.assertEqual(diagnostics.get(wait_path), expected_diagnostic)
+                summary = verify_runtime.build_ci_runtime_summary(
+                    result,
+                    git_commit="d" * 40,
+                    manifest={},
+                )
+                wait_stage = next(
+                    stage
+                    for stage in summary["runs"][0]["stages"]
+                    if stage["stageName"] == "verifier-wait"
+                )
+                self.assertEqual(wait_stage["exitCode"], 124)
+                self.assertEqual(wait_stage["timedOut"], timed_out)
+                self.assertEqual(
+                    wait_stage["diagnosticCode"],
+                    "timed_out" if timed_out else "verifier_capability_query_insert",
+                )
+                safe_output = json.dumps(summary, sort_keys=True)
+                for secret in ("hunter2", "db.internal", "/private/tmp", "top-secret"):
+                    self.assertNotIn(secret, safe_output)
+
+    def test_injected_stage_fallback_rejects_incomplete_or_inconsistent_timeout_metadata(self) -> None:
+        """Break caught: an untyped test runner can forge timeout state from only an exit code."""
+        from runtime import verify_runtime
+
+        invalid_records = (
+            {},
+            {"returncode": 3, "status": "failed"},
+            {"returncode": 3, "status": "passed", "timedOut": False},
+            {"returncode": 3, "status": "timed_out", "timedOut": True},
+            {"returncode": 124, "status": "failed", "timedOut": True},
+            {"returncode": 124, "status": "timed_out", "timedOut": False},
+            {"returncode": 17, "status": "failed", "timedOut": False},
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            evidence_path = Path(temporary_directory) / "verifier-wait.json"
+            for index, record in enumerate(invalid_records):
+                with self.subTest(index=index):
+                    evidence_path.write_text(json.dumps(record), encoding="utf-8")
+                    self.assertIsNone(
+                        verify_runtime._verifier_wait_metadata(
+                            None,
+                            evidence_path=evidence_path,
+                            expected_return_code=3,
+                            allow_evidence_fallback=True,
+                        )
+                    )
+
+            evidence_path.write_text("{not-json", encoding="utf-8")
+            self.assertIsNone(
+                verify_runtime._verifier_wait_metadata(
+                    None,
+                    evidence_path=evidence_path,
+                    expected_return_code=3,
+                    allow_evidence_fallback=True,
+                )
+            )
+
+            evidence_path.write_text(
+                json.dumps({"returncode": 124, "status": "timed_out", "timedOut": True}),
+                encoding="utf-8",
+            )
+            typed_non_timeout = verify_runtime.CapturedStageResult(
+                exit_code=124,
+                timed_out=False,
+                stdout_sha256="a" * 64,
+                stderr_sha256="b" * 64,
+            )
+            self.assertEqual(
+                verify_runtime._verifier_wait_metadata(
+                    typed_non_timeout,
+                    evidence_path=evidence_path,
+                    expected_return_code=124,
+                    allow_evidence_fallback=True,
+                ),
+                (124, False),
+            )
+            self.assertIsNone(
+                verify_runtime._verifier_wait_metadata(
+                    None,
+                    evidence_path=evidence_path,
+                    expected_return_code=124,
+                    allow_evidence_fallback=False,
+                )
+            )
 
     def test_temporary_files_are_outside_the_repository_and_removed_when_cleanup_raises(self) -> None:
         """Break caught: a cleanup/evidence exception leaves a password-bearing temp file in the repository."""

@@ -402,6 +402,113 @@ class CiArtifactTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self._export(summary, Path(temporary_directory) / "schema-runtime-ci")
 
+    def test_verifier_diagnostics_are_finite_position_bound_and_failure_only(self) -> None:
+        """Break caught: a safe verifier code is accepted on an unrelated or non-failed stage."""
+        safe_code = "verifier_schema_migration_count"
+
+        def verifier_failure_summary(stage_name: str = "verifier-wait") -> dict[str, object]:
+            summary = _passed_summary()
+            summary.update(
+                {
+                    "workflowOutcome": "FAILED",
+                    "reasonCode": "compose_up_failed",
+                    "failureScenarios": [],
+                }
+            )
+            summary["toolchain"].update({"postgresVersion": None, "flywayVersion": None})
+            summary["contractSummary"] = {
+                field: False if field == "verified" else None
+                for field in CONTRACT_FIELDS
+            }
+            stage = next(
+                item
+                for item in summary["runs"][0]["stages"]
+                if item["stageName"] == stage_name
+            )
+            stage.update({"exitCode": 3, "diagnosticCode": safe_code})
+            return summary
+
+        for stage_name in ("verifier-wait", "noop-verifier-wait"):
+            with self.subTest(valid_stage=stage_name), tempfile.TemporaryDirectory() as temporary_directory:
+                targets = self._export(
+                    verifier_failure_summary(stage_name),
+                    Path(temporary_directory) / "schema-runtime-ci",
+                )
+                exported = json.loads(targets[0].read_text(encoding="utf-8"))
+                stage = next(
+                    item
+                    for item in exported["runs"][0]["stages"]
+                    if item["stageName"] == stage_name
+                )
+                self.assertEqual(stage["diagnosticCode"], safe_code)
+                self.assertEqual(set(exported), TOP_LEVEL_FIELDS)
+                self.assertEqual(set(stage), STAGE_FIELDS)
+
+        unavailable_summary = verifier_failure_summary()
+        unavailable_wait = next(
+            item
+            for item in unavailable_summary["runs"][0]["stages"]
+            if item["stageName"] == "verifier-wait"
+        )
+        unavailable_logs = next(
+            item
+            for item in unavailable_summary["runs"][0]["stages"]
+            if item["stageName"] == "verifier-logs"
+        )
+        unavailable_wait["diagnosticCode"] = "verifier_logs_unavailable"
+        unavailable_logs.update({"exitCode": 17, "diagnosticCode": "process_failed"})
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            targets = self._export(
+                unavailable_summary,
+                Path(temporary_directory) / "schema-runtime-ci",
+            )
+            exported = json.loads(targets[0].read_text(encoding="utf-8"))
+        self.assertEqual(
+            next(
+                item
+                for item in exported["runs"][0]["stages"]
+                if item["stageName"] == "verifier-logs"
+            )["diagnosticCode"],
+            "process_failed",
+        )
+
+        invalid_mutations = (
+            lambda summary: next(
+                item for item in summary["runs"][0]["stages"]
+                if item["stageName"] == "postgres-start"
+            ).update({"exitCode": 3, "diagnosticCode": safe_code}),
+            lambda summary: next(
+                item for item in summary["runs"][0]["stages"]
+                if item["stageName"] == "verifier-wait"
+            ).update({"exitCode": 0, "diagnosticCode": safe_code}),
+            lambda summary: next(
+                item for item in summary["runs"][0]["stages"]
+                if item["stageName"] == "verifier-wait"
+            ).update({"exitCode": 124, "timedOut": True, "diagnosticCode": safe_code}),
+            lambda summary: next(
+                item for item in summary["runs"][0]["stages"]
+                if item["stageName"] == "verifier-wait"
+            ).update({"exitCode": 127, "diagnosticCode": safe_code}),
+            lambda summary: next(
+                item for item in summary["runs"][0]["stages"]
+                if item["stageName"] == "verifier-wait"
+            ).update({"exitCode": 3, "diagnosticCode": "verifier_raw_private_text"}),
+            lambda summary: next(
+                item for item in summary["runs"][0]["stages"]
+                if item["stageName"] == "verifier-logs"
+            ).update({"exitCode": 17, "diagnosticCode": "process_failed"}),
+            lambda summary: next(
+                item for item in summary["runs"][0]["stages"]
+                if item["stageName"] == "verifier-wait"
+            ).update({"diagnosticCode": "verifier_logs_unavailable"}),
+        )
+        for index, mutate in enumerate(invalid_mutations):
+            with self.subTest(invalid=index), tempfile.TemporaryDirectory() as temporary_directory:
+                summary = verifier_failure_summary()
+                mutate(summary)
+                with self.assertRaises(ValueError):
+                    self._export(summary, Path(temporary_directory) / "schema-runtime-ci")
+
     def test_fingerprint_mismatch_requires_complete_successful_runs_and_five_scenarios(self) -> None:
         """Break caught: the closed mismatch reason omits its completed A/B and scenario evidence."""
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -1382,6 +1489,68 @@ class HostedCiOnlyVerificationTests(unittest.TestCase):
             "/private/tmp",
         ):
             self.assertNotIn(marker, stdout + stderr)
+
+    def test_typed_verifier_diagnostic_replaces_only_failed_wait_code_without_raw_data(self) -> None:
+        """Break caught: runner-local verifier text enters JSON/Markdown or cannot refine process_failed."""
+        from runtime import verify_runtime
+
+        captured: dict[str, object] = {}
+        for stage_name, _, path in verify_runtime._CI_RUN_STAGE_DEFINITIONS[0][1]:
+            if stage_name.startswith("noop-"):
+                continue
+            captured[path] = verify_runtime.CapturedStageResult(
+                exit_code=3 if stage_name == "verifier-wait" else 0,
+                timed_out=False,
+                stdout_sha256="a" * 64,
+                stderr_sha256="b" * 64,
+            )
+        hostile = (
+            "password=hunter2 postgresql://user:secret@db.internal/law "
+            "/private/tmp/runtime token=top-secret"
+        )
+        result = verify_runtime.RuntimeVerificationResult(
+            {
+                "status": "FAILED",
+                "reason": "compose_up_failed",
+                "failureScenarios": [],
+                "runs": [{"stderr": hostile, "stdout": hostile, "project": hostile}],
+            },
+            ci_stage_results=captured,
+            ci_locked_images=verify_runtime._ci_locked_images_from_lock(_locked_toolchain()),
+            ci_stage_diagnostics={
+                "run-01/verifier-wait.json": "verifier_capability_query_insert",
+            },
+        )
+
+        summary = verify_runtime.build_ci_runtime_summary(
+            result,
+            git_commit="d" * 40,
+            manifest={},
+        )
+        failed_wait = next(
+            stage
+            for stage in summary["runs"][0]["stages"]
+            if stage["stageName"] == "verifier-wait"
+        )
+        verifier_logs = next(
+            stage
+            for stage in summary["runs"][0]["stages"]
+            if stage["stageName"] == "verifier-logs"
+        )
+        self.assertEqual(failed_wait["diagnosticCode"], "verifier_capability_query_insert")
+        self.assertEqual(verifier_logs["diagnosticCode"], "ok")
+        self.assertEqual(set(summary), TOP_LEVEL_FIELDS)
+        self.assertEqual(set(failed_wait), STAGE_FIELDS)
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            targets = verify_runtime.export_ci_runtime_artifact(
+                summary,
+                Path(temporary_directory) / "schema-runtime-ci",
+            )
+            artifact_text = "\n".join(path.read_text(encoding="utf-8") for path in targets)
+        self.assertIn("verifier_capability_query_insert", artifact_text)
+        for secret in ("hunter2", "db.internal", "/private/tmp", "top-secret"):
+            self.assertNotIn(secret, artifact_text)
 
     def test_builder_requires_bound_valid_fingerprints_for_pass_and_mismatch(self) -> None:
         """Break caught: typed controller results can claim PASS/mismatch with inconsistent fingerprints."""
