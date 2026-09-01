@@ -1,2 +1,3 @@
-# 生成器与单元测试使用 Python 标准库；pglast 只用于静态解析生成的 PostgreSQL SQL。
+# 生成器与大多数单元测试使用 Python 标准库；pglast 用于静态解析生成的 PostgreSQL SQL，PyYAML 用于 workflow 语义测试。
 pglast==7.10
+PyYAML==6.0.3

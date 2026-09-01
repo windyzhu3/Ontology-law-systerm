@@ -22,6 +22,11 @@ flyway.outOfOrder=false
 flyway.baselineOnMigrate=false
 flyway.cleanDisabled=true
 
+# 空库发布门禁固定顺序（密码只由部署环境注入）：
+# flyway -configFiles=flyway.conf -validateOnMigrate=true migrate
+# flyway -configFiles=flyway.conf -ignoreMigrationPatterns= validate
+# flyway -configFiles=flyway.conf info
+
 # 这些占位符只指向 IaC 预创建的 NOLOGIN 能力角色，且不得是 Schema/Table Owner。
 # API/Worker LOGIN NOINHERIT 角色不作为占位符；IaC 只向它们直授目标数据库 CONNECT。
 # 值按未加引号 SQL 标识符替换，只允许 [a-z][a-z0-9_]{0,62}。

@@ -238,7 +238,7 @@ class VerifyBaselineTest(unittest.TestCase):
             "docs/evidence/ledger/db-runtime.md",
             "ID: DB-52P2-PG18-RUNTIME\n"
             "Version: pg18-52-plus-2-v1\n"
-            "Command: python3 runtime/verify_runtime.py verify --runs 2 "
+            "Command: python3 runtime/verify_runtime.py verify --ci-only --runs 2 "
             "--evidence-dir ../../.artifacts/schema-runtime\n"
             "Exit code: 0\n",
         )
@@ -1538,6 +1538,60 @@ class VerifyBaselineTest(unittest.TestCase):
             self.assert_finding(
                 root,
                 "Delivery ledger row DB-52P2-PG18-RUNTIME RUNTIME_VERIFIED evidence lacks concrete version, command, or successful exit code record",
+            )
+
+    def test_postgresql_runtime_row_accepts_only_the_truthful_hosted_command(self) -> None:
+        """Break caught: the ledger must not turn the local BLOCKED attempt into a local PASS."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write(
+                root,
+                "database/schema-contract-52-plus-2/runtime/verify_runtime.py",
+                "# verifier\n",
+            )
+            row = {"ID": "DB-52P2-PG18-RUNTIME"}
+            hosted = (
+                "python3 runtime/verify_runtime.py verify --ci-only --runs 2 "
+                "--evidence-dir ../../.artifacts/schema-runtime"
+            )
+            local = (
+                "python3 runtime/verify_runtime.py verify --runs 2 "
+                "--evidence-dir ../../.artifacts/schema-runtime"
+            )
+
+            self.assertTrue(
+                verify_baseline_module.has_concrete_runtime_command(root, row, hosted)
+            )
+            self.assertFalse(
+                verify_baseline_module.has_concrete_runtime_command(root, row, local)
+            )
+
+    def test_postgresql_runtime_report_is_a_controlled_structured_record(self) -> None:
+        """Break caught: the required schema-runtime report cannot advance its ledger row."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write(
+                root,
+                "docs/evidence/schema-runtime/2026-09-01-postgresql-18-v1-report.md",
+                "ID: DB-52P2-PG18-RUNTIME\nVersion: pg18-52-plus-2-v1\n",
+            )
+            subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
+            subprocess.run(
+                ["git", "-C", str(root), "add", "."],
+                check=True,
+            )
+
+            records = verify_baseline_module.controlled_evidence_records(
+                root,
+                ["../evidence/schema-runtime/2026-09-01-postgresql-18-v1-report.md"],
+            )
+
+            self.assertEqual(
+                records,
+                [
+                    root
+                    / "docs/evidence/schema-runtime/2026-09-01-postgresql-18-v1-report.md"
+                ],
             )
 
     def test_ledger_enforces_nonvisual_initial_truths(self) -> None:
