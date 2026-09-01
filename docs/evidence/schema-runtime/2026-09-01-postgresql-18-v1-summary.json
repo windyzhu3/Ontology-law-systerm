@@ -472,7 +472,7 @@
     "runId": "run-01",
     "verifierOutputSha256": "305bd96791d44cbb64d4046087a7a1d7486c9ffbca1b0d8130c5a8f3e9706975"
   },
-  "schemaVersion": "postgresql-runtime-evidence-promotion-v1",
+  "schemaVersion": "postgresql-runtime-evidence-promotion-v2",
   "source": {
     "artifactId": 9763252627,
     "artifactZipSha256": "dc4a633aadf4faee4931dd782d4edd105add5078227d9f2a24f2fb4b2401e7fc",
@@ -481,6 +481,7 @@
     "pullRequest": 3,
     "repository": "windyzhu3/Ontology-law-systerm",
     "testMergeCommit": "ae0ec5d32fdc2e5db7276a9ba7ebbbeb2814a6c1",
+    "testMergeObjectSha256": "21b8c6ceedb5ea86b3f0eaed169cc77f6a1c77bbf511ff13f588b631f86a33d2",
     "testMergeParents": [
       "72a83b810339095a6ebefd11b30cf7fc8f522eec",
       "d0cd39de079f69cbd3973ab59f9f4ff75732203c"

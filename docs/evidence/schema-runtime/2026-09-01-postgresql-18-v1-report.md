@@ -17,6 +17,9 @@ Exit code: 0
 - Head commit: `d0cd39de079f69cbd3973ab59f9f4ff75732203c`
 - Test merge commit: `ae0ec5d32fdc2e5db7276a9ba7ebbbeb2814a6c1`
 - Test merge parents: `72a83b810339095a6ebefd11b30cf7fc8f522eec`, `d0cd39de079f69cbd3973ab59f9f4ff75732203c`
+- Test merge object SHA-256: `21b8c6ceedb5ea86b3f0eaed169cc77f6a1c77bbf511ff13f588b631f86a33d2`
+
+The object attestation hashes Git's canonical commit object bytes: `commit <payload-size>\0` followed by the exact commit payload.
 
 ## Exact v1 source binding
 

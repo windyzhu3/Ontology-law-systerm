@@ -240,7 +240,7 @@ _PUBLISH_FAILURE_DEFINITIONS = (
 _PUBLISH_DIRECTORY = Path("docs/evidence/schema-runtime")
 _PUBLISH_SUMMARY_NAME = "2026-09-01-postgresql-18-v1-summary.json"
 _PUBLISH_REPORT_NAME = "2026-09-01-postgresql-18-v1-report.md"
-_PROMOTED_SCHEMA_VERSION = "postgresql-runtime-evidence-promotion-v1"
+_PROMOTED_SCHEMA_VERSION = "postgresql-runtime-evidence-promotion-v2"
 _PROMOTED_TOP_LEVEL_FIELDS = (
     "schemaVersion",
     "status",
@@ -262,6 +262,7 @@ _PROMOTED_SOURCE_FIELDS = (
     "headCommit",
     "testMergeCommit",
     "testMergeParents",
+    "testMergeObjectSha256",
 )
 _PROMOTED_BINDING_FIELDS = (
     "contractVersion",
@@ -725,6 +726,7 @@ class HostedPromotionSource:
     base_commit: str
     head_commit: str
     test_merge_commit: str
+    test_merge_object_sha256: str | None = None
 
 
 @dataclass(frozen=True)
@@ -745,6 +747,7 @@ _CLOSED_HOSTED_PROMOTION = HostedPromotionSource(
     base_commit="72a83b810339095a6ebefd11b30cf7fc8f522eec",
     head_commit="d0cd39de079f69cbd3973ab59f9f4ff75732203c",
     test_merge_commit="ae0ec5d32fdc2e5db7276a9ba7ebbbeb2814a6c1",
+    test_merge_object_sha256="21b8c6ceedb5ea86b3f0eaed169cc77f6a1c77bbf511ff13f588b631f86a33d2",
 )
 
 
@@ -1330,6 +1333,50 @@ def _git_bytes(repository: Path, *arguments: str) -> bytes:
         cause = completed.stderr.decode("utf-8", "replace").strip() or f"git exited {completed.returncode}"
         raise EvidenceIOError("git_snapshot", repository, cause)
     return completed.stdout
+
+
+def _git_commit_payload_if_present(repository: Path, commit: str) -> bytes | None:
+    try:
+        completed = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repository),
+                "cat-file",
+                "--batch-check=%(objectname) %(objecttype) %(objectsize)",
+            ],
+            input=f"{commit}\n",
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise EvidenceIOError("git_snapshot", repository, error) from error
+    if completed.returncode != 0:
+        cause = completed.stderr.strip() or f"git exited {completed.returncode}"
+        raise EvidenceIOError("git_snapshot", repository, cause)
+    inspection = completed.stdout.strip()
+    if inspection == f"{commit} missing":
+        return None
+    fields = inspection.split()
+    if len(fields) != 3 or fields[0] != commit or fields[1] != "commit":
+        raise ValueError("hosted test merge object is not a commit")
+    try:
+        expected_size = int(fields[2])
+    except ValueError as error:
+        raise ValueError("hosted test merge object has an invalid size") from error
+    payload = _git_bytes(repository, "cat-file", "commit", commit)
+    if len(payload) != expected_size:
+        raise ValueError("hosted test merge object size changed during validation")
+    return payload
+
+
+def _git_commit_object_sha256(payload: bytes) -> str:
+    raw_object = b"commit " + str(len(payload)).encode("ascii") + b"\0" + payload
+    return hashlib.sha256(raw_object).hexdigest()
 
 
 def _require_directory_chain(repository: Path, directory: Path) -> None:
@@ -2863,6 +2910,10 @@ def _validate_hosted_promotion_source(source: HostedPromotionSource) -> None:
     for value in (source.base_commit, source.head_commit, source.test_merge_commit):
         if not _COMMIT_PATTERN.fullmatch(value):
             raise ValueError("hosted promotion commits must be lowercase 40-hex values")
+    if source.test_merge_object_sha256 is not None and not re.fullmatch(
+        r"[0-9a-f]{64}", source.test_merge_object_sha256
+    ):
+        raise ValueError("hosted test merge object SHA-256 must be lowercase hexadecimal")
 
 
 def _read_closed_ci_zip(
@@ -2925,20 +2976,40 @@ def _promotion_source_binding(
     repository: Path,
     source: HostedPromotionSource,
     hosted_summary: Mapping[str, object],
-) -> dict[str, object]:
+    *,
+    require_test_merge_object: bool,
+) -> tuple[dict[str, object], str]:
     _validate_hosted_promotion_source(source)
     if hosted_summary["workflowOutcome"] != "PASSED":
         raise ValueError("only a PASSED closed hosted artifact can be promoted")
     if hosted_summary["gitCommit"] != source.test_merge_commit:
         raise ValueError("closed hosted artifact does not bind the reviewed test merge")
-    for commit in (source.base_commit, source.head_commit, source.test_merge_commit):
+    for commit in (source.base_commit, source.head_commit):
         if _git_output(repository, "cat-file", "-t", commit) != "commit":
             raise ValueError("hosted promotion source binding is not a commit")
-    test_merge_parents = _git_output(
-        repository, "show", "-s", "--format=%P", source.test_merge_commit
-    ).split()
-    if test_merge_parents != [source.base_commit, source.head_commit]:
-        raise ValueError("hosted test merge parents do not match reviewed base/head order")
+    test_merge_payload = _git_commit_payload_if_present(
+        repository, source.test_merge_commit
+    )
+    if test_merge_payload is None:
+        if require_test_merge_object:
+            raise EvidenceIOError(
+                "git_snapshot", repository, "hosted test merge commit object is unavailable"
+            )
+        if source.test_merge_object_sha256 is None:
+            raise ValueError("durable hosted source lacks the test merge object attestation")
+        test_merge_object_sha256 = source.test_merge_object_sha256
+    else:
+        test_merge_parents = _git_output(
+            repository, "show", "-s", "--format=%P", source.test_merge_commit
+        ).split()
+        if test_merge_parents != [source.base_commit, source.head_commit]:
+            raise ValueError("hosted test merge parents do not match reviewed base/head order")
+        test_merge_object_sha256 = _git_commit_object_sha256(test_merge_payload)
+        if (
+            source.test_merge_object_sha256 is not None
+            and test_merge_object_sha256 != source.test_merge_object_sha256
+        ):
+            raise ValueError("hosted test merge object SHA-256 does not match its attestation")
     _git_output(repository, "merge-base", "--is-ancestor", source.base_commit, source.head_commit)
     current_head = _git_output(repository, "rev-parse", "--verify", "HEAD")
     _git_output(repository, "merge-base", "--is-ancestor", source.head_commit, current_head)
@@ -2971,7 +3042,7 @@ def _promotion_source_binding(
         or hashlib.sha256(field_bytes).hexdigest() != expected_binding["fieldContractSha256"]
     ):
         raise ValueError("closed hosted artifact contract hashes do not match its source head")
-    return expected_binding
+    return expected_binding, test_merge_object_sha256
 
 
 def _stage_by_name(run: Mapping[str, object], stage_name: str) -> Mapping[str, object]:
@@ -2985,8 +3056,15 @@ def _build_promoted_summary(
     repository: Path,
     hosted_summary: Mapping[str, object],
     source: HostedPromotionSource,
+    *,
+    require_test_merge_object: bool,
 ) -> dict[str, object]:
-    binding = _promotion_source_binding(repository, source, hosted_summary)
+    binding, test_merge_object_sha256 = _promotion_source_binding(
+        repository,
+        source,
+        hosted_summary,
+        require_test_merge_object=require_test_merge_object,
+    )
     runs = hosted_summary["runs"]
     verifier_outputs = [
         _stage_by_name(run, "verifier-logs")["stdoutSha256"] for run in runs
@@ -3005,6 +3083,7 @@ def _build_promoted_summary(
         "headCommit": source.head_commit,
         "testMergeCommit": source.test_merge_commit,
         "testMergeParents": [source.base_commit, source.head_commit],
+        "testMergeObjectSha256": test_merge_object_sha256,
     }
     promoted = {
         "schemaVersion": _PROMOTED_SCHEMA_VERSION,
@@ -3060,6 +3139,9 @@ def _render_promoted_report(summary: Mapping[str, object]) -> str:
         f"- Head commit: `{source['headCommit']}`",
         f"- Test merge commit: `{source['testMergeCommit']}`",
         f"- Test merge parents: `{source['testMergeParents'][0]}`, `{source['testMergeParents'][1]}`",
+        f"- Test merge object SHA-256: `{source['testMergeObjectSha256']}`",
+        "",
+        "The object attestation hashes Git's canonical commit object bytes: `commit <payload-size>\\0` followed by the exact commit payload.",
         "",
         "## Exact v1 source binding",
         "",
@@ -3116,7 +3198,12 @@ def prepare_hosted_evidence_promotion(
     repository = _validated_repository_root(repository_root)
     _validate_hosted_promotion_source(source)
     hosted_summary = _read_closed_ci_zip(repository, artifact_path, source)
-    promoted = _build_promoted_summary(repository, hosted_summary, source)
+    promoted = _build_promoted_summary(
+        repository,
+        hosted_summary,
+        source,
+        require_test_merge_object=True,
+    )
     json_source = json.dumps(
         promoted,
         ensure_ascii=True,
@@ -3177,15 +3264,16 @@ def _source_from_promoted_record(value: object) -> HostedPromotionSource:
         base_commit=source["baseCommit"],
         head_commit=source["headCommit"],
         test_merge_commit=source["testMergeCommit"],
+        test_merge_object_sha256=source["testMergeObjectSha256"],
     )
 
 
 def validate_promoted_evidence(
     repository_root: Path,
     *,
-    expected_source: HostedPromotionSource | None = None,
+    expected_source: HostedPromotionSource,
 ) -> dict[str, object]:
-    """Revalidate the canonical committed pair without requiring the expired ZIP."""
+    """Revalidate the committed pair against its mandatory trusted source pin."""
     repository = _validated_repository_root(repository_root)
     targets = fixed_publication_targets(repository)
     if not all(path.is_file() for path in targets):
@@ -3212,10 +3300,15 @@ def validate_promoted_evidence(
     for run in promoted_runs:
         _require_exact_fields(run, _PROMOTED_RUN_FIELDS, "promoted empty-database run")
     _require_exact_fields(raw["runANoop"], _PROMOTED_NOOP_FIELDS, "promoted run-A no-op")
-    if expected_source is not None and embedded_source != expected_source:
+    if embedded_source != expected_source:
         raise ValueError("promoted evidence source differs from the reviewed closure")
     hosted = _validate_ci_runtime_summary(raw["hostedArtifact"])
-    rebuilt = _build_promoted_summary(repository, hosted, embedded_source)
+    rebuilt = _build_promoted_summary(
+        repository,
+        hosted,
+        embedded_source,
+        require_test_merge_object=False,
+    )
     expected_json = json.dumps(
         rebuilt,
         ensure_ascii=True,

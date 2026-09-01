@@ -164,7 +164,7 @@ class HostedEvidencePromotionTests(unittest.TestCase):
             ],
         )
         promoted = json.loads(targets[0].read_text(encoding="utf-8"))
-        self.assertEqual(promoted["schemaVersion"], "postgresql-runtime-evidence-promotion-v1")
+        self.assertEqual(promoted["schemaVersion"], "postgresql-runtime-evidence-promotion-v2")
         self.assertEqual(promoted["status"], "RUNTIME_VERIFIED")
         self.assertEqual(promoted["hostedArtifact"], hosted_summary)
         self.assertEqual(promoted["source"]["workflowRun"], 33405965491)
@@ -186,8 +186,95 @@ class HostedEvidencePromotionTests(unittest.TestCase):
         )
         self.assertEqual(promoted["localExecution"]["status"], "BLOCKED")
         self.assertEqual(promoted["localExecution"]["exitCode"], 5)
-        validated = verify_runtime.validate_promoted_evidence(repository)
+        pinned_source = replace(
+            source,
+            test_merge_object_sha256=promoted["source"]["testMergeObjectSha256"],
+        )
+        validated = verify_runtime.validate_promoted_evidence(
+            repository, expected_source=pinned_source
+        )
         self.assertEqual(validated, promoted)
+
+    def test_durable_validation_survives_absent_historical_test_merge_object(self) -> None:
+        """Break caught: later validation requires an ephemeral merge object forever."""
+        verify_runtime, repository, artifact, source, _ = self._fixture()
+        prepared = verify_runtime.prepare_hosted_evidence_promotion(
+            repository, artifact, source=source
+        )
+        targets = verify_runtime.publish_hosted_evidence_promotion(prepared)
+        promoted = json.loads(targets[0].read_text(encoding="utf-8"))
+        pinned_source = replace(
+            source,
+            test_merge_object_sha256=promoted["source"]["testMergeObjectSha256"],
+        )
+        self._git(repository, "add", "docs/evidence/schema-runtime")
+        self._git(repository, "commit", "-qm", "durable hosted evidence")
+        self._git(repository, "prune", "--expire=now")
+        with self.assertRaises(subprocess.CalledProcessError):
+            self._git(repository, "cat-file", "-e", source.test_merge_commit)
+        self.assertEqual(self._git(repository, "status", "--short"), "")
+
+        validated = verify_runtime.validate_promoted_evidence(
+            repository, expected_source=pinned_source
+        )
+
+        self.assertRegex(
+            validated["source"]["testMergeObjectSha256"], r"^[0-9a-f]{64}$"
+        )
+
+    def test_tampered_durable_merge_attestation_fails_without_historical_object(self) -> None:
+        """Break caught: a rewritten attestation passes after its merge object expires."""
+        verify_runtime, repository, artifact, source, _ = self._fixture()
+        prepared = verify_runtime.prepare_hosted_evidence_promotion(
+            repository, artifact, source=source
+        )
+        targets = verify_runtime.publish_hosted_evidence_promotion(prepared)
+        promoted = json.loads(targets[0].read_text(encoding="utf-8"))
+        pinned_source = replace(
+            source,
+            test_merge_object_sha256=promoted["source"]["testMergeObjectSha256"],
+        )
+        self._git(repository, "add", "docs/evidence/schema-runtime")
+        self._git(repository, "commit", "-qm", "durable hosted evidence")
+        self._git(repository, "prune", "--expire=now")
+        promoted["source"]["testMergeObjectSha256"] = "0" * 64
+        targets[0].write_text(
+            json.dumps(promoted, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        targets[1].write_text(
+            verify_runtime._render_promoted_report(promoted), encoding="utf-8"
+        )
+
+        with self.assertRaisesRegex(TypeError, "expected_source"):
+            verify_runtime.validate_promoted_evidence(repository)
+        with self.assertRaisesRegex(ValueError, "source differs"):
+            verify_runtime.validate_promoted_evidence(
+                repository, expected_source=pinned_source
+            )
+
+    def test_present_merge_object_is_recomputed_against_durable_attestation(self) -> None:
+        """Break caught: a present merge object is not compared with stored proof."""
+        verify_runtime, repository, artifact, source, _ = self._fixture()
+        prepared = verify_runtime.prepare_hosted_evidence_promotion(
+            repository, artifact, source=source
+        )
+        targets = verify_runtime.publish_hosted_evidence_promotion(prepared)
+        promoted = json.loads(targets[0].read_text(encoding="utf-8"))
+        promoted["source"]["testMergeObjectSha256"] = "0" * 64
+        targets[0].write_text(
+            json.dumps(promoted, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        targets[1].write_text(
+            verify_runtime._render_promoted_report(promoted), encoding="utf-8"
+        )
+
+        with self.assertRaisesRegex(ValueError, "object SHA-256"):
+            verify_runtime.validate_promoted_evidence(
+                repository,
+                expected_source=replace(
+                    source, test_merge_object_sha256="0" * 64
+                ),
+            )
 
     def test_wrong_zip_digest_or_extra_member_publishes_nothing(self) -> None:
         """Break caught: an unreviewed or non-exact download is accepted as the closed artifact."""
