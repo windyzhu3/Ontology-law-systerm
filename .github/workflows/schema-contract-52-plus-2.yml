@@ -75,6 +75,7 @@ jobs:
           python3 -m unittest discover -s tests -v
           python3 scripts/verify_generated_sql.py
           python3 -m unittest discover -s runtime/tests -v
+          python3 runtime/verify_runtime.py validate-promoted-evidence
           python3 runtime/verify_runtime.py verify --ci-only --runs 2 --evidence-dir ../../.artifacts/schema-runtime
       - name: Summarize PostgreSQL 18 runtime verification
         id: runtime_summary

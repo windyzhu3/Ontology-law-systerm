@@ -2166,10 +2166,10 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
 
         repository_root = PROJECT_ROOT.parents[1]
         fixed_success_targets = (
-            repository_root / "docs" / "evidence" / "schema-runtime" / "2026-08-28-postgresql-18-summary.json",
-            repository_root / "docs" / "evidence" / "schema-runtime" / "2026-08-28-postgresql-18-report.md",
+            repository_root / "docs" / "evidence" / "schema-runtime" / "2026-09-01-postgresql-18-v1-summary.json",
+            repository_root / "docs" / "evidence" / "schema-runtime" / "2026-09-01-postgresql-18-v1-report.md",
         )
-        self.assertFalse(any(path.exists() for path in fixed_success_targets))
+        before_evidence = tuple(path.read_bytes() for path in fixed_success_targets)
         with tempfile.TemporaryDirectory() as temporary_directory:
             result = verify_runtime.run_runtime_verification(
                 PROJECT_ROOT,
@@ -2193,7 +2193,10 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
         self.assertTrue(all(scenario["status"] == "PASSED" for scenario in result["failureScenarios"]))
         self.assertNotIn("runtimeIdentity", result)
         self.assertEqual(identity_captures, [])
-        self.assertFalse(any(path.exists() for path in fixed_success_targets))
+        self.assertEqual(
+            tuple(path.read_bytes() for path in fixed_success_targets),
+            before_evidence,
+        )
 
     def test_invalid_or_empty_fingerprints_fail_the_positive_run_gate(self) -> None:
         """Break caught: two equal non-fingerprints are mistaken for a stable A/B schema."""

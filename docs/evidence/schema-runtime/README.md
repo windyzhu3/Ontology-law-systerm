@@ -1,14 +1,20 @@
 # PostgreSQL Schema 运行证据
 
-本目录目前没有可提交的 PostgreSQL 18 成功运行证据。
+`52-plus-2-v1` 已按 [ADR-0003](../../adr/ADR-0003-hosted-runtime-evidence-promotion.md) 完成 PostgreSQL 18 托管运行时验证。规范持久证据是以下固定双文件：
 
-当前执行器没有 Docker/Compose。指定命令使用 `--runs 2` 发起了两次真实运行尝试，控制器如实返回 `status=BLOCKED`、`reason=docker_compose_unavailable` 和进程退出码 `5`；两次尝试都记录 PostgreSQL 启动返回码 `127`，并仍然执行清理阶段。被忽略的 `.artifacts/schema-runtime/` 只保存本次原始诊断，不会复制到本目录。
+- [机器可读摘要](2026-09-01-postgresql-18-v1-summary.json)
+- [审阅报告](2026-09-01-postgresql-18-v1-report.md)
 
-以下固定文件仅在同一个干净的 40 位 Git HEAD 上完成两次空库运行、run A no-op、五个失败关闭场景、实际镜像 RepoDigest 与完整版本采集，并通过发布前规范化、合同校验和敏感信息扫描后才会成对产生：
+来源是 PR #3 的 workflow run `33405965491`、artifact `9763252627`。下载 ZIP SHA-256 为 `dc4a633aadf4faee4931dd782d4edd105add5078227d9f2a24f2fb4b2401e7fc`，且只含 `ci-runtime-summary.json` 与 `ci-job-summary.md`。仓库晋级器验证规范双文件、`PASSED` 语义、base/head/test-merge、V001–V840 tree、合同摘要和字段合同摘要后，才原子发布上述持久双文件；不是人工拼造成功记录。
 
-- `2026-08-28-postgresql-18-summary.json`
-- `2026-08-28-postgresql-18-report.md`
+托管结果使用 PostgreSQL 18.6、Flyway 13.4.0，完成两次隔离空库运行、run A no-op、19 个迁移、54 张受管表、13 个 Schema、206 个外键、53 个 mutation guard 和五个失败关闭探针。safe artifact 没有公开原始 32 位 catalog fingerprint；它公开的两次 verifier 输出 SHA-256 相同，持久证据按原貌标注该边界。
 
-当前两文件均刻意不存在。`BLOCKED`、`FAILED`、不完整输入、Git/输入漂移或任一文件系统错误都不得发布其中任何一个文件。
+本地执行器没有 Docker/Compose，本地结果仍是 `BLOCKED/docker_compose_unavailable`、退出码 `5`，从未声称本地 PASS。ADR-0003 仅对 v1 接受经过精确来源绑定的托管两次运行作为正式证明，不覆盖 ADR-0002、V850、v1.1 或 R1 实现。
 
-空库 Flyway 门禁顺序保持为 `migrate` → strict `validate` → `info`。数据库合同 README 和验证记录继续保留“尚未在真实 PostgreSQL 执行”的准确结论，直到上述成功门禁真实完成。
+维护命令：
+
+```bash
+python3 database/schema-contract-52-plus-2/runtime/verify_runtime.py validate-promoted-evidence
+```
+
+PR 与 `main` 的 `runtime-postgresql-18` job 会先重验该持久证据，再发起新的两次托管空库运行；任一闭合字段、来源、合同或渲染漂移都会失败关闭。

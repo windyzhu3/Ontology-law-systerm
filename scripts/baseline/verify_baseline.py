@@ -239,6 +239,7 @@ R2_STATE_REQUIREMENTS = {
     "BASE-CURRENT-MVP": "MERGED",
 }
 STRUCTURED_EVIDENCE_ROOT = Path("docs/evidence/ledger")
+STRUCTURED_RUNTIME_EVIDENCE_ROOT = Path("docs/evidence/schema-runtime")
 IMPLEMENTED_EVIDENCE_CONTRACTS = {
     "R1-OPENAPI": (
         Path("contracts/openapi/ontology-law-api.yaml"),
@@ -255,7 +256,7 @@ IMPLEMENTED_DELIVERY_ROWS = {
 }
 RUNTIME_COMMAND_CONTRACTS = {
     "DB-52P2-PG18-RUNTIME": (
-        "python3 runtime/verify_runtime.py verify --runs 2 --evidence-dir ../../.artifacts/schema-runtime",
+        "python3 runtime/verify_runtime.py verify --ci-only --runs 2 --evidence-dir ../../.artifacts/schema-runtime",
         Path("database/schema-contract-52-plus-2/runtime/verify_runtime.py"),
     ),
     "R1-E2E-GOLDEN": (
@@ -970,7 +971,11 @@ def controlled_evidence_records(root: Path, links: list[str]) -> list[Path]:
         path = resolve_in_repository_ledger_link(root, link)
         if path is None or not path.is_file():
             continue
-        if path.relative_to(root.resolve()).is_relative_to(STRUCTURED_EVIDENCE_ROOT):
+        relative = path.relative_to(root.resolve())
+        if (
+            relative.is_relative_to(STRUCTURED_EVIDENCE_ROOT)
+            or relative.is_relative_to(STRUCTURED_RUNTIME_EVIDENCE_ROOT)
+        ):
             records.append(path)
     return records
 

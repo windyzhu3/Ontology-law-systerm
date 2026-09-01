@@ -2253,6 +2253,7 @@ class WorkflowCiArtifactContractTests(unittest.TestCase):
             "python3 -m unittest discover -s tests -v",
             "python3 scripts/verify_generated_sql.py",
             "python3 -m unittest discover -s runtime/tests -v",
+            "python3 runtime/verify_runtime.py validate-promoted-evidence",
             "python3 runtime/verify_runtime.py verify --ci-only --runs 2 --evidence-dir ../../.artifacts/schema-runtime",
         )
         positions = [runtime_script.index(command) for command in commands]

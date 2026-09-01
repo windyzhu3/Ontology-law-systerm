@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import hashlib
 import html
 from html.parser import HTMLParser
+import io
 import json
 import math
 import os
@@ -21,6 +22,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import zipfile
 
 
 _DIGEST_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
@@ -236,8 +238,49 @@ _PUBLISH_FAILURE_DEFINITIONS = (
     ("checksum-mismatch", "checksum mismatch", "strict-validate", ("strict-validate",)),
 )
 _PUBLISH_DIRECTORY = Path("docs/evidence/schema-runtime")
-_PUBLISH_SUMMARY_NAME = "2026-08-28-postgresql-18-summary.json"
-_PUBLISH_REPORT_NAME = "2026-08-28-postgresql-18-report.md"
+_PUBLISH_SUMMARY_NAME = "2026-09-01-postgresql-18-v1-summary.json"
+_PUBLISH_REPORT_NAME = "2026-09-01-postgresql-18-v1-report.md"
+_PROMOTED_SCHEMA_VERSION = "postgresql-runtime-evidence-promotion-v1"
+_PROMOTED_TOP_LEVEL_FIELDS = (
+    "schemaVersion",
+    "status",
+    "governanceDecision",
+    "source",
+    "sourceBinding",
+    "localExecution",
+    "emptyDatabaseRuns",
+    "runANoop",
+    "hostedArtifact",
+)
+_PROMOTED_SOURCE_FIELDS = (
+    "repository",
+    "pullRequest",
+    "workflowRun",
+    "artifactId",
+    "artifactZipSha256",
+    "baseCommit",
+    "headCommit",
+    "testMergeCommit",
+    "testMergeParents",
+)
+_PROMOTED_BINDING_FIELDS = (
+    "contractVersion",
+    "contractSha256",
+    "fieldContractSha256",
+    "migrationTreeSha256",
+)
+_PROMOTED_LOCAL_FIELDS = ("status", "reasonCode", "exitCode")
+_PROMOTED_RUN_FIELDS = (
+    "runId",
+    "catalogFingerprintPublished",
+    "verifierOutputSha256",
+)
+_PROMOTED_NOOP_FIELDS = (
+    "runId",
+    "migrateExitCode",
+    "migrateOutputSha256",
+    "verifierOutputSha256",
+)
 _SECRET_SCAN_PATTERN = re.compile(
     r"(?ix)(?:"
     r"\b[A-Z][A-Z0-9_]*(?:PASSWORD|PASSWD|TOKEN|SECRET|API[_-]?KEY|CLIENT[_-]?SECRET)\s*(?:=|:)"
@@ -670,6 +713,39 @@ class PreparedEvidence:
     summary: dict[str, object]
     json_source: str
     markdown_source: str
+
+
+@dataclass(frozen=True)
+class HostedPromotionSource:
+    repository: str
+    pull_request: int
+    workflow_run: int
+    artifact_id: int
+    artifact_zip_sha256: str
+    base_commit: str
+    head_commit: str
+    test_merge_commit: str
+
+
+@dataclass(frozen=True)
+class PreparedHostedPromotion:
+    repository_root: Path
+    artifact_path: Path
+    source: HostedPromotionSource
+    json_source: str
+    markdown_source: str
+
+
+_CLOSED_HOSTED_PROMOTION = HostedPromotionSource(
+    repository="windyzhu3/Ontology-law-systerm",
+    pull_request=3,
+    workflow_run=33405965491,
+    artifact_id=9763252627,
+    artifact_zip_sha256="dc4a633aadf4faee4931dd782d4edd105add5078227d9f2a24f2fb4b2401e7fc",
+    base_commit="72a83b810339095a6ebefd11b30cf7fc8f522eec",
+    head_commit="d0cd39de079f69cbd3973ab59f9f4ff75732203c",
+    test_merge_commit="ae0ec5d32fdc2e5db7276a9ba7ebbbeb2814a6c1",
+)
 
 
 @dataclass(frozen=True)
@@ -2772,6 +2848,388 @@ def validate_ci_runtime_artifact(output_directory: Path) -> dict[str, object]:
     return validated
 
 
+def _validate_hosted_promotion_source(source: HostedPromotionSource) -> None:
+    if not isinstance(source, HostedPromotionSource):
+        raise ValueError("hosted promotion source must be a HostedPromotionSource")
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", source.repository):
+        raise ValueError("hosted promotion repository must be one owner/name pair")
+    if any(
+        isinstance(value, bool) or not isinstance(value, int) or value <= 0
+        for value in (source.pull_request, source.workflow_run, source.artifact_id)
+    ):
+        raise ValueError("hosted promotion numeric identifiers must be positive integers")
+    if not re.fullmatch(r"[0-9a-f]{64}", source.artifact_zip_sha256):
+        raise ValueError("hosted promotion ZIP SHA-256 must be lowercase hexadecimal")
+    for value in (source.base_commit, source.head_commit, source.test_merge_commit):
+        if not _COMMIT_PATTERN.fullmatch(value):
+            raise ValueError("hosted promotion commits must be lowercase 40-hex values")
+
+
+def _read_closed_ci_zip(
+    repository: Path,
+    artifact_path: Path,
+    source: HostedPromotionSource,
+) -> dict[str, object]:
+    requested = Path(artifact_path)
+    artifact = requested if requested.is_absolute() else repository / requested
+    artifact_bytes = _read_publication_inputs(repository, (artifact,))[0]
+    actual_digest = hashlib.sha256(artifact_bytes).hexdigest()
+    if actual_digest != source.artifact_zip_sha256:
+        raise ValueError("closed hosted artifact ZIP SHA-256 does not match the reviewed download")
+    try:
+        with zipfile.ZipFile(io.BytesIO(artifact_bytes)) as archive:
+            members = archive.infolist()
+            names = [member.filename for member in members]
+            if sorted(names) != sorted((_CI_SUMMARY_NAME, _CI_MARKDOWN_NAME)) or len(names) != 2:
+                raise ValueError("closed hosted artifact ZIP must contain the exact safe regular-file pair")
+            contents: dict[str, bytes] = {}
+            for member in members:
+                unix_mode = member.external_attr >> 16
+                if (
+                    member.is_dir()
+                    or member.flag_bits & 0x1
+                    or member.file_size > 1024 * 1024
+                    or (unix_mode and not stat.S_ISREG(unix_mode))
+                ):
+                    raise ValueError(
+                        "closed hosted artifact ZIP must contain the exact safe regular-file pair"
+                    )
+                contents[member.filename] = archive.read(member)
+    except ValueError:
+        raise
+    except (OSError, RuntimeError, zipfile.BadZipFile, zipfile.LargeZipFile) as error:
+        raise EvidenceIOError("read_closed_hosted_artifact", artifact, error) from error
+    try:
+        raw_summary = json.loads(contents[_CI_SUMMARY_NAME].decode("utf-8"))
+        actual_markdown = contents[_CI_MARKDOWN_NAME].decode("utf-8")
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise EvidenceIOError("decode_closed_hosted_artifact", artifact, error) from error
+    if not isinstance(raw_summary, Mapping):
+        raise ValueError("closed hosted artifact JSON must contain one object")
+    summary = _validate_ci_runtime_summary(raw_summary)
+    expected_json = json.dumps(
+        summary,
+        ensure_ascii=True,
+        indent=2,
+        sort_keys=True,
+        allow_nan=False,
+    ) + "\n"
+    if contents[_CI_SUMMARY_NAME].decode("utf-8") != expected_json:
+        raise ValueError("closed hosted artifact JSON is not canonical")
+    if actual_markdown != render_ci_job_summary(summary):
+        raise ValueError("closed hosted artifact Markdown does not match its validated JSON")
+    return summary
+
+
+def _promotion_source_binding(
+    repository: Path,
+    source: HostedPromotionSource,
+    hosted_summary: Mapping[str, object],
+) -> dict[str, object]:
+    _validate_hosted_promotion_source(source)
+    if hosted_summary["workflowOutcome"] != "PASSED":
+        raise ValueError("only a PASSED closed hosted artifact can be promoted")
+    if hosted_summary["gitCommit"] != source.test_merge_commit:
+        raise ValueError("closed hosted artifact does not bind the reviewed test merge")
+    for commit in (source.base_commit, source.head_commit, source.test_merge_commit):
+        if _git_output(repository, "cat-file", "-t", commit) != "commit":
+            raise ValueError("hosted promotion source binding is not a commit")
+    test_merge_parents = _git_output(
+        repository, "show", "-s", "--format=%P", source.test_merge_commit
+    ).split()
+    if test_merge_parents != [source.base_commit, source.head_commit]:
+        raise ValueError("hosted test merge parents do not match reviewed base/head order")
+    _git_output(repository, "merge-base", "--is-ancestor", source.base_commit, source.head_commit)
+    current_head = _git_output(repository, "rev-parse", "--verify", "HEAD")
+    _git_output(repository, "merge-base", "--is-ancestor", source.head_commit, current_head)
+    migration_path = "database/schema-contract-52-plus-2/generated/db/migration"
+    base_migrations = _git_bytes(repository, "ls-tree", "-r", source.base_commit, "--", migration_path)
+    head_migrations = _git_bytes(repository, "ls-tree", "-r", source.head_commit, "--", migration_path)
+    if not head_migrations or base_migrations != head_migrations:
+        raise ValueError("V001-V840 migration tree changed across the hosted source binding")
+    manifest_path = "database/schema-contract-52-plus-2/generated/schema-contract-manifest.json"
+    field_path = "database/schema-contract-52-plus-2/generated/field-contract.md"
+    manifest_bytes = _git_bytes(repository, "show", f"{source.head_commit}:{manifest_path}")
+    field_bytes = _git_bytes(repository, "show", f"{source.head_commit}:{field_path}")
+    try:
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("hosted source manifest is not valid UTF-8 JSON") from error
+    if not isinstance(manifest, Mapping):
+        raise ValueError("hosted source manifest must contain one object")
+    contract = hosted_summary["contractSummary"]
+    expected_binding = {
+        "contractVersion": "52-plus-2-v1",
+        "contractSha256": contract["contractSha256"],
+        "fieldContractSha256": contract["fieldContractSha256"],
+        "migrationTreeSha256": hashlib.sha256(head_migrations).hexdigest(),
+    }
+    if (
+        manifest.get("contractVersion") != expected_binding["contractVersion"]
+        or manifest.get("contractSha256") != expected_binding["contractSha256"]
+        or manifest.get("fieldContractSha256") != expected_binding["fieldContractSha256"]
+        or hashlib.sha256(field_bytes).hexdigest() != expected_binding["fieldContractSha256"]
+    ):
+        raise ValueError("closed hosted artifact contract hashes do not match its source head")
+    return expected_binding
+
+
+def _stage_by_name(run: Mapping[str, object], stage_name: str) -> Mapping[str, object]:
+    matches = [stage for stage in run["stages"] if stage["stageName"] == stage_name]
+    if len(matches) != 1:
+        raise ValueError(f"closed hosted artifact lacks exact stage {stage_name}")
+    return matches[0]
+
+
+def _build_promoted_summary(
+    repository: Path,
+    hosted_summary: Mapping[str, object],
+    source: HostedPromotionSource,
+) -> dict[str, object]:
+    binding = _promotion_source_binding(repository, source, hosted_summary)
+    runs = hosted_summary["runs"]
+    verifier_outputs = [
+        _stage_by_name(run, "verifier-logs")["stdoutSha256"] for run in runs
+    ]
+    noop_migrate = _stage_by_name(runs[0], "noop-migrate")
+    noop_verifier = _stage_by_name(runs[0], "noop-verifier-logs")
+    if verifier_outputs[0] != verifier_outputs[1] or noop_verifier["stdoutSha256"] != verifier_outputs[0]:
+        raise ValueError("closed hosted verifier outputs do not prove stable A/B and run-A no-op results")
+    source_record = {
+        "repository": source.repository,
+        "pullRequest": source.pull_request,
+        "workflowRun": source.workflow_run,
+        "artifactId": source.artifact_id,
+        "artifactZipSha256": source.artifact_zip_sha256,
+        "baseCommit": source.base_commit,
+        "headCommit": source.head_commit,
+        "testMergeCommit": source.test_merge_commit,
+        "testMergeParents": [source.base_commit, source.head_commit],
+    }
+    promoted = {
+        "schemaVersion": _PROMOTED_SCHEMA_VERSION,
+        "status": "RUNTIME_VERIFIED",
+        "governanceDecision": "ADR-0003",
+        "source": source_record,
+        "sourceBinding": binding,
+        "localExecution": {
+            "status": "BLOCKED",
+            "reasonCode": "docker_compose_unavailable",
+            "exitCode": 5,
+        },
+        "emptyDatabaseRuns": [
+            {
+                "runId": run["runId"],
+                "catalogFingerprintPublished": False,
+                "verifierOutputSha256": verifier_output,
+            }
+            for run, verifier_output in zip(runs, verifier_outputs, strict=True)
+        ],
+        "runANoop": {
+            "runId": "run-01",
+            "migrateExitCode": noop_migrate["exitCode"],
+            "migrateOutputSha256": noop_migrate["stdoutSha256"],
+            "verifierOutputSha256": noop_verifier["stdoutSha256"],
+        },
+        "hostedArtifact": hosted_summary,
+    }
+    return json.loads(json.dumps(promoted, ensure_ascii=True, sort_keys=True, allow_nan=False))
+
+
+def _render_promoted_report(summary: Mapping[str, object]) -> str:
+    source = summary["source"]
+    binding = summary["sourceBinding"]
+    local = summary["localExecution"]
+    lines = [
+        "# PostgreSQL 18 v1 hosted runtime evidence",
+        "",
+        "ID: DB-52P2-PG18-RUNTIME",
+        "Version: pg18-52-plus-2-v1",
+        "Command: python3 runtime/verify_runtime.py verify --ci-only --runs 2 --evidence-dir ../../.artifacts/schema-runtime",
+        "Exit code: 0",
+        "",
+        "## Governance and provenance",
+        "",
+        f"- Decision: `{summary['governanceDecision']}`",
+        f"- Repository: `{source['repository']}`",
+        f"- Pull request: `#{source['pullRequest']}`",
+        f"- Workflow run: `{source['workflowRun']}`",
+        f"- Artifact ID: `{source['artifactId']}`",
+        f"- Artifact ZIP SHA-256: `{source['artifactZipSha256']}`",
+        f"- Base commit: `{source['baseCommit']}`",
+        f"- Head commit: `{source['headCommit']}`",
+        f"- Test merge commit: `{source['testMergeCommit']}`",
+        f"- Test merge parents: `{source['testMergeParents'][0]}`, `{source['testMergeParents'][1]}`",
+        "",
+        "## Exact v1 source binding",
+        "",
+        f"- Contract version: `{binding['contractVersion']}`",
+        f"- Contract SHA-256: `{binding['contractSha256']}`",
+        f"- Field contract SHA-256: `{binding['fieldContractSha256']}`",
+        f"- V001-V840 tree SHA-256: `{binding['migrationTreeSha256']}`",
+        "",
+        "## Local execution truth",
+        "",
+        f"- Status: `{local['status']}`",
+        f"- Reason code: `{local['reasonCode']}`",
+        f"- Exit code: `{local['exitCode']}`",
+        "",
+        "The local environment did not pass PostgreSQL runtime verification. ADR-0003 accepts the closed hosted two-run proof after exact artifact and source validation.",
+        "",
+        "## Empty-database proof disclosure",
+        "",
+        "The safe artifact intentionally does not publish the raw 32-hex catalog fingerprints. It publishes SHA-256 digests of the complete verifier outputs; equality below binds run A, run B, and run A no-op to the same validated output without reconstructing hidden bytes.",
+        "",
+        "| Run | Raw catalog fingerprint published | Verifier output SHA-256 |",
+        "|---|---|---|",
+    ]
+    for run in summary["emptyDatabaseRuns"]:
+        lines.append(
+            f"| `{run['runId']}` | `{str(run['catalogFingerprintPublished']).lower()}` | `{run['verifierOutputSha256']}` |"
+        )
+    noop = summary["runANoop"]
+    lines.extend(
+        [
+            "",
+            "## Run A no-op proof",
+            "",
+            f"- Migrate exit code: `{noop['migrateExitCode']}`",
+            f"- Migrate output SHA-256: `{noop['migrateOutputSha256']}`",
+            f"- Verifier output SHA-256: `{noop['verifierOutputSha256']}`",
+            "",
+            "## Closed hosted artifact",
+            "",
+            render_ci_job_summary(summary["hostedArtifact"]).rstrip(),
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def prepare_hosted_evidence_promotion(
+    repository_root: Path,
+    artifact_path: Path,
+    *,
+    source: HostedPromotionSource,
+) -> PreparedHostedPromotion:
+    """Validate a closed hosted ZIP and render the durable v1 evidence pair."""
+    repository = _validated_repository_root(repository_root)
+    _validate_hosted_promotion_source(source)
+    hosted_summary = _read_closed_ci_zip(repository, artifact_path, source)
+    promoted = _build_promoted_summary(repository, hosted_summary, source)
+    json_source = json.dumps(
+        promoted,
+        ensure_ascii=True,
+        indent=2,
+        sort_keys=True,
+        allow_nan=False,
+    ) + "\n"
+    markdown_source = _render_promoted_report(promoted)
+    scan_publishable_evidence(json_source, markdown_source)
+    artifact = Path(artifact_path)
+    if not artifact.is_absolute():
+        artifact = repository / artifact
+    fixed_publication_targets(repository)
+    return PreparedHostedPromotion(
+        repository_root=repository,
+        artifact_path=artifact,
+        source=source,
+        json_source=json_source,
+        markdown_source=markdown_source,
+    )
+
+
+def publish_hosted_evidence_promotion(
+    prepared: PreparedHostedPromotion,
+) -> tuple[Path, Path]:
+    """Revalidate the closed input and atomically publish the durable pair."""
+    if not isinstance(prepared, PreparedHostedPromotion):
+        raise ValueError("hosted promotion must come from prepare_hosted_evidence_promotion")
+    refreshed = prepare_hosted_evidence_promotion(
+        prepared.repository_root,
+        prepared.artifact_path,
+        source=prepared.source,
+    )
+    if (
+        refreshed.json_source != prepared.json_source
+        or refreshed.markdown_source != prepared.markdown_source
+    ):
+        raise ValueError("closed hosted promotion inputs changed after validation")
+    targets = fixed_publication_targets(prepared.repository_root)
+    _publish_pair_atomically(
+        targets,
+        (prepared.json_source.encode("utf-8"), prepared.markdown_source.encode("utf-8")),
+    )
+    return targets
+
+
+def _source_from_promoted_record(value: object) -> HostedPromotionSource:
+    source = _require_exact_fields(value, _PROMOTED_SOURCE_FIELDS, "promoted source")
+    parents = source["testMergeParents"]
+    if parents != [source["baseCommit"], source["headCommit"]]:
+        raise ValueError("promoted source test-merge parents are inconsistent")
+    return HostedPromotionSource(
+        repository=source["repository"],
+        pull_request=source["pullRequest"],
+        workflow_run=source["workflowRun"],
+        artifact_id=source["artifactId"],
+        artifact_zip_sha256=source["artifactZipSha256"],
+        base_commit=source["baseCommit"],
+        head_commit=source["headCommit"],
+        test_merge_commit=source["testMergeCommit"],
+    )
+
+
+def validate_promoted_evidence(
+    repository_root: Path,
+    *,
+    expected_source: HostedPromotionSource | None = None,
+) -> dict[str, object]:
+    """Revalidate the canonical committed pair without requiring the expired ZIP."""
+    repository = _validated_repository_root(repository_root)
+    targets = fixed_publication_targets(repository)
+    if not all(path.is_file() for path in targets):
+        raise ValueError("promoted evidence pair is missing")
+    try:
+        raw = json.loads(targets[0].read_text(encoding="utf-8"))
+        actual_json = targets[0].read_text(encoding="utf-8")
+        actual_markdown = targets[1].read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise EvidenceIOError("read_promoted_evidence", targets[0], error) from error
+    if not isinstance(raw, Mapping):
+        raise ValueError("promoted evidence JSON must contain one object")
+    _require_exact_fields(raw, _PROMOTED_TOP_LEVEL_FIELDS, "promoted evidence")
+    if raw["schemaVersion"] != _PROMOTED_SCHEMA_VERSION or raw["status"] != "RUNTIME_VERIFIED":
+        raise ValueError("promoted evidence schema or status is not supported")
+    if raw["governanceDecision"] != "ADR-0003":
+        raise ValueError("promoted evidence lacks the governing ADR")
+    embedded_source = _source_from_promoted_record(raw["source"])
+    _require_exact_fields(raw["sourceBinding"], _PROMOTED_BINDING_FIELDS, "promoted source binding")
+    _require_exact_fields(raw["localExecution"], _PROMOTED_LOCAL_FIELDS, "promoted local execution")
+    promoted_runs = raw["emptyDatabaseRuns"]
+    if not isinstance(promoted_runs, list) or len(promoted_runs) != 2:
+        raise ValueError("promoted evidence must contain exactly two empty-database runs")
+    for run in promoted_runs:
+        _require_exact_fields(run, _PROMOTED_RUN_FIELDS, "promoted empty-database run")
+    _require_exact_fields(raw["runANoop"], _PROMOTED_NOOP_FIELDS, "promoted run-A no-op")
+    if expected_source is not None and embedded_source != expected_source:
+        raise ValueError("promoted evidence source differs from the reviewed closure")
+    hosted = _validate_ci_runtime_summary(raw["hostedArtifact"])
+    rebuilt = _build_promoted_summary(repository, hosted, embedded_source)
+    expected_json = json.dumps(
+        rebuilt,
+        ensure_ascii=True,
+        indent=2,
+        sort_keys=True,
+        allow_nan=False,
+    ) + "\n"
+    expected_markdown = _render_promoted_report(rebuilt)
+    if actual_json != expected_json or actual_markdown != expected_markdown:
+        raise ValueError("promoted evidence pair is not the canonical validated rendering")
+    scan_publishable_evidence(actual_json, actual_markdown)
+    return rebuilt
+
+
 def _prepare_ci_output_path(output_directory: Path) -> Path:
     requested = Path(output_directory)
     if requested.name in {"", ".", ".."} or ".." in requested.parts:
@@ -4320,6 +4778,15 @@ def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "validate-ci-artifact",
         help="revalidate the fixed structured CI artifact pair",
     )
+    promotion = subcommands.add_parser(
+        "promote-hosted-evidence",
+        help="promote the reviewed closed hosted ZIP into the durable v1 pair",
+    )
+    promotion.add_argument("--artifact-zip", required=True, type=Path)
+    subcommands.add_parser(
+        "validate-promoted-evidence",
+        help="revalidate the durable hosted PostgreSQL v1 evidence pair",
+    )
     arguments = parser.parse_args(argv)
     if arguments.command == "verify" and arguments.runs < 2:
         parser.error("--runs must be at least 2")
@@ -4428,6 +4895,30 @@ def main(
         return _run_ci_fallback_command(repository, schema, arguments.workflow_step_outcome)
     if arguments.command == "validate-ci-artifact":
         return _run_ci_validation_command(repository)
+    if arguments.command == "promote-hosted-evidence":
+        try:
+            prepared = prepare_hosted_evidence_promotion(
+                repository,
+                arguments.artifact_zip,
+                source=_CLOSED_HOSTED_PROMOTION,
+            )
+            targets = publish_hosted_evidence_promotion(prepared)
+        except Exception:
+            print("hosted runtime evidence promotion failed", file=sys.stderr)
+            return 4
+        print("hosted runtime evidence promoted: " + ", ".join(str(path) for path in targets))
+        return 0
+    if arguments.command == "validate-promoted-evidence":
+        try:
+            validate_promoted_evidence(
+                repository,
+                expected_source=_CLOSED_HOSTED_PROMOTION,
+            )
+        except Exception:
+            print("promoted hosted runtime evidence validation failed", file=sys.stderr)
+            return 4
+        print("promoted hosted runtime evidence: PASS")
+        return 0
 
     runner = runtime_runner if runtime_runner is not None else run_runtime_verification
     try:

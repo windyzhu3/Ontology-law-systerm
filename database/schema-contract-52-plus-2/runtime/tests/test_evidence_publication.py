@@ -230,8 +230,8 @@ class EvidencePublicationTests(unittest.TestCase):
             encoding="utf-8",
         )
         if old_pair is not None:
-            (publish_directory / "2026-08-28-postgresql-18-summary.json").write_bytes(old_pair[0])
-            (publish_directory / "2026-08-28-postgresql-18-report.md").write_bytes(old_pair[1])
+            (publish_directory / "2026-09-01-postgresql-18-v1-summary.json").write_bytes(old_pair[0])
+            (publish_directory / "2026-09-01-postgresql-18-v1-report.md").write_bytes(old_pair[1])
         self._git(repository, "init", "-q")
         self._git(repository, "config", "user.name", "Runtime Evidence Test")
         self._git(repository, "config", "user.email", "runtime-evidence@example.invalid")
@@ -267,7 +267,7 @@ class EvidencePublicationTests(unittest.TestCase):
 
         self.assertEqual(
             [path.name for path in targets],
-            ["2026-08-28-postgresql-18-summary.json", "2026-08-28-postgresql-18-report.md"],
+            ["2026-09-01-postgresql-18-v1-summary.json", "2026-09-01-postgresql-18-v1-report.md"],
         )
         published = json.loads(targets[0].read_text(encoding="utf-8"))
         self.assertEqual(published, complete_summary(head))
@@ -291,7 +291,7 @@ class EvidencePublicationTests(unittest.TestCase):
             self.assertIn(literal, report)
         self.assertNotIn(".artifacts", report)
         self.assertNotIn("stderr", report)
-        self.assertEqual(self._git(repository, "status", "--short"), "?? docs/evidence/schema-runtime/2026-08-28-postgresql-18-report.md\n?? docs/evidence/schema-runtime/2026-08-28-postgresql-18-summary.json")
+        self.assertEqual(self._git(repository, "status", "--short"), "?? docs/evidence/schema-runtime/2026-09-01-postgresql-18-v1-report.md\n?? docs/evidence/schema-runtime/2026-09-01-postgresql-18-v1-summary.json")
 
     def test_top_level_schema_is_closed_and_product_claims_are_rejected(self) -> None:
         """Break caught: incomplete evidence, raw-log metadata, or API/R1 claims become publishable."""
@@ -568,14 +568,14 @@ class EvidencePublicationTests(unittest.TestCase):
 
         repository, _, _, _ = self._repository()
         publish_directory = repository / "docs" / "evidence" / "schema-runtime"
-        summary_target = publish_directory / "2026-08-28-postgresql-18-summary.json"
+        summary_target = publish_directory / "2026-09-01-postgresql-18-v1-summary.json"
         summary_target.symlink_to(repository / ".gitignore")
         with self.assertRaises(ValueError):
             verify_runtime.fixed_publication_targets(repository)
 
         repository, _, _, _ = self._repository()
         publish_directory = repository / "docs" / "evidence" / "schema-runtime"
-        summary_target = publish_directory / "2026-08-28-postgresql-18-summary.json"
+        summary_target = publish_directory / "2026-09-01-postgresql-18-v1-summary.json"
         os.mkfifo(summary_target)
         with self.assertRaises(ValueError):
             verify_runtime.fixed_publication_targets(repository)
@@ -600,8 +600,8 @@ class EvidencePublicationTests(unittest.TestCase):
             repository, schema_root, raw_path, head = self._repository(old_pair=old_pair)
             prepared = self._prepare(repository, schema_root, raw_path, head)
             targets = (
-                repository / "docs" / "evidence" / "schema-runtime" / "2026-08-28-postgresql-18-summary.json",
-                repository / "docs" / "evidence" / "schema-runtime" / "2026-08-28-postgresql-18-report.md",
+                repository / "docs" / "evidence" / "schema-runtime" / "2026-09-01-postgresql-18-v1-summary.json",
+                repository / "docs" / "evidence" / "schema-runtime" / "2026-09-01-postgresql-18-v1-report.md",
             )
             real_replace = os.replace
             failed = False
@@ -633,8 +633,8 @@ class EvidencePublicationTests(unittest.TestCase):
             repository, schema_root, raw_path, head = self._repository(old_pair=old_pair)
             prepared = self._prepare(repository, schema_root, raw_path, head)
             targets = (
-                repository / "docs" / "evidence" / "schema-runtime" / "2026-08-28-postgresql-18-summary.json",
-                repository / "docs" / "evidence" / "schema-runtime" / "2026-08-28-postgresql-18-report.md",
+                repository / "docs" / "evidence" / "schema-runtime" / "2026-09-01-postgresql-18-v1-summary.json",
+                repository / "docs" / "evidence" / "schema-runtime" / "2026-09-01-postgresql-18-v1-report.md",
             )
             real_cleanup = verify_runtime._unlink_transaction_file
             failed = False
@@ -679,7 +679,7 @@ class EvidencePublicationTests(unittest.TestCase):
                 runtime_runner=nonpassing_runner,
             )
             self.assertEqual(exit_code, expected_exit)
-            self.assertFalse((repository / "docs" / "evidence" / "schema-runtime" / "2026-08-28-postgresql-18-summary.json").exists())
+            self.assertFalse((repository / "docs" / "evidence" / "schema-runtime" / "2026-09-01-postgresql-18-v1-summary.json").exists())
             self.assertEqual(head, self._git(repository, "rev-parse", "HEAD"))
 
         repository, schema_root, _, head = self._repository()
@@ -728,7 +728,7 @@ class EvidencePublicationTests(unittest.TestCase):
             ),
             4,
         )
-        self.assertFalse((repository / "docs" / "evidence" / "schema-runtime" / "2026-08-28-postgresql-18-summary.json").exists())
+        self.assertFalse((repository / "docs" / "evidence" / "schema-runtime" / "2026-09-01-postgresql-18-v1-summary.json").exists())
 
 
 if __name__ == "__main__":

@@ -56,6 +56,18 @@ python3 scripts/verify_generated_sql.py
 
 `python3 generate.py` 只应在修改 `contract/` 后执行。评审应同时检查合同源和全部生成差异；已执行的迁移不得被重写，后续兼容变更必须新增向前迁移，并先通过新的架构决策解除当前冻结边界。
 
+## PostgreSQL 18 v1 运行时门禁
+
+`52-plus-2-v1` 已在 PR #3 的 Docker-capable 托管执行器中，以 PostgreSQL 18.6 与 Flyway 13.4.0 完成两次隔离空库运行、run A no-op 和五个失败关闭探针。规范证据见 [机器摘要](../../docs/evidence/schema-runtime/2026-09-01-postgresql-18-v1-summary.json)、[审阅报告](../../docs/evidence/schema-runtime/2026-09-01-postgresql-18-v1-report.md) 与 [ADR-0003](../../docs/adr/ADR-0003-hosted-runtime-evidence-promotion.md)。
+
+本地执行器没有 Docker/Compose，本地结果仍为 `BLOCKED/docker_compose_unavailable`，没有本地 PASS。ADR-0003 仅在闭合 ZIP、来源 commit、V001–V840 tree 和合同摘要全部精确匹配后，以托管两次运行替代原计划的本地成功要求。以下命令重验仓库内持久证据：
+
+```bash
+python3 runtime/verify_runtime.py validate-promoted-evidence
+```
+
+该结论只覆盖 `52-plus-2-v1`，不覆盖 ADR-0002、V850、v1.1 或 R1 生产实现。
+
 ## Flyway 迁移顺序
 
 迁移位置固定为 `generated/db/migration`，顺序固定如下：
