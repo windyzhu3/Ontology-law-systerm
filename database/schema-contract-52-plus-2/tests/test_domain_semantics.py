@@ -30,6 +30,10 @@ EXPECTED_MIGRATIONS = (
     "V830__application_privileges.sql",
     "V840__schema_contract_validation.sql",
 )
+EXPECTED_V1_1_MIGRATIONS = (
+    *EXPECTED_MIGRATIONS,
+    "V850__lead_ingress_completion_slot.sql",
+)
 EXPECTED_MIGRATION_SHA256 = {
     "V001__bootstrap_schemas.sql": "5f0b866c7f9f4adcfc1e658053859b068b88cca6f476f376deec50f283c816e7",
     "V002__deployment_state.sql": "66fee9505dc4f5a0e9d4d180d0979867e00321af57c37c76376fbe49df635833",
@@ -51,11 +55,15 @@ EXPECTED_MIGRATION_SHA256 = {
     "V830__application_privileges.sql": "4292e7294b40211b3d141cf7b0b1d5c1e09582056bf27b9c3bde39bacb34e821",
     "V840__schema_contract_validation.sql": "0919a6047fdb94879aa2fce18ce3df8d22eaf2de5d27f9cbb26f04c27dd2b2ad",
 }
+EXPECTED_V1_1_MIGRATION_SHA256 = {
+    **EXPECTED_MIGRATION_SHA256,
+    "V850__lead_ingress_completion_slot.sql": "6f784b95ae823bf5d97ef742d5494396911828c9ddc88ff07d35a6bc816e488b",
+}
 EXPECTED_CONTRACT_SHA256 = (
-    "a9c53d0126b7997e0aac511d3a4baf1da02a5f10d829ca5113458be51813034a"
+    "0c04d48ddae6891b53fdacabdba34d1124e757b070a4c9018597e4e0a4674301"
 )
 EXPECTED_FIELD_CONTRACT_SHA256 = (
-    "be79d991fa9e13e3f0af1c682333b6a063201387b78f7c9ec32a03bad51096ed"
+    "f4c17c4c0a8697820b30adb61b8cdb209666a4672393d4f8fc9d73a5f169addf"
 )
 EXPECTED_TRANSFER_ACCEPTANCE_CONSTRAINT = (
     "(accepted_snapshot_id IS NULL AND accept_decision_record_id IS NULL AND "
@@ -66,6 +74,35 @@ EXPECTED_TRANSFER_ACCEPTANCE_CONSTRAINT = (
     "matter_no IS NOT NULL AND matter_type_code IS NOT NULL AND "
     "matter_capability_pack_code IS NOT NULL AND matter_capability_pack_version "
     "> 0 AND matter_created_at IS NOT NULL)"
+)
+INGRESS_COMPLETION_COLUMN_CONTRACT = {
+    "ingress_completion_phone_ciphertext": ("bytea", True, None),
+    "ingress_completion_phone_hmac": ("bytea", True, 32),
+    "ingress_completion_email_ciphertext": ("bytea", True, None),
+    "ingress_completion_email_hmac": ("bytea", True, 32),
+    "ingress_completion_source_code": ("varchar(64)", True, None),
+    "ingress_completion_source_summary_ciphertext": ("bytea", True, None),
+    "ingress_completed_by_appointment_id": ("uuid", True, None),
+    "ingress_completed_at": ("timestamptz(6)", True, None),
+    "ingress_completion_digest": ("bytea", True, 32),
+}
+INGRESS_COMPLETION_SLOT_EXPRESSION = (
+    "(ingress_completion_phone_ciphertext IS NULL AND "
+    "ingress_completion_phone_hmac IS NULL AND "
+    "ingress_completion_email_ciphertext IS NULL AND "
+    "ingress_completion_email_hmac IS NULL AND "
+    "ingress_completion_source_code IS NULL AND "
+    "ingress_completion_source_summary_ciphertext IS NULL AND "
+    "ingress_completed_by_appointment_id IS NULL AND "
+    "ingress_completed_at IS NULL AND ingress_completion_digest IS NULL) OR "
+    "(captured_phone_ciphertext IS NULL AND captured_phone_hmac IS NULL AND "
+    "captured_email_ciphertext IS NULL AND captured_email_hmac IS NULL AND "
+    "(ingress_completion_phone_ciphertext IS NOT NULL OR "
+    "ingress_completion_email_ciphertext IS NOT NULL) AND "
+    "ingress_completion_source_code IS NOT NULL AND "
+    "ingress_completion_source_summary_ciphertext IS NOT NULL AND "
+    "ingress_completed_by_appointment_id IS NOT NULL AND "
+    "ingress_completed_at IS NOT NULL AND ingress_completion_digest IS NOT NULL)"
 )
 
 
@@ -104,12 +141,12 @@ class FrozenDomainSemanticsTest(unittest.TestCase):
         }
         expected_manifest_hashes = {
             f"db/migration/{name}": digest
-            for name, digest in EXPECTED_MIGRATION_SHA256.items()
+            for name, digest in EXPECTED_V1_1_MIGRATION_SHA256.items()
         }
 
-        self.assertEqual(EXPECTED_MIGRATIONS, actual_migrations)
+        self.assertEqual(EXPECTED_V1_1_MIGRATIONS, actual_migrations)
         self.assertEqual(
-            EXPECTED_MIGRATION_SHA256,
+            EXPECTED_V1_1_MIGRATION_SHA256,
             actual_hashes,
         )
         self.assertEqual(
@@ -149,6 +186,41 @@ class FrozenDomainSemanticsTest(unittest.TestCase):
         self.assert_frozen_migration_contract(
             CONTRACT_ROOT,
             REPOSITORY_ROOT / "docs/baseline/CURRENT-MVP-BASELINE.md",
+        )
+
+    def test_v850_is_only_append_and_v1_migrations_keep_exact_sha256(self):
+        from contract.render import generate_all
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            generate_all(root)
+            migration_root = root / "db/migration"
+            migrations = tuple(path.name for path in sorted(migration_root.glob("*.sql")))
+            hashes = {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in sorted(migration_root.glob("*.sql"))
+            }
+            manifest = json.loads(
+                (root / "schema-contract-manifest.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(EXPECTED_V1_1_MIGRATIONS, migrations)
+        self.assertEqual(
+            EXPECTED_MIGRATION_SHA256,
+            {name: hashes[name] for name in EXPECTED_MIGRATIONS},
+        )
+        self.assertEqual("52-plus-2-v1.1", manifest["contractVersion"])
+        self.assertEqual(20, len(manifest["generatedArtifactSha256"]))
+        self.assertEqual(52, manifest["applicationTableCount"])
+        self.assertEqual(54, manifest["physicalTableCountAfterFlywayBootstrap"])
+        self.assertEqual(13, len(manifest["schemas"]))
+        self.assertEqual(
+            207,
+            sum(
+                len(table["foreignKeys"])
+                for schema in manifest["schemas"]
+                for table in schema["tables"]
+            ),
         )
 
     def test_migration_bytes_and_manifest_digest_cannot_move_together(self):
@@ -345,6 +417,83 @@ class FrozenDomainSemanticsTest(unittest.TestCase):
             "legal_need_summary_ciphertext",
         } <= lead)
         self.assertIn("lead_assignment_id", self.columns("lead.lead_contact_result"))
+
+    def test_v1_1_lead_has_exact_ingress_completion_slot(self):
+        from contract.schema_contract import BASE_SCHEMAS
+
+        base_lead = next(
+            table
+            for schema in BASE_SCHEMAS
+            for table in schema.tables
+            if f"{schema.name}.{table.name}" == "lead.lead"
+        )
+        lead = self.tables["lead.lead"]
+        base_column_names = {column.name for column in base_lead.columns}
+        evolved_columns = {
+            column.name: (column.sql_type, column.nullable, column.byte_length)
+            for column in lead.columns
+            if column.name not in base_column_names
+        }
+
+        self.assertEqual(INGRESS_COMPLETION_COLUMN_CONTRACT, evolved_columns)
+
+    def test_ingress_completion_slot_is_all_or_complete_and_write_once(self):
+        from contract.schema_contract import BASE_SCHEMAS
+
+        base_lead = next(
+            table
+            for schema in BASE_SCHEMAS
+            for table in schema.tables
+            if f"{schema.name}.{table.name}" == "lead.lead"
+        )
+        lead = self.tables["lead.lead"]
+        ingress_columns = set(INGRESS_COMPLETION_COLUMN_CONTRACT)
+        constraints = {constraint.name: constraint for constraint in lead.constraints}
+
+        self.assertEqual(
+            "(ingress_completion_phone_ciphertext IS NULL AND ingress_completion_phone_hmac IS NULL) OR "
+            "(ingress_completion_phone_ciphertext IS NOT NULL AND ingress_completion_phone_hmac IS NOT NULL)",
+            constraints["ck_lead__ingress_completion_phone_pair"].expression,
+        )
+        self.assertEqual(
+            "(ingress_completion_email_ciphertext IS NULL AND ingress_completion_email_hmac IS NULL) OR "
+            "(ingress_completion_email_ciphertext IS NOT NULL AND ingress_completion_email_hmac IS NOT NULL)",
+            constraints["ck_lead__ingress_completion_email_pair"].expression,
+        )
+        self.assertEqual(
+            INGRESS_COMPLETION_SLOT_EXPRESSION,
+            constraints["ck_lead__ingress_completion_slot"].expression,
+        )
+        self.assertEqual(
+            ingress_columns,
+            set(lead.mutable_columns) - set(base_lead.mutable_columns),
+        )
+        self.assertEqual(
+            ingress_columns,
+            set(lead.write_once_columns) - set(base_lead.write_once_columns),
+        )
+        self.assertTrue(
+            {
+                "captured_phone_ciphertext",
+                "captured_phone_hmac",
+                "captured_email_ciphertext",
+                "captured_email_hmac",
+            }.isdisjoint(lead.mutable_columns)
+        )
+        added_foreign_keys = {
+            foreign_key.name: foreign_key
+            for foreign_key in lead.foreign_keys
+            if foreign_key not in base_lead.foreign_keys
+        }
+        self.assertEqual({"fk_lead__ingress_completed_by_appointment"}, set(added_foreign_keys))
+        appointment = added_foreign_keys["fk_lead__ingress_completed_by_appointment"]
+        self.assertEqual(
+            ("tenant_id", "ingress_completed_by_appointment_id"),
+            appointment.columns,
+        )
+        self.assertEqual("identity", appointment.parent_schema)
+        self.assertEqual("appointment", appointment.parent_table)
+        self.assertEqual(("tenant_id", "appointment_id"), appointment.parent_columns)
 
     def test_opportunity_has_exact_connected_contact_source_and_full_participation_set(self):
         opportunity = self.columns("opportunity.opportunity")

@@ -33,8 +33,8 @@ def normalized_sql(path: Path) -> str:
 
 def main() -> int:
     migrations = sorted(MIGRATIONS.glob("*.sql"))
-    if len(migrations) != 19:
-        print(f"expected 19 migrations, found {len(migrations)}", file=sys.stderr)
+    if len(migrations) != 20:
+        print(f"expected 20 migrations, found {len(migrations)}", file=sys.stderr)
         return 1
 
     failures: list[str] = []

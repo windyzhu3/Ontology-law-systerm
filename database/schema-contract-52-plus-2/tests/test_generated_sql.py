@@ -21,6 +21,140 @@ class GeneratedSqlTest(unittest.TestCase):
             for relative in first_files:
                 self.assertEqual((first_root / relative).read_bytes(), (second_root / relative).read_bytes(), str(relative))
 
+    def test_v850_contains_only_forward_lead_delta(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.render(root)
+            sql = (
+                root / "db/migration/V850__lead_ingress_completion_slot.sql"
+            ).read_text(encoding="utf-8")
+
+        self.assertNotIn("CREATE TABLE", sql)
+        self.assertNotIn("DROP TABLE", sql)
+        self.assertEqual(
+            {"lead.lead"},
+            set(re.findall(r"ALTER TABLE ([a-z_]+\.[a-z_]+)", sql)),
+        )
+        for column in (
+            "ingress_completion_phone_ciphertext",
+            "ingress_completion_phone_hmac",
+            "ingress_completion_email_ciphertext",
+            "ingress_completion_email_hmac",
+            "ingress_completion_source_code",
+            "ingress_completion_source_summary_ciphertext",
+            "ingress_completed_by_appointment_id",
+            "ingress_completed_at",
+            "ingress_completion_digest",
+        ):
+            self.assertIn(f"ADD COLUMN {column}", sql)
+            self.assertRegex(
+                sql,
+                rf"COMMENT ON COLUMN lead\.lead\.{column} IS '[^']*[\u4e00-\u9fff][^']*'",
+            )
+        for constraint in (
+            "ck_lead__ingress_completion_phone_pair",
+            "ck_lead__ingress_completion_email_pair",
+            "ck_lead__ingress_completion_slot",
+            "ck_lead__ingress_completion_phone_hmac_length",
+            "ck_lead__ingress_completion_email_hmac_length",
+            "ck_lead__ingress_completion_digest_length",
+            "fk_lead__ingress_completed_by_appointment",
+        ):
+            self.assertIn(f"CONSTRAINT {constraint}", sql)
+        self.assertIn(
+            "FOREIGN KEY (tenant_id, ingress_completed_by_appointment_id) "
+            "REFERENCES identity.appointment (tenant_id, appointment_id) "
+            "ON UPDATE NO ACTION ON DELETE NO ACTION",
+            re.sub(r"\s+", " ", sql),
+        )
+        self.assertIn("DROP TRIGGER trg_lead__mutation_guard ON lead.lead", sql)
+        self.assertIn("CREATE TRIGGER trg_lead__mutation_guard", sql)
+        self.assertIn("DROP TRIGGER trg_lead__initial_unassigned ON lead.lead", sql)
+        self.assertIn("CREATE TRIGGER trg_lead__initial_unassigned", sql)
+        self.assertEqual(1, sql.count("GRANT UPDATE"))
+        self.assertIn("TO ${app_command_role}", sql)
+        self.assertIn("UPDATE platform_meta.deployment_state", sql)
+        self.assertIn("schema_contract_version = '52-plus-2-v1.1'", sql)
+        self.assertIn("schema_contract_version = '52-plus-2-v1'", sql)
+
+    def test_v1_1_keeps_exact_final_mutation_guard_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.render(root)
+            v810 = (root / "db/migration/V810__update_guards.sql").read_text(
+                encoding="utf-8"
+            )
+            v850 = (
+                root / "db/migration/V850__lead_ingress_completion_slot.sql"
+            ).read_text(encoding="utf-8")
+
+        self.assertEqual(53, v810.count("__mutation_guard\nBEFORE UPDATE OR DELETE"))
+        self.assertEqual(1, v850.count("CREATE TRIGGER trg_lead__mutation_guard"))
+        self.assertEqual(1, v850.count("DROP TRIGGER trg_lead__mutation_guard"))
+
+    def test_v850_seals_the_whole_slot_after_first_completion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.render(root)
+            sql = (
+                root / "db/migration/V850__lead_ingress_completion_slot.sql"
+            ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            "CREATE FUNCTION platform_meta.fn_guard_lead_ingress_completion_slot()",
+            sql,
+        )
+        self.assertIn("IF OLD.ingress_completion_digest IS NOT NULL", sql)
+        self.assertIn("OLD.ingress_completion_phone_ciphertext", sql)
+        self.assertIn("NEW.ingress_completion_phone_ciphertext", sql)
+        self.assertIn("OLD.ingress_completion_email_ciphertext", sql)
+        self.assertIn("NEW.ingress_completion_email_ciphertext", sql)
+        self.assertIn("ingress completion slot is already sealed", sql)
+        self.assertIn(
+            "CREATE TRIGGER trg_lead__ingress_completion_slot",
+            sql,
+        )
+        self.assertIn(
+            "EXECUTE FUNCTION platform_meta.fn_guard_lead_ingress_completion_slot()",
+            sql,
+        )
+
+    def test_v850_does_not_expand_query_read_scope_to_completion_columns(self):
+        from contract.schema_contract import BASE_SCHEMAS
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.render(root)
+            sql = (
+                root / "db/migration/V850__lead_ingress_completion_slot.sql"
+            ).read_text(encoding="utf-8")
+
+        base_lead = next(
+            table
+            for schema in BASE_SCHEMAS
+            for table in schema.tables
+            if f"{schema.name}.{table.name}" == "lead.lead"
+        )
+        query_grant = re.search(
+            r"GRANT SELECT \((.*?)\)\s+ON lead\.lead TO \$\{app_query_role\};",
+            sql,
+            re.DOTALL,
+        )
+        self.assertIn(
+            "REVOKE SELECT ON lead.lead FROM ${app_query_role};",
+            sql,
+        )
+        self.assertIsNotNone(query_grant)
+        assert query_grant is not None
+        self.assertEqual(
+            [column.name for column in base_lead.columns],
+            [column.strip() for column in query_grant.group(1).split(",")],
+        )
+        self.assertIn(
+            "'${app_query_role}', 'lead.lead', completion_column, 'SELECT'",
+            sql,
+        )
+
     def test_generated_migrations_create_only_frozen_tables(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -225,7 +359,8 @@ class GeneratedSqlTest(unittest.TestCase):
             self.render(root)
             manifest = json.loads((root / "schema-contract-manifest.json").read_text(encoding="utf-8"))
             self.assertRegex(manifest["contractSha256"], r"^[0-9a-f]{64}$")
-            self.assertEqual(19, len(manifest["generatedArtifactSha256"]))
+            self.assertEqual("52-plus-2-v1.1", manifest["contractVersion"])
+            self.assertEqual(20, len(manifest["generatedArtifactSha256"]))
             for digest in manifest["generatedArtifactSha256"].values():
                 self.assertRegex(digest, r"^[0-9a-f]{64}$")
             self.assertEqual(52, manifest["applicationTableCount"])
@@ -272,6 +407,7 @@ class GeneratedSqlTest(unittest.TestCase):
                 "V820__indexes.sql",
                 "V830__application_privileges.sql",
                 "V840__schema_contract_validation.sql",
+                "V850__lead_ingress_completion_slot.sql",
             ], names)
 
 
