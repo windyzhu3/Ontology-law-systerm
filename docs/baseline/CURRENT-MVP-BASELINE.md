@@ -6,6 +6,8 @@ Baseline ID: MVP-2026-08-28.1
 
 确认日期：2026-08-28
 
+R1实施合同确认日期：2026-09-02
+
 当前52＋2合同摘要：`a9c53d0126b7997e0aac511d3a4baf1da02a5f10d829ca5113458be51813034a`
 字段合同摘要：`be79d991fa9e13e3f0af1c682333b6a063201387b78f7c9ec32a03bad51096ed`
 
@@ -19,9 +21,11 @@ Baseline ID: MVP-2026-08-28.1
 2. `database/schema-contract-52-plus-2/contract/`：当前MVP数据结构唯一人工维护源。
 3. 由合同机械生成的manifest、字段合同和Flyway DDL。
 4. `database/schema-contract-52-plus-2/docs/runtime-validation-contract.md`：DDL无法证明的运行时规则。
-5. `docs/progress/MVP-DELIVERY-LEDGER.md`：仅记录交付状态，不改变产品或数据库语义。
-6. `docs/design/`：视觉验收证据，不产生领域规则。
-7. `docs/specs/`：设计演进历史，不作为新实现或DDL生成依据。
+5. [ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)、[R1 Task完成矩阵](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)、[R1 HTTP矩阵](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md)和[R1 Workbench合同](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)：决定R1工程、HTTP、责任完成与呈现语义；涉及持久化形态、唯一键或Receipt基数时必须服从第2至4项。
+6. [冻结R1计划](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)：只决定上述合同的实施顺序，不能覆盖合同或数据库权威。
+7. `docs/progress/MVP-DELIVERY-LEDGER.md`：仅记录交付状态，不改变产品或数据库语义。
+8. `docs/design/`：视觉验收证据，不产生领域规则。
+9. `docs/specs/`：设计演进历史，不作为新实现或DDL生成依据。
 
 以下七份历史规格及其各自的`2026-08-27 P0一致性补充`均由本基线显式替代：
 
@@ -49,6 +53,14 @@ Baseline ID: MVP-2026-08-28.1
 - 使用一个PostgreSQL数据库和13个受管Schema；jOOQ是唯一业务持久化范式，Flyway是唯一DDL真源。
 - SPA内部可有普通用户工作台、身份/授权/审计/运营管理模式和客户轻量安全入口三种受保护体验模式，但它们共享同一部署制品和OpenAPI；Provider Inbox不面向浏览器。
 - 历史“三SPA＋四OpenAPI”已被替代，不得按旧拓扑搭建工程。
+- R1代码框架精确采用ADR-0004的单Maven工程、单Jar、单npm workspace和`api|worker`互斥角色；文档冻结不等于脚手架或生产代码已经实现。
+
+## r1-http-and-workbench-contract
+
+- Tenant只由认证后的服务端ActorContext提供；公共调用方不能提交或覆盖Tenant。写操作使用调用方生成的UUID `Idempotency-Key`，这是“业务UUID由服务端生成”的唯一例外并原样映射到现有`command_id`；Receipt与领域ID仍由服务端生成UUIDv7。同key同scope同payload只重放原Receipt；异scope或异payload返回冲突和原Receipt引用且新增delta为零。
+- capture没有不存在资源的`If-Match`。Draft创建、Draft更新、Task命令与subject重验分别使用HTTP矩阵冻结的前置条件和ETag种类，不得混用。
+- R1责任完成、后继Owner、Receipt result与E2E delta以Task完成矩阵为准；零分配候选完成P0-04正常分支，不是HTTP错误。
+- Workbench envelope固定为一句`todaySummary`、零或一张完整`currentCard`、最多两条`nextSummaries`、一个`waitingCount`和一个固定`chatComposer`。普通`/workbench`无全局导航/侧栏；身份管理使用同一SPA的独立受保护route mode，生产CRUD不计入R1。
 
 ## task-waiting-contract
 
@@ -136,6 +148,6 @@ PR #2只收口本基线、历史权威、五态台账、静态数据库验证和
 
 R1生产代码不得开始，直到`docs/adr/ADR-0002-lead-ingress-completion-slot.md`、合同版本`52-plus-2-v1.1`、V850前向迁移及v1.1真实PostgreSQL证据全部完成。已确认的P0-02方案保持52＋2表数：在`lead.lead`增加类型化、一次写入的Ingress Completion槽；原始phone/email均缺失且整槽为空时才可写入至少一组联系方式，V850以前的迁移不可改写。该槽记录phone/email密文与HMAC配对、静态来源代码、加密来源说明、完成Appointment、完成时间和32字节完成摘要；不得改写原始渠道捕获值或将联系方式写入通用JSON、审计摘要或事件载荷。
 
-P0-04的`REQUEST_SOURCE_INTAKE_STOP`只表示请求，不证明来源已停用；R1只形成绑定准确Lead和Task的`DecisionRecord(LEAD_ROUTING_DISPOSITION)`及后续责任。
+P0-04的`REQUEST_SOURCE_INTAKE_STOP`只表示请求，不证明来源已停用；R1形成绑定准确Lead和Task的`DecisionRecord(LEAD_ROUTING_DISPOSITION)`，并给准确Source Intake Owner创建`ACK_SOURCE_INTAKE_STOP_REQUEST`。只有该Owner执行具名确认命令并写`DecisionRecord(SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED)`后才完成后继责任，仍不改变SourceAccount状态。
 
-R2只有在收口设计、实施计划、当前基线和PR #2视觉资产均已`MERGED`，独立`DB-52P2-PG18-RUNTIME`行为`RUNTIME_VERIFIED`，`R1-OPENAPI`、`R1-BACKEND`、`R1-SPA`均为`IMPLEMENTED`，`R1-E2E-GOLDEN`和`R1-E2E-FAILURES`均为`RUNTIME_VERIFIED`，且未通过新增通用平台能力绕过冻结边界时才能开始。R3只能在R2以同样标准完成后开始；后续页面设计可处于`DRAFT`，不得标为已实现或驱动R1扩大范围。
+R2只有在收口设计、当前基线和PR #2视觉资产已进入`main`，R1计划与四份实施合同保持`FROZEN`且位于`main`，独立`DB-52P2-PG18-RUNTIME`行为`RUNTIME_VERIFIED`，`R1-OPENAPI`、`R1-BACKEND`、`R1-SPA`均为`IMPLEMENTED`，`R1-E2E-GOLDEN`和`R1-E2E-FAILURES`均为`RUNTIME_VERIFIED`，且未通过新增通用平台能力绕过冻结边界时才能开始。`FROZEN`文档只表示实现输入已确定，不表示生产能力已经实现。R3只能在R2以同样标准完成后开始；后续页面设计可处于`DRAFT`，不得标为已实现或驱动R1扩大范围。

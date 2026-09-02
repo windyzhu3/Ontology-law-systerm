@@ -144,6 +144,11 @@ EXPECTED_VISUAL_ASSETS = {
 CANONICAL_BASELINE = Path("docs/baseline/CURRENT-MVP-BASELINE.md")
 CLOSURE_SPEC = Path("docs/superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md")
 DELIVERY_LEDGER = Path("docs/progress/MVP-DELIVERY-LEDGER.md")
+R1_PLAN = Path("docs/superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md")
+R1_SCAFFOLD_ADR = Path("docs/adr/ADR-0004-r1-scaffold-and-http-contract.md")
+R1_TASK_CONTRACT = Path("docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md")
+R1_HTTP_CONTRACT = Path("docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md")
+R1_WORKBENCH_CONTRACT = Path("docs/contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md")
 README = Path("README.md")
 VISUAL_INDEXES = {
     Path("docs/design/sales-mvp-workcards/README.md"): Path(
@@ -161,6 +166,512 @@ VISUAL_INDEX_METADATA = "\n".join(
         f"> 确认日期：{VISUAL_CONFIRMATION_DATE}",
     ]
 )
+
+R1_TASK_CONTRACTS = {
+    "RESOLVE_LEAD_DUPLICATE": ("RESOLVE_DUPLICATE_LEAD", "responsibility.decision_record"),
+    "COMPLETE_LEAD_INGRESS": ("COMPLETE_LEAD_INGRESS", "lead.lead"),
+    "ASSIGN_LEAD": ("ASSIGN_LEAD", "lead.lead_assignment"),
+    "RESOLVE_LEAD_ROUTING_GAP": ("RECORD_ROUTING_DISPOSITION", "responsibility.decision_record"),
+    "ACK_SOURCE_INTAKE_STOP_REQUEST": (
+        "ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST",
+        "responsibility.decision_record",
+    ),
+    "CONTACT_LEAD": ("RECORD_CONTACT_RESULT", "lead.lead_contact_result"),
+    "REVIEW_LEAD_VALIDITY": ("REVIEW_LEAD_VALIDITY", "responsibility.decision_record"),
+}
+R1_REQUIRED_TASK_TYPES = set(R1_TASK_CONTRACTS)
+R1_REQUIRED_BRANCHES = {
+    "P0_01_LINK_EXISTING": ("RESOLVE_LEAD_DUPLICATE", "LINK_EXISTING_PARTY"),
+    "P0_01_KEEP_SEPARATE": ("RESOLVE_LEAD_DUPLICATE", "KEEP_SEPARATE"),
+    "P0_02_COMPLETE": ("COMPLETE_LEAD_INGRESS", "INGRESS_COMPLETED"),
+    "P0_03_ASSIGN": ("ASSIGN_LEAD", "ASSIGNED"),
+    "P0_04_SCHEDULE_ROUTING_REVIEW": (
+        "RESOLVE_LEAD_ROUTING_GAP",
+        "SCHEDULE_ROUTING_REVIEW",
+    ),
+    "P0_04_RETRY_ASSIGNMENT_NOW": (
+        "RESOLVE_LEAD_ROUTING_GAP",
+        "RETRY_ASSIGNMENT_NOW",
+    ),
+    "P0_04_REQUEST_SOURCE_INTAKE_STOP": (
+        "RESOLVE_LEAD_ROUTING_GAP",
+        "REQUEST_SOURCE_INTAKE_STOP",
+    ),
+    "ACK_SOURCE_INTAKE_STOP_REQUEST": (
+        "ACK_SOURCE_INTAKE_STOP_REQUEST",
+        "SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED",
+    ),
+    "CONTACT_CONNECTED_VALID": ("CONTACT_LEAD", "CONNECTED_VALID"),
+    "CONTACT_NOT_CONNECTED_RETRY": ("CONTACT_LEAD", "NOT_CONNECTED"),
+    "CONTACT_NOT_CONNECTED_EXHAUSTED": ("CONTACT_LEAD", "NOT_CONNECTED"),
+    "CONTACT_SUSPECT_INVALID": ("CONTACT_LEAD", "SUSPECT_INVALID"),
+    "REVIEW_CONFIRM_INVALID": ("REVIEW_LEAD_VALIDITY", "CONFIRM_INVALID"),
+    "REVIEW_CLOSE_UNREACHED": ("REVIEW_LEAD_VALIDITY", "CLOSE_UNREACHED"),
+    "REVIEW_REOPEN_CONTACT": ("REVIEW_LEAD_VALIDITY", "REOPEN_CONTACT"),
+}
+R1_RECEIPT_RESULTS = {"SUCCEEDED", "NO_CHANGE", "REJECTED"}
+R1_SUCCESSOR_CONTRACTS = {
+    "P0_01_LINK_EXISTING": (
+        "COMPLETE_LEAD_INGRESS,ASSIGN_LEAD,CONTACT_LEAD,RESOLVE_LEAD_ROUTING_GAP",
+        "R1_LEAD_NEXT_RESPONSIBILITY_V1",
+        "POLICY_SELECTED",
+    ),
+    "P0_01_KEEP_SEPARATE": (
+        "COMPLETE_LEAD_INGRESS,ASSIGN_LEAD,CONTACT_LEAD,RESOLVE_LEAD_ROUTING_GAP",
+        "R1_LEAD_NEXT_RESPONSIBILITY_V1",
+        "POLICY_SELECTED",
+    ),
+    "P0_02_COMPLETE": (
+        "ASSIGN_LEAD,CONTACT_LEAD,RESOLVE_LEAD_ROUTING_GAP",
+        "R1_LEAD_NEXT_RESPONSIBILITY_V1",
+        "POLICY_SELECTED",
+    ),
+    "P0_03_ASSIGN": ("CONTACT_LEAD", "DIRECT", "ASSIGNMENT_OWNER"),
+    "P0_04_SCHEDULE_ROUTING_REVIEW": (
+        "RESOLVE_LEAD_ROUTING_GAP",
+        "NEXT_BUSINESS_WINDOW",
+        "SAME_ROUTING_SUPERVISOR",
+    ),
+    "P0_04_RETRY_ASSIGNMENT_NOW": (
+        "CONTACT_LEAD,RESOLVE_LEAD_ROUTING_GAP",
+        "R1_ASSIGNMENT_RETRY_V1",
+        "POLICY_SELECTED",
+    ),
+    "P0_04_REQUEST_SOURCE_INTAKE_STOP": (
+        "ACK_SOURCE_INTAKE_STOP_REQUEST",
+        "DIRECT",
+        "SOURCE_INTAKE_OWNER",
+    ),
+    "ACK_SOURCE_INTAKE_STOP_REQUEST": ("NONE", "NONE", "NONE"),
+    "CONTACT_CONNECTED_VALID": ("NONE", "OPPORTUNITY_BOUNDARY_V1", "NONE"),
+    "CONTACT_NOT_CONNECTED_RETRY": (
+        "CONTACT_LEAD",
+        "CONTACT_RETRY_V1",
+        "SAME_ASSIGNMENT_OWNER",
+    ),
+    "CONTACT_NOT_CONNECTED_EXHAUSTED": (
+        "REVIEW_LEAD_VALIDITY",
+        "CONTACT_RETRY_V1",
+        "ROUTING_SUPERVISOR",
+    ),
+    "CONTACT_SUSPECT_INVALID": ("REVIEW_LEAD_VALIDITY", "DIRECT", "ROUTING_SUPERVISOR"),
+    "REVIEW_CONFIRM_INVALID": ("NONE", "NONE", "NONE"),
+    "REVIEW_CLOSE_UNREACHED": ("NONE", "NONE", "NONE"),
+    "REVIEW_REOPEN_CONTACT": ("CONTACT_LEAD", "DIRECT", "CURRENT_ASSIGNMENT_OWNER"),
+}
+R1_BRANCH_DETAIL_CONTRACTS = {
+    "P0_01_LINK_EXISTING": (
+        "SUCCEEDED", "`LEAD_DUPLICATE_RESOLUTION@hash`",
+        "`LeadDuplicateResolutionRecordedV1`", "R1_PROJECTION",
+    ),
+    "P0_01_KEEP_SEPARATE": (
+        "SUCCEEDED", "`LEAD_DUPLICATE_RESOLUTION@hash`",
+        "`LeadDuplicateResolutionRecordedV1`", "R1_PROJECTION",
+    ),
+    "P0_02_COMPLETE": (
+        "SUCCEEDED", "`lead@newRevision`", "`LeadIngressCompletedV1`", "R1_PROJECTION",
+    ),
+    "P0_03_ASSIGN": (
+        "SUCCEEDED", "`assignment@revision0`", "`LeadAssignedV1`", "R1_PROJECTION",
+    ),
+    "P0_04_SCHEDULE_ROUTING_REVIEW": (
+        "SUCCEEDED", "`LEAD_ROUTING_DISPOSITION@hash`",
+        "`LeadRoutingDispositionRecordedV1`", "R1_PROJECTION",
+    ),
+    "P0_04_RETRY_ASSIGNMENT_NOW": (
+        "SUCCEEDED", "`LEAD_ROUTING_DISPOSITION@hash`",
+        "`LeadRoutingDispositionRecordedV1`", "R1_PROJECTION",
+    ),
+    "P0_04_REQUEST_SOURCE_INTAKE_STOP": (
+        "SUCCEEDED", "`LEAD_ROUTING_DISPOSITION@hash`",
+        "`SourceIntakeStopRequestedV1`", "R1_PROJECTION",
+    ),
+    "ACK_SOURCE_INTAKE_STOP_REQUEST": (
+        "SUCCEEDED", "`SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED@hash`",
+        "`SourceIntakeStopRequestAcknowledgedV1`", "R1_PROJECTION",
+    ),
+    "CONTACT_CONNECTED_VALID": (
+        "SUCCEEDED", "`contactResult@hash`", "`LeadContactResultRecordedV1`", "R1_PROJECTION",
+    ),
+    "CONTACT_NOT_CONNECTED_RETRY": (
+        "SUCCEEDED", "`contactResult@hash; attemptNo<3`",
+        "`LeadContactResultRecordedV1`", "R1_PROJECTION",
+    ),
+    "CONTACT_NOT_CONNECTED_EXHAUSTED": (
+        "SUCCEEDED", "`contactResult@hash; attemptNo=3`",
+        "`LeadContactRetryExhaustedV1`", "R1_PROJECTION",
+    ),
+    "CONTACT_SUSPECT_INVALID": (
+        "SUCCEEDED", "`contactResult@hash`", "`LeadContactResultRecordedV1`", "R1_PROJECTION",
+    ),
+    "REVIEW_CONFIRM_INVALID": (
+        "SUCCEEDED", "`LEAD_VALIDITY_REVIEW@hash`", "`LeadValidityReviewedV1`", "R1_PROJECTION",
+    ),
+    "REVIEW_CLOSE_UNREACHED": (
+        "SUCCEEDED", "`LEAD_VALIDITY_REVIEW@hash`", "`LeadValidityReviewedV1`", "R1_PROJECTION",
+    ),
+    "REVIEW_REOPEN_CONTACT": (
+        "SUCCEEDED", "`LEAD_VALIDITY_REVIEW@hash`", "`LeadValidityReviewedV1`", "R1_PROJECTION",
+    ),
+}
+R1_E2E_CONTRACTS = {
+    "E2E_P0_01_LINK": (
+        "P0_01_LINK_EXISTING", "`decision_record:+1`", "`current:DONE,r+1`",
+        "`R1 selector:exactly1`", "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`other-tenant:0; replay:all-0; technical-failure:all-0`",
+    ),
+    "E2E_P0_01_SEPARATE": (
+        "P0_01_KEEP_SEPARATE", "`decision_record:+1`", "`current:DONE,r+1`",
+        "`R1 selector:exactly1`", "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`other-tenant:0; replay:all-0; technical-failure:all-0`",
+    ),
+    "E2E_P0_02": (
+        "P0_02_COMPLETE", "`lead rows:+0; ingress slot:0-to-1; lead revision:+1`",
+        "`current:DONE,r+1`", "`R1 selector:exactly1`",
+        "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`stale:domain-0; other-tenant:0; technical-failure:all-0`",
+    ),
+    "E2E_P0_03": (
+        "P0_03_ASSIGN", "`assignment:+1; lead revision:+1`", "`current:DONE,r+1`",
+        "`CONTACT_LEAD:+1,OPEN,r0`", "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`other-tenant:0; duplicate-open-assignment:rejected; technical-failure:all-0`",
+    ),
+    "E2E_P0_04_SCHEDULE": (
+        "P0_04_SCHEDULE_ROUTING_REVIEW", "`decision_record:+1; wait_receipt:+1`",
+        "`current:DONE,r+1`", "`routing task:+1,WAITING,r1`",
+        "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`other-tenant:0; technical-failure:all-0`",
+    ),
+    "E2E_P0_04_RETRY_CANDIDATE": (
+        "P0_04_RETRY_ASSIGNMENT_NOW",
+        "`decision_record:+1; assignment:+1; lead revision:+1`", "`current:DONE,r+1`",
+        "`CONTACT_LEAD:+1,OPEN,r0`", "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`other-tenant:0; technical-failure:all-0`",
+    ),
+    "E2E_P0_04_RETRY_EMPTY": (
+        "P0_04_RETRY_ASSIGNMENT_NOW", "`decision_record:+1; assignment:+0`",
+        "`current:DONE,r+1`", "`routing task:+1,OPEN,r0`",
+        "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`no-recursion:true; other-tenant:0; technical-failure:all-0`",
+    ),
+    "E2E_P0_04_STOP_REQUEST": (
+        "P0_04_REQUEST_SOURCE_INTAKE_STOP", "`decision_record:+1; source state:+0`",
+        "`current:DONE,r+1`", "`ACK_SOURCE_INTAKE_STOP_REQUEST:+1,OPEN,r0`",
+        "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`other-tenant:0; technical-failure:all-0`",
+    ),
+    "E2E_STOP_ACK": (
+        "ACK_SOURCE_INTAKE_STOP_REQUEST", "`decision_record:+1; source state:+0`",
+        "`current:DONE,r+1`", "`NONE`", "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`other-tenant:0; technical-failure:all-0`",
+    ),
+    "E2E_CONTACT_CONNECTED": (
+        "CONTACT_CONNECTED_VALID", "`contact_result:+1; opportunity:+1`",
+        "`current:DONE,r+1`", "`R2 task:+0`", "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`other-tenant:0; technical-failure:all-0`",
+    ),
+    "E2E_CONTACT_RETRY": (
+        "CONTACT_NOT_CONNECTED_RETRY", "`contact_result:+1; wait_receipt:+1`",
+        "`current:DONE,r+1`", "`CONTACT_LEAD:+1,WAITING,r1`",
+        "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`other-tenant:0; due-before-resume:0; technical-failure:all-0`",
+    ),
+    "E2E_CONTACT_EXHAUSTED": (
+        "CONTACT_NOT_CONNECTED_EXHAUSTED", "`contact_result:+1`", "`current:DONE,r+1`",
+        "`REVIEW_LEAD_VALIDITY:+1,OPEN,r0`", "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`retry-task:+0; other-tenant:0; technical-failure:all-0`",
+    ),
+    "E2E_CONTACT_SUSPECT": (
+        "CONTACT_SUSPECT_INVALID", "`contact_result:+1`", "`current:DONE,r+1`",
+        "`REVIEW_LEAD_VALIDITY:+1,OPEN,r0`", "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`other-tenant:0; technical-failure:all-0`",
+    ),
+    "E2E_REVIEW_INVALID": (
+        "REVIEW_CONFIRM_INVALID", "`decision_record:+1`", "`current:DONE,r+1`", "`NONE`",
+        "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`other-tenant:0; technical-failure:all-0`",
+    ),
+    "E2E_REVIEW_UNREACHED": (
+        "REVIEW_CLOSE_UNREACHED", "`decision_record:+1`", "`current:DONE,r+1`", "`NONE`",
+        "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`other-tenant:0; technical-failure:all-0`",
+    ),
+    "E2E_REVIEW_REOPEN": (
+        "REVIEW_REOPEN_CONTACT", "`decision_record:+1`", "`current:DONE,r+1`",
+        "`CONTACT_LEAD:+1,OPEN,r0`", "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`old-task-reopen:0; other-tenant:0; technical-failure:all-0`",
+    ),
+}
+R1_ERROR_CONTRACTS = {
+    "VALIDATION_FAILED": ("400", "SAME_KEY_AFTER_FIX", "REQUIRED", "NONE"),
+    "IDEMPOTENCY_KEY_REQUIRED": ("400", "SAME_KEY_AFTER_FIX", "NONE", "NONE"),
+    "IDEMPOTENCY_KEY_INVALID": ("400", "SAME_KEY_AFTER_FIX", "NONE", "NONE"),
+    "UNAUTHENTICATED": ("401", "SAME_KEY_AFTER_REAUTH", "NONE", "NONE"),
+    "NOT_AUTHORIZED": ("403", "NO", "NONE", "NONE"),
+    "APPOINTMENT_INACTIVE": ("403", "NO", "NONE", "NONE"),
+    "NOT_FOUND": ("404", "NO", "NONE", "NONE"),
+    "COMMAND_PAYLOAD_CONFLICT": ("409", "NO", "NONE", "NONE"),
+    "TASK_NOT_OPEN": ("409", "NO", "NONE", "TASK"),
+    "TASK_ALREADY_COMPLETED": ("409", "NO", "NONE", "TASK"),
+    "DRAFT_DIGEST_MISMATCH": ("409", "NEW_KEY_AFTER_REFRESH", "NONE", "DRAFT"),
+    "INGRESS_COMPLETION_ALREADY_RECORDED": ("409", "NO", "NONE", "SUBJECT"),
+    "STALE_TASK": ("412", "NEW_KEY_AFTER_REFRESH", "NONE", "TASK"),
+    "STALE_DRAFT": ("412", "NEW_KEY_AFTER_REFRESH", "NONE", "DRAFT"),
+    "STALE_SUBJECT": ("412", "NEW_KEY_AFTER_REFRESH", "NONE", "SUBJECT"),
+    "SUPERVISOR_UNRESOLVED": ("422", "NEW_KEY_AFTER_ADMIN_FIX", "NONE", "NONE"),
+    "SOURCE_INTAKE_OWNER_UNRESOLVED": (
+        "422", "NEW_KEY_AFTER_ADMIN_FIX", "NONE", "NONE"
+    ),
+    "DRAFT_PRECONDITION_REQUIRED": ("428", "SAME_KEY_AFTER_FIX", "NONE", "DRAFT"),
+    "TASK_PRECONDITION_REQUIRED": ("428", "SAME_KEY_AFTER_FIX", "NONE", "TASK"),
+    "RATE_LIMITED": ("429", "SAME_KEY_AFTER_BACKOFF", "NONE", "NONE"),
+    "INTERNAL_ERROR": ("500", "SAME_KEY_AFTER_BACKOFF", "NONE", "NONE"),
+    "SERVICE_UNAVAILABLE": ("503", "SAME_KEY_AFTER_BACKOFF", "NONE", "NONE"),
+}
+R1_OPERATION_CONTRACTS = {
+    "captureLead": (
+        "POST", "/api/v1/leads", "REQUIRED", "NONE", "SOURCE_NATURAL_KEY", "201"
+    ),
+    "getCurrentWorkCard": (
+        "GET",
+        "/api/v1/workcards/current",
+        "NONE",
+        "OPTIONAL_WORKBENCH_ETAG",
+        "ACTOR_SCOPE",
+        "200/304",
+    ),
+    "saveActionDraft": (
+        "PUT",
+        "/api/v1/tasks/{taskId}/draft",
+        "REQUIRED",
+        "IF_NONE_MATCH_STAR_OR_DRAFT_ETAG",
+        "TASK_AND_DRAFT",
+        "200/201",
+    ),
+    "resolveDuplicateLead": (
+        "POST",
+        "/api/v1/tasks/{taskId}/commands/resolve-duplicate-lead",
+        "REQUIRED",
+        "TASK_ETAG",
+        "TASK_AND_LEAD_REVISION",
+        "200",
+    ),
+    "completeLeadIngress": (
+        "POST",
+        "/api/v1/tasks/{taskId}/commands/complete-lead-ingress",
+        "REQUIRED",
+        "TASK_ETAG",
+        "TASK_AND_LEAD_REVISION",
+        "200",
+    ),
+    "assignLead": (
+        "POST",
+        "/api/v1/tasks/{taskId}/commands/assign-lead",
+        "REQUIRED",
+        "TASK_ETAG",
+        "TASK_LEAD_AND_ASSIGNMENT",
+        "200",
+    ),
+    "recordRoutingDisposition": (
+        "POST",
+        "/api/v1/tasks/{taskId}/commands/record-routing-disposition",
+        "REQUIRED",
+        "TASK_ETAG",
+        "TASK_AND_LEAD_REVISION",
+        "200",
+    ),
+    "acknowledgeSourceIntakeStopRequest": (
+        "POST",
+        "/api/v1/tasks/{taskId}/commands/acknowledge-source-intake-stop-request",
+        "REQUIRED",
+        "TASK_ETAG",
+        "TASK_AND_CAUSAL_DECISION",
+        "200",
+    ),
+    "recordContactResult": (
+        "POST",
+        "/api/v1/tasks/{taskId}/commands/record-contact-result",
+        "REQUIRED",
+        "TASK_ETAG",
+        "TASK_LEAD_AND_ASSIGNMENT",
+        "200",
+    ),
+    "reviewLeadValidity": (
+        "POST",
+        "/api/v1/tasks/{taskId}/commands/review-lead-validity",
+        "REQUIRED",
+        "TASK_ETAG",
+        "TASK_AND_CAUSAL_RESULT",
+        "200",
+    ),
+    "getCommandReceipt": (
+        "GET",
+        "/api/v1/commands/{commandId}/receipt",
+        "NONE",
+        "NONE",
+        "COMMAND_ID_AND_ACTOR_SCOPE",
+        "200",
+    ),
+    "reopenDueContactTasks": (
+        "POST",
+        "/internal/v1/tasks/commands/reopen-due-contact-tasks",
+        "REQUIRED",
+        "NONE",
+        "DUE_CUTOFF_AND_OWNER_QUEUE",
+        "200",
+    ),
+}
+R1_IDEMPOTENCY_BINDING = {
+    "Header": "Idempotency-Key",
+    "ValueType": "UUID",
+    "SlotColumn": "execution.command_execution_slot.command_id",
+    "CommandId": "EXACT_CALLER_KEY",
+    "ReceiptId": "SERVER_UUIDV7",
+    "SlotScope": "TENANT_ENVELOPE_SUBJECT_SCOPE",
+    "PayloadConflict": "ORIGINAL_RECEIPT_NO_NEW_WRITES",
+}
+R1_OPERATION_ERRORS = {
+    "captureLead": {
+        "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "APPOINTMENT_INACTIVE",
+        "COMMAND_PAYLOAD_CONFLICT", "SUPERVISOR_UNRESOLVED", "RATE_LIMITED",
+        "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "getCurrentWorkCard": {
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND", "RATE_LIMITED",
+        "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "saveActionDraft": {
+        "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "APPOINTMENT_INACTIVE", "NOT_FOUND",
+        "COMMAND_PAYLOAD_CONFLICT", "TASK_NOT_OPEN", "TASK_ALREADY_COMPLETED",
+        "DRAFT_DIGEST_MISMATCH", "STALE_TASK", "STALE_DRAFT",
+        "DRAFT_PRECONDITION_REQUIRED", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "resolveDuplicateLead": {
+        "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "APPOINTMENT_INACTIVE", "NOT_FOUND",
+        "COMMAND_PAYLOAD_CONFLICT", "TASK_NOT_OPEN", "TASK_ALREADY_COMPLETED",
+        "DRAFT_DIGEST_MISMATCH", "STALE_TASK", "STALE_DRAFT", "STALE_SUBJECT",
+        "SUPERVISOR_UNRESOLVED", "TASK_PRECONDITION_REQUIRED", "RATE_LIMITED",
+        "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "completeLeadIngress": {
+        "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "APPOINTMENT_INACTIVE", "NOT_FOUND",
+        "COMMAND_PAYLOAD_CONFLICT", "TASK_NOT_OPEN", "TASK_ALREADY_COMPLETED",
+        "DRAFT_DIGEST_MISMATCH", "INGRESS_COMPLETION_ALREADY_RECORDED", "STALE_TASK",
+        "STALE_DRAFT", "STALE_SUBJECT", "SUPERVISOR_UNRESOLVED",
+        "TASK_PRECONDITION_REQUIRED", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "assignLead": {
+        "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "APPOINTMENT_INACTIVE", "NOT_FOUND",
+        "COMMAND_PAYLOAD_CONFLICT", "TASK_NOT_OPEN", "TASK_ALREADY_COMPLETED",
+        "DRAFT_DIGEST_MISMATCH", "STALE_TASK", "STALE_DRAFT", "STALE_SUBJECT",
+        "TASK_PRECONDITION_REQUIRED", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "recordRoutingDisposition": {
+        "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "APPOINTMENT_INACTIVE", "NOT_FOUND",
+        "COMMAND_PAYLOAD_CONFLICT", "TASK_NOT_OPEN", "TASK_ALREADY_COMPLETED",
+        "DRAFT_DIGEST_MISMATCH", "STALE_TASK", "STALE_DRAFT", "STALE_SUBJECT",
+        "SOURCE_INTAKE_OWNER_UNRESOLVED", "TASK_PRECONDITION_REQUIRED", "RATE_LIMITED",
+        "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "acknowledgeSourceIntakeStopRequest": {
+        "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "APPOINTMENT_INACTIVE", "NOT_FOUND",
+        "COMMAND_PAYLOAD_CONFLICT", "TASK_NOT_OPEN", "TASK_ALREADY_COMPLETED",
+        "DRAFT_DIGEST_MISMATCH", "STALE_TASK", "STALE_DRAFT", "STALE_SUBJECT",
+        "TASK_PRECONDITION_REQUIRED", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "recordContactResult": {
+        "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "APPOINTMENT_INACTIVE", "NOT_FOUND",
+        "COMMAND_PAYLOAD_CONFLICT", "TASK_NOT_OPEN", "TASK_ALREADY_COMPLETED",
+        "DRAFT_DIGEST_MISMATCH", "STALE_TASK", "STALE_DRAFT", "STALE_SUBJECT",
+        "SUPERVISOR_UNRESOLVED", "TASK_PRECONDITION_REQUIRED", "RATE_LIMITED",
+        "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "reviewLeadValidity": {
+        "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "APPOINTMENT_INACTIVE", "NOT_FOUND",
+        "COMMAND_PAYLOAD_CONFLICT", "TASK_NOT_OPEN", "TASK_ALREADY_COMPLETED",
+        "DRAFT_DIGEST_MISMATCH", "STALE_TASK", "STALE_DRAFT", "STALE_SUBJECT",
+        "TASK_PRECONDITION_REQUIRED", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "getCommandReceipt": {
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND", "RATE_LIMITED",
+        "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "reopenDueContactTasks": {
+        "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "COMMAND_PAYLOAD_CONFLICT", "RATE_LIMITED",
+        "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+}
+R1_WORKBENCH_FIELDS = {
+    "todaySummary": "1",
+    "currentCard": "0..1",
+    "nextSummaries": "0..2",
+    "waitingCount": "1",
+    "chatComposer": "1",
+}
+R1_ROUTE_MODES = {
+    "WORKBENCH": ("/workbench", "NONE", "NONE"),
+    "IDENTITY_ADMIN": ("/admin/identity/*", "IDENTITY_ONLY", "LEFT"),
+}
+R1_SCAFFOLD_DECISIONS = {
+    "backendProject": (
+        "SINGLE_MAVEN_BACKEND",
+        "单 Maven 工程 `backend/pom.xml`；不得创建第二个后端项目或聚合多模块",
+    ),
+    "jar": (
+        "SINGLE_DEPLOYABLE_JAR",
+        "唯一可部署 Jar 的 groupId 为 `io.github.windyzhu3`，artifactId 为 `ontology-law-system`",
+    ),
+    "rootPackage": (
+        "IO_GITHUB_WINDYZHU3_ONTOLOGYLAW",
+        "唯一 Java 根包为 `io.github.windyzhu3.ontologylaw`；R1 只含 bootstrap、api、worker、audit、execution、identity、lead、opportunity、query、responsibility",
+    ),
+    "runtimeRole": (
+        "OLS_API_OR_WORKER",
+        "唯一键 `ols.runtime-role` 只接受单值 `api` 或 `worker`；缺失、未知、重复来源冲突或双 Context 均启动失败",
+    ),
+    "npmWorkspace": (
+        "ROOT_SINGLE_WORKBENCH",
+        "根 `package.json` 只声明一个 workspace `apps/workbench`；提交 npm lockfile；禁止第二个可部署前端 package",
+    ),
+    "workbench": (
+        "SINGLE_SPA_ROUTE_MODES",
+        "唯一 SPA 位于 `apps/workbench`；`/workbench` 与 `/admin/identity/*` 是同一制品的不同受保护 route mode",
+    ),
+    "openapi": (
+        "SINGLE_OPENAPI_DUAL_CODEGEN",
+        "唯一源为 `contracts/openapi/ontology-law-api.yaml`；后端生成到 `backend/target/generated-sources/openapi` 且不提交；前端提交 `apps/workbench/src/generated/api/schema.d.ts`；两端 `--check` 重生成必须零差异",
+    ),
+    "database": (
+        "PG18_13_SCHEMAS",
+        "一个 PostgreSQL 18 数据库和 13 个受管 Schema；应用运行角色不是 migration owner；API 和 Worker 不持有 migration owner 凭据",
+    ),
+    "migrations": (
+        "SINGLE_JAR_FLYWAY_SOURCE",
+        "唯一迁移源为 `database/schema-contract-52-plus-2/generated/db/migration`；构建只读映射到同一 Jar 的 `db/migration`；Jar 内字节清单必须与源 SHA-256 清单相同；禁止第二套手写迁移",
+    ),
+    "jooq": (
+        "V1_1_RECORDS_POJOS_ONLY",
+        "仅从已通过门禁的真实 `52-plus-2-v1.1` PostgreSQL 空库生成；提交 records、POJOs 与 `MANIFEST.sha256`；不生成 DAO、Active Record 或第二持久化模型",
+    ),
+    "checks": (
+        "BASELINE_SCHEMA_RUNTIME_SCAFFOLD",
+        "既有稳定名为 `verify-baseline`、`verify`、`runtime-postgresql-18`；后续脚手架新增唯一 always-run 聚合名 `scaffold-gate`；本 ADR 不伪称该 workflow 已存在",
+    ),
+    "toolchain": (
+        "EXACT_PINS_2026_09_02",
+        "Temurin `25.0.4.1+1`；Maven Wrapper `3.3.4`、Maven `3.9.16`、distribution SHA-256 `5af3b743dd8b876b5c45da33b676251e5f1687712644abb4ee519ca56e1d89ce`；CPython `3.12.14`；Node `24.20.0`、npm `11.9.0`；PostgreSQL `18@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280`；Flyway `13.4.0@sha256:c093a247b19ff09a6a72774569171ee355fff2ae44ceba4a4aa4b23235d99c93`",
+    ),
+}
 
 MARKDOWN_LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.*)$", re.MULTILINE)
@@ -215,7 +726,8 @@ REQUIRED_NONVISUAL_ROWS = {
     "BASE-CLOSURE-DESIGN": ("PR2", "FROZEN", CANONICAL_BASELINE_ID, "../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md"),
     "BASE-PR2-CLOSURE-PLAN": ("PR2", "FROZEN", "2026-08-28", "../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md"),
     "BASE-CURRENT-MVP": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
-    "R1-IMPLEMENTATION-PLAN": ("R1", "DRAFT", "2026-08-28", "../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md"),
+    "R1-IMPLEMENTATION-PLAN": ("R1", "FROZEN", "2026-08-28", "../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md"),
+    "R1-IMPLEMENTATION-CONTRACT": ("R1", "FROZEN", "r1-contract-v1", "../adr/ADR-0004-r1-scaffold-and-http-contract.md"),
     "DB-52P2-PG18-RUNTIME-PLAN": ("MVP", "DRAFT", "2026-08-28", "../superpowers/plans/2026-08-28-postgresql-runtime-verification-plan.md"),
 }
 R1_PRODUCTION_ROWS = {
@@ -393,6 +905,11 @@ def iter_controlled_markdown_paths(root: Path) -> list[Path]:
         CANONICAL_BASELINE,
         CLOSURE_SPEC,
         DELIVERY_LEDGER,
+        R1_PLAN,
+        R1_SCAFFOLD_ADR,
+        R1_TASK_CONTRACT,
+        R1_HTTP_CONTRACT,
+        R1_WORKBENCH_CONTRACT,
         *VISUAL_INDEXES,
     ):
         if (root / fixed_path).is_file():
@@ -874,6 +1391,420 @@ def is_markdown_delimiter_row(line: str, width: int) -> bool:
     return len(cells) == width and all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells)
 
 
+def parse_controlled_markdown_table(
+    text: str,
+    heading: str,
+    headers: tuple[str, ...],
+    label: str,
+    findings: list[str],
+) -> list[dict[str, str]] | None:
+    section = extract_markdown_section(text, heading)
+    if section is None:
+        findings.append(f"{label} missing section: {heading}")
+        return None
+    lines = active_markdown_text(section).splitlines()
+    intended = [
+        index
+        for index, line in enumerate(lines)
+        if line.strip().startswith("|")
+        and line.strip().endswith("|")
+        and tuple(cell.strip() for cell in line.strip().strip("|").split("|"))
+        == headers
+    ]
+    if len(intended) != 1:
+        findings.append(f"{label} must contain exactly one {heading} table")
+        return None
+    header_index = intended[0]
+    if header_index + 1 >= len(lines) or not is_markdown_delimiter_row(
+        lines[header_index + 1].strip(), len(headers)
+    ):
+        findings.append(f"{label} table delimiter is invalid: {heading}")
+        return None
+    rows: list[dict[str, str]] = []
+    row_index = header_index + 2
+    while (
+        row_index < len(lines)
+        and lines[row_index].strip().startswith("|")
+        and lines[row_index].strip().endswith("|")
+    ):
+        cells = [cell.strip() for cell in lines[row_index].strip().strip("|").split("|")]
+        if len(cells) != len(headers) or any(not cell for cell in cells):
+            findings.append(f"{label} row at line {row_index + 1} is incomplete: {heading}")
+            return None
+        rows.append(dict(zip(headers, cells, strict=True)))
+        row_index += 1
+    if not rows:
+        findings.append(f"{label} table has no rows: {heading}")
+        return None
+    return rows
+
+
+def unique_rows_by(
+    rows: list[dict[str, str]],
+    key: str,
+    label: str,
+    findings: list[str],
+) -> dict[str, dict[str, str]] | None:
+    indexed: dict[str, dict[str, str]] = {}
+    for row in rows:
+        value = row[key]
+        if value in indexed:
+            findings.append(f"{label} duplicate {key}: {value}")
+            return None
+        indexed[value] = row
+    return indexed
+
+
+def verify_r1_contracts(root: Path, findings: list[str]) -> None:
+    governed = {
+        R1_PLAN: read_text(root, R1_PLAN),
+        R1_SCAFFOLD_ADR: read_text(root, R1_SCAFFOLD_ADR),
+        R1_TASK_CONTRACT: read_text(root, R1_TASK_CONTRACT),
+        R1_HTTP_CONTRACT: read_text(root, R1_HTTP_CONTRACT),
+        R1_WORKBENCH_CONTRACT: read_text(root, R1_WORKBENCH_CONTRACT),
+    }
+    for path, text in governed.items():
+        if text is None:
+            findings.append(f"Missing frozen R1 contract: {path.as_posix()}")
+            return
+    plan_text = governed[R1_PLAN]
+    adr_text = governed[R1_SCAFFOLD_ADR]
+    task_text = governed[R1_TASK_CONTRACT]
+    http_text = governed[R1_HTTP_CONTRACT]
+    workbench_text = governed[R1_WORKBENCH_CONTRACT]
+    assert plan_text is not None
+    assert adr_text is not None
+    assert task_text is not None
+    assert http_text is not None
+    assert workbench_text is not None
+    if field_value(plan_text, "Status") != "FROZEN":
+        findings.append("R1 implementation plan must declare Status: FROZEN")
+        return
+    metadata = (
+        (task_text, "R1-TASK-COMPLETION-V1", "R1 task contract"),
+        (http_text, "R1-HTTP-V1", "R1 HTTP contract"),
+        (workbench_text, "R1-WORKBENCH-V1", "R1 workbench contract"),
+    )
+    for text, expected_id, label in metadata:
+        if field_value(text, "Contract ID") != expected_id or field_value(text, "Status") != "FROZEN":
+            findings.append(f"{label} must declare Contract ID {expected_id} and Status FROZEN")
+            return
+    if field_value(adr_text, "Contract ID") != "R1-SCAFFOLD-V1" or field_value(
+        adr_text, "Status"
+    ) != "Accepted":
+        findings.append("ADR-0004 must declare Contract ID R1-SCAFFOLD-V1 and Status Accepted")
+        return
+
+    task_headers = (
+        "TaskType",
+        "BusinessPurpose",
+        "SubjectSelector",
+        "OwnerAuthoritySlot",
+        "PrimaryCommand",
+        "PayloadSchema",
+        "CompletionFactType",
+        "CompletionBinding",
+        "NaturalIdempotencyKey",
+        "LockRoot",
+        "SLA",
+    )
+    task_rows = parse_controlled_markdown_table(
+        task_text, "Task registry", task_headers, "R1 task registry", findings
+    )
+    if task_rows is None:
+        return
+    tasks = unique_rows_by(task_rows, "TaskType", "R1 task registry", findings)
+    if tasks is None:
+        return
+    for task_type in sorted(R1_REQUIRED_TASK_TYPES - tasks.keys()):
+        findings.append(f"R1 task registry missing TaskType: {task_type}")
+        return
+    for task_type in sorted(tasks.keys() - R1_REQUIRED_TASK_TYPES):
+        findings.append(f"R1 task registry uses unknown TaskType: {task_type}")
+        return
+    commands: set[str] = set()
+    for task_type, row in tasks.items():
+        command = row["PrimaryCommand"]
+        if command in commands:
+            findings.append(f"R1 task registry duplicate PrimaryCommand: {command}")
+            return
+        commands.add(command)
+        if row["CompletionFactType"] in {"—", "-", "NONE"}:
+            findings.append(
+                f"R1 task registry TaskType {task_type} has no bound CompletionFactType"
+            )
+            return
+        if (command, row["CompletionFactType"]) != R1_TASK_CONTRACTS[task_type]:
+            findings.append(f"R1 task registry TaskType {task_type} differs from its frozen command/Fact binding")
+            return
+
+    branch_headers = (
+        "BranchID",
+        "TaskType",
+        "OutcomeCode",
+        "ReceiptResult",
+        "CompletionFactType",
+        "CompletionBinding",
+        "EventType",
+        "QueueOwner",
+        "AllowedSuccessorTaskTypes",
+        "SuccessorPolicy",
+        "SuccessorOwnerSlot",
+    )
+    branch_rows = parse_controlled_markdown_table(
+        task_text,
+        "Completion branches",
+        branch_headers,
+        "R1 completion branches",
+        findings,
+    )
+    if branch_rows is None:
+        return
+    branches = unique_rows_by(branch_rows, "BranchID", "R1 completion branch", findings)
+    if branches is None:
+        return
+    for branch_id in sorted(R1_REQUIRED_BRANCHES.keys() - branches.keys()):
+        findings.append(f"R1 completion branches missing BranchID: {branch_id}")
+        return
+    for branch_id in sorted(branches.keys() - R1_REQUIRED_BRANCHES.keys()):
+        findings.append(f"R1 completion branches use unknown BranchID: {branch_id}")
+        return
+    for branch_id, row in branches.items():
+        required_task, required_outcome = R1_REQUIRED_BRANCHES[branch_id]
+        if (row["TaskType"], row["OutcomeCode"]) != (required_task, required_outcome):
+            findings.append(f"R1 completion branch {branch_id} has inconsistent task or outcome")
+            return
+        if row["ReceiptResult"] not in R1_RECEIPT_RESULTS:
+            findings.append(
+                f"R1 completion branch {branch_id} uses unknown ReceiptResult: {row['ReceiptResult']}"
+            )
+            return
+        if row["CompletionFactType"] != tasks[required_task]["CompletionFactType"]:
+            findings.append(f"R1 completion branch {branch_id} is not bound to its Task completion Fact")
+            return
+        branch_detail = (
+            row["ReceiptResult"],
+            row["CompletionBinding"],
+            row["EventType"],
+            row["QueueOwner"],
+        )
+        if branch_detail != R1_BRANCH_DETAIL_CONTRACTS[branch_id]:
+            findings.append(
+                f"R1 completion branch {branch_id} differs from its frozen branch contract"
+            )
+            return
+        successor_contract = (
+            row["AllowedSuccessorTaskTypes"],
+            row["SuccessorPolicy"],
+            row["SuccessorOwnerSlot"],
+        )
+        if successor_contract != R1_SUCCESSOR_CONTRACTS[branch_id]:
+            findings.append(
+                f"R1 completion branch {branch_id} differs from its frozen successor contract"
+            )
+            return
+
+    e2e_headers = (
+        "ScenarioID",
+        "BranchID",
+        "FactDelta",
+        "TaskDelta",
+        "SuccessorDelta",
+        "ReceiptEventOutboxAudit",
+        "IsolationRollback",
+    )
+    e2e_rows = parse_controlled_markdown_table(
+        task_text, "E2E deltas", e2e_headers, "R1 E2E deltas", findings
+    )
+    if e2e_rows is None:
+        return
+    scenarios = unique_rows_by(e2e_rows, "ScenarioID", "R1 E2E scenario", findings)
+    if scenarios is None:
+        return
+    if set(scenarios) != set(R1_E2E_CONTRACTS):
+        findings.append("R1 E2E deltas must contain the exact frozen ScenarioID set")
+        return
+    for scenario_id, row in scenarios.items():
+        actual = (
+            row["BranchID"],
+            row["FactDelta"],
+            row["TaskDelta"],
+            row["SuccessorDelta"],
+            row["ReceiptEventOutboxAudit"],
+            row["IsolationRollback"],
+        )
+        if actual != R1_E2E_CONTRACTS[scenario_id]:
+            findings.append(
+                f"R1 E2E scenario differs from frozen delta contract: {scenario_id}"
+            )
+            return
+    e2e_branches = [row["BranchID"] for row in e2e_rows]
+    if set(e2e_branches) != set(branches):
+        findings.append("R1 E2E deltas must cover every completion BranchID")
+        return
+
+    operation_headers = (
+        "OperationId",
+        "Method",
+        "Path",
+        "TenantSource",
+        "IdempotencyKey",
+        "Preconditions",
+        "SubjectBinding",
+        "SuccessStatus",
+        "ErrorCodes",
+    )
+    operation_rows = parse_controlled_markdown_table(
+        http_text, "Operations", operation_headers, "R1 HTTP operations", findings
+    )
+    if operation_rows is None:
+        return
+    operations = unique_rows_by(operation_rows, "OperationId", "R1 HTTP operation", findings)
+    if operations is None:
+        return
+    if set(operations) != set(R1_OPERATION_CONTRACTS):
+        findings.append("R1 HTTP operations must contain the exact frozen OperationId set")
+        return
+    for operation_id, row in operations.items():
+        method, path, idempotency, preconditions, subject_binding, success_status = (
+            R1_OPERATION_CONTRACTS[operation_id]
+        )
+        if (
+            row["Method"],
+            row["Path"],
+            row["IdempotencyKey"],
+            row["Preconditions"],
+            row["SubjectBinding"],
+            row["SuccessStatus"],
+        ) != (method, path, idempotency, preconditions, subject_binding, success_status):
+            findings.append(f"R1 HTTP operation {operation_id} differs from its frozen contract")
+            return
+        if row["TenantSource"] != "ACTOR_CONTEXT":
+            findings.append(f"R1 HTTP operation {operation_id} must derive tenant from ACTOR_CONTEXT")
+            return
+
+    idempotency_headers = ("Property", "FrozenValue")
+    idempotency_rows = parse_controlled_markdown_table(
+        http_text,
+        "Idempotency binding",
+        idempotency_headers,
+        "R1 HTTP idempotency binding",
+        findings,
+    )
+    if idempotency_rows is None:
+        return
+    idempotency = unique_rows_by(
+        idempotency_rows, "Property", "R1 HTTP idempotency binding", findings
+    )
+    if idempotency is None:
+        return
+    if {key: row["FrozenValue"] for key, row in idempotency.items()} != R1_IDEMPOTENCY_BINDING:
+        findings.append(
+            "R1 HTTP idempotency binding differs from the frozen command slot contract"
+        )
+        return
+
+    error_headers = (
+        "ErrorCode",
+        "HttpStatus",
+        "RetryPolicy",
+        "FieldErrors",
+        "CurrentETag",
+        "SafeText",
+    )
+    error_rows = parse_controlled_markdown_table(
+        http_text, "Error registry", error_headers, "R1 HTTP error registry", findings
+    )
+    if error_rows is None:
+        return
+    errors = unique_rows_by(error_rows, "ErrorCode", "R1 HTTP error registry", findings)
+    if errors is None:
+        return
+    if set(errors) != set(R1_ERROR_CONTRACTS):
+        findings.append("R1 HTTP error registry must contain the exact frozen ErrorCode set")
+        return
+    for error_code, expected in R1_ERROR_CONTRACTS.items():
+        row = errors[error_code]
+        if (
+            row["HttpStatus"],
+            row["RetryPolicy"],
+            row["FieldErrors"],
+            row["CurrentETag"],
+        ) != expected:
+            findings.append(f"R1 HTTP error registry row differs from frozen contract: {error_code}")
+            return
+        if row["SafeText"] in {"—", "-", "NONE", "TBD"}:
+            findings.append(f"R1 HTTP error registry lacks safe text: {error_code}")
+            return
+    for operation_id, row in operations.items():
+        operation_errors = {code.strip() for code in row["ErrorCodes"].split(",")}
+        for error_code in operation_errors:
+            if error_code not in errors:
+                findings.append(
+                    f"R1 HTTP operation {operation_id} references unknown ErrorCode: {error_code}"
+                )
+                return
+        if operation_errors != R1_OPERATION_ERRORS[operation_id]:
+            findings.append(
+                f"R1 HTTP operation {operation_id} differs from its frozen ErrorCode set"
+            )
+            return
+    envelope_headers = ("Field", "Cardinality", "Contract")
+    envelope_rows = parse_controlled_markdown_table(
+        workbench_text,
+        "Envelope fields",
+        envelope_headers,
+        "R1 workbench envelope",
+        findings,
+    )
+    if envelope_rows is None:
+        return
+    envelope = unique_rows_by(envelope_rows, "Field", "R1 workbench envelope", findings)
+    if envelope is None or {key: row["Cardinality"] for key, row in envelope.items()} != R1_WORKBENCH_FIELDS:
+        if envelope is not None:
+            findings.append("R1 workbench envelope differs from the frozen field/cardinality set")
+        return
+    route_headers = ("RouteMode", "PathPattern", "Navigation", "Sidebar")
+    route_rows = parse_controlled_markdown_table(
+        workbench_text, "Route modes", route_headers, "R1 workbench routes", findings
+    )
+    if route_rows is None:
+        return
+    routes = unique_rows_by(route_rows, "RouteMode", "R1 workbench route", findings)
+    if routes is None:
+        return
+    route_values = {
+        key: (row["PathPattern"], row["Navigation"], row["Sidebar"])
+        for key, row in routes.items()
+    }
+    if route_values != R1_ROUTE_MODES:
+        findings.append("R1 workbench route modes differ from the frozen contract")
+        return
+
+    decision_headers = ("Decision", "FrozenCode", "FrozenValue")
+    decision_rows = parse_controlled_markdown_table(
+        adr_text, "Controlled decisions", decision_headers, "ADR-0004 decisions", findings
+    )
+    if decision_rows is None:
+        return
+    decisions = unique_rows_by(decision_rows, "Decision", "ADR-0004 decision", findings)
+    if decisions is None or set(decisions) != set(R1_SCAFFOLD_DECISIONS):
+        if decisions is not None:
+            findings.append("ADR-0004 must contain the exact controlled decision set")
+        return
+    for decision, row in decisions.items():
+        frozen_code, frozen_value = R1_SCAFFOLD_DECISIONS[decision]
+        if row["FrozenCode"] != frozen_code:
+            findings.append(f"ADR-0004 decision differs from frozen code: {decision}")
+            return
+        if row["FrozenValue"] != frozen_value:
+            findings.append(f"ADR-0004 decision differs from frozen value: {decision}")
+            return
+        if re.search(r"(?i)\b(?:TBD|TODO|latest|dynamic)\b", row["FrozenValue"]):
+            findings.append(f"ADR-0004 decision is not frozen: {decision}")
+            return
+
+
 def parse_delivery_ledger(ledger_text: str, findings: list[str]) -> list[dict[str, str]] | None:
     lines = active_markdown_text(ledger_text).splitlines()
     table_starts = [
@@ -961,8 +1892,12 @@ def component_root(root: Path, path: Path) -> str:
 
 
 def field_value(text: str, name: str) -> str | None:
-    match = re.search(rf"(?mi)^[ \t]*{re.escape(name)}[ \t]*:[ \t]*(\S[^\r\n]*)$", text)
-    return match.group(1).strip() if match else None
+    """Return one top-level Markdown metadata field, never nested/code content."""
+    matches = re.findall(
+        rf"(?mi)^{re.escape(name)}[ \t]*:[ \t]*(\S[^\r\n]*)$",
+        active_markdown_text(text),
+    )
+    return matches[0].strip() if len(matches) == 1 else None
 
 
 def controlled_evidence_records(root: Path, links: list[str]) -> list[Path]:
@@ -1447,6 +2382,7 @@ def _verify_repository_result_unchecked(root: Path) -> VerificationResult:
     verify_historical_specs(root, structural_findings)
     verify_waiting_contract(structural_findings, baseline_text)
     verify_matter_endpoint(structural_findings, baseline_text)
+    verify_r1_contracts(root, structural_findings)
     readiness_blockers = (
         verify_delivery_ledger(root, structural_findings) or []
     )
