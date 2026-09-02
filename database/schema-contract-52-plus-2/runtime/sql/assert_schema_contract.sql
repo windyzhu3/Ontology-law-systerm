@@ -269,8 +269,8 @@ BEGIN
     SELECT count(*) INTO actual_count
     FROM pg_catalog.unnest(capability_roles) AS capability(role_name)
     WHERE pg_catalog.has_function_privilege(
-        capability.role_name,
-        'platform_meta.fn_guard_lead_ingress_completion_slot()'::pg_catalog.regprocedure,
+        capability.role_name::pg_catalog.name,
+        'platform_meta.fn_guard_lead_ingress_completion_slot()'::pg_catalog.regprocedure::pg_catalog.oid,
         'EXECUTE'
     ) IS TRUE;
     IF actual_count <> 0 THEN

@@ -2055,6 +2055,22 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
 
         self.assertEqual(actual_count, 20)
 
+    def test_function_privilege_probe_binds_the_name_and_oid_overload(self) -> None:
+        """Break caught: a text role name leaves has_function_privilege unresolved on PostgreSQL 18."""
+        schema_contract = (
+            PROJECT_ROOT / "runtime" / "sql" / "assert_schema_contract.sql"
+        ).read_text(encoding="utf-8")
+
+        probe = re.search(
+            r"pg_catalog\.has_function_privilege\(\s*"
+            r"capability\.role_name::pg_catalog\.name,\s*"
+            r"'platform_meta\.fn_guard_lead_ingress_completion_slot\(\)'"
+            r"::pg_catalog\.regprocedure::pg_catalog\.oid,\s*'EXECUTE'\s*\)",
+            schema_contract,
+        )
+
+        self.assertIsNotNone(probe)
+
     def test_v1_1_manifest_cannot_overwrite_fixed_v1_publication(self) -> None:
         """Break caught: a v1.1 runtime result is published to the durable fixed v1 evidence pair."""
         from runtime import verify_runtime
