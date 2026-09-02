@@ -129,6 +129,77 @@ LEDGER_HEADERS = [
     "Superseded by",
 ]
 
+R1_TASK_ROWS = [
+    ("RESOLVE_LEAD_DUPLICATE", "RESOLVE_DUPLICATE_LEAD", "responsibility.decision_record"),
+    ("COMPLETE_LEAD_INGRESS", "COMPLETE_LEAD_INGRESS", "lead.lead"),
+    ("ASSIGN_LEAD", "ASSIGN_LEAD", "lead.lead_assignment"),
+    ("RESOLVE_LEAD_ROUTING_GAP", "RECORD_ROUTING_DISPOSITION", "responsibility.decision_record"),
+    ("ACK_SOURCE_INTAKE_STOP_REQUEST", "ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST", "responsibility.decision_record"),
+    ("CONTACT_LEAD", "RECORD_CONTACT_RESULT", "lead.lead_contact_result"),
+    ("REVIEW_LEAD_VALIDITY", "REVIEW_LEAD_VALIDITY", "responsibility.decision_record"),
+]
+
+R1_BRANCH_ROWS = [
+    ("P0_01_LINK_EXISTING", "RESOLVE_LEAD_DUPLICATE", "LINK_EXISTING_PARTY"),
+    ("P0_01_KEEP_SEPARATE", "RESOLVE_LEAD_DUPLICATE", "KEEP_SEPARATE"),
+    ("P0_02_COMPLETE", "COMPLETE_LEAD_INGRESS", "INGRESS_COMPLETED"),
+    ("P0_03_ASSIGN", "ASSIGN_LEAD", "ASSIGNED"),
+    ("P0_04_SCHEDULE_ROUTING_REVIEW", "RESOLVE_LEAD_ROUTING_GAP", "SCHEDULE_ROUTING_REVIEW"),
+    ("P0_04_RETRY_ASSIGNMENT_NOW", "RESOLVE_LEAD_ROUTING_GAP", "RETRY_ASSIGNMENT_NOW"),
+    ("P0_04_REQUEST_SOURCE_INTAKE_STOP", "RESOLVE_LEAD_ROUTING_GAP", "REQUEST_SOURCE_INTAKE_STOP"),
+    ("ACK_SOURCE_INTAKE_STOP_REQUEST", "ACK_SOURCE_INTAKE_STOP_REQUEST", "SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED"),
+    ("CONTACT_CONNECTED_VALID", "CONTACT_LEAD", "CONNECTED_VALID"),
+    ("CONTACT_NOT_CONNECTED_RETRY", "CONTACT_LEAD", "NOT_CONNECTED"),
+    ("CONTACT_NOT_CONNECTED_EXHAUSTED", "CONTACT_LEAD", "NOT_CONNECTED"),
+    ("CONTACT_SUSPECT_INVALID", "CONTACT_LEAD", "SUSPECT_INVALID"),
+    ("REVIEW_CONFIRM_INVALID", "REVIEW_LEAD_VALIDITY", "CONFIRM_INVALID"),
+    ("REVIEW_CLOSE_UNREACHED", "REVIEW_LEAD_VALIDITY", "CLOSE_UNREACHED"),
+    ("REVIEW_REOPEN_CONTACT", "REVIEW_LEAD_VALIDITY", "REOPEN_CONTACT"),
+]
+
+R1_SUCCESSOR_ROWS = {
+    "P0_01_LINK_EXISTING": ("COMPLETE_LEAD_INGRESS,ASSIGN_LEAD,CONTACT_LEAD,RESOLVE_LEAD_ROUTING_GAP", "R1_LEAD_NEXT_RESPONSIBILITY_V1", "POLICY_SELECTED"),
+    "P0_01_KEEP_SEPARATE": ("COMPLETE_LEAD_INGRESS,ASSIGN_LEAD,CONTACT_LEAD,RESOLVE_LEAD_ROUTING_GAP", "R1_LEAD_NEXT_RESPONSIBILITY_V1", "POLICY_SELECTED"),
+    "P0_02_COMPLETE": ("ASSIGN_LEAD,CONTACT_LEAD,RESOLVE_LEAD_ROUTING_GAP", "R1_LEAD_NEXT_RESPONSIBILITY_V1", "POLICY_SELECTED"),
+    "P0_03_ASSIGN": ("CONTACT_LEAD", "DIRECT", "ASSIGNMENT_OWNER"),
+    "P0_04_SCHEDULE_ROUTING_REVIEW": ("RESOLVE_LEAD_ROUTING_GAP", "NEXT_BUSINESS_WINDOW", "SAME_ROUTING_SUPERVISOR"),
+    "P0_04_RETRY_ASSIGNMENT_NOW": ("CONTACT_LEAD,RESOLVE_LEAD_ROUTING_GAP", "R1_ASSIGNMENT_RETRY_V1", "POLICY_SELECTED"),
+    "P0_04_REQUEST_SOURCE_INTAKE_STOP": ("ACK_SOURCE_INTAKE_STOP_REQUEST", "DIRECT", "SOURCE_INTAKE_OWNER"),
+    "ACK_SOURCE_INTAKE_STOP_REQUEST": ("NONE", "NONE", "NONE"),
+    "CONTACT_CONNECTED_VALID": ("NONE", "OPPORTUNITY_BOUNDARY_V1", "NONE"),
+    "CONTACT_NOT_CONNECTED_RETRY": ("CONTACT_LEAD", "CONTACT_RETRY_V1", "SAME_ASSIGNMENT_OWNER"),
+    "CONTACT_NOT_CONNECTED_EXHAUSTED": ("REVIEW_LEAD_VALIDITY", "CONTACT_RETRY_V1", "ROUTING_SUPERVISOR"),
+    "CONTACT_SUSPECT_INVALID": ("REVIEW_LEAD_VALIDITY", "DIRECT", "ROUTING_SUPERVISOR"),
+    "REVIEW_CONFIRM_INVALID": ("NONE", "NONE", "NONE"),
+    "REVIEW_CLOSE_UNREACHED": ("NONE", "NONE", "NONE"),
+    "REVIEW_REOPEN_CONTACT": ("CONTACT_LEAD", "DIRECT", "CURRENT_ASSIGNMENT_OWNER"),
+}
+
+R1_ERROR_CODES = [
+    ("VALIDATION_FAILED", "400", "SAME_KEY_AFTER_FIX", "REQUIRED", "NONE"),
+    ("IDEMPOTENCY_KEY_REQUIRED", "400", "SAME_KEY_AFTER_FIX", "NONE", "NONE"),
+    ("IDEMPOTENCY_KEY_INVALID", "400", "SAME_KEY_AFTER_FIX", "NONE", "NONE"),
+    ("UNAUTHENTICATED", "401", "SAME_KEY_AFTER_REAUTH", "NONE", "NONE"),
+    ("NOT_AUTHORIZED", "403", "NO", "NONE", "NONE"),
+    ("APPOINTMENT_INACTIVE", "403", "NO", "NONE", "NONE"),
+    ("NOT_FOUND", "404", "NO", "NONE", "NONE"),
+    ("COMMAND_PAYLOAD_CONFLICT", "409", "NO", "NONE", "NONE"),
+    ("TASK_NOT_OPEN", "409", "NO", "NONE", "TASK"),
+    ("TASK_ALREADY_COMPLETED", "409", "NO", "NONE", "TASK"),
+    ("DRAFT_DIGEST_MISMATCH", "409", "NEW_KEY_AFTER_REFRESH", "NONE", "DRAFT"),
+    ("INGRESS_COMPLETION_ALREADY_RECORDED", "409", "NO", "NONE", "SUBJECT"),
+    ("STALE_TASK", "412", "NEW_KEY_AFTER_REFRESH", "NONE", "TASK"),
+    ("STALE_DRAFT", "412", "NEW_KEY_AFTER_REFRESH", "NONE", "DRAFT"),
+    ("STALE_SUBJECT", "412", "NEW_KEY_AFTER_REFRESH", "NONE", "SUBJECT"),
+    ("SUPERVISOR_UNRESOLVED", "422", "NEW_KEY_AFTER_ADMIN_FIX", "NONE", "NONE"),
+    ("SOURCE_INTAKE_OWNER_UNRESOLVED", "422", "NEW_KEY_AFTER_ADMIN_FIX", "NONE", "NONE"),
+    ("DRAFT_PRECONDITION_REQUIRED", "428", "SAME_KEY_AFTER_FIX", "NONE", "DRAFT"),
+    ("TASK_PRECONDITION_REQUIRED", "428", "SAME_KEY_AFTER_FIX", "NONE", "TASK"),
+    ("RATE_LIMITED", "429", "SAME_KEY_AFTER_BACKOFF", "NONE", "NONE"),
+    ("INTERNAL_ERROR", "500", "SAME_KEY_AFTER_BACKOFF", "NONE", "NONE"),
+    ("SERVICE_UNAVAILABLE", "503", "SAME_KEY_AFTER_BACKOFF", "NONE", "NONE"),
+]
+
 
 def markdown_row(*cells: str) -> str:
     return "| " + " | ".join(cells) + " |"
@@ -176,6 +247,236 @@ def visual_assets() -> list[tuple[str, str]]:
 
 
 class VerifyBaselineTest(unittest.TestCase):
+    def write_r1_contract_fixture(self, root: Path) -> None:
+        task_header = (
+            "TaskType", "BusinessPurpose", "SubjectSelector", "OwnerAuthoritySlot",
+            "PrimaryCommand", "PayloadSchema", "CompletionFactType", "CompletionBinding",
+            "NaturalIdempotencyKey", "LockRoot", "SLA",
+        )
+        task_lines = [markdown_row(*task_header), markdown_row(*(["---"] * len(task_header)))]
+        completion_binding_by_fact = {
+            "lead.lead": "revision",
+            "lead.lead_assignment": "revision",
+            "lead.lead_contact_result": "hash",
+            "responsibility.decision_record": "hash",
+        }
+        for task_type, command, completion_fact in R1_TASK_ROWS:
+            task_lines.append(
+                markdown_row(
+                    task_type, task_type, "lead.lead@revision", "LEAD_INTAKE_OWNER",
+                    command, f"{command}_V1@1", completion_fact,
+                    completion_binding_by_fact[completion_fact],
+                    "tenant+operation+Idempotency-Key", "tenant+lead", "R1_TEST_V1@1s",
+                )
+            )
+
+        branch_header = (
+            "BranchID", "TaskType", "OutcomeCode", "ReceiptResult",
+            "CompletionFactType", "CompletionBinding", "EventType", "QueueOwner",
+            "AllowedSuccessorTaskTypes", "SuccessorPolicy", "SuccessorOwnerSlot",
+        )
+        task_fact = {task: fact for task, _, fact in R1_TASK_ROWS}
+        branch_lines = [
+            markdown_row(*branch_header),
+            markdown_row(*(["---"] * len(branch_header))),
+        ]
+        e2e_header = (
+            "ScenarioID", "BranchID", "FactDelta", "TaskDelta", "SuccessorDelta",
+            "ReceiptEventOutboxAudit", "IsolationRollback",
+        )
+        e2e_lines = [
+            markdown_row(*e2e_header),
+            markdown_row(*(["---"] * len(e2e_header))),
+        ]
+        for branch_id, task_type, outcome in R1_BRANCH_ROWS:
+            completion_fact = task_fact[task_type]
+            successor_types, successor_policy, successor_owner = R1_SUCCESSOR_ROWS[branch_id]
+            receipt_result, completion_binding, event_type, queue_owner = (
+                verify_baseline_module.R1_BRANCH_DETAIL_CONTRACTS[branch_id]
+            )
+            branch_lines.append(
+                markdown_row(
+                    branch_id, task_type, outcome, receipt_result, completion_fact,
+                    completion_binding, event_type, queue_owner,
+                    successor_types, successor_policy, successor_owner,
+                )
+            )
+        for scenario_id, row in verify_baseline_module.R1_E2E_CONTRACTS.items():
+            e2e_lines.append(
+                markdown_row(scenario_id, *row)
+            )
+        self.write(
+            root,
+            "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md",
+            "\n".join(
+                [
+                    "# R1 task completion matrix",
+                    "",
+                    "Contract ID: R1-TASK-COMPLETION-V1",
+                    "",
+                    "Status: FROZEN",
+                    "",
+                    "## Task registry",
+                    "",
+                    *task_lines,
+                    "",
+                    "## Completion branches",
+                    "",
+                    *branch_lines,
+                    "",
+                    "## E2E deltas",
+                    "",
+                    *e2e_lines,
+                    "",
+                ]
+            ),
+        )
+
+        error_header = (
+            "ErrorCode", "HttpStatus", "RetryPolicy", "FieldErrors", "CurrentETag", "SafeText",
+        )
+        error_lines = [
+            markdown_row(*error_header),
+            markdown_row(*(["---"] * len(error_header))),
+        ]
+        for code, status, retry, fields, etag in R1_ERROR_CODES:
+            error_lines.append(
+                markdown_row(code, status, retry, fields, etag, f"Safe {code.lower()} message")
+            )
+        operation_header = (
+            "OperationId", "Method", "Path", "TenantSource", "IdempotencyKey",
+            "Preconditions", "SubjectBinding", "SuccessStatus", "ErrorCodes",
+        )
+        operation_rows = [
+            ("captureLead", "POST", "/api/v1/leads", "ACTOR_CONTEXT", "REQUIRED", "NONE", "SOURCE_NATURAL_KEY", "201"),
+            ("getCurrentWorkCard", "GET", "/api/v1/workcards/current", "ACTOR_CONTEXT", "NONE", "OPTIONAL_WORKBENCH_ETAG", "ACTOR_SCOPE", "200/304"),
+            ("saveActionDraft", "PUT", "/api/v1/tasks/{taskId}/draft", "ACTOR_CONTEXT", "REQUIRED", "IF_NONE_MATCH_STAR_OR_DRAFT_ETAG", "TASK_AND_DRAFT", "200/201"),
+            ("resolveDuplicateLead", "POST", "/api/v1/tasks/{taskId}/commands/resolve-duplicate-lead", "ACTOR_CONTEXT", "REQUIRED", "TASK_ETAG", "TASK_AND_LEAD_REVISION", "200"),
+            ("completeLeadIngress", "POST", "/api/v1/tasks/{taskId}/commands/complete-lead-ingress", "ACTOR_CONTEXT", "REQUIRED", "TASK_ETAG", "TASK_AND_LEAD_REVISION", "200"),
+            ("assignLead", "POST", "/api/v1/tasks/{taskId}/commands/assign-lead", "ACTOR_CONTEXT", "REQUIRED", "TASK_ETAG", "TASK_LEAD_AND_ASSIGNMENT", "200"),
+            ("recordRoutingDisposition", "POST", "/api/v1/tasks/{taskId}/commands/record-routing-disposition", "ACTOR_CONTEXT", "REQUIRED", "TASK_ETAG", "TASK_AND_LEAD_REVISION", "200"),
+            ("acknowledgeSourceIntakeStopRequest", "POST", "/api/v1/tasks/{taskId}/commands/acknowledge-source-intake-stop-request", "ACTOR_CONTEXT", "REQUIRED", "TASK_ETAG", "TASK_AND_CAUSAL_DECISION", "200"),
+            ("recordContactResult", "POST", "/api/v1/tasks/{taskId}/commands/record-contact-result", "ACTOR_CONTEXT", "REQUIRED", "TASK_ETAG", "TASK_LEAD_AND_ASSIGNMENT", "200"),
+            ("reviewLeadValidity", "POST", "/api/v1/tasks/{taskId}/commands/review-lead-validity", "ACTOR_CONTEXT", "REQUIRED", "TASK_ETAG", "TASK_AND_CAUSAL_RESULT", "200"),
+            ("getCommandReceipt", "GET", "/api/v1/commands/{commandId}/receipt", "ACTOR_CONTEXT", "NONE", "NONE", "COMMAND_ID_AND_ACTOR_SCOPE", "200"),
+            ("reopenDueContactTasks", "POST", "/internal/v1/tasks/commands/reopen-due-contact-tasks", "ACTOR_CONTEXT", "REQUIRED", "NONE", "DUE_CUTOFF_AND_OWNER_QUEUE", "200"),
+        ]
+        operation_lines = [
+            markdown_row(*operation_header),
+            markdown_row(*(["---"] * len(operation_header))),
+        ]
+        for row in operation_rows:
+            errors = ",".join(sorted(verify_baseline_module.R1_OPERATION_ERRORS[row[0]]))
+            operation_lines.append(markdown_row(*row, errors))
+        idempotency_header = ("Property", "FrozenValue")
+        idempotency_lines = [
+            markdown_row(*idempotency_header),
+            markdown_row("---", "---"),
+            markdown_row("Header", "Idempotency-Key"),
+            markdown_row("ValueType", "UUID"),
+            markdown_row("SlotColumn", "execution.command_execution_slot.command_id"),
+            markdown_row("CommandId", "EXACT_CALLER_KEY"),
+            markdown_row("ReceiptId", "SERVER_UUIDV7"),
+            markdown_row("SlotScope", "TENANT_ENVELOPE_SUBJECT_SCOPE"),
+            markdown_row("PayloadConflict", "ORIGINAL_RECEIPT_NO_NEW_WRITES"),
+        ]
+        self.write(
+            root,
+            "docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md",
+            "\n".join(
+                [
+                    "# R1 HTTP error and precondition matrix",
+                    "",
+                    "Contract ID: R1-HTTP-V1",
+                    "",
+                    "Status: FROZEN",
+                    "",
+                    "## Operations",
+                    "",
+                    *operation_lines,
+                    "",
+                    "## Idempotency binding",
+                    "",
+                    *idempotency_lines,
+                    "",
+                    "## Error registry",
+                    "",
+                    *error_lines,
+                    "",
+                ]
+            ),
+        )
+
+        envelope_header = ("Field", "Cardinality", "Contract")
+        envelope_lines = [
+            markdown_row(*envelope_header),
+            markdown_row(*(["---"] * len(envelope_header))),
+            markdown_row("todaySummary", "1", "one safe sentence"),
+            markdown_row("currentCard", "0..1", "only full card"),
+            markdown_row("nextSummaries", "0..2", "summary only"),
+            markdown_row("waitingCount", "1", "nonnegative integer"),
+            markdown_row("chatComposer", "1", "fixed bottom candidate input"),
+        ]
+        route_header = ("RouteMode", "PathPattern", "Navigation", "Sidebar")
+        route_lines = [
+            markdown_row(*route_header),
+            markdown_row(*(["---"] * len(route_header))),
+            markdown_row("WORKBENCH", "/workbench", "NONE", "NONE"),
+            markdown_row("IDENTITY_ADMIN", "/admin/identity/*", "IDENTITY_ONLY", "LEFT"),
+        ]
+        self.write(
+            root,
+            "docs/contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md",
+            "\n".join(
+                [
+                    "# R1 workbench presentation contract",
+                    "",
+                    "Contract ID: R1-WORKBENCH-V1",
+                    "",
+                    "Status: FROZEN",
+                    "",
+                    "## Envelope fields",
+                    "",
+                    *envelope_lines,
+                    "",
+                    "## Route modes",
+                    "",
+                    *route_lines,
+                    "",
+                ]
+            ),
+        )
+
+        decision_header = ("Decision", "FrozenCode", "FrozenValue")
+        decisions = [
+            (decision, frozen_code, frozen_value)
+            for decision, (frozen_code, frozen_value) in
+            verify_baseline_module.R1_SCAFFOLD_DECISIONS.items()
+        ]
+        decision_lines = [
+            markdown_row(*decision_header),
+            markdown_row(*(["---"] * len(decision_header))),
+            *(markdown_row(*row) for row in decisions),
+        ]
+        self.write(
+            root,
+            "docs/adr/ADR-0004-r1-scaffold-and-http-contract.md",
+            "\n".join(
+                [
+                    "# ADR-0004 R1 scaffold and HTTP contract",
+                    "",
+                    "Status: Accepted",
+                    "",
+                    "Contract ID: R1-SCAFFOLD-V1",
+                    "",
+                    "## Controlled decisions",
+                    "",
+                    *decision_lines,
+                    "",
+                ]
+            ),
+        )
+
     def create_valid_repository(self, root: Path) -> None:
         self.write(
             root,
@@ -219,7 +520,12 @@ class VerifyBaselineTest(unittest.TestCase):
         self.write(root, "database/schema-contract-52-plus-2/generated/db/migration/V840__schema_contract_validation.sql", "-- migration\n")
         self.write(root, "database/schema-contract-52-plus-2/tests/test_generated_sql.py", "# generated SQL test\n")
         self.write(root, "docs/superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md", "# PR2 plan\n")
-        self.write(root, "docs/superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md", "# R1 plan\n")
+        self.write(
+            root,
+            "docs/superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md",
+            "# R1 plan\n\nStatus: FROZEN\n",
+        )
+        self.write_r1_contract_fixture(root)
         self.write(root, "docs/superpowers/plans/2026-08-28-postgresql-runtime-verification-plan.md", "# Runtime plan\n")
         self.write(root, "contracts/openapi/ontology-law-api.yaml", "openapi: 3.1.0\n")
         self.write(root, "contracts/openapi/tests/test_ontology_law_api.py", "# OpenAPI test\n")
@@ -266,7 +572,8 @@ class VerifyBaselineTest(unittest.TestCase):
             markdown_row("BASE-CLOSURE-DESIGN", "PR2", "Closure design", "Docs", "[Closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md)", "Product", CANONICAL_BASELINE_ID, "PR2 merge", "MERGED", "[confirmed closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md); `merge-commit=abcdef0`", "none", "—"),
             markdown_row("BASE-PR2-CLOSURE-PLAN", "PR2", "Closure plan", "Plan", "[PR2 plan](../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md)", "Product", "2026-08-28", "PR2 merge", "MERGED", "[plan](../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md); `merge-commit=abcdef0`", "none", "—"),
             markdown_row("BASE-CURRENT-MVP", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", CANONICAL_BASELINE_ID, "PR2 merge", "MERGED", "[closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md); `merge-commit=abcdef0`", "none", "—"),
-            markdown_row("R1-IMPLEMENTATION-PLAN", "R1", "Lead-contact plan", "Plan", "[R1 plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Engineering", "2026-08-28", "R1 implementation", "DRAFT", "[plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Plan is not production code", "—"),
+            markdown_row("R1-IMPLEMENTATION-PLAN", "R1", "Lead-contact plan", "Plan", "[R1 plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Engineering", "2026-08-28", "R1 implementation", "FROZEN", "[plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Production code is not yet implemented", "—"),
+            markdown_row("R1-IMPLEMENTATION-CONTRACT", "R1", "R1 scaffold, HTTP, task, and workbench contract", "Docs", "[ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)", "Engineering", "r1-contract-v1", "R1 implementation", "FROZEN", "[ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md); [task matrix](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md); [HTTP matrix](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md); [workbench contract](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)", "Production scaffold is not yet implemented", "—"),
             markdown_row("DB-52P2-PG18-RUNTIME-PLAN", "MVP", "PostgreSQL runtime plan", "Plan", "[runtime plan](../superpowers/plans/2026-08-28-postgresql-runtime-verification-plan.md)", "Database", "2026-08-28", "R1 implementation", "DRAFT", "[plan](../superpowers/plans/2026-08-28-postgresql-runtime-verification-plan.md)", "Plan is not runtime evidence", "—"),
             markdown_row("DB-52P2-PG18-RUNTIME", "MVP", "PostgreSQL 18 runtime verification", "Runtime", "[runtime verifier](../../database/schema-contract-52-plus-2/runtime/verify_runtime.py)", "Database", "pg18-52-plus-2-v1", "R2 entry", "RUNTIME_VERIFIED", "[runtime record](../evidence/ledger/db-runtime.md)", "none", "—"),
             markdown_row("R1-OPENAPI", "R1", "OpenAPI", "API", "[OpenAPI source](../../contracts/openapi/ontology-law-api.yaml)", "Engineering", "r1", "R2 entry", "IMPLEMENTED", "[structured record](../evidence/ledger/r1-openapi.md)", "none", "—"),
@@ -456,6 +763,32 @@ class VerifyBaselineTest(unittest.TestCase):
             ledger.write_text("\n".join(lines) + "\n", encoding="utf-8")
             return
         self.fail(f"Missing ledger fixture row: {row_id}")
+
+    def replace_contract_table_cell(
+        self,
+        root: Path,
+        relative_path: str,
+        row_id: str,
+        column: str,
+        value: str,
+    ) -> None:
+        contract = root / relative_path
+        lines = contract.read_text(encoding="utf-8").splitlines()
+        for index, line in enumerate(lines):
+            if not line.startswith(f"| {row_id} |"):
+                continue
+            cells = line.removeprefix("| ").removesuffix(" |").split(" | ")
+            table_header = next(
+                candidate.removeprefix("| ").removesuffix(" |").split(" | ")
+                for candidate in reversed(lines[:index])
+                if candidate.startswith("| ") and column in candidate
+            )
+            self.assertEqual(len(cells), len(table_header))
+            cells[table_header.index(column)] = value
+            lines[index] = markdown_row(*cells)
+            contract.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            return
+        self.fail(f"Missing contract fixture row: {row_id}")
 
     def assert_merged_evidence_cell_is_rejected(self, root: Path) -> None:
         findings = verify_repository(root)
@@ -1403,6 +1736,244 @@ class VerifyBaselineTest(unittest.TestCase):
                 "Current baseline must freeze Matter endpoint with same-transaction "
                 "MatterCreated, no second Matter identity, and no reverse rewrite of "
                 "sales history: docs/baseline/CURRENT-MVP-BASELINE.md",
+            )
+
+    def test_r1_task_registry_rejects_a_missing_required_row(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            contract = root / "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md"
+            lines = contract.read_text(encoding="utf-8").splitlines()
+            contract.write_text(
+                "\n".join(
+                    line for line in lines
+                    if not line.startswith("| CONTACT_LEAD |")
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 task registry missing TaskType: CONTACT_LEAD",
+            )
+
+    def test_r1_task_registry_rejects_a_duplicate_primary_command(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md",
+                "COMPLETE_LEAD_INGRESS",
+                "PrimaryCommand",
+                "RESOLVE_DUPLICATE_LEAD",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 task registry duplicate PrimaryCommand: RESOLVE_DUPLICATE_LEAD",
+            )
+
+    def test_r1_completion_branch_rejects_an_unknown_receipt_result(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md",
+                "CONTACT_CONNECTED_VALID",
+                "ReceiptResult",
+                "FAILED",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 completion branch CONTACT_CONNECTED_VALID uses unknown ReceiptResult: FAILED",
+            )
+
+    def test_r1_http_operation_rejects_an_unknown_error_code(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md",
+                "recordContactResult",
+                "ErrorCodes",
+                "VALIDATION_FAILED,UNKNOWN_ERROR",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 HTTP operation recordContactResult references unknown ErrorCode: UNKNOWN_ERROR",
+            )
+
+    def test_r1_task_registry_rejects_an_unbound_completion_fact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md",
+                "CONTACT_LEAD",
+                "CompletionFactType",
+                "—",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 task registry TaskType CONTACT_LEAD has no bound CompletionFactType",
+            )
+
+    def test_r1_e2e_allows_distinct_scenarios_for_one_completion_branch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            contract = root / "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md"
+            lines = contract.read_text(encoding="utf-8").splitlines()
+            retry_scenarios = [
+                line
+                for line in lines
+                if "| P0_04_RETRY_ASSIGNMENT_NOW |" in line
+                and line.startswith("| E2E_")
+            ]
+
+            self.assertEqual(len(retry_scenarios), 2)
+            self.assertEqual(verify_repository(root), [])
+
+    def test_r1_completion_branch_rejects_changed_successor_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md",
+                "P0_02_COMPLETE",
+                "SuccessorPolicy",
+                "NONE",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 completion branch P0_02_COMPLETE differs from its frozen successor contract",
+            )
+
+    def test_r1_idempotency_binding_rejects_opaque_value(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md",
+                "ValueType",
+                "FrozenValue",
+                "OPAQUE",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 HTTP idempotency binding differs from the frozen command slot contract",
+            )
+
+    def test_r1_http_operation_rejects_changed_subject_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md",
+                "captureLead",
+                "SubjectBinding",
+                "NONE",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 HTTP operation captureLead differs from its frozen contract",
+            )
+
+    def test_r1_plan_status_cannot_be_spoofed_from_a_code_fence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            plan = root / "docs/superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md"
+            plan.write_text(
+                "```text\nStatus: FROZEN\n```\n\nStatus: DRAFT\n",
+                encoding="utf-8",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 implementation plan must declare Status: FROZEN",
+            )
+
+    def test_r1_scaffold_decision_rejects_changed_frozen_code(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/adr/ADR-0004-r1-scaffold-and-http-contract.md",
+                "backendProject",
+                "FrozenCode",
+                "MULTI_MODULE_BACKEND",
+            )
+
+            self.assert_finding(
+                root,
+                "ADR-0004 decision differs from frozen code: backendProject",
+            )
+
+    def test_r1_completion_branch_rejects_changed_event_type(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md",
+                "P0_03_ASSIGN",
+                "EventType",
+                "WrongEventV1",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 completion branch P0_03_ASSIGN differs from its frozen branch contract",
+            )
+
+    def test_r1_e2e_rejects_changed_fact_delta(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md",
+                "E2E_P0_03",
+                "FactDelta",
+                "assignment:+0",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 E2E scenario differs from frozen delta contract: E2E_P0_03",
+            )
+
+    def test_r1_scaffold_decision_rejects_changed_frozen_value(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/adr/ADR-0004-r1-scaffold-and-http-contract.md",
+                "backendProject",
+                "FrozenValue",
+                "multiple Maven projects",
+            )
+
+            self.assert_finding(
+                root,
+                "ADR-0004 decision differs from frozen value: backendProject",
             )
 
     def test_ledger_rejects_unknown_delivery_state(self) -> None:

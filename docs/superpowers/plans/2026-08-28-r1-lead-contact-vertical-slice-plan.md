@@ -1,5 +1,11 @@
 # R1 Lead Contact Vertical Slice Implementation Plan
 
+Plan ID: R1-LEAD-CONTACT-V1
+
+Status: FROZEN
+
+确认日期：2026-09-02
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 以一份OpenAPI、一个响应式SPA和一个Spring Boot模块化单体制品，实现Lead接入、P0-01至P0-04入口处置、唯一分配、CONTACT_LEAD工作卡、ActionDraft、ContactResult、重试/无效复核及可恢复CommandReceipt的首个真实垂直切片。
@@ -10,6 +16,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md`
 
+**Frozen implementation contracts:** [ADR-0004](../../adr/ADR-0004-r1-scaffold-and-http-contract.md)、[Task completion matrix](../../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)、[HTTP/error/precondition matrix](../../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md)、[Workbench presentation contract](../../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)。本计划与这些合同冲突时，以合同中的受控表为准；修改必须显式修订合同和 baseline verifier。
+
 ## Global Constraints
 
 - 只有PR #2已合并且`DB-52P2-PG18-RUNTIME`达到`RUNTIME_VERIFIED`后，才从最新`main`创建`feat/r1-lead-contact-slice`。
@@ -18,7 +26,7 @@
 - 不引入JPA/Hibernate/Spring Data、H2、Kafka、Redis、BPMN、通用工作流、通用Job、EAV或运行时规则DSL。
 - R1不调用LLM；AI关闭时全部路径必须可完成。
 - 领域Fact是完成Task的唯一依据。ActionDraft确认、HTTP成功、用户点击、Audit、Event、Outbox或Receipt都不能替代完成Fact。
-- 所有UUID由服务端生成UUIDv7；所有时间以数据库`clock_timestamp()`或同事务可信时间写入；客户端不能生成或决定HMAC、领域摘要、密文、Owner或可信时间，只能原样回传服务器签发的ActionDraft digest或HTTP ETag用于并发校验。
+- 所有领域ID和Receipt ID由服务端生成UUIDv7；调用方提供的UUID `Idempotency-Key`是唯一例外，服务端原样保存为Command ID。所有时间以数据库`clock_timestamp()`或同事务可信时间写入；客户端不能生成或决定HMAC、领域摘要、密文、Owner或可信时间，只能原样回传服务器签发的ActionDraft digest或HTTP ETag用于并发校验。
 - 每个行为严格遵循RED→GREEN→REFACTOR；每个任务提交前运行其列出的测试。
 
 ---
@@ -144,7 +152,7 @@ python3 -m unittest tests.test_topology -v
 
 - [ ] `RuntimeRoleConfiguration`只接受`ols.runtime-role=api`或`worker`；API加载Controller/同步Query/Command入口，Worker只加载Outbox及内部定时调用器；二者共享同一编译制品但Bean集合互斥。
 
-- [ ] 创建npm workspace，只包含`apps/workbench`；所有依赖使用`--save-exact`并提交`package-lock.json`。禁止创建第二个前端package来模拟Admin/Customer。
+- [ ] 创建npm workspace，只包含`apps/workbench`；所有依赖使用`--save-exact`并提交`package-lock.json`。禁止创建第二个前端package来模拟身份管理或其他体验模式。
 
 - [ ] 运行拓扑、架构和空应用启动测试至通过。
 
@@ -167,6 +175,7 @@ git commit -m "build: scaffold single-artifact R1 topology"
 - Create: `contracts/openapi/examples/complete-lead-ingress.request.json`
 - Create: `contracts/openapi/examples/assign-lead.request.json`
 - Create: `contracts/openapi/examples/record-routing-disposition.request.json`
+- Create: `contracts/openapi/examples/acknowledge-source-intake-stop-request.request.json`
 - Create: `contracts/openapi/examples/record-contact-result.request.json`
 - Create: `contracts/openapi/examples/review-lead-validity.request.json`
 - Create: `contracts/openapi/examples/command-receipt.response.json`
@@ -178,7 +187,7 @@ git commit -m "build: scaffold single-artifact R1 topology"
 - Modify: `backend/pom.xml`
 - Modify: `apps/workbench/package.json`
 
-- [ ] 先写契约测试，要求唯一OpenAPI为3.1，所有写请求携带Bearer认证、`X-Tenant-Id`、UUID `X-Command-Id`、UUID `X-Correlation-Id`和准确`If-Match`；错误统一为RFC 9457 `application/problem+json`。
+- [ ] 先写契约测试，要求唯一OpenAPI为3.1；公共请求使用Bearer认证，Tenant只从服务端ActorContext取得；每个写操作按HTTP矩阵要求UUID `Idempotency-Key`和各自前置条件。错误统一为RFC 9457 `application/problem+json`，公共合同不得暴露调用方可指定的Tenant；幂等键是调用方可指定Command ID的唯一明确例外。
 
 - [ ] 冻结以下具名端点，禁止通用`POST /commands`或自由`actionCode`：
 
@@ -191,16 +200,17 @@ git commit -m "build: scaffold single-artifact R1 topology"
 | POST | `/api/v1/tasks/{taskId}/commands/complete-lead-ingress` | `completeLeadIngress` |
 | POST | `/api/v1/tasks/{taskId}/commands/assign-lead` | `assignLead` |
 | POST | `/api/v1/tasks/{taskId}/commands/record-routing-disposition` | `recordRoutingDisposition` |
+| POST | `/api/v1/tasks/{taskId}/commands/acknowledge-source-intake-stop-request` | `acknowledgeSourceIntakeStopRequest` |
 | POST | `/api/v1/tasks/{taskId}/commands/record-contact-result` | `recordContactResult` |
 | POST | `/api/v1/tasks/{taskId}/commands/review-lead-validity` | `reviewLeadValidity` |
 | GET | `/api/v1/commands/{commandId}/receipt` | `getCommandReceipt` |
 | POST | `/internal/v1/tasks/commands/reopen-due-contact-tasks` | `reopenDueContactTasks` |
 
-- [ ] `CurrentWorkCardEnvelope`固定包含零或一张完整`currentCard`、最多两条`nextSummaries`和`waitingCount`；卡片冻结taskId/revision、Subject选择器、Owner Appointment、businessPurpose、primaryCommand、expectedCompletionFact、SLA及版本化表单Schema。`currentCard.actionDraft`固定为null或当前Task唯一已授权草稿，字段恰为`draftId`、`draftRevision`、`actionCode`、`schemaVersion`、`values`、`digest`、`updatedAt`、`editable`；刷新恢复只通过`GET /api/v1/workcards/current`完成，不新增第二个Draft读取端点。
+- [ ] `CurrentWorkCardEnvelope`固定包含一句`todaySummary`、零或一张完整`currentCard`、最多两条`nextSummaries`、`waitingCount`和一个固定底部`chatComposer`；精确基数与路由模式由Workbench合同控制。卡片冻结taskId/revision、Subject选择器、Owner Appointment、businessPurpose、primaryCommand、expectedCompletionFact、SLA及版本化表单Schema。`currentCard.actionDraft`固定为null或当前Task唯一已授权草稿，字段恰为`draftId`、`draftRevision`、`actionCode`、`schemaVersion`、`values`、`digest`、`updatedAt`、`editable`；刷新恢复只通过`GET /api/v1/workcards/current`完成，不新增第二个Draft读取端点。
 
 - [ ] 命令结果码冻结为数据库现有枚举：ContactResult只允许`CONNECTED_VALID|NOT_CONNECTED|SUSPECT_INVALID`。P0-04 Decision只允许`SCHEDULE_ROUTING_REVIEW|RETRY_ASSIGNMENT_NOW|REQUEST_SOURCE_INTAKE_STOP`；最后一项只是请求，不证明来源已停用。
 
-- [ ] 固定安全错误码：`COMMAND_PAYLOAD_CONFLICT`、`STALE_SUBJECT`、`APPOINTMENT_INACTIVE`、`NOT_AUTHORIZED`、`TASK_NOT_OPEN`、`TASK_ALREADY_COMPLETED`、`DRAFT_DIGEST_MISMATCH`、`INGRESS_COMPLETION_ALREADY_RECORDED`、`NO_ASSIGNMENT_CANDIDATE`。
+- [ ] 实现HTTP矩阵的封闭错误注册表、per-operation引用、`currentETag`种类和重试策略。零分配候选是P0-04正常完成分支，必须创建`RESOLVE_LEAD_ROUTING_GAP`，不得建模为HTTP错误。
 
 - [ ] 配置OpenAPI Generator 7.25.0只生成Spring interface/model到`target/generated-sources/openapi`；前端使用`openapi-typescript@7.13.0`生成`schema.d.ts`，并以`openapi-fetch@0.17.0`调用。两端生成物必须可重复，不能手改。
 
@@ -225,10 +235,10 @@ git commit -m "feat(api): define R1 OpenAPI contract"
 
 - Create: `backend/src/test/java/io/github/windyzhu3/ontologylaw/testing/PostgresIntegrationTest.java`
 - Create: `backend/src/test/resources/db/bootstrap-runtime-logins.sql`
-- Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/shared/internal/persistence/CapabilityRoleExecutor.java`
-- Create: `backend/src/test/java/io/github/windyzhu3/ontologylaw/shared/internal/persistence/CapabilityRoleExecutorIT.java`
+- Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/execution/internal/persistence/CapabilityRoleExecutor.java`
+- Create: `backend/src/test/java/io/github/windyzhu3/ontologylaw/execution/internal/persistence/CapabilityRoleExecutorIT.java`
 - Create: `backend/scripts/generate-jooq.sh`
-- Generate: `backend/src/generated/jooq/io/github/windyzhu3/ontologylaw/shared/internal/persistence/jooq/`
+- Generate: `backend/src/generated/jooq/io/github/windyzhu3/ontologylaw/{identity,audit,execution,responsibility,lead,opportunity}/internal/persistence/jooq/`
 - Create: `backend/src/generated/jooq/MANIFEST.sha256`
 - Modify: `backend/pom.xml`
 
@@ -238,7 +248,7 @@ git commit -m "feat(api): define R1 OpenAPI contract"
 
 - [ ] 运行测试确认失败，然后实现最小role executor与测试数据源配置。
 
-- [ ] 使用已迁移PostgreSQL按Owner Schema生成jOOQ，并统一写入`backend/src/generated/jooq/io/github/windyzhu3/ontologylaw/shared/internal/persistence/jooq/`下的Schema子包；领域包不得依赖该根包。提交生成快照和`MANIFEST.sha256`，`generate-jooq.sh --check`重生成到临时目录并逐字节比较。R1不得生成DAO或Active Record。
+- [ ] 使用已迁移PostgreSQL只为R1实际访问的表生成jOOQ；每个生成的record/POJO写入对应Fact Owner的`internal.persistence.jooq`，禁止`shared`生成根和跨Owner引用。提交统一`MANIFEST.sha256`，`generate-jooq.sh --check`重生成到临时目录并逐字节比较。R1不得生成DAO或Active Record。
 
 - [ ] 运行实库、权限、jOOQ漂移与ArchUnit测试。
 
@@ -269,11 +279,11 @@ git commit -m "build: add PostgreSQL jOOQ integration base"
 - Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/identity/AuthorizationService.java`
 - Create: `backend/src/test/java/io/github/windyzhu3/ontologylaw/execution/CommandRuntimeIT.java`
 
-- [ ] 先写实库失败测试：同一slot键＋同payload返回原Receipt；同键异payload提交REJECTED Receipt并审计；成功事务同时存在Slot、Fact、Audit、Event、Owner Outbox、Receipt；Audit失败或Handler技术异常时全部回滚且不留Slot/Receipt。
+- [ ] 先写实库失败测试：同一slot键＋同payload返回原Receipt；同一Command UUID异payload或异Scope返回`COMMAND_PAYLOAD_CONFLICT`和原Receipt引用且所有新增delta为0；成功事务同时存在Slot、Fact、Audit、Event、Owner Outbox、Receipt；Audit失败或Handler技术异常时全部回滚且不留Slot/Receipt。
 
 - [ ] 测试授权在事务开始与提交前都加载准确Tenant/Principal/Appointment/组织Scope/authority path；Appointment撤销、Subject revision变化或存在DENY时拒绝。
 
-- [ ] 实现静态Handler注册表，不用反射扫描自由命令名。Payload使用RFC 8785规范化JSON摘要；Scope摘要覆盖Tenant、命令类型和准确Subject。
+- [ ] 实现静态Handler注册表，不用反射扫描自由命令名。Payload使用RFC 8785规范化JSON摘要；Scope摘要覆盖Tenant、命令类型和准确Subject。遵循`LEAD→TASK→COMMAND_SLOT`锁序，在Command阶段以Tenant＋Command UUID取得事务级advisory lock并拒绝同Tenant跨Scope复用，保证Receipt查询单义而不修改52＋2 Schema。
 
 - [ ] 成功分支、NO_CHANGE分支、REJECTED分支严格遵循运行时合同；连接中断、锁超时和SQL异常回滚，不伪造FAILED Receipt。
 
@@ -303,7 +313,7 @@ git commit -m "feat: implement atomic command runtime"
 
 - [ ] 先写失败测试覆盖来源幂等、业务疑似重复、缺联系方式、自动分配、人工分配、零候选、跨租户候选和并发双分配。
 
-- [ ] 冻结确定性分配：候选仅为同Tenant、ACTIVE Appointment、静态`SALES_CONTACT_OWNER`角色且授权实时有效者；按Appointment UUID排序后，用`SHA-256(tenantId || leadId)`前8字节无符号值取模。无候选时创建主管P0-04 Task，不伪造Assignment。需要人工模式由版本化`R1SourcePolicyRegistry`按sourceAccountCode静态选择，不建配置表。
+- [ ] 冻结确定性分配：版本化`R1SourcePolicyRegistry`按sourceAccountCode静态提供assignmentMode、有序routing organization root codes、主管root、来源接入root和IANA business timezone，不建配置表；policy priority是候选覆盖的首个有序root索引。候选严格消费Task矩阵的同Tenant、ACTIVE Appointment、`SALES_CONTACT_OWNER` AuthorityGrant和DENY规则，再按priority、appointment start、Appointment UUID升序选择第一项，不散列、不随机。无候选时以准确唯一主管创建P0-04 Task；主管为零个或多个时返回`SUPERVISOR_UNRESOLVED`且所有业务delta为0。
 
 - [ ] `captureLead`只接收明文输入到应用边界；服务端加密/HMAC并写不可变Lead。疑似重复创建`RESOLVE_LEAD_DUPLICATE`；缺联系方式创建`COMPLETE_LEAD_INGRESS`；人工模式创建`ASSIGN_LEAD`；其余路径原子创建LeadAssignment、更新current pointer并创建CONTACT_LEAD。
 
@@ -313,7 +323,7 @@ git commit -m "feat: implement atomic command runtime"
 
 - [ ] P0-03创建唯一OPEN LeadAssignment、回填Lead current pointer并创建CONTACT_LEAD；Owner不符合Appointment/授权时拒绝且无部分写入。
 
-- [ ] P0-04用`DecisionRecord(LEAD_ROUTING_DISPOSITION)`完成：`SCHEDULE_ROUTING_REVIEW`创建新同Owner Task并OPEN→WAITING＋WaitReceipt；`RETRY_ASSIGNMENT_NOW`重新运行当前候选政策；`REQUEST_SOURCE_INTAKE_STOP`只把当前Lead处置标记为已请求，不改写任何全局来源状态。
+- [ ] P0-04用`DecisionRecord(LEAD_ROUTING_DISPOSITION)`完成：`SCHEDULE_ROUTING_REVIEW`创建新同Owner Task并OPEN→WAITING＋WaitReceipt；`RETRY_ASSIGNMENT_NOW`只运行一次当前候选政策；`REQUEST_SOURCE_INTAKE_STOP`先按Source Policy来源接入root唯一解析ACTIVE且具备`SOURCE_INTAKE_REQUEST_ACK`、无DENY的Appointment，零个或多个返回`SOURCE_INTAKE_OWNER_UNRESOLVED`且全部delta为0。解析成功才创建`ACK_SOURCE_INTAKE_STOP_REQUEST`，不改写任何全局来源状态；后者由`ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST`和`DecisionRecord(SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED)`完成。
 
 - [ ] 运行四组实库测试及并发测试至通过。
 
@@ -336,7 +346,7 @@ git commit -m "feat: implement R1 lead intake responsibilities"
 - Create: `backend/src/test/java/io/github/windyzhu3/ontologylaw/query/CurrentWorkCardIT.java`
 - Create: `backend/src/test/java/io/github/windyzhu3/ontologylaw/responsibility/ActionDraftIT.java`
 
-- [ ] 先写失败测试：任一Appointment最多返回一张完整OPEN卡；排序固定为逾期、原始SLA截止、任务创建时间、UUID；另外只返回两条摘要和等待计数。WAITING/他人责任/未授权对象不能成为完整卡。
+- [ ] 先写失败测试：任一Appointment最多返回一张完整OPEN卡；排序固定为逾期、原始SLA截止、任务创建时间、UUID；envelope还必须有一句`todaySummary`、最多两条摘要、等待计数和固定`chatComposer`。WAITING/他人责任/未授权对象不能成为完整卡。
 
 - [ ] 测试一Task最多一份Draft；保存使用revision CAS；action/schema必须等于Task静态注册；确认时只能回传服务器签发的digest且必须匹配；`GET /api/v1/workcards/current`按冻结字段返回草稿供刷新恢复；确认后不可编辑；确认本身不完成Task。
 
@@ -367,9 +377,9 @@ git commit -m "feat: serve one current work card"
 
 - [ ] `CONNECTED_VALID`要求legalNeed并原子写ContactResult、唯一Opportunity锚点、Task DONE、Audit/Event/Outbox/Receipt。R1只产生`OpportunityOpened`边界，不创建无Handler的R2 Task，也不实现报价或实质商机推进。
 
-- [ ] `NOT_CONNECTED`原子完成当前Task并创建新CONTACT_LEAD Task：先OPEN revision=0，再同事务CAS到WAITING revision=1并追加WaitReceipt；静态`CONTACT_RETRY_V1`计算resumeDueAt。到期由内部具名命令WAITING→OPEN，不能直接插入WAITING。
+- [ ] `NOT_CONNECTED`严格消费`CONTACT_RETRY_V1`：初次计attempt 1、总次数最多3；attempt 1/2分别按Source Policy IANA时区与`CN_WEEKDAY_V1`下一工作日10:00/15:00恢复，due为恢复后30分钟，并优先切换到另一受控可用channel。可重试时原子完成当前Task并创建新CONTACT_LEAD Task：先OPEN revision=0，再同事务CAS到WAITING revision=1并追加WaitReceipt；attempt 3耗尽时不再创建联系重试，只创建主管复核。到期由内部具名命令WAITING→OPEN，不能直接插入WAITING。
 
-- [ ] `SUSPECT_INVALID`完成当前Task并创建主管`REVIEW_LEAD_VALIDITY` OPEN Task；复核用DecisionRecord完成，`CONFIRM_INVALID`结束，`REOPEN_CONTACT`创建新CONTACT_LEAD而不重开旧Task。
+- [ ] `SUSPECT_INVALID`或重试耗尽完成当前Task并创建主管`REVIEW_LEAD_VALIDITY` OPEN Task；复核用DecisionRecord完成，`CONFIRM_INVALID`和`CLOSE_UNREACHED`结束，`REOPEN_CONTACT`创建新CONTACT_LEAD而不重开旧Task。
 
 - [ ] 测试`WAITING→DONE`只能由准确冻结完成Fact触发；到期本身只恢复OPEN。等待客户、Provider或其他Owner不得把原人工Task挂WAITING。
 
@@ -427,9 +437,9 @@ git commit -m "feat: expose R1 API and worker roles"
 - Create: `apps/workbench/src/styles/workbench.css`
 - Create: `apps/workbench/src/test/setup.ts`
 
-- [ ] 先按P0-01至P0-04与基础首联视觉写Vitest/Testing Library失败测试：一张展开卡、一个绿色主按钮、选项只改变主命令参数、最多两条摘要、等待计数、刷新恢复Draft、提交未知时按CommandId恢复Receipt。
+- [ ] 先按P0-01至P0-04与基础首联视觉写Vitest/Testing Library失败测试：一句今日摘要、一张展开卡、一个绿色主按钮、选项只改变主命令参数、最多两条摘要、等待计数、固定Chat Composer、刷新恢复Draft、提交未知时按CommandId恢复Receipt。
 
-- [ ] 实现响应式工作台，使用暖白/石墨/翡翠绿/浅薄荷tokens；普通用户文案不得显示Task/Event/Decision/revision/hash/WAITING等内部术语。Admin/Customer只保留受保护路由壳，不创建独立应用或R1页面。
+- [ ] 实现响应式工作台，使用暖白/石墨/翡翠绿/浅薄荷tokens；DTO保留taskType/revision供合同与并发使用，但普通用户只看到本地化业务目的和安全版本状态，不渲染原始Task/Event/Decision/hash/WAITING代码。只保留受保护`IDENTITY_ADMIN` route mode壳，不创建Customer壳、独立应用或R1身份管理页面。
 
 - [ ] 对四类入口卡、CONTACT_LEAD、重试摘要和无效复核卡分别实现由OpenAPI discriminator驱动的固定表单；不接受服务器未注册的动态组件或任意Schema执行。
 
@@ -468,7 +478,7 @@ git commit -m "feat(web): implement the R1 workbench"
 
 - [ ] 黄金路径：Capture Lead→自动Assignment→CONTACT_LEAD CurrentCard→保存/刷新Draft→CONNECTED_VALID→ContactResult＋Opportunity＋Event/Audit/Receipt→Task DONE→按CommandId恢复相同Receipt。
 
-- [ ] 失败路径至少覆盖：来源幂等；P0-01两种决定；P0-02一次补全和二次覆盖拒绝；P0-03越权Owner；P0-04三种处置；同Command异payload；过期revision；Appointment提交前撤销；Audit插入失败全回滚；跨租户读写拒绝；浏览器双击；网络响应丢失后Receipt恢复。
+- [ ] 失败/分支路径逐行覆盖Task完成矩阵全部BranchID和E2E delta，包括来源幂等、P0-01两种决定、P0-02一次补全和二次覆盖拒绝、P0-03越权Owner、P0-04三种处置、来源停用请求ACK、联系重试/耗尽/疑似无效、主管三结果、同Command异payload/异Scope零新增、过期revision、Appointment提交前撤销、Audit插入失败全回滚、跨租户拒绝、浏览器双击及网络响应丢失后Receipt恢复。
 
 - [ ] 等待路径：NOT_CONNECTED创建新OPEN后同事务WAITING r1＋WaitReceipt；到期internal命令恢复OPEN；旧Task不重开；SUSPECT_INVALID创建主管Task并以DecisionRecord收口。
 
