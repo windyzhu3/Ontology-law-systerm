@@ -90,7 +90,27 @@ WITH catalog_lines(section_name, object_key, definition) AS (
     FROM catalog_lines
 )
 SELECT pg_catalog.json_build_object(
+    'contractRevision', (
+        SELECT revision
+        FROM platform_meta.deployment_state
+        WHERE deployment_state_key = 'PRIMARY'
+    ),
+    'contractVersion', (
+        SELECT schema_contract_version
+        FROM platform_meta.deployment_state
+        WHERE deployment_state_key = 'PRIMARY'
+    ),
     'fingerprint', pg_catalog.md5(serialized),
+    'maximumMigrationVersion', (
+        SELECT max(version::integer)
+        FROM platform_meta.flyway_schema_history
+        WHERE success AND version IS NOT NULL AND type = 'SQL'
+    ),
+    'migrationCount', (
+        SELECT count(*)
+        FROM platform_meta.flyway_schema_history
+        WHERE success AND version IS NOT NULL AND type = 'SQL'
+    ),
     'postgresVersion', pg_catalog.version(),
     'serverVersion', current_setting('server_version'),
     'status', 'PASSED'

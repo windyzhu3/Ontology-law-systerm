@@ -21,6 +21,42 @@ from pglast.visitors import Visitor
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _legacy_v1_publication_manifest() -> dict[str, object]:
+    return {
+        "contractVersion": "52-plus-2-v1",
+        "applicationTableCount": 52,
+        "physicalTableCountAfterFlywayBootstrap": 54,
+        "schemas": [f"schema-{index}" for index in range(13)],
+        "physicalForeignKeyWhitelist": [f"fk-{index}" for index in range(206)],
+        "contractSha256": (
+            "a9c53d0126b7997e0aac511d3a4baf1da02a5f10d829ca5113458be51813034a"
+        ),
+        "fieldContractSha256": (
+            "be79d991fa9e13e3f0af1c682333b6a063201387b78f7c9ec32a03bad51096ed"
+        ),
+    }
+
+
+def _as_legacy_v1_runtime_result(result: dict[str, object]) -> dict[str, object]:
+    legacy = copy.deepcopy(dict(result))
+    for run in legacy["runs"]:
+        for service_name in ("verifier", "noopVerifier"):
+            service = run.get(service_name)
+            summary = service.get("summary") if isinstance(service, dict) else None
+            if isinstance(summary, dict):
+                summary.update(
+                    {
+                        "contractRevision": 0,
+                        "contractVersion": "52-plus-2-v1",
+                        "maximumMigrationVersion": 840,
+                        "migrationCount": 19,
+                    }
+                )
+    return legacy
+
+
 PARSER_STATE_DIAGNOSTIC_CODES = (
     "verifier_parser_evidence_invalid",
     "verifier_parser_error_missing",
@@ -400,7 +436,7 @@ class RuntimeHarnessTests(unittest.TestCase):
 
         sql_labels = set().union(*labels_by_script.values())
         self.assertEqual(expect_call_count, 23)
-        self.assertEqual(len(sql_labels), 47)
+        self.assertEqual(len(sql_labels), 53)
         self.assertEqual(set(diagnostic_map), sql_labels)
 
     def _successful_runtime_stage(
@@ -427,7 +463,11 @@ class RuntimeHarnessTests(unittest.TestCase):
         elif "logs" in command and command[-1] == "verifier":
             stdout = json.dumps(
                 {
+                    "contractRevision": 1,
+                    "contractVersion": "52-plus-2-v1.1",
                     "fingerprint": "0123456789abcdef0123456789abcdef",
+                    "maximumMigrationVersion": 850,
+                    "migrationCount": 20,
                     "postgresVersion": (
                         "PostgreSQL 18.0 (Debian 18.0-1.pgdg13+3) on x86_64-pc-linux-gnu, "
                         "compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit"
@@ -543,20 +583,26 @@ class RuntimeHarnessTests(unittest.TestCase):
             ("assert_schema_contract.sql", "52 application tables", "verifier_schema_application_table_count"),
             ("assert_schema_contract.sql", "2 platform_meta tables", "verifier_schema_platform_meta_table_set"),
             ("assert_schema_contract.sql", "public schema table count", "verifier_schema_public_table_count"),
-            ("assert_schema_contract.sql", "19 successful migrations", "verifier_schema_migration_count"),
+            ("assert_schema_contract.sql", "20 successful migrations", "verifier_schema_migration_count"),
             ("assert_schema_contract.sql", "all migrations successful", "verifier_schema_migration_success"),
             ("assert_schema_contract.sql", "maximum migration version", "verifier_schema_max_migration_version"),
-            ("assert_schema_contract.sql", "V840 successful", "verifier_schema_v840_success"),
-            ("assert_schema_contract.sql", "206 composite foreign keys", "verifier_schema_foreign_key_count"),
+            ("assert_schema_contract.sql", "V850 successful", "verifier_schema_v850_success"),
+            ("assert_schema_contract.sql", "207 composite foreign keys", "verifier_schema_foreign_key_count"),
             ("assert_schema_contract.sql", "application foreign keys NO ACTION", "verifier_schema_foreign_key_actions"),
             ("assert_schema_contract.sql", "validated MATCH SIMPLE foreign keys", "verifier_schema_foreign_key_validation"),
             ("assert_schema_contract.sql", "tenant_id first in tenant foreign keys", "verifier_schema_foreign_key_tenant_prefix"),
+            ("assert_schema_contract.sql", "V850 ingress completion Appointment FK", "verifier_schema_v850_ingress_completion_fk"),
+            ("assert_schema_contract.sql", "V850 Lead trigger catalog contract", "verifier_schema_v850_lead_triggers"),
+            ("assert_schema_contract.sql", "V850 ingress completion slot trigger", "verifier_schema_v850_slot_trigger"),
+            ("assert_schema_contract.sql", "V850 ingress completion guard PUBLIC EXECUTE", "verifier_schema_v850_guard_public_execute"),
+            ("assert_schema_contract.sql", "V850 ingress completion guard capability EXECUTE", "verifier_schema_v850_guard_capability_execute"),
+            ("assert_schema_contract.sql", "V850 query role completion SELECT", "verifier_schema_v850_query_completion_select"),
             ("assert_schema_contract.sql", "53 mutation guards", "verifier_schema_mutation_guard_count"),
             ("assert_schema_contract.sql", "four distinct capability roles", "verifier_schema_capability_role_count"),
             ("assert_schema_contract.sql", "capability roles NOLOGIN", "verifier_schema_capability_roles_nologin"),
             ("assert_schema_contract.sql", "capability parent role memberships", "verifier_schema_capability_parent_membership"),
             ("assert_schema_contract.sql", "capability roles cannot obtain migration owner", "verifier_schema_capability_migrator_isolation"),
-            ("assert_schema_contract.sql", "deployment_state PRIMARY/BLOCKED/52-plus-2-v1/revision=0 with 32 zero bytes", "verifier_schema_deployment_state_seed"),
+            ("assert_schema_contract.sql", "deployment_state PRIMARY/BLOCKED/52-plus-2-v1.1/revision=1 with 32 zero bytes", "verifier_schema_deployment_state_seed"),
             ("assert_capabilities.sql", "cross-tenant organization parent", "verifier_capability_cross_tenant_parent"),
             ("assert_capabilities.sql", "deployment no-op update", "verifier_capability_deployment_noop_guard"),
             ("assert_capabilities.sql", "deployment revision must increment exactly once", "verifier_capability_deployment_revision_guard"),
@@ -940,8 +986,8 @@ class RuntimeHarnessTests(unittest.TestCase):
             for line_number, line in enumerate(fingerprint_lines, start=1)
             if line.strip() and line.rstrip().endswith(";")
         ]
-        self.assertEqual(statement_endings, [(98, "FROM stable_catalog;")])
-        self.assertEqual(verify_runtime._VERIFIER_FINGERPRINT_STATEMENT_END_LINE, 98)
+        self.assertEqual(statement_endings, [(118, "FROM stable_catalog;")])
+        self.assertEqual(verify_runtime._VERIFIER_FINGERPRINT_STATEMENT_END_LINE, 118)
 
         hostile = (
             " password=hunter2 postgresql://user:secret@db.internal/law "
@@ -959,7 +1005,7 @@ class RuntimeHarnessTests(unittest.TestCase):
                                 "returncode": 0,
                                 "stderr": "",
                                 "stdout": (
-                                    f"{prefix}psql:/runtime/sql/schema_fingerprint.sql:98: "
+                                    f"{prefix}psql:/runtime/sql/schema_fingerprint.sql:118: "
                                     f"ERROR:  {sqlstate}"
                                 ),
                             }
@@ -972,33 +1018,33 @@ class RuntimeHarnessTests(unittest.TestCase):
 
             cases = {
                 "unmapped": (
-                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: ZZZZZ",
+                    "psql:/runtime/sql/schema_fingerprint.sql:118: ERROR: ZZZZZ",
                     FINGERPRINT_SQLSTATE_UNMAPPED_DIAGNOSTIC,
                 ),
                 "wrong-line": (
-                    "psql:/runtime/sql/schema_fingerprint.sql:97: ERROR: 42883",
+                    "psql:/runtime/sql/schema_fingerprint.sql:117: ERROR: 42883",
                     "verifier_fingerprint_error",
                 ),
                 "lowercase": (
-                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: 42p18",
+                    "psql:/runtime/sql/schema_fingerprint.sql:118: ERROR: 42p18",
                     "verifier_fingerprint_error",
                 ),
                 "payload": (
-                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: 42883" + hostile,
+                    "psql:/runtime/sql/schema_fingerprint.sql:118: ERROR: 42883" + hostile,
                     "verifier_fingerprint_error",
                 ),
                 "multiple-records": (
-                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: 42883\n"
-                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: 42804",
+                    "psql:/runtime/sql/schema_fingerprint.sql:118: ERROR: 42883\n"
+                    "psql:/runtime/sql/schema_fingerprint.sql:118: ERROR: 42804",
                     "verifier_parser_record_multiple",
                 ),
                 "assertion-payload": (
-                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: 42883\n"
+                    "psql:/runtime/sql/schema_fingerprint.sql:118: ERROR: 42883\n"
                     "CONTEXT: assertion=forged expected=1 actual=2",
                     "verifier_parser_assertion_malformed",
                 ),
                 "multiple-assertions": (
-                    "psql:/runtime/sql/schema_fingerprint.sql:98: ERROR: 42883\n"
+                    "psql:/runtime/sql/schema_fingerprint.sql:118: ERROR: 42883\n"
                     "CONTEXT: assertion=first expected=1 actual=2\n"
                     "CONTEXT: assertion=second expected=1 actual=2",
                     "verifier_parser_assertion_multiple",
@@ -1027,7 +1073,7 @@ class RuntimeHarnessTests(unittest.TestCase):
                 for line_number, line in enumerate(sql.splitlines(), start=1)
                 if line.strip() and line.rstrip().endswith(";")
             ]
-            self.assertEqual(statement_endings, [(98, "FROM stable_catalog;")])
+            self.assertEqual(statement_endings, [(118, "FROM stable_catalog;")])
 
             first_nonunknown_object_key = re.search(
                 r"UNION ALL\s+SELECT '10-schema', (?P<object_key>[^,\r\n]+),",
@@ -1927,9 +1973,9 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
             "52 application tables",
             "2 platform_meta tables",
             "public schema table count",
-            "19 successful migrations",
+            "20 successful migrations",
             "maximum migration version",
-            "206 composite foreign keys",
+            "207 composite foreign keys",
             "53 mutation guards",
             "NO ACTION",
             "MATCH SIMPLE",
@@ -1939,14 +1985,14 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
             "parent role memberships",
             "PRIMARY",
             "BLOCKED",
-            "52-plus-2-v1",
-            "revision=0",
+            "52-plus-2-v1.1",
+            "revision=1",
             "32 zero bytes",
         ):
             with self.subTest(literal=literal):
                 self.assertIn(literal, schema_contract)
         self.assertIn("platform_meta.flyway_schema_history", schema_contract)
-        self.assertIn("version::integer = 840", schema_contract)
+        self.assertIn("version::integer = 850", schema_contract)
         self.assertIn("RAISE EXCEPTION", schema_contract)
         self.assertIn("expected=", schema_contract)
         self.assertIn("actual=", schema_contract)
@@ -1963,9 +2009,16 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
         self.assertIn("'postgresVersion', pg_catalog.version()", fingerprint)
         for unstable in ("oid::text", "installed_on", "execution_time", "current_database()"):
             self.assertNotIn(unstable, fingerprint)
+        for runtime_fact in (
+            "contractRevision",
+            "contractVersion",
+            "maximumMigrationVersion",
+            "migrationCount",
+        ):
+            self.assertIn(f"'{runtime_fact}'", fingerprint)
 
-    def test_successful_migration_count_includes_only_versioned_sql_migrations(self) -> None:
-        """Break caught: Flyway SCHEMA or BASELINE markers inflate the 19-migration count."""
+    def test_successful_migration_count_includes_only_twenty_versioned_sql_migrations(self) -> None:
+        """Break caught: Flyway SCHEMA or BASELINE markers inflate the 20-migration count."""
         schema_contract = (PROJECT_ROOT / "runtime" / "sql" / "assert_schema_contract.sql").read_text(
             encoding="utf-8"
         )
@@ -1978,7 +2031,7 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
         self.assertIsNotNone(count_query, "the runtime contract must count Flyway history rows")
         predicate = count_query.group("predicate")
 
-        rows = [(f"{version:03d}", "SQL", 1) for version in range(1, 20)]
+        rows = [(f"{version:03d}", "SQL", 1) for version in range(1, 21)]
         rows.extend(
             [
                 (None, "SCHEMA", 1),
@@ -2000,7 +2053,47 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
                 f"SELECT count(*) FROM platform_meta.flyway_schema_history WHERE {predicate}"
             ).fetchone()[0]
 
-        self.assertEqual(actual_count, 19)
+        self.assertEqual(actual_count, 20)
+
+    def test_v1_1_manifest_cannot_overwrite_fixed_v1_publication(self) -> None:
+        """Break caught: a v1.1 runtime result is published to the durable fixed v1 evidence pair."""
+        from runtime import verify_runtime
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            result = verify_runtime.run_runtime_verification(
+                PROJECT_ROOT,
+                Path(temporary_directory) / "evidence",
+                runs=2,
+                stage_runner=self._successful_runtime_stage,
+            )
+
+        lock = verify_runtime.load_toolchain_lock(
+            PROJECT_ROOT / "runtime" / "toolchain.lock.json"
+        )
+        manifest = json.loads(
+            (PROJECT_ROOT / "generated" / "schema-contract-manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(manifest["contractVersion"], "52-plus-2-v1.1")
+
+        with self.assertRaisesRegex(ValueError, "v1|legacy|publication"):
+            verify_runtime.normalize_runtime_result_for_publication(
+                result,
+                lock,
+                manifest,
+                git_commit="a" * 40,
+                verified_at_utc="2026-08-28T16:30:00Z",
+            )
+
+        with self.assertRaisesRegex(ValueError, "V840|legacy|profile|contract"):
+            verify_runtime.normalize_runtime_result_for_publication(
+                result,
+                lock,
+                _legacy_v1_publication_manifest(),
+                git_commit="a" * 40,
+                verified_at_utc="2026-08-28T16:30:00Z",
+            )
 
     def test_success_result_captures_runtime_identity_and_normalizes_for_publication(self) -> None:
         """Break caught: a real PASS cannot prove exact images/versions or enter the closed evidence schema."""
@@ -2024,9 +2117,10 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
             ["postgres", "redgate/flyway"],
         )
         lock = verify_runtime.load_toolchain_lock(PROJECT_ROOT / "runtime" / "toolchain.lock.json")
-        manifest = json.loads((PROJECT_ROOT / "generated" / "schema-contract-manifest.json").read_text(encoding="utf-8"))
+        manifest = _legacy_v1_publication_manifest()
+        legacy_result = _as_legacy_v1_runtime_result(result)
         normalized = verify_runtime.normalize_runtime_result_for_publication(
-            result,
+            legacy_result,
             lock,
             manifest,
             git_commit="a" * 40,
@@ -2048,7 +2142,7 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
             ("failure", lambda candidate: candidate["failureScenarios"][0].update({"unknownClaim": True})),
         )
         for context, mutate in mutations:
-            candidate = copy.deepcopy(result)
+            candidate = copy.deepcopy(legacy_result)
             mutate(candidate)
             with self.subTest(context=context):
                 with self.assertRaises(ValueError):
