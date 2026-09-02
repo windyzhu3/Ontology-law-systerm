@@ -2452,6 +2452,7 @@ def _manifest(
     schemas: Sequence[Schema],
     generated_artifact_hashes: dict[str, str],
     field_contract_sha256: str,
+    contract_version: str,
 ) -> dict:
     from .reference_registry import TYPED_REFERENCE_ALLOWED_TARGETS
 
@@ -2461,7 +2462,7 @@ def _manifest(
         for table in schema.tables
     ]
     manifest = {
-        "contractVersion": "52-plus-2-v1",
+        "contractVersion": contract_version,
         "applicationTableCount": len(application_tables),
         "selfManagedPlatformTableCount": 1,
         "flywayManagedTable": "platform_meta.flyway_schema_history",
@@ -2706,26 +2707,56 @@ def _manifest(
 
 
 def generate_all(root: Path) -> None:
-    schemas = _contract_schemas()
+    from .schema_contract import BASE_SCHEMAS, CONTRACT_VERSION, EVOLUTIONS, SCHEMAS
+
+    base_schemas = BASE_SCHEMAS
+    schemas = SCHEMAS
+    _validate_contract(base_schemas)
     _validate_contract(schemas)
     root.mkdir(parents=True, exist_ok=True)
     migration_dir = root / "db" / "migration"
     migration_dir.mkdir(parents=True, exist_ok=True)
 
-    platform = next(schema for schema in schemas if schema.name == "platform_meta")
-    application = tuple(schema for schema in schemas if schema.name != "platform_meta")
+    platform = next(
+        schema for schema in base_schemas if schema.name == "platform_meta"
+    )
+    application = tuple(
+        schema for schema in base_schemas if schema.name != "platform_meta"
+    )
 
     files = {
-        "V001__bootstrap_schemas.sql": _render_bootstrap(schemas),
+        "V001__bootstrap_schemas.sql": _render_bootstrap(base_schemas),
         "V002__deployment_state.sql": _render_deployment_state(platform),
-        "V800__cross_domain_foreign_keys.sql": _render_foreign_keys(schemas),
-        "V810__update_guards.sql": _render_update_guards(schemas),
-        "V820__indexes.sql": _render_indexes(schemas),
-        "V830__application_privileges.sql": _render_privileges(schemas),
-        "V840__schema_contract_validation.sql": _render_validation(schemas),
+        "V800__cross_domain_foreign_keys.sql": _render_foreign_keys(base_schemas),
+        "V810__update_guards.sql": _render_update_guards(base_schemas),
+        "V820__indexes.sql": _render_indexes(base_schemas),
+        "V830__application_privileges.sql": _render_privileges(base_schemas),
+        "V840__schema_contract_validation.sql": _render_validation(base_schemas),
     }
     for schema in application:
         files[DOMAIN_MIGRATIONS[schema.name]] = _render_domain(schema)
+
+    evolved_schemas = base_schemas
+    previous_version = 840
+    for evolution in EVOLUTIONS:
+        if evolution.version <= previous_version:
+            raise ValueError("Contract evolutions must be strictly ordered after V840")
+        expected_prefix = f"V{evolution.version:03d}__"
+        if not evolution.migration_name.startswith(expected_prefix):
+            raise ValueError(
+                f"Evolution V{evolution.version} has inconsistent migration name"
+            )
+        next_schemas = evolution.apply(evolved_schemas)
+        _validate_contract(next_schemas)
+        if evolution.migration_name in files:
+            raise ValueError(f"Duplicate migration name: {evolution.migration_name}")
+        files[evolution.migration_name] = evolution.render_sql(
+            evolved_schemas, next_schemas
+        )
+        evolved_schemas = next_schemas
+        previous_version = evolution.version
+    if evolved_schemas != schemas:
+        raise ValueError("Applied evolution chain differs from current schema contract")
 
     expected_paths = {migration_dir / name for name in files}
     for old in migration_dir.glob("*.sql"):
@@ -2746,6 +2777,7 @@ def generate_all(root: Path) -> None:
                 schemas,
                 artifact_hashes,
                 hashlib.sha256(field_contract.encode("utf-8")).hexdigest(),
+                CONTRACT_VERSION,
             ),
             ensure_ascii=False,
             indent=2,

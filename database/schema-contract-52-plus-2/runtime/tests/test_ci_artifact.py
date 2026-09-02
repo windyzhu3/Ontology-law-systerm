@@ -24,8 +24,14 @@ REPOSITORY_ROOT = PROJECT_ROOT.parents[1]
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "schema-contract-52-plus-2.yml"
 POSTGRES_DIGEST = "sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280"
 FLYWAY_DIGEST = "sha256:c093a247b19ff09a6a72774569171ee355fff2ae44ceba4a4aa4b23235d99c93"
-CONTRACT_DIGEST = "a9c53d0126b7997e0aac511d3a4baf1da02a5f10d829ca5113458be51813034a"
-FIELD_DIGEST = "be79d991fa9e13e3f0af1c682333b6a063201387b78f7c9ec32a03bad51096ed"
+CONTRACT_DIGEST = "0c04d48ddae6891b53fdacabdba34d1124e757b070a4c9018597e4e0a4674301"
+FIELD_DIGEST = "f4c17c4c0a8697820b30adb61b8cdb209666a4672393d4f8fc9d73a5f169addf"
+LEGACY_V1_CONTRACT_DIGEST = (
+    "a9c53d0126b7997e0aac511d3a4baf1da02a5f10d829ca5113458be51813034a"
+)
+LEGACY_V1_FIELD_DIGEST = (
+    "be79d991fa9e13e3f0af1c682333b6a063201387b78f7c9ec32a03bad51096ed"
+)
 
 TOP_LEVEL_FIELDS = {
     "schemaVersion",
@@ -149,7 +155,7 @@ def _stage(
     }
 
 
-def _passed_summary() -> dict[str, object]:
+def _current_v1_1_passed_summary() -> dict[str, object]:
     runs = [
         {
             "runId": "run-01",
@@ -177,7 +183,7 @@ def _passed_summary() -> dict[str, object]:
             }
         )
     return {
-        "schemaVersion": "postgresql-runtime-ci-artifact-v1",
+        "schemaVersion": "postgresql-runtime-ci-artifact-v1.1",
         "gitCommit": "c" * 40,
         "workflowOutcome": "PASSED",
         "reasonCode": "runtime_verified",
@@ -201,10 +207,10 @@ def _passed_summary() -> dict[str, object]:
         },
         "contractSummary": {
             "verified": True,
-            "migrationCount": 19,
+            "migrationCount": 20,
             "managedTableCount": 54,
             "managedSchemaCount": 13,
-            "physicalForeignKeyCount": 206,
+            "physicalForeignKeyCount": 207,
             "mutationGuardCount": 53,
             "contractSha256": CONTRACT_DIGEST,
             "fieldContractSha256": FIELD_DIGEST,
@@ -212,8 +218,29 @@ def _passed_summary() -> dict[str, object]:
     }
 
 
+def _legacy_v1_passed_summary() -> dict[str, object]:
+    summary = _current_v1_1_passed_summary()
+    summary["schemaVersion"] = "postgresql-runtime-ci-artifact-v1"
+    summary["contractSummary"] = {
+        "verified": True,
+        "migrationCount": 19,
+        "managedTableCount": 54,
+        "managedSchemaCount": 13,
+        "physicalForeignKeyCount": 206,
+        "mutationGuardCount": 53,
+        "contractSha256": LEGACY_V1_CONTRACT_DIGEST,
+        "fieldContractSha256": LEGACY_V1_FIELD_DIGEST,
+    }
+    return summary
+
+
+def _passed_summary() -> dict[str, object]:
+    """Retain the imported historical fixture used by hosted v1 promotion tests."""
+    return _legacy_v1_passed_summary()
+
+
 def _fingerprint_mismatch_summary() -> dict[str, object]:
-    summary = _passed_summary()
+    summary = _current_v1_1_passed_summary()
     summary["workflowOutcome"] = "FAILED"
     summary["reasonCode"] = "runtime_fingerprint_mismatch"
     summary["toolchain"]["postgresVersion"] = None
@@ -305,7 +332,7 @@ class CiArtifactTests(unittest.TestCase):
         """Break caught: the public exporter leaves schema openings or extra upload files."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             output_directory = Path(temporary_directory) / "schema-runtime-ci"
-            targets = self._export(_passed_summary(), output_directory)
+            targets = self._export(_current_v1_1_passed_summary(), output_directory)
 
             self.assertEqual(
                 [path.name for path in targets],
@@ -353,7 +380,7 @@ class CiArtifactTests(unittest.TestCase):
         for index, mutate in enumerate(mutations):
             with tempfile.TemporaryDirectory() as temporary_directory:
                 output_directory = Path(temporary_directory) / "schema-runtime-ci"
-                summary = _passed_summary()
+                summary = _current_v1_1_passed_summary()
                 mutate(summary)
                 with self.subTest(index=index):
                     with self.assertRaises(ValueError):
@@ -363,7 +390,7 @@ class CiArtifactTests(unittest.TestCase):
 
     def test_compose_up_failure_requires_an_executed_failed_run_stage(self) -> None:
         """Break caught: a claimed compose startup failure contains no observed runtime failure."""
-        summary = _passed_summary()
+        summary = _current_v1_1_passed_summary()
         summary.update(
             {
                 "workflowOutcome": "FAILED",
@@ -407,7 +434,7 @@ class CiArtifactTests(unittest.TestCase):
         safe_code = "verifier_fingerprint_sqlstate_undefined_function_operator"
 
         def verifier_failure_summary(stage_name: str = "verifier-wait") -> dict[str, object]:
-            summary = _passed_summary()
+            summary = _current_v1_1_passed_summary()
             summary.update(
                 {
                     "workflowOutcome": "FAILED",
@@ -550,7 +577,11 @@ class CiArtifactTests(unittest.TestCase):
                 {"postgresVersion": "18.0", "flywayVersion": "13.4.0"}
             ),
             lambda summary: summary.update(
-                {"contractSummary": copy.deepcopy(_passed_summary()["contractSummary"])}
+                {
+                    "contractSummary": copy.deepcopy(
+                        _current_v1_1_passed_summary()["contractSummary"]
+                    )
+                }
             ),
         )
         for index, mutate in enumerate(invalid_mutations):
@@ -563,20 +594,79 @@ class CiArtifactTests(unittest.TestCase):
     def test_verified_contract_counts_require_real_integers(self) -> None:
         """Break caught: JSON floats or booleans are accepted as immutable contract counts."""
         expected_counts = {
-            "migrationCount": 19,
+            "migrationCount": 20,
             "managedTableCount": 54,
             "managedSchemaCount": 13,
-            "physicalForeignKeyCount": 206,
+            "physicalForeignKeyCount": 207,
             "mutationGuardCount": 53,
         }
         for field, expected in expected_counts.items():
             for invalid in (float(expected), True):
                 with self.subTest(field=field, invalid=invalid):
-                    summary = _passed_summary()
+                    summary = _current_v1_1_passed_summary()
                     summary["contractSummary"][field] = invalid
                     with tempfile.TemporaryDirectory() as temporary_directory:
                         with self.assertRaises(ValueError):
                             self._export(summary, Path(temporary_directory) / "schema-runtime-ci")
+
+    def test_legacy_v1_profile_remains_valid_after_current_gate_advances(self) -> None:
+        """Break caught: current v1.1 facts make the durable v1 hosted artifact unverifiable."""
+        from runtime import verify_runtime
+
+        legacy = _legacy_v1_passed_summary()
+
+        validated = verify_runtime._validate_ci_runtime_summary(legacy)
+
+        self.assertEqual(validated, legacy)
+        self.assertEqual(validated["contractSummary"]["migrationCount"], 19)
+        self.assertEqual(validated["contractSummary"]["physicalForeignKeyCount"], 206)
+        changed = copy.deepcopy(legacy)
+        changed["contractSummary"]["migrationCount"] = 20
+        with self.assertRaises(ValueError):
+            verify_runtime._validate_ci_runtime_summary(changed)
+
+        legacy_with_current_digests = copy.deepcopy(legacy)
+        legacy_with_current_digests["contractSummary"]["contractSha256"] = CONTRACT_DIGEST
+        legacy_with_current_digests["contractSummary"]["fieldContractSha256"] = FIELD_DIGEST
+        with self.assertRaises(ValueError):
+            verify_runtime._validate_ci_runtime_summary(legacy_with_current_digests)
+
+        current_with_legacy_digests = _current_v1_1_passed_summary()
+        current_with_legacy_digests["contractSummary"][
+            "contractSha256"
+        ] = LEGACY_V1_CONTRACT_DIGEST
+        current_with_legacy_digests["contractSummary"][
+            "fieldContractSha256"
+        ] = LEGACY_V1_FIELD_DIGEST
+        with self.assertRaises(ValueError):
+            verify_runtime._validate_ci_runtime_summary(current_with_legacy_digests)
+
+    def test_legacy_publication_contract_rejects_manifest_profile_drift(self) -> None:
+        """Break caught: a v1-labelled manifest can redefine the legacy FK count or digests."""
+        from runtime import verify_runtime
+
+        manifest = {
+            "contractVersion": "52-plus-2-v1",
+            "applicationTableCount": 52,
+            "physicalTableCountAfterFlywayBootstrap": 54,
+            "schemas": [f"schema-{index}" for index in range(13)],
+            "physicalForeignKeyWhitelist": [f"fk-{index}" for index in range(207)],
+            "contractSha256": CONTRACT_DIGEST,
+            "fieldContractSha256": FIELD_DIGEST,
+        }
+        contract = {
+            "contractVersion": "52-plus-2-v1",
+            "migrationCount": 19,
+            "managedTableCount": 54,
+            "managedSchemaCount": 13,
+            "physicalForeignKeyCount": 207,
+            "mutationGuardCount": 53,
+            "contractSha256": CONTRACT_DIGEST,
+            "fieldContractSha256": FIELD_DIGEST,
+        }
+
+        with self.assertRaisesRegex(ValueError, "legacy|v1|manifest|profile"):
+            verify_runtime._validate_contract_summary(contract, manifest)
 
     def test_not_started_and_executed_stage_shapes_are_mutually_exclusive(self) -> None:
         """Break caught: null stages carry hashes or executed stages omit captured-byte hashes."""
@@ -612,7 +702,7 @@ class CiArtifactTests(unittest.TestCase):
         )
         for mutation in invalid_stages:
             with tempfile.TemporaryDirectory() as temporary_directory:
-                summary = _passed_summary()
+                summary = _current_v1_1_passed_summary()
                 summary["runs"][0]["stages"][0].update(mutation)
                 with self.subTest(mutation=mutation):
                     with self.assertRaises(ValueError):
@@ -627,7 +717,7 @@ class CiArtifactTests(unittest.TestCase):
             "postgresql://reviewer:uri-secret@db.internal/law",
             "RuntimeError: /private/tmp/exception-secret",
         )
-        summary = _passed_summary()
+        summary = _current_v1_1_passed_summary()
         encoded = "\n".join(secrets).encode("utf-8")
         summary["runs"][0]["stages"][0]["stdoutSha256"] = hashlib.sha256(encoded).hexdigest()
         summary["runs"][0]["stages"][0]["stderrSha256"] = hashlib.sha256(encoded[::-1]).hexdigest()
@@ -655,7 +745,10 @@ class CiArtifactTests(unittest.TestCase):
     def test_markdown_is_rendered_from_validated_safe_fields_only(self) -> None:
         """Break caught: Markdown accepts a free-form message or source absent from validated JSON."""
         with tempfile.TemporaryDirectory() as temporary_directory:
-            targets = self._export(_passed_summary(), Path(temporary_directory) / "schema-runtime-ci")
+            targets = self._export(
+                _current_v1_1_passed_summary(),
+                Path(temporary_directory) / "schema-runtime-ci",
+            )
             summary = json.loads(targets[0].read_text(encoding="utf-8"))
             markdown = targets[1].read_text(encoding="utf-8")
 
@@ -672,7 +765,7 @@ class CiArtifactTests(unittest.TestCase):
         self.assertNotIn("/tmp", markdown)
 
         renderer = self._public("render_ci_job_summary")
-        mutated = _passed_summary()
+        mutated = _current_v1_1_passed_summary()
         mutated["reasonCode"] = "exception text: /tmp/private-secret"
         with self.assertRaises(ValueError):
             renderer(mutated)
@@ -818,9 +911,9 @@ class CiArtifactTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             output_directory = root / "schema-runtime-ci"
-            old_targets = self._export(_passed_summary(), output_directory)
+            old_targets = self._export(_current_v1_1_passed_summary(), output_directory)
             self.assertTrue(all(path.is_file() for path in old_targets))
-            replacement = copy.deepcopy(_passed_summary())
+            replacement = copy.deepcopy(_current_v1_1_passed_summary())
             replacement["gitCommit"] = "f" * 40
             real_replace = os.replace
 
@@ -856,7 +949,7 @@ class CiArtifactTests(unittest.TestCase):
             root = Path(temporary_directory)
             too_long = root / ("x" * 300)
             with self.assertRaises(ValueError):
-                self._export(_passed_summary(), too_long)
+                self._export(_current_v1_1_passed_summary(), too_long)
             self.assertEqual(list(root.iterdir()), [])
 
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -866,7 +959,7 @@ class CiArtifactTests(unittest.TestCase):
             output_directory = root / "schema-runtime-ci"
             output_directory.symlink_to(outside, target_is_directory=True)
             with self.assertRaises(ValueError):
-                self._export(_passed_summary(), output_directory)
+                self._export(_current_v1_1_passed_summary(), output_directory)
             self.assertEqual(list(outside.iterdir()), [])
             self.assertFalse(output_directory.exists())
 
@@ -877,7 +970,7 @@ class CiArtifactTests(unittest.TestCase):
             loop_a.symlink_to(loop_b)
             loop_b.symlink_to(loop_a)
             with self.assertRaises(ValueError):
-                self._export(_passed_summary(), loop_a)
+                self._export(_current_v1_1_passed_summary(), loop_a)
             self.assertFalse(loop_a.is_symlink())
             self.assertTrue(loop_b.is_symlink())
 
@@ -906,7 +999,7 @@ class CiArtifactTests(unittest.TestCase):
                         (output_directory / "raw.log").write_text("secret\n", encoding="utf-8")
                 with self.subTest(shape=shape):
                     with self.assertRaises(ValueError):
-                        self._export(_passed_summary(), output_directory)
+                        self._export(_current_v1_1_passed_summary(), output_directory)
                     self.assertFalse(output_directory.exists())
                     self._assert_no_transaction_residue(root)
 
@@ -919,7 +1012,7 @@ class CiArtifactTests(unittest.TestCase):
             os.link(outside, output_directory / "ci-runtime-summary.json")
             (output_directory / "ci-job-summary.md").write_text("old\n", encoding="utf-8")
             with self.assertRaises(ValueError):
-                self._export(_passed_summary(), output_directory)
+                self._export(_current_v1_1_passed_summary(), output_directory)
             self.assertFalse(output_directory.exists())
             self.assertEqual(outside.read_text(encoding="utf-8"), "do not overwrite\n")
             self._assert_no_transaction_residue(root)
@@ -929,8 +1022,8 @@ class CiArtifactTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             output_directory = root / "schema-runtime-ci"
-            self._export(_passed_summary(), output_directory)
-            invalid = _passed_summary()
+            self._export(_current_v1_1_passed_summary(), output_directory)
+            invalid = _current_v1_1_passed_summary()
             invalid["reasonCode"] = "exception: secret text"
             with self.assertRaises(ValueError):
                 self._export(invalid, output_directory)
@@ -1287,10 +1380,11 @@ class HostedCiOnlyVerificationTests(unittest.TestCase):
         (generated_directory / "schema-contract-manifest.json").write_text(
             json.dumps(
                 {
+                    "contractVersion": "52-plus-2-v1.1",
                     "applicationTableCount": 52,
                     "physicalTableCountAfterFlywayBootstrap": 54,
                     "schemas": [f"schema-{index}" for index in range(13)],
-                    "physicalForeignKeyWhitelist": [f"fk-{index}" for index in range(206)],
+                    "physicalForeignKeyWhitelist": [f"fk-{index}" for index in range(207)],
                     "contractSha256": CONTRACT_DIGEST,
                     "fieldContractSha256": FIELD_DIGEST,
                 },
@@ -1349,7 +1443,11 @@ class HostedCiOnlyVerificationTests(unittest.TestCase):
 
         def summary(value: str) -> dict[str, object]:
             return {
+                "contractRevision": 1,
+                "contractVersion": "52-plus-2-v1.1",
                 "fingerprint": value,
+                "maximumMigrationVersion": 850,
+                "migrationCount": 20,
                 "postgresVersion": postgres_version,
                 "serverVersion": "18.0 fixture",
                 "status": "PASSED",
@@ -2092,6 +2190,37 @@ class HostedCiOnlyVerificationTests(unittest.TestCase):
                 schema_root=schema_root,
                 runtime_runner=failing_runner,
             )
+
+    def test_default_v1_1_verify_keeps_current_artifact_without_legacy_publication(self) -> None:
+        """Break caught: a successful v1.1 local gate fails while trying to overwrite fixed v1 evidence."""
+        from runtime import verify_runtime
+
+        repository, schema_root, _ = self._repository()
+
+        def passed_runner(_schema_root, output_directory, *, runs):
+            self.assertEqual(runs, 2)
+            output_directory.mkdir(parents=True, exist_ok=True)
+            return self._passed_runtime_result()
+
+        exit_code, stdout, stderr = self._capture_main(
+            verify_runtime,
+            ["verify", "--runs", "2", "--evidence-dir", ".artifacts/schema-runtime"],
+            repository_root=repository,
+            schema_root=schema_root,
+            runtime_runner=passed_runner,
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr, "")
+        self.assertEqual(json.loads(stdout)["status"], "PASSED")
+        safe_directory = repository / ".artifacts" / "schema-runtime-ci"
+        validated = verify_runtime.validate_ci_runtime_artifact(safe_directory)
+        self.assertEqual(validated["schemaVersion"], "postgresql-runtime-ci-artifact-v1.1")
+        self.assertEqual(validated["contractSummary"]["migrationCount"], 20)
+        self.assertEqual(validated["contractSummary"]["physicalForeignKeyCount"], 207)
+        self.assertTrue(
+            all(not path.exists() for path in verify_runtime.fixed_publication_targets(repository))
+        )
 
     def test_ci_only_passed_verify_keeps_safe_pair_without_fixed_docs_and_standalone_validation(self) -> None:
         """Break caught: hosted success publishes docs, invalidates its pair, or leaves no uploadable artifact."""

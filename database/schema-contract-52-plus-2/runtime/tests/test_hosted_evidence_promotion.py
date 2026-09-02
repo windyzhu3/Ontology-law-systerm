@@ -35,9 +35,27 @@ class HostedEvidencePromotionTests(unittest.TestCase):
         evidence_directory = repository / "docs/evidence/schema-runtime"
         migration_directory.mkdir(parents=True)
         evidence_directory.mkdir(parents=True)
-        field_contract = b"fixture field contract\n"
-        field_digest = hashlib.sha256(field_contract).hexdigest()
-        contract_digest = "c" * 64
+        legacy_profile = verify_runtime._CI_CONTRACT_PROFILES[
+            "postgresql-runtime-ci-artifact-v1"
+        ]
+        contract_digest = legacy_profile["contractSha256"]
+        field_digest = legacy_profile["fieldContractSha256"]
+        source_repository = Path(__file__).resolve().parents[4]
+        field_contract = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(source_repository),
+                "show",
+                (
+                    f"{verify_runtime._CLOSED_HOSTED_PROMOTION.head_commit}:"
+                    "database/schema-contract-52-plus-2/generated/field-contract.md"
+                ),
+            ],
+            check=True,
+            capture_output=True,
+        ).stdout
+        self.assertEqual(hashlib.sha256(field_contract).hexdigest(), field_digest)
         (repository / ".gitignore").write_text("/source-artifact.zip\n", encoding="utf-8")
         (schema / "generated/field-contract.md").write_bytes(field_contract)
         (schema / "generated/schema-contract-manifest.json").write_text(
@@ -95,8 +113,6 @@ class HostedEvidencePromotionTests(unittest.TestCase):
             self.fail(f"unsupported test merge mode: {test_merge_mode}")
         summary = _passed_summary()
         summary["gitCommit"] = test_merge
-        summary["contractSummary"]["contractSha256"] = contract_digest
-        summary["contractSummary"]["fieldContractSha256"] = field_digest
         pair_directory = repository / "pair"
         verify_runtime.export_ci_runtime_artifact(summary, pair_directory)
         artifact = repository / "source-artifact.zip"

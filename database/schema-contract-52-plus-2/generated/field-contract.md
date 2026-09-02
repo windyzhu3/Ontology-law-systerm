@@ -1249,7 +1249,8 @@ Lead接入事实：一行代表渠道一次不可覆盖的原始接入，由销�
 - Fact Owner：`LeadRuntime`
 - 更新策略：`CONTROLLED`
 - 主键：`(tenant_id, lead_id)`
-- 允许更新字段：`parsed_party_id, party_resolution_code, disposition_code, current_assignment_id, revision`
+- 允许更新字段：`parsed_party_id, party_resolution_code, disposition_code, current_assignment_id, revision, ingress_completion_phone_ciphertext, ingress_completion_phone_hmac, ingress_completion_email_ciphertext, ingress_completion_email_hmac, ingress_completion_source_code, ingress_completion_source_summary_ciphertext, ingress_completed_by_appointment_id, ingress_completed_at, ingress_completion_digest`
+- Write-once字段：`ingress_completion_phone_ciphertext, ingress_completion_phone_hmac, ingress_completion_email_ciphertext, ingress_completion_email_hmac, ingress_completion_source_code, ingress_completion_source_summary_ciphertext, ingress_completed_by_appointment_id, ingress_completed_at, ingress_completion_digest`
 
 | 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
 |---|---|---:|---|---|
@@ -1276,6 +1277,15 @@ Lead接入事实：一行代表渠道一次不可覆盖的原始接入，由销�
 | `current_assignment_id` | `uuid` | 是 | `—` | 当前Assignment标识：为空表示尚未分派；只作为当前指针受控更新，历史由LeadAssignment链保留。 |
 | `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
 | `created_at` | `timestamptz(6)` | 否 | `—` | 创建时间：该Lead首次持久化的带时区微秒精度时间，永久冻结。 |
+| `ingress_completion_phone_ciphertext` | `bytea` | 是 | `—` | 补全电话密文：仅在原始电话与邮箱均缺失时由完成接入命令一次写入；缺失时为空。 |
+| `ingress_completion_phone_hmac` | `bytea` | 是 | `—` | 补全电话HMAC：与补全电话密文配对的32字节受控精确匹配值；缺失时为空。 |
+| `ingress_completion_email_ciphertext` | `bytea` | 是 | `—` | 补全邮箱密文：仅在原始电话与邮箱均缺失时由完成接入命令一次写入；缺失时为空。 |
+| `ingress_completion_email_hmac` | `bytea` | 是 | `—` | 补全邮箱HMAC：与补全邮箱密文配对的32字节受控精确匹配值；缺失时为空。 |
+| `ingress_completion_source_code` | `varchar(64)` | 是 | `—` | 补全来源代码：标识静态注册的补全来源类型，不保存凭据或自由文本。 |
+| `ingress_completion_source_summary_ciphertext` | `bytea` | 是 | `—` | 补全来源说明密文：保存最小必要的受保护来源说明，不写入审计摘要或事件载荷。 |
+| `ingress_completed_by_appointment_id` | `uuid` | 是 | `—` | 补全执行任命：指向同租户执行完成接入命令的准确Appointment。 |
+| `ingress_completed_at` | `timestamptz(6)` | 是 | `—` | 补全完成时间：完成接入命令写入整槽的带时区微秒精度时间。 |
+| `ingress_completion_digest` | `bytea` | 是 | `—` | 补全完成摘要：覆盖规范化补全值、来源、执行任命与完成时间的32字节摘要。 |
 
 约束：
 
@@ -1288,12 +1298,19 @@ Lead接入事实：一行代表渠道一次不可覆盖的原始接入，由销�
 - `ck_lead__captured_phone_hmac_length`（`CHECK`：`octet_length(captured_phone_hmac) = 32`）：摘要格式：captured_phone_hmac必须保存32字节的规范二进制值。
 - `ck_lead__captured_email_hmac_length`（`CHECK`：`octet_length(captured_email_hmac) = 32`）：摘要格式：captured_email_hmac必须保存32字节的规范二进制值。
 - `ck_lead__captured_content_digest_length`（`CHECK`：`octet_length(captured_content_digest) = 32`）：摘要格式：captured_content_digest必须保存32字节的规范二进制值。
+- `ck_lead__ingress_completion_phone_pair`（`CHECK`：`(ingress_completion_phone_ciphertext IS NULL AND ingress_completion_phone_hmac IS NULL) OR (ingress_completion_phone_ciphertext IS NOT NULL AND ingress_completion_phone_hmac IS NOT NULL)`）：补全电话配对：电话密文与HMAC必须同时存在或同时为空。
+- `ck_lead__ingress_completion_email_pair`（`CHECK`：`(ingress_completion_email_ciphertext IS NULL AND ingress_completion_email_hmac IS NULL) OR (ingress_completion_email_ciphertext IS NOT NULL AND ingress_completion_email_hmac IS NOT NULL)`）：补全邮箱配对：邮箱密文与HMAC必须同时存在或同时为空。
+- `ck_lead__ingress_completion_slot`（`CHECK`：`(ingress_completion_phone_ciphertext IS NULL AND ingress_completion_phone_hmac IS NULL AND ingress_completion_email_ciphertext IS NULL AND ingress_completion_email_hmac IS NULL AND ingress_completion_source_code IS NULL AND ingress_completion_source_summary_ciphertext IS NULL AND ingress_completed_by_appointment_id IS NULL AND ingress_completed_at IS NULL AND ingress_completion_digest IS NULL) OR (captured_phone_ciphertext IS NULL AND captured_phone_hmac IS NULL AND captured_email_ciphertext IS NULL AND captured_email_hmac IS NULL AND (ingress_completion_phone_ciphertext IS NOT NULL OR ingress_completion_email_ciphertext IS NOT NULL) AND ingress_completion_source_code IS NOT NULL AND ingress_completion_source_summary_ciphertext IS NOT NULL AND ingress_completed_by_appointment_id IS NOT NULL AND ingress_completed_at IS NOT NULL AND ingress_completion_digest IS NOT NULL)`）：补全槽完整性：整槽必须全空，或在原始电话与邮箱均缺失时一次写入至少一组联系方式及全部来源元数据。
+- `ck_lead__ingress_completion_phone_hmac_length`（`CHECK`：`octet_length(ingress_completion_phone_hmac) = 32`）：摘要格式：ingress_completion_phone_hmac必须保存32字节的规范二进制值。
+- `ck_lead__ingress_completion_email_hmac_length`（`CHECK`：`octet_length(ingress_completion_email_hmac) = 32`）：摘要格式：ingress_completion_email_hmac必须保存32字节的规范二进制值。
+- `ck_lead__ingress_completion_digest_length`（`CHECK`：`octet_length(ingress_completion_digest) = 32`）：摘要格式：ingress_completion_digest必须保存32字节的规范二进制值。
 
 物理外键：
 
 - `fk_lead__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
 - `fk_lead__parsed_party`：`(tenant_id, parsed_party_id) → party.party(tenant_id, party_id)`。Party解析关系：解析结果必须指向同租户Party。
 - `fk_lead__current_assignment`：`(tenant_id, current_assignment_id) → lead.lead_assignment(tenant_id, lead_assignment_id)`。当前分派关系：当前指针必须指向同租户LeadAssignment；所属Lead一致性由命令提交前复验。
+- `fk_lead__ingress_completed_by_appointment`：`(tenant_id, ingress_completed_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。补全执行任命关系：完成接入的Appointment必须存在于同一租户。
 
 索引：
 
@@ -2733,6 +2750,7 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `party.party` | `fk_party__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `lead.lead` | `fk_lead__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `lead.lead` | `fk_lead__parsed_party` | `(tenant_id, parsed_party_id)` | `party.party` | `(tenant_id, party_id)` | 否 |
+| `lead.lead` | `fk_lead__ingress_completed_by_appointment` | `(tenant_id, ingress_completed_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
 | `lead.lead_assignment` | `fk_lead_assignment__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `lead.lead_assignment` | `fk_lead_assignment__owner_appointment` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
 | `lead.lead_contact_result` | `fk_lead_contact_result__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
@@ -2889,7 +2907,7 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `evidence.upload_session` | `CONTROLLED` | `status, received_at, finalized_at, revision` |
 | `evidence.evidence_binding` | `CONTROLLED` | `revoked_at, revoked_by_appointment_id, revocation_authorization_digest, revocation_reason_code, revision` |
 | `party.party` | `CONTROLLED` | `canonical_name, primary_identifier_type, primary_identifier_ciphertext, primary_identifier_hmac, status, merged_into_party_id, merged_at, revision` |
-| `lead.lead` | `CONTROLLED` | `parsed_party_id, party_resolution_code, disposition_code, current_assignment_id, revision` |
+| `lead.lead` | `CONTROLLED` | `parsed_party_id, party_resolution_code, disposition_code, current_assignment_id, revision, ingress_completion_phone_ciphertext, ingress_completion_phone_hmac, ingress_completion_email_ciphertext, ingress_completion_email_hmac, ingress_completion_source_code, ingress_completion_source_summary_ciphertext, ingress_completed_by_appointment_id, ingress_completed_at, ingress_completion_digest` |
 | `lead.lead_assignment` | `CONTROLLED` | `assignment_status_code, closed_at, close_reason_code, revision` |
 | `opportunity.opportunity` | `CONTROLLED` | `current_quote_revision_id, close_outcome_code, closed_at, revision` |
 | `opportunity.quote_issue` | `CONTROLLED` | `issue_status_code, revoked_at, revocation_reason_code, revision` |

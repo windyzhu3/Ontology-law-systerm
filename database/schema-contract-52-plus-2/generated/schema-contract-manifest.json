@@ -1,5 +1,5 @@
 {
-  "contractVersion": "52-plus-2-v1",
+  "contractVersion": "52-plus-2-v1.1",
   "applicationTableCount": 52,
   "selfManagedPlatformTableCount": 1,
   "flywayManagedTable": "platform_meta.flyway_schema_history",
@@ -23,9 +23,10 @@
     "db/migration/V810__update_guards.sql": "bc95f1b0a80924848162388f9e9162d8a628091e93c5112579bd33f7ebeab0b7",
     "db/migration/V820__indexes.sql": "1c6968f012d5085fae5fcb0dbcee17cd9225034b9c81e8ef9de717d96e5f820f",
     "db/migration/V830__application_privileges.sql": "4292e7294b40211b3d141cf7b0b1d5c1e09582056bf27b9c3bde39bacb34e821",
-    "db/migration/V840__schema_contract_validation.sql": "0919a6047fdb94879aa2fce18ce3df8d22eaf2de5d27f9cbb26f04c27dd2b2ad"
+    "db/migration/V840__schema_contract_validation.sql": "0919a6047fdb94879aa2fce18ce3df8d22eaf2de5d27f9cbb26f04c27dd2b2ad",
+    "db/migration/V850__lead_ingress_completion_slot.sql": "6f784b95ae823bf5d97ef742d5494396911828c9ddc88ff07d35a6bc816e488b"
   },
-  "fieldContractSha256": "be79d991fa9e13e3f0af1c682333b6a063201387b78f7c9ec32a03bad51096ed",
+  "fieldContractSha256": "f4c17c4c0a8697820b30adb61b8cdb209666a4672393d4f8fc9d73a5f169addf",
   "schemas": [
     {
       "name": "identity",
@@ -6986,9 +6987,28 @@
             "party_resolution_code",
             "disposition_code",
             "current_assignment_id",
-            "revision"
+            "revision",
+            "ingress_completion_phone_ciphertext",
+            "ingress_completion_phone_hmac",
+            "ingress_completion_email_ciphertext",
+            "ingress_completion_email_hmac",
+            "ingress_completion_source_code",
+            "ingress_completion_source_summary_ciphertext",
+            "ingress_completed_by_appointment_id",
+            "ingress_completed_at",
+            "ingress_completion_digest"
           ],
-          "writeOnceColumns": [],
+          "writeOnceColumns": [
+            "ingress_completion_phone_ciphertext",
+            "ingress_completion_phone_hmac",
+            "ingress_completion_email_ciphertext",
+            "ingress_completion_email_hmac",
+            "ingress_completion_source_code",
+            "ingress_completion_source_summary_ciphertext",
+            "ingress_completed_by_appointment_id",
+            "ingress_completed_at",
+            "ingress_completion_digest"
+          ],
           "stateColumn": null,
           "initialState": null,
           "stateTransitions": [],
@@ -7176,6 +7196,78 @@
               "default": null,
               "byteLength": null,
               "comment": "创建时间：该Lead首次持久化的带时区微秒精度时间，永久冻结。"
+            },
+            {
+              "name": "ingress_completion_phone_ciphertext",
+              "sqlType": "bytea",
+              "nullable": true,
+              "default": null,
+              "byteLength": null,
+              "comment": "补全电话密文：仅在原始电话与邮箱均缺失时由完成接入命令一次写入；缺失时为空。"
+            },
+            {
+              "name": "ingress_completion_phone_hmac",
+              "sqlType": "bytea",
+              "nullable": true,
+              "default": null,
+              "byteLength": 32,
+              "comment": "补全电话HMAC：与补全电话密文配对的32字节受控精确匹配值；缺失时为空。"
+            },
+            {
+              "name": "ingress_completion_email_ciphertext",
+              "sqlType": "bytea",
+              "nullable": true,
+              "default": null,
+              "byteLength": null,
+              "comment": "补全邮箱密文：仅在原始电话与邮箱均缺失时由完成接入命令一次写入；缺失时为空。"
+            },
+            {
+              "name": "ingress_completion_email_hmac",
+              "sqlType": "bytea",
+              "nullable": true,
+              "default": null,
+              "byteLength": 32,
+              "comment": "补全邮箱HMAC：与补全邮箱密文配对的32字节受控精确匹配值；缺失时为空。"
+            },
+            {
+              "name": "ingress_completion_source_code",
+              "sqlType": "varchar(64)",
+              "nullable": true,
+              "default": null,
+              "byteLength": null,
+              "comment": "补全来源代码：标识静态注册的补全来源类型，不保存凭据或自由文本。"
+            },
+            {
+              "name": "ingress_completion_source_summary_ciphertext",
+              "sqlType": "bytea",
+              "nullable": true,
+              "default": null,
+              "byteLength": null,
+              "comment": "补全来源说明密文：保存最小必要的受保护来源说明，不写入审计摘要或事件载荷。"
+            },
+            {
+              "name": "ingress_completed_by_appointment_id",
+              "sqlType": "uuid",
+              "nullable": true,
+              "default": null,
+              "byteLength": null,
+              "comment": "补全执行任命：指向同租户执行完成接入命令的准确Appointment。"
+            },
+            {
+              "name": "ingress_completed_at",
+              "sqlType": "timestamptz(6)",
+              "nullable": true,
+              "default": null,
+              "byteLength": null,
+              "comment": "补全完成时间：完成接入命令写入整槽的带时区微秒精度时间。"
+            },
+            {
+              "name": "ingress_completion_digest",
+              "sqlType": "bytea",
+              "nullable": true,
+              "default": null,
+              "byteLength": 32,
+              "comment": "补全完成摘要：覆盖规范化补全值、来源、执行任命与完成时间的32字节摘要。"
             }
           ],
           "constraints": [
@@ -7232,6 +7324,42 @@
               "kind": "CHECK",
               "expression": "octet_length(captured_content_digest) = 32",
               "comment": "摘要格式：captured_content_digest必须保存32字节的规范二进制值。"
+            },
+            {
+              "name": "ck_lead__ingress_completion_phone_pair",
+              "kind": "CHECK",
+              "expression": "(ingress_completion_phone_ciphertext IS NULL AND ingress_completion_phone_hmac IS NULL) OR (ingress_completion_phone_ciphertext IS NOT NULL AND ingress_completion_phone_hmac IS NOT NULL)",
+              "comment": "补全电话配对：电话密文与HMAC必须同时存在或同时为空。"
+            },
+            {
+              "name": "ck_lead__ingress_completion_email_pair",
+              "kind": "CHECK",
+              "expression": "(ingress_completion_email_ciphertext IS NULL AND ingress_completion_email_hmac IS NULL) OR (ingress_completion_email_ciphertext IS NOT NULL AND ingress_completion_email_hmac IS NOT NULL)",
+              "comment": "补全邮箱配对：邮箱密文与HMAC必须同时存在或同时为空。"
+            },
+            {
+              "name": "ck_lead__ingress_completion_slot",
+              "kind": "CHECK",
+              "expression": "(ingress_completion_phone_ciphertext IS NULL AND ingress_completion_phone_hmac IS NULL AND ingress_completion_email_ciphertext IS NULL AND ingress_completion_email_hmac IS NULL AND ingress_completion_source_code IS NULL AND ingress_completion_source_summary_ciphertext IS NULL AND ingress_completed_by_appointment_id IS NULL AND ingress_completed_at IS NULL AND ingress_completion_digest IS NULL) OR (captured_phone_ciphertext IS NULL AND captured_phone_hmac IS NULL AND captured_email_ciphertext IS NULL AND captured_email_hmac IS NULL AND (ingress_completion_phone_ciphertext IS NOT NULL OR ingress_completion_email_ciphertext IS NOT NULL) AND ingress_completion_source_code IS NOT NULL AND ingress_completion_source_summary_ciphertext IS NOT NULL AND ingress_completed_by_appointment_id IS NOT NULL AND ingress_completed_at IS NOT NULL AND ingress_completion_digest IS NOT NULL)",
+              "comment": "补全槽完整性：整槽必须全空，或在原始电话与邮箱均缺失时一次写入至少一组联系方式及全部来源元数据。"
+            },
+            {
+              "name": "ck_lead__ingress_completion_phone_hmac_length",
+              "kind": "CHECK",
+              "expression": "octet_length(ingress_completion_phone_hmac) = 32",
+              "comment": "摘要格式：ingress_completion_phone_hmac必须保存32字节的规范二进制值。"
+            },
+            {
+              "name": "ck_lead__ingress_completion_email_hmac_length",
+              "kind": "CHECK",
+              "expression": "octet_length(ingress_completion_email_hmac) = 32",
+              "comment": "摘要格式：ingress_completion_email_hmac必须保存32字节的规范二进制值。"
+            },
+            {
+              "name": "ck_lead__ingress_completion_digest_length",
+              "kind": "CHECK",
+              "expression": "octet_length(ingress_completion_digest) = 32",
+              "comment": "摘要格式：ingress_completion_digest必须保存32字节的规范二进制值。"
             }
           ],
           "foreignKeys": [
@@ -7283,6 +7411,23 @@
               "deferrable": false,
               "initiallyDeferred": false,
               "comment": "当前分派关系：当前指针必须指向同租户LeadAssignment；所属Lead一致性由命令提交前复验。"
+            },
+            {
+              "name": "fk_lead__ingress_completed_by_appointment",
+              "columns": [
+                "tenant_id",
+                "ingress_completed_by_appointment_id"
+              ],
+              "parentTable": "identity.appointment",
+              "parentColumns": [
+                "tenant_id",
+                "appointment_id"
+              ],
+              "onUpdate": "NO ACTION",
+              "onDelete": "NO ACTION",
+              "deferrable": false,
+              "initiallyDeferred": false,
+              "comment": "补全执行任命关系：完成接入的Appointment必须存在于同一租户。"
             }
           ],
           "typedReferences": [],
@@ -16738,6 +16883,23 @@
       "initiallyDeferred": false
     },
     {
+      "name": "fk_lead__ingress_completed_by_appointment",
+      "childTable": "lead.lead",
+      "childColumns": [
+        "tenant_id",
+        "ingress_completed_by_appointment_id"
+      ],
+      "parentTable": "identity.appointment",
+      "parentColumns": [
+        "tenant_id",
+        "appointment_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "deferrable": false,
+      "initiallyDeferred": false
+    },
+    {
       "name": "fk_lead_assignment__tenant",
       "childTable": "lead.lead_assignment",
       "childColumns": [
@@ -19790,5 +19952,5 @@
     "two NOINHERIT startup LOGIN roles receive only direct target-database CONNECT from IaC: API selects one exact NOLOGIN Command, Query or Audit capability with SET LOCAL ROLE per statement path; Worker selects Worker capability only",
     "IaC-protected migration owner is used only by the release job as DeploymentRuntime; artifact, manifest and schema contract digests match before CAS to ACTIVE, while V840 validates only the four application roles"
   ],
-  "contractSha256": "a9c53d0126b7997e0aac511d3a4baf1da02a5f10d829ca5113458be51813034a"
+  "contractSha256": "0c04d48ddae6891b53fdacabdba34d1124e757b070a4c9018597e4e0a4674301"
 }

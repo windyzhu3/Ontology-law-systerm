@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -80,3 +80,12 @@ class Schema:
     name: str
     comment: str
     tables: Tuple[Table, ...]
+
+
+@dataclass(frozen=True)
+class ContractEvolution:
+    version: int
+    migration_name: str
+    contract_version: str
+    apply: Callable[[Tuple[Schema, ...]], Tuple[Schema, ...]]
+    render_sql: Callable[[Tuple[Schema, ...], Tuple[Schema, ...]], str]

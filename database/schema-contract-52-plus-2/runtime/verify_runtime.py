@@ -149,7 +149,16 @@ _RAW_SERVICE_FIELDS = (
     "summary",
     "waitReturnCode",
 )
-_RAW_SUMMARY_FIELDS = ("fingerprint", "postgresVersion", "serverVersion", "status")
+_RAW_SUMMARY_FIELDS = (
+    "contractRevision",
+    "contractVersion",
+    "fingerprint",
+    "maximumMigrationVersion",
+    "migrationCount",
+    "postgresVersion",
+    "serverVersion",
+    "status",
+)
 _RAW_FAILURE_FIELDS = (
     "actualPhase",
     "actualMessage",
@@ -295,7 +304,43 @@ _SECRET_SCAN_PATTERN = re.compile(
 )
 _PRODUCT_CLAIM_PATTERN = re.compile(r"(?i)(?:\bAPI\b|\bSPA\b|\bR1\b|授权业务逻辑)")
 
-_CI_SCHEMA_VERSION = "postgresql-runtime-ci-artifact-v1"
+_LEGACY_V1_CONTRACT_SHA256 = "a9c53d0126b7997e0aac511d3a4baf1da02a5f10d829ca5113458be51813034a"
+_LEGACY_V1_FIELD_CONTRACT_SHA256 = "be79d991fa9e13e3f0af1c682333b6a063201387b78f7c9ec32a03bad51096ed"
+_CURRENT_V1_1_CONTRACT_SHA256 = "0c04d48ddae6891b53fdacabdba34d1124e757b070a4c9018597e4e0a4674301"
+_CURRENT_V1_1_FIELD_CONTRACT_SHA256 = "f4c17c4c0a8697820b30adb61b8cdb209666a4672393d4f8fc9d73a5f169addf"
+_RUNTIME_CONTRACT_PROFILES = {
+    "52-plus-2-v1": {
+        "contractRevision": 0,
+        "maximumMigrationVersion": 840,
+        "migrationCount": 19,
+    },
+    "52-plus-2-v1.1": {
+        "contractRevision": 1,
+        "maximumMigrationVersion": 850,
+        "migrationCount": 20,
+    },
+}
+_CI_SCHEMA_VERSION = "postgresql-runtime-ci-artifact-v1.1"
+_CI_CONTRACT_PROFILES = {
+    "postgresql-runtime-ci-artifact-v1": {
+        "migrationCount": 19,
+        "managedTableCount": 54,
+        "managedSchemaCount": 13,
+        "physicalForeignKeyCount": 206,
+        "mutationGuardCount": 53,
+        "contractSha256": _LEGACY_V1_CONTRACT_SHA256,
+        "fieldContractSha256": _LEGACY_V1_FIELD_CONTRACT_SHA256,
+    },
+    _CI_SCHEMA_VERSION: {
+        "migrationCount": 20,
+        "managedTableCount": 54,
+        "managedSchemaCount": 13,
+        "physicalForeignKeyCount": 207,
+        "mutationGuardCount": 53,
+        "contractSha256": _CURRENT_V1_1_CONTRACT_SHA256,
+        "fieldContractSha256": _CURRENT_V1_1_FIELD_CONTRACT_SHA256,
+    },
+}
 _CI_SUMMARY_NAME = "ci-runtime-summary.json"
 _CI_MARKDOWN_NAME = "ci-job-summary.md"
 _CI_TOP_LEVEL_FIELDS = (
@@ -463,14 +508,38 @@ _VERIFIER_ASSERTION_DIAGNOSTICS = {
     "52 application tables": ("schema", "verifier_schema_application_table_count"),
     "2 platform_meta tables": ("schema", "verifier_schema_platform_meta_table_set"),
     "public schema table count": ("schema", "verifier_schema_public_table_count"),
-    "19 successful migrations": ("schema", "verifier_schema_migration_count"),
+    "20 successful migrations": ("schema", "verifier_schema_migration_count"),
     "all migrations successful": ("schema", "verifier_schema_migration_success"),
     "maximum migration version": ("schema", "verifier_schema_max_migration_version"),
-    "V840 successful": ("schema", "verifier_schema_v840_success"),
-    "206 composite foreign keys": ("schema", "verifier_schema_foreign_key_count"),
+    "V850 successful": ("schema", "verifier_schema_v850_success"),
+    "207 composite foreign keys": ("schema", "verifier_schema_foreign_key_count"),
     "application foreign keys NO ACTION": ("schema", "verifier_schema_foreign_key_actions"),
     "validated MATCH SIMPLE foreign keys": ("schema", "verifier_schema_foreign_key_validation"),
     "tenant_id first in tenant foreign keys": ("schema", "verifier_schema_foreign_key_tenant_prefix"),
+    "V850 ingress completion Appointment FK": (
+        "schema",
+        "verifier_schema_v850_ingress_completion_fk",
+    ),
+    "V850 Lead trigger catalog contract": (
+        "schema",
+        "verifier_schema_v850_lead_triggers",
+    ),
+    "V850 ingress completion slot trigger": (
+        "schema",
+        "verifier_schema_v850_slot_trigger",
+    ),
+    "V850 ingress completion guard PUBLIC EXECUTE": (
+        "schema",
+        "verifier_schema_v850_guard_public_execute",
+    ),
+    "V850 ingress completion guard capability EXECUTE": (
+        "schema",
+        "verifier_schema_v850_guard_capability_execute",
+    ),
+    "V850 query role completion SELECT": (
+        "schema",
+        "verifier_schema_v850_query_completion_select",
+    ),
     "53 mutation guards": ("schema", "verifier_schema_mutation_guard_count"),
     "four distinct capability roles": ("schema", "verifier_schema_capability_role_count"),
     "capability roles NOLOGIN": ("schema", "verifier_schema_capability_roles_nologin"),
@@ -479,7 +548,7 @@ _VERIFIER_ASSERTION_DIAGNOSTICS = {
         "schema",
         "verifier_schema_capability_migrator_isolation",
     ),
-    "deployment_state PRIMARY/BLOCKED/52-plus-2-v1/revision=0 with 32 zero bytes": (
+    "deployment_state PRIMARY/BLOCKED/52-plus-2-v1.1/revision=1 with 32 zero bytes": (
         "schema",
         "verifier_schema_deployment_state_seed",
     ),
@@ -563,8 +632,8 @@ _VERIFIER_PHASE_DIAGNOSTICS = {
     "fingerprint": ("schema_fingerprint.sql", "verifier_fingerprint_error"),
 }
 # psql attributes SendQuery failures to the statement terminator; this is not a
-# claim that line 98 identifies the failing source section inside the statement.
-_VERIFIER_FINGERPRINT_STATEMENT_END_LINE = 98
+# claim that line 118 identifies the failing source section inside the statement.
+_VERIFIER_FINGERPRINT_STATEMENT_END_LINE = 118
 _VERIFIER_FINGERPRINT_SQLSTATE_DIAGNOSTICS = {
     "42725": "verifier_fingerprint_sqlstate_ambiguous_function_operator",
     "42883": "verifier_fingerprint_sqlstate_undefined_function_operator",
@@ -1482,6 +1551,8 @@ def normalize_runtime_result_for_publication(
     result = _require_exact_fields(result, _RAW_RESULT_FIELDS, "raw runtime result")
     if result["status"] != "PASSED":
         raise ValueError("only a PASSED runtime result can be normalized for publication")
+    if manifest.get("contractVersion") != "52-plus-2-v1":
+        raise ValueError("fixed legacy v1 publication requires the 52-plus-2-v1 manifest")
     if not _COMMIT_PATTERN.fullmatch(git_commit):
         raise ValueError("publication Git commit must be one lowercase 40-hex commit")
     _validate_utc_timestamp(verified_at_utc, "verified_at_utc")
@@ -1541,6 +1612,21 @@ def normalize_runtime_result_for_publication(
     return _validate_publishable_summary(candidate, lock, manifest, git_commit)
 
 
+def _validate_runtime_contract_facts(
+    summary: Mapping[str, object],
+    *,
+    expected_contract_version: str,
+) -> None:
+    profile = _RUNTIME_CONTRACT_PROFILES.get(expected_contract_version)
+    if profile is None or summary.get("contractVersion") != expected_contract_version:
+        raise ValueError("runtime verifier summary has the wrong contract profile")
+    if any(
+        type(summary.get(field)) is not int or summary.get(field) != expected_value
+        for field, expected_value in profile.items()
+    ):
+        raise ValueError("runtime verifier summary has inconsistent contract profile facts")
+
+
 def _normalize_runtime_run(raw_run: object, index: int) -> tuple[dict[str, object], str]:
     raw_run = _require_exact_fields(raw_run, _RAW_RUN_FIELDS, "raw runtime run")
     expected_id = f"run-{index + 1:02d}"
@@ -1555,6 +1641,7 @@ def _normalize_runtime_run(raw_run: object, index: int) -> tuple[dict[str, objec
     summary = _require_exact_fields(verifier["summary"], _RAW_SUMMARY_FIELDS, "raw verifier summary")
     if summary["status"] != "PASSED" or not isinstance(summary["serverVersion"], str) or not _SERVER_VERSION_PATTERN.fullmatch(summary["serverVersion"]):
         raise ValueError("raw verifier summary must report a complete PostgreSQL 18 server version")
+    _validate_runtime_contract_facts(summary, expected_contract_version="52-plus-2-v1")
     fingerprint = summary["fingerprint"]
     postgres_version = summary["postgresVersion"]
     if raw_run.get("initialFingerprint") != fingerprint:
@@ -1590,6 +1677,10 @@ def _normalize_runtime_run(raw_run: object, index: int) -> tuple[dict[str, objec
         )
         if noop_summary["status"] != "PASSED" or noop_summary["serverVersion"] != summary["serverVersion"]:
             raise ValueError("run-01 no-op verifier server version changed")
+        _validate_runtime_contract_facts(
+            noop_summary,
+            expected_contract_version="52-plus-2-v1",
+        )
         noop_fingerprint = noop_summary["fingerprint"]
         if noop_summary["postgresVersion"] != postgres_version:
             raise ValueError("run-01 no-op verifier PostgreSQL version changed")
@@ -1829,25 +1920,47 @@ def _validate_publish_failures(scenarios: object) -> None:
 
 def _validate_contract_summary(summary: object, manifest: Mapping[str, object]) -> None:
     contract = _require_exact_fields(summary, _PUBLISH_CONTRACT_FIELDS, "contract summary")
-    expected = {
+    manifest_facts = {
         "contractVersion": manifest.get("contractVersion"),
-        "migrationCount": 19,
+        "applicationTableCount": manifest.get("applicationTableCount"),
         "managedTableCount": manifest.get("physicalTableCountAfterFlywayBootstrap"),
-        "managedSchemaCount": len(manifest.get("schemas", ())) if isinstance(manifest.get("schemas"), list) else None,
+        "managedSchemaCount": (
+            len(manifest.get("schemas", ()))
+            if isinstance(manifest.get("schemas"), list)
+            else None
+        ),
         "physicalForeignKeyCount": (
             len(manifest.get("physicalForeignKeyWhitelist", ()))
             if isinstance(manifest.get("physicalForeignKeyWhitelist"), list)
             else None
         ),
-        "mutationGuardCount": 53,
         "contractSha256": manifest.get("contractSha256"),
         "fieldContractSha256": manifest.get("fieldContractSha256"),
     }
-    if manifest.get("applicationTableCount") != 52 or expected["managedTableCount"] != 54:
-        raise ValueError("contract manifest does not describe the frozen 52-plus-2 table boundary")
-    for field, expected_value in expected.items():
+    expected_manifest_facts = {
+        "contractVersion": "52-plus-2-v1",
+        "applicationTableCount": 52,
+        "managedTableCount": 54,
+        "managedSchemaCount": 13,
+        "physicalForeignKeyCount": 206,
+        "contractSha256": _LEGACY_V1_CONTRACT_SHA256,
+        "fieldContractSha256": _LEGACY_V1_FIELD_CONTRACT_SHA256,
+    }
+    if manifest_facts != expected_manifest_facts:
+        raise ValueError("fixed legacy v1 publication manifest has profile drift")
+    expected_contract = {
+        "contractVersion": "52-plus-2-v1",
+        "migrationCount": 19,
+        "managedTableCount": 54,
+        "managedSchemaCount": 13,
+        "physicalForeignKeyCount": 206,
+        "mutationGuardCount": 53,
+        "contractSha256": _LEGACY_V1_CONTRACT_SHA256,
+        "fieldContractSha256": _LEGACY_V1_FIELD_CONTRACT_SHA256,
+    }
+    for field, expected_value in expected_contract.items():
         if contract[field] != expected_value:
-            raise ValueError(f"contract summary {field} does not match the exact manifest")
+            raise ValueError(f"contract summary {field} does not match the fixed legacy v1 profile")
     for digest_field in ("contractSha256", "fieldContractSha256"):
         digest = contract[digest_field]
         if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
@@ -2300,7 +2413,7 @@ def _ci_verified_contract_summary(manifest: Mapping[str, object]) -> dict[str, o
     foreign_keys = manifest.get("physicalForeignKeyWhitelist")
     candidate = {
         "verified": True,
-        "migrationCount": 19,
+        "migrationCount": 20,
         "managedTableCount": manifest.get("physicalTableCountAfterFlywayBootstrap"),
         "managedSchemaCount": len(schemas) if isinstance(schemas, list) else None,
         "physicalForeignKeyCount": len(foreign_keys) if isinstance(foreign_keys, list) else None,
@@ -2308,8 +2421,11 @@ def _ci_verified_contract_summary(manifest: Mapping[str, object]) -> dict[str, o
         "contractSha256": manifest.get("contractSha256"),
         "fieldContractSha256": manifest.get("fieldContractSha256"),
     }
-    if manifest.get("applicationTableCount") != 52:
-        raise ValueError("CI contract manifest is outside the 52-plus-2 boundary")
+    if (
+        manifest.get("contractVersion") != "52-plus-2-v1.1"
+        or manifest.get("applicationTableCount") != 52
+    ):
+        raise ValueError("CI contract manifest is outside the current 52-plus-2-v1.1 boundary")
     return candidate
 
 
@@ -2437,6 +2553,10 @@ def _validate_ci_controller_verifier(
     summary = _require_exact_fields(verifier["summary"], _RAW_SUMMARY_FIELDS, f"{context} summary")
     if summary["status"] != "PASSED":
         raise ValueError(f"{context} summary did not pass")
+    _validate_runtime_contract_facts(
+        summary,
+        expected_contract_version="52-plus-2-v1.1",
+    )
     return summary
 
 
@@ -2453,7 +2573,8 @@ def _ci_flyway_version(result: Mapping[str, object]) -> str:
 
 def _validate_ci_runtime_summary(summary: Mapping[str, object]) -> dict[str, object]:
     summary = _require_exact_fields(summary, _CI_TOP_LEVEL_FIELDS, "CI runtime summary")
-    if summary["schemaVersion"] != _CI_SCHEMA_VERSION:
+    schema_version = summary["schemaVersion"]
+    if not isinstance(schema_version, str) or schema_version not in _CI_CONTRACT_PROFILES:
         raise ValueError("CI runtime summary schemaVersion is not supported")
     git_commit = summary["gitCommit"]
     if not isinstance(git_commit, str) or not _COMMIT_PATTERN.fullmatch(git_commit):
@@ -2494,7 +2615,10 @@ def _validate_ci_runtime_summary(summary: Mapping[str, object]) -> dict[str, obj
             )
 
     _validate_ci_toolchain(summary["toolchain"])
-    _validate_ci_contract_summary(summary["contractSummary"])
+    _validate_ci_contract_summary(
+        summary["contractSummary"],
+        expected_facts=_CI_CONTRACT_PROFILES[schema_version],
+    )
     _validate_ci_outcome_semantics(summary)
     try:
         normalized = json.loads(
@@ -2615,7 +2739,11 @@ def _validate_ci_toolchain(value: object) -> None:
         raise ValueError("CI toolchain versions must both be verified or both be absent")
 
 
-def _validate_ci_contract_summary(value: object) -> None:
+def _validate_ci_contract_summary(
+    value: object,
+    *,
+    expected_facts: Mapping[str, object],
+) -> None:
     contract = _require_exact_fields(value, _CI_CONTRACT_FIELDS, "CI contract summary")
     if not isinstance(contract["verified"], bool):
         raise ValueError("CI contract verified flag must be boolean")
@@ -2632,24 +2760,26 @@ def _validate_ci_contract_summary(value: object) -> None:
         if any(contract[field] is not None for field in fact_fields):
             raise ValueError("CI unverified contract summary must contain only null facts")
         return
-    expected = {
-        "migrationCount": 19,
-        "managedTableCount": 54,
-        "managedSchemaCount": 13,
-        "physicalForeignKeyCount": 206,
-        "mutationGuardCount": 53,
-    }
+    numeric_fields = (
+        "migrationCount",
+        "managedTableCount",
+        "managedSchemaCount",
+        "physicalForeignKeyCount",
+        "mutationGuardCount",
+    )
     if any(
-        isinstance(contract[field], bool)
-        or not isinstance(contract[field], int)
-        or contract[field] != expected_value
-        for field, expected_value in expected.items()
+        type(contract[field]) is not int or contract[field] != expected_facts[field]
+        for field in numeric_fields
     ):
         raise ValueError("CI verified contract summary has inconsistent fixed facts")
     for field in ("contractSha256", "fieldContractSha256"):
         digest = contract[field]
-        if not isinstance(digest, str) or not _CI_HASH_PATTERN.fullmatch(digest):
-            raise ValueError("CI verified contract summary has an invalid hash")
+        if (
+            not isinstance(digest, str)
+            or not _CI_HASH_PATTERN.fullmatch(digest)
+            or digest != expected_facts[field]
+        ):
+            raise ValueError("CI verified contract summary has an invalid profile hash")
 
 
 def _validate_ci_outcome_semantics(summary: Mapping[str, object]) -> None:
@@ -5119,34 +5249,48 @@ def main(
         return {"PASSED": 0, "FAILED": 4, "BLOCKED": 5}[status]
     if status == "PASSED" and not arguments.ci_only:
         try:
-            if result.get("schemaVersion") != "postgresql-runtime-evidence-v1":
-                lock = load_toolchain_lock(schema / "runtime" / "toolchain.lock.json")
-                manifest_path = schema / "generated" / "schema-contract-manifest.json"
-                manifest = _decode_json_object(
-                    _read_publication_inputs(repository, (manifest_path,))[0],
-                    manifest_path,
-                    "read_contract_manifest",
-                )
-                result = normalize_runtime_result_for_publication(
-                    result,
-                    lock,
-                    manifest,
-                    git_commit=before_snapshot.head,
-                    verified_at_utc=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                )
-                _write_evidence_atomically(output_directory / "runtime-summary.json", result)
-            prepared = prepare_publishable_evidence(
-                repository,
-                output_directory / "runtime-summary.json",
-                schema / "runtime" / "toolchain.lock.json",
-                schema / "generated" / "schema-contract-manifest.json",
-                expected_head=before_snapshot.head,
+            manifest_path = schema / "generated" / "schema-contract-manifest.json"
+            manifest = _decode_json_object(
+                _read_publication_inputs(repository, (manifest_path,))[0],
+                manifest_path,
+                "read_contract_manifest",
             )
-            targets = publish_prepared_evidence(prepared)
+            if manifest.get("contractVersion") == "52-plus-2-v1.1":
+                current_summary = validate_ci_runtime_artifact(ci_output_directory)
+                if (
+                    current_summary["workflowOutcome"] != "PASSED"
+                    or current_summary["gitCommit"] != before_snapshot.head
+                ):
+                    raise ValueError("current v1.1 CI artifact does not bind the successful checkout")
+                targets = (
+                    ci_output_directory / _CI_SUMMARY_NAME,
+                    ci_output_directory / _CI_MARKDOWN_NAME,
+                )
+                evidence_result_field = "currentRuntimeArtifact"
+            else:
+                if result.get("schemaVersion") != "postgresql-runtime-evidence-v1":
+                    lock = load_toolchain_lock(schema / "runtime" / "toolchain.lock.json")
+                    result = normalize_runtime_result_for_publication(
+                        result,
+                        lock,
+                        manifest,
+                        git_commit=before_snapshot.head,
+                        verified_at_utc=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    )
+                    _write_evidence_atomically(output_directory / "runtime-summary.json", result)
+                prepared = prepare_publishable_evidence(
+                    repository,
+                    output_directory / "runtime-summary.json",
+                    schema / "runtime" / "toolchain.lock.json",
+                    manifest_path,
+                    expected_head=before_snapshot.head,
+                )
+                targets = publish_prepared_evidence(prepared)
+                evidence_result_field = "publishedEvidence"
         except ValueError as error:
             print(f"runtime evidence publication error: {error}", file=sys.stderr)
             return 4
-        result = {**result, "publishedEvidence": [str(target) for target in targets]}
+        result = {**result, evidence_result_field: [str(target) for target in targets]}
 
     print(json.dumps({"evidenceDir": str(output_directory), **result}, sort_keys=True))
     return {"PASSED": 0, "FAILED": 4, "BLOCKED": 5}[status]
