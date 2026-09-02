@@ -1908,6 +1908,21 @@ class VerifyBaselineTest(unittest.TestCase):
                 "R1 implementation plan must declare Status: FROZEN",
             )
 
+    def test_r1_plan_status_cannot_be_spoofed_from_a_list_nested_code_fence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            plan = root / "docs/superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md"
+            plan.write_text(
+                "# R1 plan\n\n- ```text\n  Status: FROZEN\n  ```\n",
+                encoding="utf-8",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 implementation plan must declare Status: FROZEN",
+            )
+
     def test_r1_scaffold_decision_rejects_changed_frozen_code(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

@@ -1892,8 +1892,9 @@ def component_root(root: Path, path: Path) -> str:
 
 
 def field_value(text: str, name: str) -> str | None:
+    """Return one top-level Markdown metadata field, never nested/code content."""
     matches = re.findall(
-        rf"(?mi)^[ \t]*{re.escape(name)}[ \t]*:[ \t]*(\S[^\r\n]*)$",
+        rf"(?mi)^{re.escape(name)}[ \t]*:[ \t]*(\S[^\r\n]*)$",
         active_markdown_text(text),
     )
     return matches[0].strip() if len(matches) == 1 else None
