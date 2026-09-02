@@ -2071,6 +2071,15 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
 
         self.assertIsNotNone(probe)
 
+    def test_direct_psql_runtime_contract_contains_no_flyway_placeholders(self) -> None:
+        """Break caught: direct psql execution leaves an unsubstituted Flyway role placeholder."""
+        schema_contract = (
+            PROJECT_ROOT / "runtime" / "sql" / "assert_schema_contract.sql"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn("${", schema_contract)
+        self.assertIn("'law_app_query'", schema_contract)
+
     def test_v1_1_manifest_cannot_overwrite_fixed_v1_publication(self) -> None:
         """Break caught: a v1.1 runtime result is published to the durable fixed v1 evidence pair."""
         from runtime import verify_runtime

@@ -290,7 +290,7 @@ BEGIN
         'ingress_completion_digest'
     ]::text[]) AS completion_column(column_name)
     WHERE pg_catalog.has_column_privilege(
-        '${app_query_role}',
+        'law_app_query',
         'lead.lead',
         completion_column.column_name,
         'SELECT'
