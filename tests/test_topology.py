@@ -40,7 +40,8 @@ jobs:
       - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c
         with:
           distribution: temurin
-          java-version: "25.0.4.1+1"
+          java-version: "25.0.4.1"
+      - run: java -version 2>&1 | grep -F 'Temurin-25.0.4.1+1'
       - run: ./mvnw -f backend/pom.xml package
   workbench:
     runs-on: ubuntu-latest
@@ -512,7 +513,7 @@ class TopologyVerifierTest(unittest.TestCase):
         )
         errors = self._verify()
         self.assertTrue(
-            any("backend job must run" in error and "package" in error for error in errors),
+            any("backend job must verify" in error and "package" in error for error in errors),
             errors,
         )
 

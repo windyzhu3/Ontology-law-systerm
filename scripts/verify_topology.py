@@ -417,12 +417,15 @@ def _verify_workflow(snapshot: dict[Path, bytes], source: str, errors: list[str]
                 errors.append(f"workflow action {repository} must use the exact approved commit")
 
     _verify_setup_version(jobs.get("topology"), "actions/setup-python", "python-version", "3.12.14", errors)
-    _verify_setup_version(jobs.get("backend"), "actions/setup-java", "java-version", "25.0.4.1+1", errors)
+    _verify_setup_version(jobs.get("backend"), "actions/setup-java", "java-version", "25.0.4.1", errors)
     _verify_setup_version(jobs.get("workbench"), "actions/setup-node", "node-version", "24.20.0", errors)
 
     backend_commands = _job_run_steps(jobs.get("backend"))
-    if backend_commands != ["./mvnw -f backend/pom.xml package"]:
-        errors.append("backend job must run exactly ./mvnw -f backend/pom.xml package")
+    if backend_commands != [
+        "java -version 2>&1 | grep -F 'Temurin-25.0.4.1+1'",
+        "./mvnw -f backend/pom.xml package",
+    ]:
+        errors.append("backend job must verify exact Temurin 25.0.4.1+1 and run Maven package")
 
     expected_workbench_commands = [
         "npm install --global npm@11.9.0",
