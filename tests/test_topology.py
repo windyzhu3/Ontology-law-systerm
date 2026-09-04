@@ -12,6 +12,7 @@ import unittest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 VERIFIER_PATH = REPOSITORY_ROOT / "scripts" / "verify_topology.py"
+ADR_PATH = REPOSITORY_ROOT / "docs" / "adr" / "ADR-0004-r1-scaffold-and-http-contract.md"
 
 
 VALID_WORKFLOW = """
@@ -211,6 +212,22 @@ class TopologyVerifierTest(unittest.TestCase):
 
     def test_valid_single_artifact_layout_passes(self) -> None:
         self.assertEqual([], self._verify())
+
+    def test_adr_closes_party_ownership_and_query_jooq_boundaries(self) -> None:
+        adr = ADR_PATH.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "`actions/setup-java` | `dd06d9cba3e5552c54d9f8ea23572deb30010f7c`",
+            adr,
+        )
+        self.assertIn("audit、execution、identity、lead、opportunity、party、query、responsibility", adr)
+        self.assertIn("| `party` | 无 R1 业务包 |", adr)
+        self.assertIn("`lead` | `identity`、`audit`、`execution`、`responsibility`、`opportunity`、`party`", adr)
+        self.assertIn(
+            "Query 通过各 Fact Owner 的具名 read port 组合读取模型，不拥有生成记录。",
+            adr,
+        )
+        self.assertIn("`party.internal.persistence.jooq`", adr)
 
     def test_openapi_is_optional_but_only_the_canonical_source_is_allowed(self) -> None:
         self.assertEqual([], self._verify())

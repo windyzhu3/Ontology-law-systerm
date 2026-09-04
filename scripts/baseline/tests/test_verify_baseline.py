@@ -316,6 +316,14 @@ class VerifyBaselineTest(unittest.TestCase):
                     "",
                     "Status: FROZEN",
                     "",
+                    "### Persisted subject and secondary bindings",
+                    "R1_COMMAND_SCOPE_V1",
+                    "### Non-completion command Receipt results",
+                    "R1_DUPLICATE_CANDIDATE_V1",
+                    "R1_BUSINESS_WINDOW_V1",
+                    "**Pre-slot gate：**",
+                    "`legalNeed: SafeText2000`",
+                    "",
                     "## Task registry",
                     "",
                     *task_lines,
@@ -391,6 +399,13 @@ class VerifyBaselineTest(unittest.TestCase):
                     "",
                     "Status: FROZEN",
                     "",
+                    "## Request DTO catalog",
+                    "`legalNeed: SafeText2000`",
+                    "## Successful response projections",
+                    "## ETag contract",
+                    "## ActionDraft confirmation lifecycle",
+                    "## OpenAPI security binding",
+                    "",
                     "## Operations",
                     "",
                     *operation_lines,
@@ -434,6 +449,11 @@ class VerifyBaselineTest(unittest.TestCase):
                     "Contract ID: R1-WORKBENCH-V1",
                     "",
                     "Status: FROZEN",
+                    "",
+                    "## CurrentWorkCardEnvelope wire projection",
+                    "`PreconditionTokens`",
+                    "## Command form and Draft projection",
+                    "`ActionDraftProjection`",
                     "",
                     "## Envelope fields",
                     "",
@@ -1906,6 +1926,23 @@ class VerifyBaselineTest(unittest.TestCase):
             self.assert_finding(
                 root,
                 "R1 implementation plan must declare Status: FROZEN",
+            )
+
+    def test_r1_executable_contract_marker_is_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            contract = root / "docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md"
+            contract.write_text(
+                contract.read_text(encoding="utf-8").replace(
+                    "## ActionDraft confirmation lifecycle", "## Draft lifecycle"
+                ),
+                encoding="utf-8",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 executable contract marker missing from docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md: ## ActionDraft confirmation lifecycle",
             )
 
     def test_r1_plan_status_cannot_be_spoofed_from_a_list_nested_code_fence(self) -> None:
