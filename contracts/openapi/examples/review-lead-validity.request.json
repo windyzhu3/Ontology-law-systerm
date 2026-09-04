@@ -1,0 +1,9 @@
+{
+  "draftId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1002",
+  "expectedDraftRevision": 1,
+  "draftDigest": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+  "triggeringContactResultId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1007",
+  "triggeringContactResultHash": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+  "decisionCode": "REOPEN_CONTACT",
+  "rationaleSummary": "现有信息仍可核验，重新安排一次联系。"
+}

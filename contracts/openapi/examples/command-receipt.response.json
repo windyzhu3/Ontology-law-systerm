@@ -1,0 +1,11 @@
+{
+  "commandId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1013",
+  "receiptId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1009",
+  "outcome": "SUCCEEDED",
+  "completedAt": "2026-09-05T01:40:00.123456Z",
+  "resultFact": {
+    "factType": "LEAD_CONTACT_RESULT",
+    "factRef": "fact_ref_public_01",
+    "digest": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+  }
+}

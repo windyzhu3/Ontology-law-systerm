@@ -1,0 +1,7 @@
+{
+  "draftId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1002",
+  "expectedDraftRevision": 1,
+  "draftDigest": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+  "decisionCode": "SCHEDULE_ROUTING_REVIEW",
+  "rationaleSummary": "当前没有符合来源策略的可用销售负责人。"
+}

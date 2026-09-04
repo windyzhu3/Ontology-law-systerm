@@ -102,6 +102,7 @@ Lead接入 → Assignment分配 → ContactResult联系结果
 ├── README.md
 ├── backend/                            # Spring Boot 模块化单体脚手架；尚无 R1 业务实现
 ├── apps/workbench/                     # React/Vite 工作台脚手架；尚无 R1 业务实现
+├── contracts/openapi/                  # 唯一 R1 HTTP 契约、示例与前后端生成源
 ├── docs/
 │   ├── design/                        # 已确认高保真视觉证据索引
 │   └── specs/                         # 产品、架构及物理模型历史规格
@@ -124,6 +125,20 @@ Lead接入 → Assignment分配 → ContactResult联系结果
 ```
 
 ## 7. 生成与验证
+
+全新 checkout 必须先安装锁文件中的精确 npm 依赖，再检查已提交的前端 OpenAPI 类型与唯一契约是否一致；后端 `package` 会在 `generate-sources` 阶段生成并编译 Spring API interface/model，同时运行合同与架构测试：
+
+```bash
+npm ci
+npm run openapi:check
+./mvnw -f backend/pom.xml package
+```
+
+Windows PowerShell 使用 `.\mvnw.cmd -f backend/pom.xml package`。只有在有意修改 `contracts/openapi/ontology-law-api.yaml` 后才运行 `npm run openapi:generate`，随后必须再次运行 `npm run openapi:check` 并审阅生成差异。
+
+`contracts/openapi/ontology-law-api.yaml` 及其 `examples/` 是唯一人工维护的 HTTP 合同源。`apps/workbench/src/generated/api/schema.d.ts` 是必须提交的确定性生成物，不得手工编辑；`backend/target/generated-sources/openapi` 是 Maven 构建产物，不得提交或移动进领域包。CI 会在前端 typecheck 之前执行漂移检查，并通过后端 `package` 证明生成代码可编译、合同测试可运行。
+
+数据库合同使用独立的确定性生成与验证入口：
 
 ```bash
 cd database/schema-contract-52-plus-2

@@ -1,0 +1,13 @@
+{
+  "actionCode": "RECORD_CONTACT_RESULT",
+  "schemaVersion": 1,
+  "values": {
+    "leadAssignmentId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1003",
+    "leadAssignmentRevision": 0,
+    "contactChannelCode": "PHONE",
+    "resultCode": "CONNECTED_VALID",
+    "resultSummary": "已与客户本人取得联系。",
+    "legalNeed": "客户希望评估违法解除劳动合同的赔偿范围。",
+    "evidenceSubmissionId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1008"
+  }
+}

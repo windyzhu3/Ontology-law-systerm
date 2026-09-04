@@ -1,0 +1,14 @@
+{
+  "sourceChannelCode": "WEB_FORM",
+  "sourceAccountCode": "official-site",
+  "sourceRecordKey": "lead-2026-0001",
+  "capturedAt": "2026-09-05T01:30:00.123456Z",
+  "capturedName": "张三",
+  "phone": "+8613800138000",
+  "email": "zhangsan@example.cn",
+  "cityCode": "SHANGHAI",
+  "serviceCategoryCode": "LABOR_DISPUTE",
+  "jurisdictionCode": "CN_SH",
+  "urgencyCode": "NORMAL",
+  "legalNeedSummary": "希望确认解除劳动合同后的补偿方案。"
+}

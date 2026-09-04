@@ -34,6 +34,7 @@ EXACT_MAVEN_PROPERTIES = {
     "openapi-generator.version": "7.25.0",
 }
 EXACT_MAVEN_PLUGINS = {
+    "openapi-generator-maven-plugin": "${openapi-generator.version}",
     "maven-compiler-plugin": "3.14.1",
     "maven-surefire-plugin": "3.5.4",
     "maven-failsafe-plugin": "3.5.4",
@@ -49,6 +50,8 @@ EXACT_WRAPPER_PROPERTIES = {
 EXACT_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$")
 EXACT_SCRIPTS = {
     "root": {
+        "openapi:generate": "openapi-typescript contracts/openapi/ontology-law-api.yaml --output apps/workbench/src/generated/api/schema.d.ts --alphabetize",
+        "openapi:check": "openapi-typescript contracts/openapi/ontology-law-api.yaml --output apps/workbench/src/generated/api/schema.d.ts --alphabetize --check",
         "typecheck": "npm run typecheck --workspace apps/workbench",
         "test": "npm run test --workspace apps/workbench",
         "build": "npm run build --workspace apps/workbench",
@@ -58,6 +61,32 @@ EXACT_SCRIPTS = {
         "test": "vitest run --passWithNoTests",
         "build": "tsc --noEmit && vite build",
     },
+}
+EXACT_OPENAPI_GENERATOR_CONFIGURATION = {
+    "inputSpec": "${project.basedir}/../contracts/openapi/ontology-law-api.yaml",
+    "generatorName": "spring",
+    "library": "spring-boot",
+    "output": "${project.build.directory}/generated-sources/openapi",
+    "apiPackage": "io.github.windyzhu3.ontologylaw.api.adapter.generated.api",
+    "modelPackage": "io.github.windyzhu3.ontologylaw.api.adapter.generated.model",
+    "generateApis": "true",
+    "generateModels": "true",
+    "generateSupportingFiles": "false",
+    "generateApiDocumentation": "false",
+    "generateModelDocumentation": "false",
+    "generateApiTests": "false",
+    "generateModelTests": "false",
+    "addCompileSourceRoot": "true",
+    "skipValidateSpec": "false",
+}
+EXACT_OPENAPI_GENERATOR_OPTIONS = {
+    "interfaceOnly": "true",
+    "skipDefaultInterface": "true",
+    "useJakartaEe": "true",
+    "openApiNullable": "false",
+    "documentationProvider": "none",
+    "annotationLibrary": "swagger2",
+    "useTags": "true",
 }
 
 
@@ -222,15 +251,15 @@ def _verify_scripts(package: dict, label: str, errors: list[str]) -> None:
     scripts = package.get("scripts")
     if not isinstance(scripts, dict):
         scripts = {}
-    for name in ("typecheck", "test", "build"):
+    for name, expected in EXACT_SCRIPTS[label].items():
         command = scripts.get(name)
         if not isinstance(command, str) or not command.strip():
             errors.append(f"required {label} script '{name}' is missing")
         elif "--if-present" in command:
             errors.append(f"{label} script '{name}' must not use --if-present")
-        elif command != EXACT_SCRIPTS[label][name]:
+        elif command != expected:
             errors.append(
-                f"required {label} script '{name}' must be exactly {EXACT_SCRIPTS[label][name]!r}"
+                f"required {label} script '{name}' must be exactly {expected!r}"
             )
 
 
@@ -256,6 +285,167 @@ def _verify_openapi(snapshot: dict[Path, bytes], source: str, errors: list[str])
             "second OpenAPI source is forbidden; only contracts/openapi/ontology-law-api.yaml is allowed; "
             f"{source} found {[str(path) for path in sources]}"
         )
+
+
+def _verify_exact_xml_values(
+    parent: ET.Element,
+    expected: dict[str, str],
+    label: str,
+    errors: list[str],
+    allowed_nested: set[str] | None = None,
+) -> None:
+    allowed_nested = set() if allowed_nested is None else allowed_nested
+    expected_names = set(expected) | allowed_nested
+    children = list(parent)
+    actual_names = [child.tag.rsplit("}", 1)[-1] for child in children]
+    if len(actual_names) != len(expected_names) or set(actual_names) != expected_names:
+        errors.append(f"{label} fields must be exactly {sorted(expected_names)}")
+    for name, expected_value in expected.items():
+        matches = [
+            child for child in children
+            if child.tag.rsplit("}", 1)[-1] == name
+        ]
+        actual_value = None if len(matches) != 1 else (matches[0].text or "").strip()
+        if actual_value != expected_value:
+            errors.append(f"{label} {name} must be exactly {expected_value}")
+
+
+def _verify_openapi_generator(
+    pom: ET.Element,
+    namespace: dict[str, str],
+    errors: list[str],
+) -> None:
+    for profile in pom.findall("m:profiles/m:profile", namespace):
+        profile_id = profile.findtext("m:id", default="<unnamed>", namespaces=namespace)
+        profile_properties = profile.find("m:properties", namespace)
+        if profile_properties is not None and any(
+            child.tag.rsplit("}", 1)[-1] == "openapi-generator.version"
+            for child in profile_properties
+        ):
+            errors.append(
+                f"Maven profile {profile_id} must not override openapi-generator.version"
+            )
+        if any(
+            plugin.findtext("m:artifactId", namespaces=namespace)
+            == "openapi-generator-maven-plugin"
+            for plugin in profile.findall(".//m:plugin", namespace)
+        ):
+            errors.append(
+                f"Maven profile {profile_id} must not declare openapi-generator-maven-plugin"
+            )
+
+    generator_plugins = [
+        plugin
+        for plugin in pom.findall("m:build/m:plugins/m:plugin", namespace)
+        if plugin.findtext("m:artifactId", namespaces=namespace) == "openapi-generator-maven-plugin"
+    ]
+    if len(generator_plugins) != 1:
+        errors.append("OpenAPI Generator plugin must be declared exactly once in the main build")
+        return
+
+    plugin = generator_plugins[0]
+    _verify_exact_xml_values(
+        plugin,
+        {
+            "groupId": "org.openapitools",
+            "artifactId": "openapi-generator-maven-plugin",
+            "version": "${openapi-generator.version}",
+        },
+        "OpenAPI Generator plugin",
+        errors,
+        {"executions"},
+    )
+
+    executions = plugin.findall("m:executions/m:execution", namespace)
+    if len(executions) != 1:
+        errors.append("OpenAPI Generator plugin must declare exactly one execution")
+        return
+    executions_container = plugin.find("m:executions", namespace)
+    if executions_container is not None:
+        _verify_exact_xml_values(
+            executions_container,
+            {},
+            "OpenAPI Generator executions",
+            errors,
+            {"execution"},
+        )
+    execution = executions[0]
+    _verify_exact_xml_values(
+        execution,
+        {
+            "id": "generate-r1-openapi-contract",
+            "phase": "generate-sources",
+        },
+        "OpenAPI Generator execution",
+        errors,
+        {"goals", "configuration"},
+    )
+    goals = execution.find("m:goals", namespace)
+    if goals is None:
+        errors.append("OpenAPI Generator execution goals are required")
+    else:
+        _verify_exact_xml_values(
+            goals,
+            {"goal": "generate"},
+            "OpenAPI Generator goals",
+            errors,
+        )
+
+    configuration = execution.find("m:configuration", namespace)
+    if configuration is None:
+        errors.append("OpenAPI Generator execution configuration is required")
+        return
+    _verify_exact_xml_values(
+        configuration,
+        EXACT_OPENAPI_GENERATOR_CONFIGURATION,
+        "OpenAPI Generator configuration",
+        errors,
+        {"configOptions"},
+    )
+    config_options = configuration.find("m:configOptions", namespace)
+    if config_options is None:
+        errors.append("OpenAPI Generator configOptions are required")
+        return
+    _verify_exact_xml_values(
+        config_options,
+        EXACT_OPENAPI_GENERATOR_OPTIONS,
+        "OpenAPI Generator configOptions",
+        errors,
+    )
+
+
+def _uses_default_success_condition(container: dict) -> bool:
+    if "if" not in container:
+        return True
+    condition = container.get("if")
+    if not isinstance(condition, str):
+        return False
+    expression = condition.strip()
+    if expression.startswith("${{") and expression.endswith("}}"):
+        expression = expression[3:-2].strip()
+    return expression == "success()"
+
+
+def _verify_workflow_failure_behavior(jobs: dict, errors: list[str]) -> None:
+    for job_name in ("topology", "backend", "workbench", "scaffold-gate"):
+        job = jobs.get(job_name)
+        if not isinstance(job, dict):
+            continue
+        if "continue-on-error" in job:
+            errors.append(f"workflow {job_name} job must not declare continue-on-error")
+        if job_name != "scaffold-gate" and not _uses_default_success_condition(job):
+            errors.append(f"workflow {job_name} job must use the default success() condition")
+        for index, step in enumerate(job.get("steps", []), start=1):
+            if not isinstance(step, dict):
+                continue
+            if "continue-on-error" in step:
+                errors.append(
+                    f"workflow {job_name} step {index} must not declare continue-on-error"
+                )
+            if not _uses_default_success_condition(step):
+                errors.append(
+                    f"workflow {job_name} step {index} must use the default success() condition"
+                )
 
 
 def _verify_maven(snapshot: dict[Path, bytes], source: str, errors: list[str]) -> None:
@@ -299,6 +489,8 @@ def _verify_maven(snapshot: dict[Path, bytes], source: str, errors: list[str]) -
         actual_version = None if plugin is None else plugin.findtext("m:version", namespaces=namespace)
         if actual_version != expected_version:
             errors.append(f"Maven plugin {artifact} must be exactly {expected_version}")
+
+    _verify_openapi_generator(pom, namespace, errors)
 
     enforcer = plugins.get("maven-enforcer-plugin")
     enforcer_elements = [] if enforcer is None else list(enforcer.iter())
@@ -400,6 +592,7 @@ def _verify_workflow(snapshot: dict[Path, bytes], source: str, errors: list[str]
     required_jobs = {"topology", "backend", "workbench", "scaffold-gate"}
     if set(jobs) != required_jobs:
         errors.append(f"scaffold workflow jobs must be exactly {sorted(required_jobs)}")
+    _verify_workflow_failure_behavior(jobs, errors)
 
     for job_name, job in jobs.items():
         if not isinstance(job, dict):
@@ -431,12 +624,16 @@ def _verify_workflow(snapshot: dict[Path, bytes], source: str, errors: list[str]
         "npm install --global npm@11.9.0",
         'test "$(npm --version)" = "11.9.0"',
         "npm ci",
+        "npm run openapi:check",
         "npm run typecheck",
         "npm test",
         "npm run build",
     ]
     if _job_run_steps(jobs.get("workbench")) != expected_workbench_commands:
-        errors.append("workbench job must activate and verify npm 11.9.0 before npm ci")
+        errors.append(
+            "workbench job must activate and verify npm 11.9.0 before npm ci, "
+            "then check OpenAPI generated types before typecheck"
+        )
 
     topology_commands = _job_commands(jobs.get("topology"))
     if "PyYAML==6.0.3" not in topology_commands:

@@ -1,0 +1,145 @@
+{
+  "todaySummary": "今天有一项首联责任需要处理。",
+  "currentCard": {
+    "taskId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1001",
+    "taskType": "CONTACT_LEAD",
+    "taskRevision": 2,
+    "subject": {
+      "subjectType": "LEAD",
+      "subjectRef": "lead_ref_public_01",
+      "subjectRevision": 3,
+      "title": "劳动争议咨询",
+      "subtitle": "上海 · 普通优先级"
+    },
+    "owner": {
+      "displayName": "王律师",
+      "organizationLabel": "上海业务组"
+    },
+    "businessPurpose": {
+      "code": "CONTACT_LEAD",
+      "label": "记录首次联系结果"
+    },
+    "primaryCommand": {
+      "code": "RECORD_CONTACT_RESULT",
+      "label": "确认联系结果",
+      "enabled": true
+    },
+    "expectedCompletionFact": "LEAD_CONTACT_RESULT",
+    "sla": {
+      "code": "R1_CONTACT_30M_V1",
+      "dueAt": "2026-09-05T02:00:00.123456Z",
+      "status": "DUE_SOON",
+      "timeHint": "请在 30 分钟内完成"
+    },
+    "versionStatus": "CURRENT",
+    "commandForm": {
+      "actionCode": "RECORD_CONTACT_RESULT",
+      "schemaVersion": 1,
+      "values": {
+        "leadAssignmentId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1003",
+        "leadAssignmentRevision": 0,
+        "contactChannelCode": "PHONE",
+        "resultCode": "CONNECTED_VALID",
+        "resultSummary": "已与客户本人取得联系。",
+        "legalNeed": "客户希望评估违法解除劳动合同的赔偿范围。",
+        "evidenceSubmissionId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1008"
+      },
+      "fields": [
+        {
+          "name": "contactChannelCode",
+          "label": "联系渠道",
+          "control": "SELECT",
+          "required": true,
+          "readOnly": false,
+          "options": [
+            {"value": "PHONE", "label": "电话", "disabled": false},
+            {"value": "EMAIL", "label": "电子邮件", "disabled": false}
+          ]
+        },
+        {
+          "name": "resultCode",
+          "label": "联系结果",
+          "control": "SELECT",
+          "required": true,
+          "readOnly": false,
+          "options": [
+            {"value": "CONNECTED_VALID", "label": "有效接通", "disabled": false},
+            {"value": "NOT_CONNECTED", "label": "未接通", "disabled": false},
+            {"value": "SUSPECT_INVALID", "label": "疑似无效", "disabled": false}
+          ]
+        },
+        {
+          "name": "resultSummary",
+          "label": "结果摘要",
+          "control": "TEXTAREA",
+          "required": false,
+          "readOnly": false,
+          "options": []
+        },
+        {
+          "name": "legalNeed",
+          "label": "已确认法律需求",
+          "control": "TEXTAREA",
+          "required": true,
+          "readOnly": false,
+          "options": []
+        },
+        {
+          "name": "evidenceSubmissionId",
+          "label": "证据提交",
+          "control": "SELECT",
+          "required": false,
+          "readOnly": false,
+          "options": [
+            {
+              "value": "01955c2a-7b14-7a12-8f45-4f6e8c9a1008",
+              "label": "客户提交的材料摘要",
+              "disabled": false
+            }
+          ]
+        }
+      ]
+    },
+    "actionDraft": {
+      "draftId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1002",
+      "draftRevision": 1,
+      "actionCode": "RECORD_CONTACT_RESULT",
+      "schemaVersion": 1,
+      "values": {
+        "leadAssignmentId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1003",
+        "leadAssignmentRevision": 0,
+        "contactChannelCode": "PHONE",
+        "resultCode": "CONNECTED_VALID",
+        "resultSummary": "已与客户本人取得联系。",
+        "legalNeed": "客户希望评估违法解除劳动合同的赔偿范围。",
+        "evidenceSubmissionId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1008"
+      },
+      "digest": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+      "updatedAt": "2026-09-05T01:35:00.654321Z",
+      "editable": true
+    },
+    "preconditions": {
+      "taskETag": "\"task.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"",
+      "subjectETag": "\"subject.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\"",
+      "draftETag": "\"draft.CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC\""
+    }
+  },
+  "nextSummaries": [
+    {
+      "taskId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1012",
+      "businessPurpose": {
+        "code": "CONTACT_LEAD",
+        "label": "下一项首次联系"
+      },
+      "priority": "NORMAL",
+      "timeHint": "今天 11:00 前"
+    }
+  ],
+  "waitingCount": 1,
+  "chatComposer": {
+    "mode": "ACTION_DRAFT",
+    "targetTaskId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1001",
+    "placeholder": "补充或修改当前动作草稿",
+    "enabled": true
+  }
+}

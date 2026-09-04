@@ -1,0 +1,11 @@
+{
+  "draftId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1002",
+  "expectedDraftRevision": 1,
+  "draftDigest": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+  "decisionCode": "KEEP_SEPARATE",
+  "candidateLeadId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1004",
+  "candidateLeadRevision": 5,
+  "partyId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1005",
+  "partyRevision": 2,
+  "rationaleSummary": "联系方式相同，但经核验是不同当事人。"
+}

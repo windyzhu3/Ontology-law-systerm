@@ -1,0 +1,8 @@
+{
+  "draftId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1002",
+  "expectedDraftRevision": 1,
+  "draftDigest": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+  "causalDecisionId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1006",
+  "causalDecisionHash": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
+  "rationaleSummary": "已收到并确认来源接入停用请求。"
+}

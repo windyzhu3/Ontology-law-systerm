@@ -1,0 +1,7 @@
+{
+  "taskId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1001",
+  "expectedTaskRevision": 1,
+  "waitReceiptId": "01955c2a-7b14-7a12-8f45-4f6e8c9a1010",
+  "waitReceiptHash": "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+  "dueCutoff": "2026-09-05T01:30:00.123456Z"
+}
