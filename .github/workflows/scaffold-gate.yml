@@ -1,0 +1,80 @@
+name: Scaffold gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  topology:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12.14"
+      - name: Install exact topology parser
+        run: python -m pip install PyYAML==6.0.3
+      - name: Test topology verifier
+        run: python -m unittest tests.test_topology -v
+      - name: Verify repository topology
+        run: python scripts/verify_topology.py
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: "25.0.4.1+1"
+          cache: maven
+      - name: Package backend and verify architecture
+        run: ./mvnw -f backend/pom.xml package
+
+  workbench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24.20.0"
+          cache: npm
+      - name: Activate exact npm
+        run: npm install --global npm@11.9.0
+      - name: Verify exact npm
+        run: test "$(npm --version)" = "11.9.0"
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  scaffold-gate:
+    if: ${{ always() }}
+    needs:
+      - topology
+      - backend
+      - workbench
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every scaffold job
+        env:
+          TOPOLOGY_RESULT: ${{ needs.topology.result }}
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          WORKBENCH_RESULT: ${{ needs.workbench.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$TOPOLOGY_RESULT" = success
+          test "$BACKEND_RESULT" = success
+          test "$WORKBENCH_RESULT" = success
