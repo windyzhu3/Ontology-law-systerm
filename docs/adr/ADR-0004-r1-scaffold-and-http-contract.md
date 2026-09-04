@@ -20,7 +20,7 @@ HTTP 的操作、错误与前置条件由 [R1 HTTP 矩阵](../contracts/r1/R1-HT
 |---|---|---|
 | backendProject | SINGLE_MAVEN_BACKEND | 单 Maven 工程 `backend/pom.xml`；不得创建第二个后端项目或聚合多模块 |
 | jar | SINGLE_DEPLOYABLE_JAR | 唯一可部署 Jar 的 groupId 为 `io.github.windyzhu3`，artifactId 为 `ontology-law-system` |
-| rootPackage | IO_GITHUB_WINDYZHU3_ONTOLOGYLAW | 唯一 Java 根包为 `io.github.windyzhu3.ontologylaw`；R1 只含 bootstrap、api、worker、audit、execution、identity、lead、opportunity、query、responsibility |
+| rootPackage | IO_GITHUB_WINDYZHU3_ONTOLOGYLAW | 唯一 Java 根包为 `io.github.windyzhu3.ontologylaw`；R1 只含 bootstrap、api、worker、audit、execution、identity、lead、opportunity、party、query、responsibility |
 | runtimeRole | OLS_API_OR_WORKER | 唯一键 `ols.runtime-role` 只接受单值 `api` 或 `worker`；缺失、未知、重复来源冲突或双 Context 均启动失败 |
 | npmWorkspace | ROOT_SINGLE_WORKBENCH | 根 `package.json` 只声明一个 workspace `apps/workbench`；提交 npm lockfile；禁止第二个可部署前端 package |
 | workbench | SINGLE_SPA_ROUTE_MODES | 唯一 SPA 位于 `apps/workbench`；`/workbench` 与 `/admin/identity/*` 是同一制品的不同受保护 route mode |
@@ -49,7 +49,7 @@ HTTP 的操作、错误与前置条件由 [R1 HTTP 矩阵](../contracts/r1/R1-HT
 | `actions/checkout` | `11d5960a326750d5838078e36cf38b85af677262` |
 | `actions/setup-python` | `a26af69be951a213d495a4c3e4e4022e16d87065` |
 | `actions/upload-artifact` | `ea165f8d65b6e75b540449e92b4886f43607fa02` |
-| `actions/setup-java` | `b6effb05e454b25005698d916606bdc6ffcbf961` |
+| `actions/setup-java` | `dd06d9cba3e5552c54d9f8ea23572deb30010f7c` |
 | `actions/setup-node` | `49933ea5288caeca8642d1e84afbd3f7d6820020` |
 
 这些 SHA 是 2026-09-02 对官方仓库相应 major ref 的解析结果；变更必须通过新 ADR 或本 ADR 的显式修订，而不是悄然移动。
@@ -61,17 +61,18 @@ HTTP 的操作、错误与前置条件由 [R1 HTTP 矩阵](../contracts/r1/R1-HT
 | Consumer | May depend on public API of |
 |---|---|
 | `identity` | 无 R1 业务包 |
+| `party` | 无 R1 业务包 |
 | `audit` | `identity` |
 | `opportunity` | `identity`、`audit` |
 | `execution` | `identity`、`audit` |
 | `responsibility` | `identity`、`audit`、`execution` |
-| `lead` | `identity`、`audit`、`execution`、`responsibility`、`opportunity` |
+| `lead` | `identity`、`audit`、`execution`、`responsibility`、`opportunity`、`party` |
 | `query` | `identity`、`responsibility`、`lead`、`opportunity` |
 | `api` | 上述包的具名应用端口和 `query`；不得引用其他包的 `internal` |
 | `worker` | mTLS internal client、准确 Owner queue port；不得引用 Controller、浏览器 DTO 或 Command Repository |
 | `bootstrap` | 只负责选择并组装一个 runtime role Context |
 
-领域包保持纯 Java，不依赖 Spring、Jackson、HTTP 或 jOOQ。jOOQ 类型只能存在于各 Fact Owner 的 `internal.persistence`，API 不得暴露 Repository、jOOQ Record 或内部 Command 模型。任何包不得访问另一个包的 `internal`。
+领域包保持纯 Java，不依赖 Spring、Jackson、HTTP 或 jOOQ。jOOQ 类型只能存在于各 Fact Owner 的 `internal.persistence`，其中 Party record/POJO 只能位于 `party.internal.persistence.jooq`；禁止共享生成根，也不得把 Party record 放入 Lead。Query 通过各 Fact Owner 的具名 read port 组合读取模型，不拥有生成记录。API 不得暴露 Repository、jOOQ Record 或内部 Command 模型。任何包不得访问另一个包的 `internal`。
 
 ## Runtime role and Bean isolation
 

@@ -149,6 +149,31 @@ R1_SCAFFOLD_ADR = Path("docs/adr/ADR-0004-r1-scaffold-and-http-contract.md")
 R1_TASK_CONTRACT = Path("docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md")
 R1_HTTP_CONTRACT = Path("docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md")
 R1_WORKBENCH_CONTRACT = Path("docs/contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md")
+R1_EXECUTABLE_CONTRACT_MARKERS = {
+    R1_TASK_CONTRACT: (
+        "### Persisted subject and secondary bindings",
+        "### Non-completion command Receipt results",
+        "R1_COMMAND_SCOPE_V1",
+        "R1_DUPLICATE_CANDIDATE_V1",
+        "R1_BUSINESS_WINDOW_V1",
+        "**Pre-slot gate：**",
+        "`legalNeed: SafeText2000`",
+    ),
+    R1_HTTP_CONTRACT: (
+        "## Request DTO catalog",
+        "## Successful response projections",
+        "## ETag contract",
+        "## ActionDraft confirmation lifecycle",
+        "## OpenAPI security binding",
+        "`legalNeed: SafeText2000`",
+    ),
+    R1_WORKBENCH_CONTRACT: (
+        "## CurrentWorkCardEnvelope wire projection",
+        "## Command form and Draft projection",
+        "`PreconditionTokens`",
+        "`ActionDraftProjection`",
+    ),
+}
 README = Path("README.md")
 VISUAL_INDEXES = {
     Path("docs/design/sales-mvp-workcards/README.md"): Path(
@@ -316,9 +341,12 @@ R1_BRANCH_DETAIL_CONTRACTS = {
 }
 R1_E2E_CONTRACTS = {
     "E2E_P0_01_LINK": (
-        "P0_01_LINK_EXISTING", "`decision_record:+1`", "`current:DONE,r+1`",
-        "`R1 selector:exactly1`", "`receipt:+1,event:+1,outbox:+1,audit:+1`",
-        "`other-tenant:0; replay:all-0; technical-failure:all-0`",
+        "P0_01_LINK_EXISTING",
+        "`decision_record:+1; lead rows:+0; parsed_party_id:candidate.parsed_party_id; "
+        "party_resolution_code:RESOLVED; disposition_code:LINK_EXISTING_PARTY; lead revision:+1`",
+        "`current:DONE,r+1`", "`R1 selector on post-CAS Lead revision:exactly1`",
+        "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`candidate Lead/Party mutation:0; other-tenant:0; replay:all-0; technical-failure:all-0`",
     ),
     "E2E_P0_01_SEPARATE": (
         "P0_01_KEEP_SEPARATE", "`decision_record:+1`", "`current:DONE,r+1`",
@@ -633,7 +661,7 @@ R1_SCAFFOLD_DECISIONS = {
     ),
     "rootPackage": (
         "IO_GITHUB_WINDYZHU3_ONTOLOGYLAW",
-        "唯一 Java 根包为 `io.github.windyzhu3.ontologylaw`；R1 只含 bootstrap、api、worker、audit、execution、identity、lead、opportunity、query、responsibility",
+        "唯一 Java 根包为 `io.github.windyzhu3.ontologylaw`；R1 只含 bootstrap、api、worker、audit、execution、identity、lead、opportunity、party、query、responsibility",
     ),
     "runtimeRole": (
         "OLS_API_OR_WORKER",
@@ -1489,6 +1517,15 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
         if field_value(text, "Contract ID") != expected_id or field_value(text, "Status") != "FROZEN":
             findings.append(f"{label} must declare Contract ID {expected_id} and Status FROZEN")
             return
+    for path, markers in R1_EXECUTABLE_CONTRACT_MARKERS.items():
+        text = governed[path]
+        assert text is not None
+        for marker in markers:
+            if marker not in text:
+                findings.append(
+                    f"R1 executable contract marker missing from {path.as_posix()}: {marker}"
+                )
+                return
     if field_value(adr_text, "Contract ID") != "R1-SCAFFOLD-V1" or field_value(
         adr_text, "Status"
     ) != "Accepted":

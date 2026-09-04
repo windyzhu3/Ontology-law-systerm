@@ -33,6 +33,8 @@ Status: FROZEN
 
 ## Task 0: 用V850补齐P0-02权威完成槽
 
+> 状态：已完成并由`DB-52P2-PG18-RUNTIME-V1-1`真实PostgreSQL 18证据验证；保留下列步骤作为可复现历史，不得重复生成另一套迁移。
+
 **Files:**
 
 - Create: `docs/adr/ADR-0002-lead-ingress-completion-slot.md`
@@ -110,6 +112,8 @@ git commit -m "feat(db): add lead ingress completion slot"
 
 ## Task 1: 建立单制品工程和架构门禁
 
+> 状态：已由PR #6合并；本任务只允许随ADR-0004修订同步维护机械边界，不再扩建空壳。
+
 **Files:**
 
 - Create: `.mvn/wrapper/maven-wrapper.properties`
@@ -124,6 +128,7 @@ git commit -m "feat(db): add lead ingress completion slot"
 - Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/identity/package-info.java`
 - Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/lead/package-info.java`
 - Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/opportunity/package-info.java`
+- Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/party/package-info.java`
 - Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/query/package-info.java`
 - Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/responsibility/package-info.java`
 - Create: `backend/src/test/java/io/github/windyzhu3/ontologylaw/ArchitectureTest.java`
@@ -189,6 +194,8 @@ git commit -m "build: scaffold single-artifact R1 topology"
 
 - [ ] 先写契约测试，要求唯一OpenAPI为3.1；公共请求使用Bearer认证，Tenant只从服务端ActorContext取得；每个写操作按HTTP矩阵要求UUID `Idempotency-Key`和各自前置条件。错误统一为RFC 9457 `application/problem+json`，公共合同不得暴露调用方可指定的Tenant；幂等键是调用方可指定Command ID的唯一明确例外。
 
+- [ ] 逐字段实现HTTP合同的Request DTO catalog、成功响应、安全Receipt/Problem投影、strong ETag、Draft确认生命周期和Bearer/mTLS绑定；OpenAPI是这些wire schema的唯一可执行来源，不在Java或TypeScript手写第二套DTO。
+
 - [ ] 冻结以下具名端点，禁止通用`POST /commands`或自由`actionCode`：
 
 | Method | Path | Operation |
@@ -205,6 +212,8 @@ git commit -m "build: scaffold single-artifact R1 topology"
 | POST | `/api/v1/tasks/{taskId}/commands/review-lead-validity` | `reviewLeadValidity` |
 | GET | `/api/v1/commands/{commandId}/receipt` | `getCommandReceipt` |
 | POST | `/internal/v1/tasks/commands/reopen-due-contact-tasks` | `reopenDueContactTasks` |
+
+`reopenDueContactTasks`名称保留复数仅表示Worker逐项调用；一次HTTP请求、一个CommandId和一张Receipt只恢复一张由Task合同准确绑定的WAITING Task，禁止空批成功。
 
 - [ ] `CurrentWorkCardEnvelope`固定包含一句`todaySummary`、零或一张完整`currentCard`、最多两条`nextSummaries`、`waitingCount`和一个固定底部`chatComposer`；精确基数与路由模式由Workbench合同控制。卡片冻结taskId/revision、Subject选择器、Owner Appointment、businessPurpose、primaryCommand、expectedCompletionFact、SLA及版本化表单Schema。`currentCard.actionDraft`固定为null或当前Task唯一已授权草稿，字段恰为`draftId`、`draftRevision`、`actionCode`、`schemaVersion`、`values`、`digest`、`updatedAt`、`editable`；刷新恢复只通过`GET /api/v1/workcards/current`完成，不新增第二个Draft读取端点。
 
@@ -238,7 +247,7 @@ git commit -m "feat(api): define R1 OpenAPI contract"
 - Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/execution/internal/persistence/CapabilityRoleExecutor.java`
 - Create: `backend/src/test/java/io/github/windyzhu3/ontologylaw/execution/internal/persistence/CapabilityRoleExecutorIT.java`
 - Create: `backend/scripts/generate-jooq.sh`
-- Generate: `backend/src/generated/jooq/io/github/windyzhu3/ontologylaw/{identity,audit,execution,responsibility,lead,opportunity}/internal/persistence/jooq/`
+- Generate: `backend/src/generated/jooq/io/github/windyzhu3/ontologylaw/{identity,audit,execution,responsibility,party,lead,opportunity}/internal/persistence/jooq/`
 - Create: `backend/src/generated/jooq/MANIFEST.sha256`
 - Modify: `backend/pom.xml`
 
@@ -283,7 +292,7 @@ git commit -m "build: add PostgreSQL jOOQ integration base"
 
 - [ ] 测试授权在事务开始与提交前都加载准确Tenant/Principal/Appointment/组织Scope/authority path；Appointment撤销、Subject revision变化或存在DENY时拒绝。
 
-- [ ] 实现静态Handler注册表，不用反射扫描自由命令名。Payload使用RFC 8785规范化JSON摘要；Scope摘要覆盖Tenant、命令类型和准确Subject。遵循`LEAD→TASK→COMMAND_SLOT`锁序，在Command阶段以Tenant＋Command UUID取得事务级advisory lock并拒绝同Tenant跨Scope复用，保证Receipt查询单义而不修改52＋2 Schema。
+- [ ] 实现静态Handler注册表，不用反射扫描自由命令名。Payload使用RFC 8785规范化JSON摘要；Scope严格使用Task合同`R1_COMMAND_SCOPE_V1`，覆盖Tenant、命令类型、taskId、唯一持久Lead subject及具名次级selector。按Task合同区分pre-slot零Command写入与post-slot终局REJECTED Receipt；遵循`LEAD→TASK→COMMAND_SLOT`锁序，在Command阶段以Tenant＋Command UUID取得事务级advisory lock并拒绝同Tenant跨Scope复用，保证Receipt查询单义而不修改52＋2 Schema。
 
 - [ ] 成功分支、NO_CHANGE分支、REJECTED分支严格遵循运行时合同；连接中断、锁超时和SQL异常回滚，不伪造FAILED Receipt。
 
@@ -313,7 +322,7 @@ git commit -m "feat: implement atomic command runtime"
 
 - [ ] 先写失败测试覆盖来源幂等、业务疑似重复、缺联系方式、自动分配、人工分配、零候选、跨租户候选和并发双分配。
 
-- [ ] 冻结确定性分配：版本化`R1SourcePolicyRegistry`按sourceAccountCode静态提供assignmentMode、有序routing organization root codes、主管root、来源接入root和IANA business timezone，不建配置表；policy priority是候选覆盖的首个有序root索引。候选严格消费Task矩阵的同Tenant、ACTIVE Appointment、`SALES_CONTACT_OWNER` AuthorityGrant和DENY规则，再按priority、appointment start、Appointment UUID升序选择第一项，不散列、不随机。无候选时以准确唯一主管创建P0-04 Task；主管为零个或多个时返回`SUPERVISOR_UNRESOLVED`且所有业务delta为0。
+- [ ] 严格实现Task合同冻结的`R1SourcePolicyRegistry`、`R1_DUPLICATE_CANDIDATE_V1`、business SLA/window、规范化/HMAC profiles及R1代码allowlist，不增加配置表或运行时规则DSL。候选继续按policy priority、appointment start、Appointment UUID升序选择第一项，不散列、不随机。
 
 - [ ] `captureLead`只接收明文输入到应用边界；服务端加密/HMAC并写不可变Lead。疑似重复创建`RESOLVE_LEAD_DUPLICATE`；缺联系方式创建`COMPLETE_LEAD_INGRESS`；人工模式创建`ASSIGN_LEAD`；其余路径原子创建LeadAssignment、更新current pointer并创建CONTACT_LEAD。
 
@@ -340,7 +349,7 @@ git commit -m "feat: implement R1 lead intake responsibilities"
 
 - Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/query/CurrentWorkCardQuery.java`
 - Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/query/CurrentWorkCard.java`
-- Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/query/internal/persistence/JooqCurrentWorkCardQuery.java`
+- Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/query/CurrentWorkCardProjectionService.java`
 - Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/responsibility/ActionDraftService.java`
 - Create: `backend/src/main/java/io/github/windyzhu3/ontologylaw/responsibility/internal/persistence/JooqActionDraftRepository.java`
 - Create: `backend/src/test/java/io/github/windyzhu3/ontologylaw/query/CurrentWorkCardIT.java`
@@ -350,7 +359,7 @@ git commit -m "feat: implement R1 lead intake responsibilities"
 
 - [ ] 测试一Task最多一份Draft；保存使用revision CAS；action/schema必须等于Task静态注册；确认时只能回传服务器签发的digest且必须匹配；`GET /api/v1/workcards/current`按冻结字段返回草稿供刷新恢复；确认后不可编辑；确认本身不完成Task。
 
-- [ ] Query每条SQL显式绑定tenantId并先解析Subject后做四轴授权；敏感字段仅按卡片Schema最小解密，不把jOOQ Record暴露给API。
+- [ ] Query只组合各Fact Owner的具名read port；SQL和jOOQ Record留在对应Owner的`internal.persistence`，每条SQL显式绑定tenantId并先解析Subject后做四轴授权。敏感字段仅按卡片Schema最小解密，不把jOOQ Record暴露给Query或API。
 
 - [ ] 实现并运行两组测试至通过。
 
@@ -375,7 +384,7 @@ git commit -m "feat: serve one current work card"
 
 - [ ] 先写失败测试：Task类型/Owner/Assignment/Lead路径不一致拒绝；每个Task至多一条ContactResult；contactNo在Lead内递增；并发提交只有一个成功；同Command重放返回原Receipt。
 
-- [ ] `CONNECTED_VALID`要求legalNeed并原子写ContactResult、唯一Opportunity锚点、Task DONE、Audit/Event/Outbox/Receipt。R1只产生`OpportunityOpened`边界，不创建无Handler的R2 Task，也不实现报价或实质商机推进。
+- [ ] `CONNECTED_VALID`要求确认Draft携带HTTP合同的`legalNeed: SafeText2000`，以该原文生成Opportunity的受保护`legal_need_ciphertext/digest`，并原子写ContactResult、唯一Opportunity锚点、Task DONE、Audit/Event/Outbox/Receipt；不得静默复用Lead捕获摘要。R1只产生`OpportunityOpened`边界，不创建无Handler的R2 Task，也不实现报价或实质商机推进。
 
 - [ ] `NOT_CONNECTED`严格消费`CONTACT_RETRY_V1`：初次计attempt 1、总次数最多3；attempt 1/2分别按Source Policy IANA时区与`CN_WEEKDAY_V1`下一工作日10:00/15:00恢复，due为恢复后30分钟，并优先切换到另一受控可用channel。可重试时原子完成当前Task并创建新CONTACT_LEAD Task：先OPEN revision=0，再同事务CAS到WAITING revision=1并追加WaitReceipt；attempt 3耗尽时不再创建联系重试，只创建主管复核。到期由内部具名命令WAITING→OPEN，不能直接插入WAITING。
 
@@ -408,7 +417,7 @@ git commit -m "feat: close the first-contact fact loop"
 
 - [ ] API delegate只做DTO转换和调用具名Application Service；不得直接使用DSLContext或生成jOOQ类型。
 
-- [ ] Worker不持有Command/Query/Audit数据库能力。`DueTaskScheduler`只通过mTLS保护的internal端点请求API执行具名到期恢复命令；internal端点使用Service Principal并仍走CommandRuntime。
+- [ ] Worker不持有Command/Query/Audit数据库能力。`DueTaskScheduler`逐张Task调用mTLS保护的internal端点；每次提交Task/WaitReceipt准确selector并只恢复一张Task，internal端点使用Service Principal且仍走CommandRuntime。
 
 - [ ] 测试API角色无Worker Bean、Worker角色无Controller/Command数据库成员资格；两个角色可由同一Jar分别启动，缺少对端时不会伪造任务恢复成功。
 
