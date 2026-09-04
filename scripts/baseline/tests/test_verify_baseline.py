@@ -305,6 +305,82 @@ class VerifyBaselineTest(unittest.TestCase):
             e2e_lines.append(
                 markdown_row(scenario_id, *row)
             )
+        candidate_payload_lines = [
+            markdown_row("PrimaryCommand", "ExactCandidateFields"),
+            markdown_row("---", "---"),
+            markdown_row(
+                "RESOLVE_DUPLICATE_LEAD",
+                "decisionCode,candidateLeadId,candidateLeadRevision,partyId,partyRevision,rationaleSummary",
+            ),
+            markdown_row("COMPLETE_LEAD_INGRESS", "phone?,email?,sourceCode,sourceSummary"),
+            markdown_row("ASSIGN_LEAD", "ownerAppointmentId"),
+            markdown_row("RECORD_ROUTING_DISPOSITION", "decisionCode,rationaleSummary"),
+            markdown_row(
+                "ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST",
+                "causalDecisionId,causalDecisionHash,rationaleSummary",
+            ),
+            markdown_row(
+                "RECORD_CONTACT_RESULT",
+                "leadAssignmentId,leadAssignmentRevision,contactChannelCode,resultCode,resultSummary?,legalNeed?,evidenceSubmissionId?",
+            ),
+            markdown_row(
+                "REVIEW_LEAD_VALIDITY",
+                "triggeringContactResultId,triggeringContactResultHash,decisionCode,rationaleSummary",
+            ),
+        ]
+        candidate_condition_lines = [
+            markdown_row("PrimaryCommand", "ExactConditionalValidation"),
+            markdown_row("---", "---"),
+            markdown_row(
+                "COMPLETE_LEAD_INGRESS",
+                "at-least-one-of-phone-email",
+            ),
+            markdown_row(
+                "RECORD_CONTACT_RESULT",
+                "legalNeed-required-when-CONNECTED_VALID-and-forbidden-otherwise",
+            ),
+        ]
+        duplicate_transition_lines = [
+            markdown_row(
+                "BranchID",
+                "RequiredCurrentDisposition",
+                "CandidateSelectors",
+                "CurrentLeadCAS",
+                "ForbiddenCurrentLeadChanges",
+                "CandidateLeadPartyMutation",
+                "DecisionDigest",
+                "SuccessorSelector",
+            ),
+            markdown_row(*(["---"] * 8)),
+            markdown_row(
+                "P0_01_LINK_EXISTING",
+                "CAPTURED",
+                "candidateLead@revision+party@revision:revalidate",
+                "parsed_party_id=candidate.parsed_party_id;party_resolution_code=RESOLVED;disposition_code=LINK_EXISTING_PARTY;revision=old+1",
+                "current_assignment_id,capture_fields,ingress_slot",
+                "NONE",
+                "old-current-lead-selector+candidate-lead-party-selectors+new-values+new-revision",
+                "post-CAS-lead-revision;duplicate-only-when-CAPTURED",
+            ),
+            markdown_row(
+                "P0_01_KEEP_SEPARATE",
+                "CAPTURED",
+                "candidateLead@revision+party@revision:revalidate",
+                "disposition_code=KEEP_SEPARATE;revision=old+1",
+                "parsed_party_id,party_resolution_code,current_assignment_id,capture_fields,ingress_slot",
+                "NONE",
+                "old-current-lead-selector+candidate-lead-party-selectors+KEEP_SEPARATE+new-revision",
+                "post-CAS-lead-revision;duplicate-only-when-CAPTURED",
+            ),
+        ]
+        code_allowlist_lines = [
+            markdown_row("Code domain", "Allowed values"),
+            markdown_row("---", "---"),
+            markdown_row(
+                "Lead disposition used by R1",
+                "`CAPTURED`, `LINK_EXISTING_PARTY`, `KEEP_SEPARATE`",
+            ),
+        ]
         self.write(
             root,
             "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md",
@@ -331,6 +407,22 @@ class VerifyBaselineTest(unittest.TestCase):
                     "## Completion branches",
                     "",
                     *branch_lines,
+                    "",
+                    "## Candidate payload registry",
+                    "",
+                    *candidate_payload_lines,
+                    "",
+                    "## Candidate payload condition registry",
+                    "",
+                    *candidate_condition_lines,
+                    "",
+                    "## Duplicate resolution transition registry",
+                    "",
+                    *duplicate_transition_lines,
+                    "",
+                    "## R1 code allowlists",
+                    "",
+                    *code_allowlist_lines,
                     "",
                     "## E2E deltas",
                     "",
@@ -388,6 +480,20 @@ class VerifyBaselineTest(unittest.TestCase):
             markdown_row("SlotScope", "TENANT_ENVELOPE_SUBJECT_SCOPE"),
             markdown_row("PayloadConflict", "ORIGINAL_RECEIPT_NO_NEW_WRITES"),
         ]
+        authentication_challenge_lines = [
+            markdown_row("SecurityScheme", "Operations", "UnauthenticatedTransport"),
+            markdown_row("---", "---", "---"),
+            markdown_row(
+                "publicBearer",
+                "/api/v1/**",
+                "HTTP_401_PROBLEM_WITH_WWW_AUTHENTICATE_BEARER",
+            ),
+            markdown_row(
+                "internalMutualTls",
+                "reopenDueContactTasks",
+                "TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE",
+            ),
+        ]
         self.write(
             root,
             "docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md",
@@ -405,6 +511,10 @@ class VerifyBaselineTest(unittest.TestCase):
                     "## ETag contract",
                     "## ActionDraft confirmation lifecycle",
                     "## OpenAPI security binding",
+                    "",
+                    "## Authentication challenge binding",
+                    "",
+                    *authentication_challenge_lines,
                     "",
                     "## Operations",
                     "",
@@ -2009,6 +2119,114 @@ class VerifyBaselineTest(unittest.TestCase):
             self.assert_finding(
                 root,
                 "R1 E2E scenario differs from frozen delta contract: E2E_P0_03",
+            )
+
+    def test_r1_candidate_payload_requires_legal_need(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md",
+                "RECORD_CONTACT_RESULT",
+                "ExactCandidateFields",
+                "leadAssignmentId,leadAssignmentRevision,contactChannelCode,resultCode,resultSummary?,evidenceSubmissionId?",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 candidate payload differs from frozen fields: RECORD_CONTACT_RESULT",
+            )
+
+    def test_r1_candidate_payload_freezes_legal_need_branch_condition(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            contract = root / "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md"
+            contract.write_text(
+                contract.read_text(encoding="utf-8").replace(
+                    "legalNeed-required-when-CONNECTED_VALID-and-forbidden-otherwise",
+                    "legalNeed-optional-for-all-results",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 candidate payload condition differs from frozen contract: RECORD_CONTACT_RESULT",
+            )
+
+    def test_r1_duplicate_transition_requires_keep_separate_lead_cas(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            contract = root / "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md"
+            contract.write_text(
+                contract.read_text(encoding="utf-8").replace(
+                    "disposition_code=KEEP_SEPARATE;revision=old+1",
+                    "NONE",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 duplicate transition differs from frozen contract: P0_01_KEEP_SEPARATE",
+            )
+
+    def test_r1_duplicate_transition_keeps_candidate_lead_and_party_immutable(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            contract = root / "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md"
+            contract.write_text(
+                contract.read_text(encoding="utf-8").replace(
+                    "| NONE | old-current-lead-selector+candidate-lead-party-selectors+KEEP_SEPARATE+new-revision |",
+                    "| candidateLead.revision=old+1 | old-current-lead-selector+candidate-lead-party-selectors+KEEP_SEPARATE+new-revision |",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 duplicate transition differs from frozen contract: P0_01_KEEP_SEPARATE",
+            )
+
+    def test_r1_lead_disposition_allowlist_requires_keep_separate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md",
+                "Lead disposition used by R1",
+                "Allowed values",
+                "`CAPTURED`, `LINK_EXISTING_PARTY`",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 Lead disposition allowlist differs from the frozen contract",
+            )
+
+    def test_r1_mtls_authentication_must_not_emit_a_bearer_challenge(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_contract_table_cell(
+                root,
+                "docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md",
+                "internalMutualTls",
+                "UnauthenticatedTransport",
+                "HTTP_401_PROBLEM_WITH_WWW_AUTHENTICATE_BEARER",
+            )
+
+            self.assert_finding(
+                root,
+                "R1 authentication challenge differs from frozen contract: internalMutualTls",
             )
 
     def test_r1_scaffold_decision_rejects_changed_frozen_value(self) -> None:

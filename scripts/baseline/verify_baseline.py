@@ -153,6 +153,9 @@ R1_EXECUTABLE_CONTRACT_MARKERS = {
     R1_TASK_CONTRACT: (
         "### Persisted subject and secondary bindings",
         "### Non-completion command Receipt results",
+        "## Candidate payload registry",
+        "## Candidate payload condition registry",
+        "## Duplicate resolution transition registry",
         "R1_COMMAND_SCOPE_V1",
         "R1_DUPLICATE_CANDIDATE_V1",
         "R1_BUSINESS_WINDOW_V1",
@@ -165,6 +168,7 @@ R1_EXECUTABLE_CONTRACT_MARKERS = {
         "## ETag contract",
         "## ActionDraft confirmation lifecycle",
         "## OpenAPI security binding",
+        "## Authentication challenge binding",
         "`legalNeed: SafeText2000`",
     ),
     R1_WORKBENCH_CONTRACT: (
@@ -339,6 +343,63 @@ R1_BRANCH_DETAIL_CONTRACTS = {
         "SUCCEEDED", "`LEAD_VALIDITY_REVIEW@hash`", "`LeadValidityReviewedV1`", "R1_PROJECTION",
     ),
 }
+R1_CANDIDATE_PAYLOAD_CONTRACTS = {
+    "RESOLVE_DUPLICATE_LEAD": (
+        "decisionCode,candidateLeadId,candidateLeadRevision,partyId,partyRevision,"
+        "rationaleSummary"
+    ),
+    "COMPLETE_LEAD_INGRESS": "phone?,email?,sourceCode,sourceSummary",
+    "ASSIGN_LEAD": "ownerAppointmentId",
+    "RECORD_ROUTING_DISPOSITION": "decisionCode,rationaleSummary",
+    "ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST": (
+        "causalDecisionId,causalDecisionHash,rationaleSummary"
+    ),
+    "RECORD_CONTACT_RESULT": (
+        "leadAssignmentId,leadAssignmentRevision,contactChannelCode,resultCode,"
+        "resultSummary?,legalNeed?,evidenceSubmissionId?"
+    ),
+    "REVIEW_LEAD_VALIDITY": (
+        "triggeringContactResultId,triggeringContactResultHash,decisionCode,rationaleSummary"
+    ),
+}
+R1_CANDIDATE_CONDITION_CONTRACTS = {
+    "COMPLETE_LEAD_INGRESS": "at-least-one-of-phone-email",
+    "RECORD_CONTACT_RESULT": (
+        "legalNeed-required-when-CONNECTED_VALID-and-forbidden-otherwise"
+    ),
+}
+R1_DUPLICATE_TRANSITION_CONTRACTS = {
+    "P0_01_LINK_EXISTING": (
+        "CAPTURED",
+        "candidateLead@revision+party@revision:revalidate",
+        "parsed_party_id=candidate.parsed_party_id;party_resolution_code=RESOLVED;"
+        "disposition_code=LINK_EXISTING_PARTY;revision=old+1",
+        "current_assignment_id,capture_fields,ingress_slot",
+        "NONE",
+        "old-current-lead-selector+candidate-lead-party-selectors+new-values+new-revision",
+        "post-CAS-lead-revision;duplicate-only-when-CAPTURED",
+    ),
+    "P0_01_KEEP_SEPARATE": (
+        "CAPTURED",
+        "candidateLead@revision+party@revision:revalidate",
+        "disposition_code=KEEP_SEPARATE;revision=old+1",
+        "parsed_party_id,party_resolution_code,current_assignment_id,capture_fields,ingress_slot",
+        "NONE",
+        "old-current-lead-selector+candidate-lead-party-selectors+KEEP_SEPARATE+new-revision",
+        "post-CAS-lead-revision;duplicate-only-when-CAPTURED",
+    ),
+}
+R1_LEAD_DISPOSITION_ALLOWLIST = "`CAPTURED`, `LINK_EXISTING_PARTY`, `KEEP_SEPARATE`"
+R1_AUTHENTICATION_CHALLENGE_CONTRACTS = {
+    "publicBearer": (
+        "/api/v1/**",
+        "HTTP_401_PROBLEM_WITH_WWW_AUTHENTICATE_BEARER",
+    ),
+    "internalMutualTls": (
+        "reopenDueContactTasks",
+        "TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE",
+    ),
+}
 R1_E2E_CONTRACTS = {
     "E2E_P0_01_LINK": (
         "P0_01_LINK_EXISTING",
@@ -349,9 +410,11 @@ R1_E2E_CONTRACTS = {
         "`candidate Lead/Party mutation:0; other-tenant:0; replay:all-0; technical-failure:all-0`",
     ),
     "E2E_P0_01_SEPARATE": (
-        "P0_01_KEEP_SEPARATE", "`decision_record:+1`", "`current:DONE,r+1`",
-        "`R1 selector:exactly1`", "`receipt:+1,event:+1,outbox:+1,audit:+1`",
-        "`other-tenant:0; replay:all-0; technical-failure:all-0`",
+        "P0_01_KEEP_SEPARATE",
+        "`decision_record:+1; lead rows:+0; disposition_code:KEEP_SEPARATE; lead revision:+1`",
+        "`current:DONE,r+1`", "`R1 selector on post-CAS Lead revision:exactly1`",
+        "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`candidate Lead/Party mutation:0; other-tenant:0; replay:all-0; technical-failure:all-0`",
     ),
     "E2E_P0_02": (
         "P0_02_COMPLETE", "`lead rows:+0; ingress slot:0-to-1; lead revision:+1`",
@@ -1575,6 +1638,62 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
             findings.append(f"R1 task registry TaskType {task_type} differs from its frozen command/Fact binding")
             return
 
+    candidate_payload_headers = ("PrimaryCommand", "ExactCandidateFields")
+    candidate_payload_rows = parse_controlled_markdown_table(
+        task_text,
+        "Candidate payload registry",
+        candidate_payload_headers,
+        "R1 candidate payload registry",
+        findings,
+    )
+    if candidate_payload_rows is None:
+        return
+    candidate_payloads = unique_rows_by(
+        candidate_payload_rows,
+        "PrimaryCommand",
+        "R1 candidate payload",
+        findings,
+    )
+    if candidate_payloads is None:
+        return
+    if set(candidate_payloads) != set(R1_CANDIDATE_PAYLOAD_CONTRACTS):
+        findings.append("R1 candidate payload registry must contain the exact PrimaryCommand set")
+        return
+    for command, expected_fields in R1_CANDIDATE_PAYLOAD_CONTRACTS.items():
+        if candidate_payloads[command]["ExactCandidateFields"] != expected_fields:
+            findings.append(f"R1 candidate payload differs from frozen fields: {command}")
+            return
+
+    candidate_condition_headers = ("PrimaryCommand", "ExactConditionalValidation")
+    candidate_condition_rows = parse_controlled_markdown_table(
+        task_text,
+        "Candidate payload condition registry",
+        candidate_condition_headers,
+        "R1 candidate payload condition registry",
+        findings,
+    )
+    if candidate_condition_rows is None:
+        return
+    candidate_conditions = unique_rows_by(
+        candidate_condition_rows,
+        "PrimaryCommand",
+        "R1 candidate payload condition",
+        findings,
+    )
+    if candidate_conditions is None:
+        return
+    if set(candidate_conditions) != set(R1_CANDIDATE_CONDITION_CONTRACTS):
+        findings.append(
+            "R1 candidate payload condition registry must contain the exact PrimaryCommand set"
+        )
+        return
+    for command, expected_condition in R1_CANDIDATE_CONDITION_CONTRACTS.items():
+        if candidate_conditions[command]["ExactConditionalValidation"] != expected_condition:
+            findings.append(
+                f"R1 candidate payload condition differs from frozen contract: {command}"
+            )
+            return
+
     branch_headers = (
         "BranchID",
         "TaskType",
@@ -1640,6 +1759,71 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
                 f"R1 completion branch {branch_id} differs from its frozen successor contract"
             )
             return
+
+    duplicate_transition_headers = (
+        "BranchID",
+        "RequiredCurrentDisposition",
+        "CandidateSelectors",
+        "CurrentLeadCAS",
+        "ForbiddenCurrentLeadChanges",
+        "CandidateLeadPartyMutation",
+        "DecisionDigest",
+        "SuccessorSelector",
+    )
+    duplicate_transition_rows = parse_controlled_markdown_table(
+        task_text,
+        "Duplicate resolution transition registry",
+        duplicate_transition_headers,
+        "R1 duplicate transition registry",
+        findings,
+    )
+    if duplicate_transition_rows is None:
+        return
+    duplicate_transitions = unique_rows_by(
+        duplicate_transition_rows,
+        "BranchID",
+        "R1 duplicate transition",
+        findings,
+    )
+    if duplicate_transitions is None:
+        return
+    if set(duplicate_transitions) != set(R1_DUPLICATE_TRANSITION_CONTRACTS):
+        findings.append("R1 duplicate transition registry must contain the exact BranchID set")
+        return
+    for branch_id, expected in R1_DUPLICATE_TRANSITION_CONTRACTS.items():
+        row = duplicate_transitions[branch_id]
+        actual = tuple(row[header] for header in duplicate_transition_headers[1:])
+        if actual != expected:
+            findings.append(
+                f"R1 duplicate transition differs from frozen contract: {branch_id}"
+            )
+            return
+
+    code_allowlist_headers = ("Code domain", "Allowed values")
+    code_allowlist_rows = parse_controlled_markdown_table(
+        task_text,
+        "R1 code allowlists",
+        code_allowlist_headers,
+        "R1 code allowlists",
+        findings,
+    )
+    if code_allowlist_rows is None:
+        return
+    code_allowlists = unique_rows_by(
+        code_allowlist_rows,
+        "Code domain",
+        "R1 code allowlist",
+        findings,
+    )
+    if code_allowlists is None:
+        return
+    lead_disposition = code_allowlists.get("Lead disposition used by R1")
+    if (
+        lead_disposition is None
+        or lead_disposition["Allowed values"] != R1_LEAD_DISPOSITION_ALLOWLIST
+    ):
+        findings.append("R1 Lead disposition allowlist differs from the frozen contract")
+        return
 
     e2e_headers = (
         "ScenarioID",
@@ -1718,6 +1902,40 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
             return
         if row["TenantSource"] != "ACTOR_CONTEXT":
             findings.append(f"R1 HTTP operation {operation_id} must derive tenant from ACTOR_CONTEXT")
+            return
+
+    authentication_headers = (
+        "SecurityScheme",
+        "Operations",
+        "UnauthenticatedTransport",
+    )
+    authentication_rows = parse_controlled_markdown_table(
+        http_text,
+        "Authentication challenge binding",
+        authentication_headers,
+        "R1 authentication challenge binding",
+        findings,
+    )
+    if authentication_rows is None:
+        return
+    authentication = unique_rows_by(
+        authentication_rows,
+        "SecurityScheme",
+        "R1 authentication challenge",
+        findings,
+    )
+    if authentication is None:
+        return
+    if set(authentication) != set(R1_AUTHENTICATION_CHALLENGE_CONTRACTS):
+        findings.append("R1 authentication challenge binding must contain the exact scheme set")
+        return
+    for scheme, expected in R1_AUTHENTICATION_CHALLENGE_CONTRACTS.items():
+        row = authentication[scheme]
+        actual = (row["Operations"], row["UnauthenticatedTransport"])
+        if actual != expected:
+            findings.append(
+                f"R1 authentication challenge differs from frozen contract: {scheme}"
+            )
             return
 
     idempotency_headers = ("Property", "FrozenValue")

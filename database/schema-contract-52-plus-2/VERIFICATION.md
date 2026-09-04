@@ -1,10 +1,8 @@
 # 52＋2 Schema 合同验证记录
 
-验证日期：2026-09-01
+本记录保留历史 `52-plus-2-v1` 静态/运行时证据，并索引当前 `52-plus-2-v1.1` PostgreSQL 运行时证据；不是领域、拓扑或生命周期规范。
 
-本记录保存静态校验与 `52-plus-2-v1` PostgreSQL 运行时证据，不是领域、拓扑或生命周期规范。
-
-## 静态校验证据（非规范）
+## 历史 v1 静态校验证据（非规范）
 
 - `python3 generate.py --check`：通过；静态合同与生成物逐字节一致。
 - `python3 -m unittest discover -s tests -v`：50/50 通过。
@@ -15,7 +13,16 @@
 - 跨行关系：25 个守卫合同已进入 manifest；更新、权限、注释和第 55 张表由生成测试及 `V840` 失败式验证。
 - 禁止项扫描：未出现级联删除、`SET NULL`、`SET DEFAULT`、业务原生 enum 或手工创建 Flyway 历史表。
 
-## PostgreSQL 18 v1 运行时证据
+## 当前 PostgreSQL 18 v1.1 运行时证据
+
+PR #5 workflow run `33590363980` 的闭合 artifact `9831569892` 在 PostgreSQL 18.6、Flyway 13.4.0 上通过。它是独立的 `52-plus-2-v1.1` 闭合，绑定 V001–V850 tree、20 个迁移、54 张受管表、13 个 Schema、207 个物理外键和53个 mutation guard；完整的 source binding、两次隔离空库运行、run A no-op 和五个失败关闭探针见：
+
+- [v1.1 机器摘要](../../docs/evidence/schema-runtime/2026-08-28-postgresql-18-v1.1-summary.json)
+- [v1.1 审阅报告](../../docs/evidence/schema-runtime/2026-08-28-postgresql-18-v1.1-report.md)
+
+该证据不复用或扩大 ADR-0003 的 v1 晋级证明。它证明当前数据库 v1.1 运行时门禁，不证明 R1 业务生产实现。
+
+## 历史 PostgreSQL 18 v1 运行时证据
 
 PR #3 workflow run `33405965491` 的闭合 artifact `9763252627` 在 PostgreSQL 18.6、Flyway 13.4.0 上通过。它绑定 test-merge `ae0ec5d32fdc2e5db7276a9ba7ebbbeb2814a6c1`、base `72a83b810339095a6ebefd11b30cf7fc8f522eec` 与 head `d0cd39de079f69cbd3973ab59f9f4ff75732203c`，完成两套隔离空库、run A no-op 和五个失败关闭探针。
 
@@ -28,8 +35,8 @@ PR #3 workflow run `33405965491` 的闭合 artifact `9763252627` 在 PostgreSQL 
 
 safe artifact 不公开原始 catalog fingerprint，只公开完整 verifier 输出的 SHA-256；run A、run B 与 run A no-op 的该摘要相同。不得把输出摘要描述成原始 fingerprint。
 
-## 本地限制与门禁结论
+## 历史 v1 本地限制与门禁结论
 
 当前本地执行器没有 Docker/Compose，本地尝试保持 `BLOCKED/docker_compose_unavailable`、退出码 `5`，没有本地 PASS。ADR-0003 规定：在精确 artifact/source/合同校验与持久发布后，本次托管两套空库证明正式满足 v1 运行时门禁，因此 `DB-52P2-PG18-RUNTIME=RUNTIME_VERIFIED`。
 
-该结论只覆盖 V001–V840 与 `52-plus-2-v1`；不覆盖 ADR-0002、V850、v1.1 或 R1 生产实现。受控发布仍须在目标环境执行 `migrate` → strict `validate` → `info`，并在应用制品与 manifest 摘要匹配后才可 CAS 激活 `deployment_state`。
+该历史结论只覆盖 V001–V840 与 `52-plus-2-v1`。`python3 runtime/verify_runtime.py validate-promoted-evidence` 只重验该 ADR-0003 v1 持久证据对，不验证 v1.1 report。当前受控发布仍须在目标环境执行 `migrate` → strict `validate` → `info`，并在应用制品与 `52-plus-2-v1.1` manifest 摘要匹配后才可 CAS 激活 `deployment_state`。

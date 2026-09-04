@@ -80,11 +80,13 @@ Receipt outcome 的封闭集合只有 `SUCCEEDED`、`NO_CHANGE`、`REJECTED`。C
 
 `P0_01_LINK_EXISTING`在同一Lead锁和事务中完成两类写入，二者缺一即整体回滚：先按冻结候选规则重验候选Lead准确revision及其`parsed_party_id`所指向Party仍为准确revision的ACTIVE最终Party；再对当前Lead执行一次CAS，仅把`parsed_party_id=candidateLead.parsed_party_id`、`party_resolution_code=RESOLVED`、`disposition_code=LINK_EXISTING_PARTY`和`revision=old+1`写入数据库合同允许更新列。它不更新候选Lead或Party，不合并/删除Lead或Party，也不复制Party标识。`DecisionRecord(LEAD_DUPLICATE_RESOLUTION, LINK_EXISTING_PARTY)`的`content_digest`覆盖当前Lead旧selector、候选Lead/Party selector、上述新值和新Lead revision；它仍是Task唯一完成Fact及Receipt/Event准确结果Fact。后继选择器只消费CAS后的Lead revision。
 
+`P0_01_KEEP_SEPARATE`也必须在同一Lead锁和事务中重验创建Task时冻结的候选Lead/Party准确selector；随后只对当前Lead执行一次CAS，把`disposition_code=KEEP_SEPARATE`、`revision=old+1`写入允许更新列。它不得修改当前Lead的`parsed_party_id`、`party_resolution_code`、`current_assignment_id`、捕获字段或V850 ingress槽，也不得更新候选Lead/Party、关联Party、合并或删除任何记录。`DecisionRecord(LEAD_DUPLICATE_RESOLUTION, KEEP_SEPARATE)`的`content_digest`覆盖当前Lead旧selector、候选Lead/Party selector、`KEEP_SEPARATE`和新Lead revision；它仍是唯一完成Fact。后继选择器只消费CAS后的Lead revision，并因该Lead已不再是`CAPTURED`而跳过重复候选规则。
+
 ## Deterministic owner and successor rules
 
 ### Duplicate candidate registry
 
-`R1_DUPLICATE_CANDIDATE_V1`只做受保护精确匹配，不做姓名模糊匹配、全文搜索或`captured_content_digest`相等推断。对刚捕获的Lead `L`，候选`C`必须同时满足：同Tenant；`C.lead_id <> L.lead_id`；`C.created_at <= duplicate Task.created_at`；`C.party_resolution_code=RESOLVED`；`C.parsed_party_id`指向同Tenant且在可信时刻仍为`ACTIVE`的Party；并且至少一个非空标准化联系方式HMAC相等。phone匹配比较`L.captured_phone_hmac/ingress_completion_phone_hmac`中非空值与`C`对应两列中非空值；email同理，不跨phone/email用途比较。
+`R1_DUPLICATE_CANDIDATE_V1`只对当前`disposition_code=CAPTURED`的Lead执行受保护精确匹配，不做姓名模糊匹配、全文搜索或`captured_content_digest`相等推断。对该Lead `L`，候选`C`必须同时满足：同Tenant；`C.lead_id <> L.lead_id`；`C.created_at <= duplicate Task.created_at`；`C.party_resolution_code=RESOLVED`；`C.parsed_party_id`指向同Tenant且在可信时刻仍为`ACTIVE`的Party；并且至少一个非空标准化联系方式HMAC相等。phone匹配比较`L.captured_phone_hmac/ingress_completion_phone_hmac`中非空值与`C`对应两列中非空值；email同理，不跨phone/email用途比较。
 
 候选按`matchRank`升序、`C.captured_at`升序、`C.lead_id`的RFC 4122网络字节无符号字典序升序取第一项；phone和email都匹配的`matchRank=0`，只phone为1，只email为2。没有候选就不创建`RESOLVE_LEAD_DUPLICATE`；禁止按姓名、展示文本、数据库默认collation、随机数或未冻结权重补候选。执行`LINK_EXISTING_PARTY`时必须重验原有界集合第一项、候选Lead revision及其同一ACTIVE Party revision；有变化返回stale拒绝，不能悄然改连新候选。
 
@@ -106,7 +108,7 @@ Receipt outcome 的封闭集合只有 `SUCCEEDED`、`NO_CHANGE`、`REJECTED`。C
 
 ### 下一责任选择器
 
-`R1_LEAD_NEXT_RESPONSIBILITY_V1` 在同一事务、同一 Lead lock 下重验：疑似重复则 `RESOLVE_LEAD_DUPLICATE`；缺少联系方式且 V850 槽为空则 `COMPLETE_LEAD_INGRESS`；已有明确人工 Owner 请求则 `ASSIGN_LEAD`；可自动分配则原子创建 Assignment 和 `CONTACT_LEAD`；零候选则 `RESOLVE_LEAD_ROUTING_GAP`。必须恰建一个后继或在已有 OPEN 同类型自然唯一键命中时返回 NO_CHANGE，禁止同时建立两张责任卡。
+`R1_LEAD_NEXT_RESPONSIBILITY_V1` 在同一事务、同一 Lead lock 下重验：仅当当前`disposition_code=CAPTURED`且疑似重复时才创建`RESOLVE_LEAD_DUPLICATE`；缺少联系方式且 V850 槽为空则 `COMPLETE_LEAD_INGRESS`；已有明确人工 Owner 请求则 `ASSIGN_LEAD`；可自动分配则原子创建 Assignment 和 `CONTACT_LEAD`；零候选则 `RESOLVE_LEAD_ROUTING_GAP`。必须恰建一个后继或在已有 OPEN 同类型自然唯一键命中时返回 NO_CHANGE，禁止同时建立两张责任卡。LINK与KEEP_SEPARATE都从CAS后的Lead revision进入本选择器；二者均不会重复创建刚完成的duplicate-resolution Task。
 
 `RETRY_ASSIGNMENT_NOW` 只执行一次候选选择：命中时创建一条 Assignment 和一张 `CONTACT_LEAD`；仍为空时创建一张新的 `RESOLVE_LEAD_ROUTING_GAP`，不得递归自动重试。
 
@@ -142,7 +144,7 @@ Task registry的`TaskType`、`PrimaryCommand`、`PayloadSchema`、`CompletionFac
 | Source assignment mode | `MANUAL`, `AUTOMATIC` |
 | Task business purpose | 恰等于该行`TaskType` |
 | Decision contract (`version=1`) | `LEAD_DUPLICATE_RESOLUTION`, `LEAD_ROUTING_DISPOSITION`, `SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED`, `LEAD_VALIDITY_REVIEW` |
-| Lead disposition used by R1 | `CAPTURED`（capture初值）, `LINK_EXISTING_PARTY`（仅P0-01 LINK CAS） |
+| Lead disposition used by R1 | `CAPTURED`, `LINK_EXISTING_PARTY`, `KEEP_SEPARATE` |
 | Lead assignment reason | `MANUAL_SELECTION`, `SOURCE_POLICY_AUTOMATIC`, `ROUTING_RETRY` |
 | Contact channel | `PHONE`, `EMAIL` |
 | Ingress completion source | `OWNER_CONFIRMED`, `CUSTOMER_PROVIDED` |
@@ -152,7 +154,33 @@ Task registry的`TaskType`、`PrimaryCommand`、`PayloadSchema`、`CompletionFac
 | Receipt outcome | `SUCCEEDED`, `NO_CHANGE`, `REJECTED` |
 | Review reason | `SUSPECT_INVALID`, `CONTACT_RETRY_EXHAUSTED` |
 
-每个命令的candidate payload字段也封闭：RESOLVE_DUPLICATE_LEAD=`decisionCode,candidateLeadId,candidateLeadRevision,partyId,partyRevision,rationaleSummary`；COMPLETE_LEAD_INGRESS=`phone?,email?,sourceCode,sourceSummary`且phone/email至少一个；ASSIGN_LEAD=`ownerAppointmentId`；RECORD_ROUTING_DISPOSITION=`decisionCode,rationaleSummary`；ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST=`causalDecisionId,causalDecisionHash,rationaleSummary`；RECORD_CONTACT_RESULT=`leadAssignmentId,leadAssignmentRevision,contactChannelCode,resultCode,resultSummary?,evidenceSubmissionId?`；REVIEW_LEAD_VALIDITY=`triggeringContactResultId,triggeringContactResultHash,decisionCode,rationaleSummary`。所有主命令请求另带固定Draft确认三元组，不属于candidate payload。
+## Candidate payload registry
+
+| PrimaryCommand | ExactCandidateFields |
+|---|---|
+| RESOLVE_DUPLICATE_LEAD | decisionCode,candidateLeadId,candidateLeadRevision,partyId,partyRevision,rationaleSummary |
+| COMPLETE_LEAD_INGRESS | phone?,email?,sourceCode,sourceSummary |
+| ASSIGN_LEAD | ownerAppointmentId |
+| RECORD_ROUTING_DISPOSITION | decisionCode,rationaleSummary |
+| ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST | causalDecisionId,causalDecisionHash,rationaleSummary |
+| RECORD_CONTACT_RESULT | leadAssignmentId,leadAssignmentRevision,contactChannelCode,resultCode,resultSummary?,legalNeed?,evidenceSubmissionId? |
+| REVIEW_LEAD_VALIDITY | triggeringContactResultId,triggeringContactResultHash,decisionCode,rationaleSummary |
+
+`COMPLETE_LEAD_INGRESS`的phone/email至少一个。`RECORD_CONTACT_RESULT`的`legalNeed`在`CONNECTED_VALID`时必填，在其他结果时禁止。所有主命令请求另带固定Draft确认三元组，不属于candidate payload。
+
+## Candidate payload condition registry
+
+| PrimaryCommand | ExactConditionalValidation |
+|---|---|
+| COMPLETE_LEAD_INGRESS | at-least-one-of-phone-email |
+| RECORD_CONTACT_RESULT | legalNeed-required-when-CONNECTED_VALID-and-forbidden-otherwise |
+
+## Duplicate resolution transition registry
+
+| BranchID | RequiredCurrentDisposition | CandidateSelectors | CurrentLeadCAS | ForbiddenCurrentLeadChanges | CandidateLeadPartyMutation | DecisionDigest | SuccessorSelector |
+|---|---|---|---|---|---|---|---|
+| P0_01_LINK_EXISTING | CAPTURED | candidateLead@revision+party@revision:revalidate | parsed_party_id=candidate.parsed_party_id;party_resolution_code=RESOLVED;disposition_code=LINK_EXISTING_PARTY;revision=old+1 | current_assignment_id,capture_fields,ingress_slot | NONE | old-current-lead-selector+candidate-lead-party-selectors+new-values+new-revision | post-CAS-lead-revision;duplicate-only-when-CAPTURED |
+| P0_01_KEEP_SEPARATE | CAPTURED | candidateLead@revision+party@revision:revalidate | disposition_code=KEEP_SEPARATE;revision=old+1 | parsed_party_id,party_resolution_code,current_assignment_id,capture_fields,ingress_slot | NONE | old-current-lead-selector+candidate-lead-party-selectors+KEEP_SEPARATE+new-revision | post-CAS-lead-revision;duplicate-only-when-CAPTURED |
 
 ## CONTACT_RETRY_V1
 
@@ -181,7 +209,7 @@ Task registry的`TaskType`、`PrimaryCommand`、`PayloadSchema`、`CompletionFac
 | ScenarioID | BranchID | FactDelta | TaskDelta | SuccessorDelta | ReceiptEventOutboxAudit | IsolationRollback |
 |---|---|---|---|---|---|---|
 | E2E_P0_01_LINK | P0_01_LINK_EXISTING | `decision_record:+1; lead rows:+0; parsed_party_id:candidate.parsed_party_id; party_resolution_code:RESOLVED; disposition_code:LINK_EXISTING_PARTY; lead revision:+1` | `current:DONE,r+1` | `R1 selector on post-CAS Lead revision:exactly1` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `candidate Lead/Party mutation:0; other-tenant:0; replay:all-0; technical-failure:all-0` |
-| E2E_P0_01_SEPARATE | P0_01_KEEP_SEPARATE | `decision_record:+1` | `current:DONE,r+1` | `R1 selector:exactly1` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `other-tenant:0; replay:all-0; technical-failure:all-0` |
+| E2E_P0_01_SEPARATE | P0_01_KEEP_SEPARATE | `decision_record:+1; lead rows:+0; disposition_code:KEEP_SEPARATE; lead revision:+1` | `current:DONE,r+1` | `R1 selector on post-CAS Lead revision:exactly1` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `candidate Lead/Party mutation:0; other-tenant:0; replay:all-0; technical-failure:all-0` |
 | E2E_P0_02 | P0_02_COMPLETE | `lead rows:+0; ingress slot:0-to-1; lead revision:+1` | `current:DONE,r+1` | `R1 selector:exactly1` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `stale:domain-0; other-tenant:0; technical-failure:all-0` |
 | E2E_P0_03 | P0_03_ASSIGN | `assignment:+1; lead revision:+1` | `current:DONE,r+1` | `CONTACT_LEAD:+1,OPEN,r0` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `other-tenant:0; duplicate-open-assignment:rejected; technical-failure:all-0` |
 | E2E_P0_04_SCHEDULE | P0_04_SCHEDULE_ROUTING_REVIEW | `decision_record:+1; wait_receipt:+1` | `current:DONE,r+1` | `routing task:+1,WAITING,r1` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `other-tenant:0; technical-failure:all-0` |
