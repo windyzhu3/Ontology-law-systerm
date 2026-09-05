@@ -70,9 +70,12 @@ class R1CommandPolicyIT extends CommandRuntimeIT {
         return identity(h,code,scope,"SERVICE");
     }
     Service identity(Handler h,String code,UUID scope,String kind)throws Exception {
+        return identity(h,code,scope,kind,h.seed.org());
+    }
+    Service identity(Handler h,String code,UUID scope,String kind,UUID appointmentOrg)throws Exception {
         UUID principal=UUID.randomUUID(),app=UUID.randomUUID(),grant=UUID.randomUUID();
         mutate(h,"insert into identity.principal (tenant_id,principal_id,principal_kind,identity_provider_code,external_subject_hmac,display_name,state,created_at) values (?,?,?,?,decode(repeat('02',32),'hex'),'service','ACTIVE',clock_timestamp())",h.seed.tenant(),principal,kind,principal.toString());
-        mutate(h,"insert into identity.appointment (tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) values (?,?,?,?,'SERVICE',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",h.seed.tenant(),app,principal,h.seed.org());
+        mutate(h,"insert into identity.appointment (tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) values (?,?,?,?,'SERVICE',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",h.seed.tenant(),app,principal,appointmentOrg);
         mutate(h,"insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values (?,?,?,?,?,?,clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",h.seed.tenant(),grant,app,h.seed.appointment(),scope,code);
         return new Service(new Actor(h.seed.tenant(),principal,app,null,null),grant);
     }
@@ -83,8 +86,11 @@ class R1CommandPolicyIT extends CommandRuntimeIT {
                 new CommandAuthorizationBinding.Recovery(h.task,h.seed.request().subject(),0L,wait,hash));
     }
     CommandEnvelope recoveryEnvelope(Handler h,CommandHandler.Context context) {
+        return recoveryEnvelope(h,context,"2026-01-01T00:00:00Z");
+    }
+    CommandEnvelope recoveryEnvelope(Handler h,CommandHandler.Context context,String dueCutoff) {
         var b=(CommandAuthorizationBinding.Recovery)context.binding();
-        return envelope(h,context.scope().type(),context.authorization().actor(),Map.of("taskId",b.taskId().toString(),"waitReceiptId",b.waitReceiptId().toString(),"waitReceiptHash",b.waitReceiptHash(),"expectedTaskRevision",b.taskRevision(),"dueCutoff","2026-01-01T00:00:00Z"));
+        return envelope(h,context.scope().type(),context.authorization().actor(),Map.of("taskId",b.taskId().toString(),"waitReceiptId",b.waitReceiptId().toString(),"waitReceiptHash",b.waitReceiptHash(),"expectedTaskRevision",b.taskRevision(),"dueCutoff",dueCutoff));
     }
 
     @Test void frozen_capture_handler_can_register() throws Exception {
@@ -221,7 +227,7 @@ class R1CommandPolicyIT extends CommandRuntimeIT {
             eligibilityCalls++;fixture.recoveryEligibility(c,e,context);
         }
         public void validateBeforeWork(Connection c,CommandEnvelope e,Context context) {}
-        public Result execute(Connection c,CommandEnvelope e,Context context) {return Result.noChange(result);}
+        public Result execute(Connection c,CommandEnvelope e,Context context)throws SQLException {return Result.noChange(result);}
         public void validateBeforeCommit(Connection c,CommandEnvelope e,Context context,Result result) {}
     }
     @Test void real_capture_no_change_replay_and_conflict_reauthorize_without_extra_audit()throws Exception {
@@ -341,5 +347,112 @@ class R1CommandPolicyIT extends CommandRuntimeIT {
         var result=run(new CommandRuntime(List.of(handler),auth,"POLICY_IT",readers),envelope(h,CommandEnvelope.Type.CAPTURE_LEAD,h.seed.request().actor(),Map.of("sourceAccountCode","FIXTURE")));
         assertEquals(CommandOutcome.Status.REJECTED,result.status());assertEquals("NOT_AUTHORIZED",result.rejectionCode());
         assertEquals(List.of(1L,1L,1L,0L,0L),counts(h).subList(0,5));
+    }
+    CommandRuntime eventRuntime(CommandHandler handler) {
+        return new CommandRuntime(List.of(handler),auth,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("EVENT_POLICY_IT"),readers,R1EventReaders.databaseBacked());
+    }
+    @Test void capture_event_requires_exact_new_natural_key_and_transaction_final_revision()throws Exception {
+        for(boolean wrong:List.of(false,true)) {
+            var h=captureHandler();UUID lead=UUID.randomUUID();String digest=hash("new capture");var original=capture(h,"FIXTURE",captureGrant(h));
+            var context=new CommandHandler.Context(CommandScope.capture(h.seed.tenant(),"FIXTURE",digest),original.authorization(),new CommandAuthorizationBinding.Capture("FIXTURE",digest,original.authorization().subject()));
+            var handler=new NoChangeHandler(h,context,new Subject("lead.lead",lead,wrong?0L:1L,null)) {
+                @Override public Result execute(Connection c,CommandEnvelope e,Context ctx)throws SQLException {
+                    sql(c,"insert into lead.lead (tenant_id,lead_id,source_channel_code,source_account_code,source_record_key_digest,captured_at,service_category_code,jurisdiction_code,urgency_code,legal_need_summary_ciphertext,captured_content_digest,party_resolution_code,disposition_code,created_at) values (?,?,'FIXTURE','FIXTURE',?,clock_timestamp(),'FIXTURE','FIXTURE','FIXTURE',decode('01','hex'),decode(repeat('00',32),'hex'),'UNRESOLVED','CAPTURED',clock_timestamp())",h.seed.tenant(),lead,Base64.getUrlDecoder().decode(digest));
+                    sql(c,"update lead.lead set disposition_code='KEEP_SEPARATE',revision=revision+1 where tenant_id=? and lead_id=?",h.seed.tenant(),lead);
+                    return Result.succeeded(result,Event.LeadCapturedV1);
+                }
+            };
+            var e=envelope(h,CommandEnvelope.Type.CAPTURE_LEAD,h.seed.request().actor(),Map.of("sourceAccountCode","FIXTURE"));var runtime=eventRuntime(handler);
+            if(wrong) {assertThrows(SQLException.class,()->run(runtime,e));assertEquals(List.of(0L,0L,0L,0L,0L),counts(h).subList(0,5));}
+            else {var outcome=run(runtime,e);assertEquals(1L,outcome.resultFact().revision());assertEquals(lead,outcome.resultFact().id());assertEquals(outcome,run(runtime,e));assertEquals(List.of(1L,1L,1L,1L,1L),counts(h).subList(0,5));}
+        }
+    }
+    @Test void draft_event_proves_saved_revision_without_confirming_or_completing_the_task()throws Exception {
+        for(boolean wrong:List.of(false,true)) {
+            var row=draftRows[5];var h=task(row);UUID draftId=draft(h,row);var ctx=draftContext(h,row,draftId);
+            var handler=new NoChangeHandler(h,ctx,new Subject("responsibility.action_draft",wrong?UUID.randomUUID():draftId,1L,null)) {
+                @Override public Result execute(Connection c,CommandEnvelope e,Context context)throws SQLException {
+                    sql(c,"update responsibility.action_draft set candidate_payload='{"+"\"resultCode\":\"NOT_CONNECTED\"}"+"',candidate_payload_digest=?,last_edited_at=clock_timestamp(),revision=revision+1 where tenant_id=? and action_draft_id=?",CanonicalJson.digest("{\"resultCode\":\"NOT_CONNECTED\"}"),h.seed.tenant(),draftId);
+                    return Result.succeeded(result,Event.ActionDraftSavedV1);
+                }
+            };
+            var e=draftEnvelope(h,row,h.seed.request().actor());
+            if(wrong){assertThrows(SQLException.class,()->run(eventRuntime(handler),e));assertEquals(List.of(0L,0L,0L,0L,0L),counts(h).subList(0,5));}
+            else {var outcome=run(eventRuntime(handler),e);assertEquals(draftId,outcome.resultFact().id());assertEquals(1L,outcome.resultFact().revision());assertEquals(List.of(1L,1L,1L,1L,1L),counts(h).subList(0,5));}
+            try(var c=database.apiConnection()){inTransaction(c,Capability.QUERY,x->{assertEquals("OPEN:0",scalar(x,"select state||':'||revision from responsibility.task_occurrence where tenant_id='"+h.seed.tenant()+"'"));assertEquals("DRAFT:"+(wrong?0:1),scalar(x,"select state||':'||revision from responsibility.action_draft where tenant_id='"+h.seed.tenant()+"'"));return null;});}
+        }
+    }
+    record Waiting(UUID id,String hash) {}
+    @Test void stale_draft_binding_cannot_label_an_existing_revision_as_a_new_save()throws Exception {
+        var row=draftRows[5];var h=task(row);UUID draftId=draft(h,row);var ctx=draftContext(h,row,draftId);
+        mutate(h,"update responsibility.action_draft set candidate_payload='{\"resultCode\":\"NOT_CONNECTED\"}',candidate_payload_digest=?,last_edited_at=clock_timestamp(),revision=revision+1 where tenant_id=? and action_draft_id=?",CanonicalJson.digest("{\"resultCode\":\"NOT_CONNECTED\"}"),h.seed.tenant(),draftId);
+        var handler=new NoChangeHandler(h,ctx,new Subject("responsibility.action_draft",draftId,1L,null)) {
+            @Override public Result execute(Connection c,CommandEnvelope e,Context context) {return Result.succeeded(result,Event.ActionDraftSavedV1);}
+        };
+        assertThrows(SQLException.class,()->run(eventRuntime(handler),draftEnvelope(h,row,h.seed.request().actor())));
+        assertEquals(List.of(0L,0L,0L,0L,0L),counts(h).subList(0,5));
+    }
+    Waiting waiting(Handler h,String profile)throws Exception {
+        UUID wait=UUID.randomUUID();
+        mutate(h,"update responsibility.task_occurrence set state='WAITING',revision=revision+1 where tenant_id=? and task_occurrence_id=?",h.seed.tenant(),h.task);
+        mutate(h,"insert into responsibility.wait_receipt (tenant_id,wait_receipt_id,task_occurrence_id,task_revision,wait_sequence,wait_reason_code,wait_contract_code,wait_contract_version,entered_waiting_at,resume_due_at,recorded_by_appointment_id) values (?,?,?,1,1,'CONTACT_RETRY',?,1,'2026-09-04T00:00:00.000000Z','2026-09-04T01:00:00.000000Z',?)",h.seed.tenant(),wait,h.task,profile,h.seed.appointment());
+        String json="{\"awaited_fact_hash\":null,\"awaited_fact_id\":null,\"awaited_fact_revision\":null,\"awaited_fact_type\":null,\"entered_waiting_at\":\"2026-09-04T00:00:00.000000Z\",\"recorded_by_appointment_id\":\""+h.seed.appointment()+"\",\"resume_due_at\":\"2026-09-04T01:00:00.000000Z\",\"task_occurrence_id\":\""+h.task+"\",\"task_revision\":1,\"tenantId\":\""+h.seed.tenant()+"\",\"wait_contract_code\":\""+profile+"\",\"wait_contract_version\":1,\"wait_reason_code\":\"CONTACT_RETRY\",\"wait_receipt_id\":\""+wait+"\",\"wait_sequence\":1}";
+        return new Waiting(wait,Base64.getUrlEncoder().withoutPadding().encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(json.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+    }
+    @Test void recovery_success_uses_owner_organization_across_orgs_and_keeps_owner_subject_sla_and_wait()throws Exception {
+        for(boolean contact:List.of(true,false)) {
+            var row=draftRows[contact?5:3];var h=task(row);String code=contact?"CONTACT_TASK_RECOVER":"ROUTING_REVIEW_TASK_RECOVER";String profile=contact?"CONTACT_RETRY_V1":"R1_ROUTING_REVIEW_WAIT_V1";
+            UUID serviceOrg=UUID.randomUUID();mutate(h,"insert into identity.organization_unit (tenant_id,organization_unit_id,unit_code,display_name,state,created_at) values (?,?,'SERVICE_ORG','service','ACTIVE',clock_timestamp())",h.seed.tenant(),serviceOrg);
+            var service=identity(h,code,h.seed.org(),"SERVICE",serviceOrg);var wait=waiting(h,profile);var type=contact?CommandEnvelope.Type.REOPEN_DUE_CONTACT_TASKS:CommandEnvelope.Type.REOPEN_DUE_ROUTING_REVIEW_TASKS;
+            var ctx=new CommandHandler.Context(CommandScope.reopen(h.seed.tenant(),type,h.task,wait.id(),wait.hash()),new Request(service.actor(),new Subject("responsibility.task_occurrence",h.task,1L,null),h.seed.org(),new Requirement(code,"SYSTEM_RECOVERY",Path.SYSTEM,service.grant())),new CommandAuthorizationBinding.Recovery(h.task,h.seed.request().subject(),1L,wait.id(),wait.hash()));
+            var handler=new NoChangeHandler(h,ctx,new Subject("responsibility.task_occurrence",h.task,2L,null)) {
+                @Override public void recoveryEligibility(Connection c,CommandEnvelope e,Context context)throws SQLException {
+                    eligibilityCalls++;
+                    var cutoff=java.time.OffsetDateTime.parse((String)((Map<?,?>)e.payload()).get("dueCutoff"));
+                    try(var p=c.prepareStatement("select t.state,t.revision,w.resume_due_at<=? and ?<=clock_timestamp() from responsibility.task_occurrence t join responsibility.wait_receipt w using(tenant_id,task_occurrence_id) where t.tenant_id=? and t.task_occurrence_id=? and w.wait_receipt_id=?")) {
+                        p.setObject(1,cutoff);p.setObject(2,cutoff);p.setObject(3,h.seed.tenant());p.setObject(4,h.task);p.setObject(5,wait.id());
+                        try(var r=p.executeQuery()){if(!r.next() || !"WAITING".equals(r.getString(1)) || r.getLong(2)!=1 || !r.getBoolean(3))throw new Rejected("VALIDATION_FAILED");}
+                    }
+                }
+                @Override public Result execute(Connection c,CommandEnvelope e,Context context)throws SQLException {
+                    sql(c,"update responsibility.task_occurrence set state='OPEN',revision=revision+1 where tenant_id=? and task_occurrence_id=? and state='WAITING' and revision=1",h.seed.tenant(),h.task);
+                    return Result.succeeded(result,contact?Event.ContactTaskReopenedV1:Event.RoutingReviewTaskReopenedV1);
+                }
+            };
+            var eventFacts=R1EventReaders.databaseBacked();R1EventFacts.Task before;
+            try(var c=database.apiConnection()){before=inTransaction(c,Capability.QUERY,x->eventFacts.task(x,h.seed.tenant(),h.task));}
+            var runtime=eventRuntime(handler);
+            assertEquals("VALIDATION_FAILED",assertThrows(CommandHandler.Rejected.class,()->run(runtime,recoveryEnvelope(h,ctx))).code());assertEquals(List.of(0L,0L,0L,0L,0L),counts(h).subList(0,5));
+            var e=recoveryEnvelope(h,ctx,"2026-09-05T00:00:00Z");var outcome=run(runtime,e);assertEquals(2L,outcome.resultFact().revision());assertEquals(h.task,outcome.resultFact().id());
+            assertEquals(outcome,run(runtime,e));assertEquals(2,handler.eligibilityCalls);assertEquals(List.of(1L,1L,1L,1L,1L),counts(h).subList(0,5));
+            try(var c=database.apiConnection()){inTransaction(c,Capability.QUERY,x->{var after=eventFacts.task(x,h.seed.tenant(),h.task);assertEquals("OPEN",after.state());assertEquals(before.owner(),after.owner());assertEquals(before.lead(),after.lead());assertEquals(before.slaCode(),after.slaCode());assertEquals(before.slaSeconds(),after.slaSeconds());assertEquals(before.slaDue(),after.slaDue());assertEquals(wait.hash(),eventFacts.latestWait(x,h.seed.tenant(),h.task).selector().hash());assertNull(after.completion());return null;});}
+        }
+    }
+    @Test void cross_org_recovery_denies_uncovered_owner_org_and_inactive_owner_principal_or_org()throws Exception {
+        for(int scenario=0;scenario<3;scenario++) {
+            var h=task(draftRows[5]);UUID serviceOrg=UUID.randomUUID();mutate(h,"insert into identity.organization_unit (tenant_id,organization_unit_id,unit_code,display_name,state,created_at) values (?,?,'SERVICE_ORG','service','ACTIVE',clock_timestamp())",h.seed.tenant(),serviceOrg);
+            var service=identity(h,"CONTACT_TASK_RECOVER",scenario==0?serviceOrg:h.seed.org(),"SERVICE",serviceOrg);
+            var context=recovery(h,service,CommandEnvelope.Type.REOPEN_DUE_CONTACT_TASKS,"CONTACT_TASK_RECOVER");
+            if(scenario==1)mutate(h,"update identity.principal set state='SUSPENDED',revision=revision+1 where tenant_id=? and principal_id=?",h.seed.tenant(),h.seed.principal());
+            if(scenario==2)mutate(h,"update identity.organization_unit set state='CLOSED',closed_at=clock_timestamp(),revision=revision+1 where tenant_id=? and organization_unit_id=?",h.seed.tenant(),h.seed.org());
+            var handler=new NoChangeHandler(h,context,new Subject("responsibility.task_occurrence",h.task,1L,null));
+            var failure=assertThrows(CommandHandler.Rejected.class,()->run(eventRuntime(handler),recoveryEnvelope(h,context)));assertEquals("NOT_AUTHORIZED",failure.code());assertEquals(List.of(0L,0L,0L,0L,0L),counts(h).subList(0,5));
+        }
+    }
+    @Test void recovery_event_rejects_fake_transition_wrong_post_cas_source_and_sla_mutation()throws Exception {
+        for(int scenario=0;scenario<3;scenario++) {
+            int variant=scenario;var h=task(draftRows[5]);var service=service(h,"CONTACT_TASK_RECOVER",h.seed.org());var wait=waiting(h,"CONTACT_RETRY_V1");
+            var type=CommandEnvelope.Type.REOPEN_DUE_CONTACT_TASKS;
+            var ctx=new CommandHandler.Context(CommandScope.reopen(h.seed.tenant(),type,h.task,wait.id(),wait.hash()),new Request(service.actor(),new Subject("responsibility.task_occurrence",h.task,1L,null),h.seed.org(),new Requirement("CONTACT_TASK_RECOVER","SYSTEM_RECOVERY",Path.SYSTEM,service.grant())),new CommandAuthorizationBinding.Recovery(h.task,h.seed.request().subject(),1L,wait.id(),wait.hash()));
+            var handler=new NoChangeHandler(h,ctx,new Subject("responsibility.task_occurrence",scenario==1?UUID.randomUUID():h.task,2L,null)) {
+                @Override public void recoveryEligibility(Connection c,CommandEnvelope e,Context context) {}
+                @Override public Result execute(Connection c,CommandEnvelope e,Context context)throws SQLException {
+                    if(variant!=0)sql(c,"update responsibility.task_occurrence set state='OPEN',revision=revision+1"+(variant==2?",original_sla_seconds=original_sla_seconds+1":"")+" where tenant_id=? and task_occurrence_id=?",h.seed.tenant(),h.task);
+                    return Result.succeeded(result,Event.ContactTaskReopenedV1);
+                }
+            };
+            assertThrows(SQLException.class,()->run(eventRuntime(handler),recoveryEnvelope(h,ctx)));assertEquals(List.of(0L,0L,0L,0L,0L),counts(h).subList(0,5));
+            try(var c=database.apiConnection()){inTransaction(c,Capability.QUERY,x->{assertEquals("WAITING:1:14400",scalar(x,"select state||':'||revision||':'||original_sla_seconds from responsibility.task_occurrence where tenant_id='"+h.seed.tenant()+"'"));return null;});}
+        }
     }
 }

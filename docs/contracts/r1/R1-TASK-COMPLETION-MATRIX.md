@@ -150,6 +150,7 @@ Receipt outcome 的封闭集合只有 `SUCCEEDED`、`NO_CHANGE`、`REJECTED`。C
 - 三种盲索引用途封闭为`LEAD_PHONE_EXACT`、`LEAD_EMAIL_EXACT`、`SOURCE_RECORD_KEY`。KMS/Secret Manager按Tenant＋用途提供独立`R1_HMAC_SHA256_V1`密钥；HMAC输入为UTF-8 JCS对象`{"profile":"R1_HMAC_SHA256_V1","purpose":...,"sourceAccountCode":...或null,"value":...}`。phone/email的`sourceAccountCode=null`，使捕获值与V850补全值可安全精确比较；source record key按请求中区分大小写、不trim的原始Unicode标量串并带准确sourceAccountCode计算。R1不轮换或双写key version，也不保存明文、密钥或可逆输入。
 - `captured_content_digest`使用`R1_JSON_JCS_SHA256_V1`覆盖`sourceChannelCode,sourceAccountCode,sourceRecordKeyDigest,capturedAt,capturedName,phone,email,cityCode,serviceCategoryCode,jurisdictionCode,urgencyCode,legalNeedSummary`，其中受保护值先按上述profile规范化、digest以base64url放入JCS；不包含ciphertext、Lead ID、解析/处置/currentAssignment、revision或创建时间。`ingress_completion_digest`同法只覆盖`phone,email,sourceCode,sourceSummary,completedByAppointmentId,completedAt`。
 - Decision exact hash使用其持久化`content_digest`。`lead_contact_result`和`responsibility.wait_receipt`的exact hash使用`R1_JSON_JCS_SHA256_V1`覆盖该不可变行除`tenant_id`以外的全部持久字段，并把`tenantId`作为JCS顶层必填字段；NULL显式为JSON null。实现不得以序列化对象、数据库行文本或显示DTO临时计算替代。
+- 上述两种不可变行的JCS属性名使用准确SQL持久字段名（`snake_case`）；唯一重命名是`tenant_id`→`tenantId`。字段值按本节UUID、UTC六位小数时间、整数、无padding base64url二进制和显式null规则逐字段编码，不采用camelCase显示DTO别名。该说明落实既有“持久字段＋tenantId例外”规则，不改变命令scope或payload摘要向量。
 
 ### R1 code allowlists
 

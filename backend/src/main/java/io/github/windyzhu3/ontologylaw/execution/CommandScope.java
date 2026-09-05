@@ -8,10 +8,12 @@ public final class CommandScope {
     private final UUID tenantId;
     private final CommandEnvelope.Type type;
     private final String canonical;
-    private CommandScope(UUID tenantId,CommandEnvelope.Type type,Object fields){this.tenantId=Objects.requireNonNull(tenantId);this.type=Objects.requireNonNull(type);this.canonical=CanonicalJson.encode(fields);}
+    private final UUID taskId;
+    private CommandScope(UUID tenantId,CommandEnvelope.Type type,Map<String,?> fields){this.tenantId=Objects.requireNonNull(tenantId);this.type=Objects.requireNonNull(type);this.canonical=CanonicalJson.encode(fields);this.taskId=fields.containsKey("taskId")?UUID.fromString((String)fields.get("taskId")):null;}
     public UUID tenantId(){return tenantId;}
     public CommandEnvelope.Type type(){return type;}
     public String canonical(){return canonical;}
+    public UUID taskId(){return taskId;}
     public byte[] digest(){return CanonicalJson.digest(canonical);}
     public static CommandScope capture(UUID tenant,String sourceAccountCode,String sourceRecordKeyDigest){
         if(sourceAccountCode==null || sourceAccountCode.isEmpty() || sourceAccountCode.length()>128)throw new IllegalArgumentException("Invalid source account code");

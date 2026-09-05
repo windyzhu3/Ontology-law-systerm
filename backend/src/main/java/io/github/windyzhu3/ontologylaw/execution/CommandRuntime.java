@@ -12,6 +12,7 @@ public final class CommandRuntime {
     private final Map<CommandEnvelope.Type,CommandHandler> handlers;
     private final R1CommandPolicy policy;
     private final AuditAppender audit;
+    private final R1EventFacts eventFacts;
     public CommandRuntime(Collection<CommandHandler> handlers,AuthorizationService authorization,String executionNodeCode) {this(handlers,authorization,AuditAppender.databaseBacked(executionNodeCode));}
     public CommandRuntime(Collection<CommandHandler> handlers,AuthorizationService authorization,AuditAppender audit) {
         this(handlers,authorization,audit,null);
@@ -20,12 +21,15 @@ public final class CommandRuntime {
         this(handlers,authorization,AuditAppender.databaseBacked(executionNodeCode),facts);
     }
     public CommandRuntime(Collection<CommandHandler> handlers,AuthorizationService authorization,AuditAppender audit,R1AuthorizationFacts facts) {
+        this(handlers,authorization,audit,facts,null);
+    }
+    public CommandRuntime(Collection<CommandHandler> handlers,AuthorizationService authorization,AuditAppender audit,R1AuthorizationFacts facts,R1EventFacts eventFacts) {
         var registry=new EnumMap<CommandEnvelope.Type,CommandHandler>(CommandEnvelope.Type.class);
         for(var handler:handlers) {
             var type=Objects.requireNonNull(handler.type());
             if(registry.put(type,handler)!=null)throw new IllegalArgumentException("Duplicate static handler");
         }
-        this.handlers=Map.copyOf(registry);this.policy=new R1CommandPolicy(authorization,facts);this.audit=Objects.requireNonNull(audit);
+        this.handlers=Map.copyOf(registry);this.policy=new R1CommandPolicy(authorization,facts);this.audit=Objects.requireNonNull(audit);this.eventFacts=eventFacts;
     }
     /** Caller owns a fresh connection. Commit acknowledgement loss has unknown durability; retry the same key. */
     public CommandResult execute(Connection connection,CommandEnvelope envelope) throws SQLException {
@@ -52,10 +56,11 @@ public final class CommandRuntime {
             try {
                 setLocalRole(c,Capability.QUERY);
                 terminal=policy.authorize(c,envelope,context,false);if(!terminal.allowed())throw new CommandHandler.Rejected(terminal.rejectionCode());
+                var eventPolicy=new R1EventPolicy(eventFacts);eventPolicy.beforeWork(c,envelope,context);
                 setLocalRole(c,Capability.COMMAND);handler.validateBeforeWork(c,envelope,context);result=handler.execute(c,envelope,context);
-                validateResult(envelope.type(),result);
                 if(result.status()==CommandOutcome.Status.NO_CHANGE)c.rollback(business);
                 setLocalRole(c,Capability.QUERY);handler.validateBeforeCommit(c,envelope,context,result);
+                eventPolicy.validate(c,envelope,context,result);
                 terminal=policy.authorize(c,envelope,context,true);
                 if(!terminal.allowed())throw new CommandHandler.Rejected(terminal.rejectionCode());
             } catch(CommandHandler.Rejected denied) {
@@ -75,28 +80,5 @@ public final class CommandRuntime {
             audit.append(c,new AuditAppender.Entry(auditId,envelope.commandId(),envelope.type().name(),envelope.correlationId(),status.name(),terminal,summary,CanonicalJson.digest(summary)));
             return receipt;
         });
-    }
-    private static void validateResult(CommandEnvelope.Type type,CommandHandler.Result result)throws SQLException {
-        String expected=switch(type) {
-            case COMPLETE_LEAD_INGRESS,CAPTURE_LEAD -> "lead.lead";
-            case ASSIGN_LEAD -> "lead.lead_assignment";
-            case RECORD_CONTACT_RESULT -> "lead.lead_contact_result";
-            case SAVE_ACTION_DRAFT -> "responsibility.action_draft";
-            case REOPEN_DUE_CONTACT_TASKS,REOPEN_DUE_ROUTING_REVIEW_TASKS -> "responsibility.task_occurrence";
-            default -> "responsibility.decision_record";
-        };
-        if(!expected.equals(result.fact().type()))throw new SQLException("Unexpected result fact type","22000");
-        Set<CommandHandler.Event> events=switch(type) {
-            case RESOLVE_DUPLICATE_LEAD -> Set.of(CommandHandler.Event.LeadDuplicateResolutionRecordedV1);
-            case COMPLETE_LEAD_INGRESS -> Set.of(CommandHandler.Event.LeadIngressCompletedV1);
-            case ASSIGN_LEAD -> Set.of(CommandHandler.Event.LeadAssignedV1);
-            case RECORD_ROUTING_DISPOSITION -> Set.of(CommandHandler.Event.LeadRoutingDispositionRecordedV1,CommandHandler.Event.SourceIntakeStopRequestedV1);
-            case ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST -> Set.of(CommandHandler.Event.SourceIntakeStopRequestAcknowledgedV1);
-            case RECORD_CONTACT_RESULT -> Set.of(CommandHandler.Event.LeadContactResultRecordedV1,CommandHandler.Event.LeadContactRetryExhaustedV1);
-            case REVIEW_LEAD_VALIDITY -> Set.of(CommandHandler.Event.LeadValidityReviewedV1);
-            default -> Set.of(); // Missing non-completion descriptors fail closed; later static contract required.
-        };
-        var unique=new HashSet<CommandHandler.Notification>();
-        for(var notification:result.notifications())if(!events.contains(notification.event()) || !notification.event().sourceFactType().equals(notification.sourceFact().type()) || !unique.add(notification))throw new SQLException("Unregistered event descriptor","22000");
     }
 }

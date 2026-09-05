@@ -4,7 +4,7 @@
 
 本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。当前最新基线已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同、V850 前向迁移及 PostgreSQL 18 v1.1 运行时证据。R1 的 A/B（脚手架、OpenAPI）、C0 合同修正及 C 数据库基础设施已合并；D 的 CommandRuntime、实时授权与审计基础设施及实库测试已通过 PR #12 合并（`ae88e63257699715dc3ee0c139563f5bfafdb2b7`），不包含生产业务 Handler。完整 R1 后端业务、SPA业务生产能力及E2E仍未实现或验收；基础设施测试不提升完整 R1 交付门禁。
 
-MVP-2026-09-05.2现已冻结capture、draft、两类recovery的命令专属授权和完整R1成功事件集合，补齐`OpportunityOpened`的Schema/Owner Outbox映射，并把`CONNECTED_VALID`校正为2 Event/2 Outbox。下一门禁是把这些静态策略和精确事件集合接入真实Owner facts及CommandRuntime；合同冻结不表示完整R1后端、SPA或E2E已实现。
+MVP-2026-09-05.2现已冻结capture、draft、两类recovery的命令专属授权和完整R1成功事件集合，补齐`OpportunityOpened`的Schema/Owner Outbox映射，并把`CONNECTED_VALID`校正为2 Event/2 Outbox。本收口分支已将可复用授权与精确事件校验接入真实Owner facts及CommandRuntime，并完成实库机制验证，详见[分层验收记录](docs/progress/2026-09-05-r1-contract-closure-acceptance.md)。完整checkout CI和合并单独记账；下一业务工作仍是原计划Task 5，完整R1后端、SPA和浏览器E2E门禁未完成。
 
 > 当前权威以当前MVP基线为准；历史规格仅保留为设计演进证据。销售MVP终点、P0验收映射及52＋2边界均由该基线统一解释。
 
