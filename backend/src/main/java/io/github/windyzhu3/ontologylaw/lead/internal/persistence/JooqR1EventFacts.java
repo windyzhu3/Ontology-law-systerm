@@ -38,6 +38,11 @@ public final class JooqR1EventFacts implements R1EventFacts {
         return new Contact(new Subject("lead.lead_contact_result",id,null,Base64.getUrlEncoder().withoutPadding().encodeToString(CanonicalJson.digest(CanonicalJson.encode(fields)))),
                 r.get(f.LEAD_ID),r.get(f.LEAD_ASSIGNMENT_ID),r.get(f.CONTACT_TASK_ID),r.get(f.CONTACT_NO),r.get(f.RESULT_CODE));
     }
+    public boolean contactExistsForTask(Connection c,UUID tenant,UUID taskId) {
+        var f=LEAD_CONTACT_RESULT;
+        return DSL.using(c,SQLDialect.POSTGRES).fetchExists(DSL.selectOne().from(f)
+                .where(f.TENANT_ID.eq(tenant)).and(f.CONTACT_TASK_ID.eq(taskId)));
+    }
     public Assignment assignment(Connection c,UUID tenant,UUID id) {
         var a=LEAD_ASSIGNMENT;var r=DSL.using(c,SQLDialect.POSTGRES).select(a.REVISION,a.LEAD_ID,a.OWNER_APPOINTMENT_ID).from(a).where(a.TENANT_ID.eq(tenant)).and(a.LEAD_ASSIGNMENT_ID.eq(id)).fetchOne();
         return r==null?null:new Assignment(new Subject("lead.lead_assignment",id,r.value1(),null),r.value2(),r.value3());

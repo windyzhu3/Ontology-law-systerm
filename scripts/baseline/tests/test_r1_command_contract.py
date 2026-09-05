@@ -134,6 +134,21 @@ class R1CommandContractTest(unittest.TestCase):
             )
             self.assertTrue(self.validator()(root))
 
+    def test_payload_schema_rejects_numeric_zero_as_additional_properties(self) -> None:
+        for numeric_zero in ("0", "0.0"):
+            with self.subTest(numeric_zero=numeric_zero):
+                temporary, root = self.copy_contract_fixture()
+                with temporary:
+                    schema_path = root / SCHEMA
+                    text = schema_path.read_text(encoding="utf-8")
+                    old = '"additionalProperties": false'
+                    self.assertEqual(text.count(old), 1)
+                    schema_path.write_text(
+                        text.replace(old, f'"additionalProperties": {numeric_zero}'),
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(self.validator()(root))
+
     def test_connected_branch_counts_are_two_events_and_two_outboxes(self) -> None:
         self.assert_contract_mutation_fails(
             "LeadContactResultRecordedV1,OpportunityOpened | 2 | 2 |",

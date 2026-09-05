@@ -379,7 +379,7 @@ def validate_r1_command_contract(root: Path) -> list[str]:
     except (json.JSONDecodeError, _DuplicateJsonMember):
         findings.append(f"Malformed R1 notification payload Schema: {SCHEMA_PATH.as_posix()}")
     else:
-        if schema != EXPECTED_SCHEMA:
+        if schema != EXPECTED_SCHEMA or schema["additionalProperties"] is not False:
             findings.append(
                 "R1 notification payload Schema must allow only the empty object under "
                 "JSON Schema 2020-12"

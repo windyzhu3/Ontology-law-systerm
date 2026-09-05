@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class R1ContractClosureIT extends PostgresIntegrationTest {
     static UUID id(int n){return UUID.fromString("01900000-0000-7000-8000-"+String.format(Locale.ROOT,"%012d",n));}
     static String scalar(Connection c,String query)throws SQLException{try(var s=c.createStatement();var r=s.executeQuery(query)){assertTrue(r.next());return r.getString(1);}}
-    enum Fault { NONE, DROP_OPPORTUNITY, ADD_OPPORTUNITY, WRONG_OPPORTUNITY, WRONG_CONTACT, WRONG_HASH, DUPLICATE, WRONG_OWNER, MISSING_OPPORTUNITY, OPPORTUNITY_REVISION, MISSING_DONE, MISSING_CONFIRM, ALREADY_CONFIRMED_NO_CONFIRM_WRITE }
+    enum Fault { NONE, DROP_OPPORTUNITY, ADD_OPPORTUNITY, WRONG_OPPORTUNITY, WRONG_CONTACT, WRONG_HASH, DUPLICATE, WRONG_OWNER, MISSING_OPPORTUNITY, OPPORTUNITY_REVISION, MISSING_DONE, MISSING_CONFIRM, ALREADY_CONFIRMED_NO_CONFIRM_WRITE, PREEXISTING_CONTACT_OPPORTUNITY_NO_INSERTS }
     class ContactHandler implements CommandHandler {
         final UUID tenant,principal,owner,org,grant,lead,task,assignment,contact,opportunity,draft;
         final String code;final int number;final Fault fault;final String contactHash;
@@ -55,15 +55,15 @@ class R1ContractClosureIT extends PostgresIntegrationTest {
         }
         public void lockRoots(Connection c,CommandEnvelope e,Context context)throws SQLException {
             try(var p=c.prepareStatement("select lead_id from lead.lead where tenant_id=? and lead_id=? for update")){p.setObject(1,tenant);p.setObject(2,lead);p.executeQuery().close();}
-            try(var p=c.prepareStatement("select task_occurrence_id from responsibility.task_occurrence where tenant_id=? and task_occurrence_id=? for update")){p.setObject(1,tenant);p.setObject(2,task);p.executeQuery().close();}
+            try(var p=c.prepareStatement("select task_occurrence_id from responsibility.task_occurrence where tenant_id=? and task_occurrence_id=? for update")){p.setObject(1,tenant);p.setObject(2,context.scope().taskId());p.executeQuery().close();}
         }
         public void recoveryEligibility(Connection c,CommandEnvelope e,Context context){throw new AssertionError();}
         public void validateBeforeWork(Connection c,CommandEnvelope e,Context context)throws SQLException {
             if(!"OPEN".equals(scalar(c,"select state from responsibility.task_occurrence where tenant_id='"+tenant+"'")))throw new Rejected("STALE_TASK");
         }
         public Result execute(Connection c,CommandEnvelope e,Context context)throws SQLException {
-            sql(c,"insert into lead.lead_contact_result (tenant_id,lead_contact_result_id,lead_id,lead_assignment_id,contact_no,contact_task_id,contact_channel_code,result_code,resulted_at,created_at) values (?,?,?,?,?,?,'PHONE',?,'2026-09-05T00:00:00.123456Z','2026-09-05T00:00:00.123456Z')",tenant,contact,lead,assignment,number,task,code);
-            if((code.equals("CONNECTED_VALID") && fault!=Fault.MISSING_OPPORTUNITY) || fault==Fault.ADD_OPPORTUNITY) {
+            if(fault!=Fault.PREEXISTING_CONTACT_OPPORTUNITY_NO_INSERTS)sql(c,"insert into lead.lead_contact_result (tenant_id,lead_contact_result_id,lead_id,lead_assignment_id,contact_no,contact_task_id,contact_channel_code,result_code,resulted_at,created_at) values (?,?,?,?,?,?,'PHONE',?,'2026-09-05T00:00:00.123456Z','2026-09-05T00:00:00.123456Z')",tenant,contact,lead,assignment,number,task,code);
+            if(fault!=Fault.PREEXISTING_CONTACT_OPPORTUNITY_NO_INSERTS && ((code.equals("CONNECTED_VALID") && fault!=Fault.MISSING_OPPORTUNITY) || fault==Fault.ADD_OPPORTUNITY)) {
                 sql(c,"insert into opportunity.opportunity (tenant_id,opportunity_id,source_lead_id,source_assignment_id,source_contact_result_id,owner_appointment_id,legal_need_ciphertext,legal_need_digest,created_at) values (?,?,?,?,?,?,decode('01','hex'),decode(repeat('00',32),'hex'),clock_timestamp())",tenant,opportunity,lead,assignment,contact,owner);
                 if(fault==Fault.OPPORTUNITY_REVISION)sql(c,"update opportunity.opportunity set revision=revision+1,close_outcome_code='FIXTURE',closed_at=clock_timestamp() where tenant_id=? and opportunity_id=?",tenant,opportunity);
             }
@@ -130,6 +130,34 @@ class R1ContractClosureIT extends PostgresIntegrationTest {
             assertEquals("0",scalar(x,"select count(*) from opportunity.opportunity where tenant_id='"+h.tenant+"'"));
             assertEquals("OPEN:0",scalar(x,"select state||':'||revision from responsibility.task_occurrence where tenant_id='"+h.tenant+"'"));
             assertEquals(before,scalar(x,"select row_to_json(d)::text from responsibility.action_draft d where tenant_id='"+h.tenant+"'"));return null;
+        });}
+    }
+    @Test void previously_committed_contact_and_opportunity_without_current_inserts_roll_back_command()throws Exception {
+        var h=new ContactHandler(23,"CONNECTED_VALID",1,Fault.PREEXISTING_CONTACT_OPPORTUNITY_NO_INSERTS);
+        // Commit both facts before the command; its only business writes will complete Task and confirm Draft.
+        try(var c=database.apiConnection()){inTransaction(c,Capability.COMMAND,x->{
+            sql(x,"insert into lead.lead_contact_result (tenant_id,lead_contact_result_id,lead_id,lead_assignment_id,contact_no,contact_task_id,contact_channel_code,result_code,resulted_at,created_at) values (?,?,?,?,1,?,'PHONE','CONNECTED_VALID','2026-09-05T00:00:00.123456Z','2026-09-05T00:00:00.123456Z')",h.tenant,h.contact,h.lead,h.assignment,h.task);
+            sql(x,"insert into opportunity.opportunity (tenant_id,opportunity_id,source_lead_id,source_assignment_id,source_contact_result_id,owner_appointment_id,legal_need_ciphertext,legal_need_digest,created_at) values (?,?,?,?,?,?,decode('01','hex'),decode(repeat('00',32),'hex'),clock_timestamp())",h.tenant,h.opportunity,h.lead,h.assignment,h.contact,h.owner);return null;
+        });}
+        var before=contactBusinessRows(h);
+        assertEquals(List.of(0L,0L,0L,0L,0L),counts(h.tenant));
+        var failure=assertThrows(SQLException.class,()->run(runtime(h),h.envelope()));
+        assertEquals("22000",failure.getSQLState());
+        assertEquals(List.of(0L,0L,0L,0L,0L),counts(h.tenant));
+        assertEquals(before,contactBusinessRows(h),"Prior ContactResult/Opportunity and every Task/Draft column must remain unchanged");
+        try(var c=database.apiConnection()){inTransaction(c,Capability.QUERY,x->{
+            assertEquals("1",scalar(x,"select count(*) from lead.lead_contact_result where tenant_id='"+h.tenant+"'"));
+            assertEquals("1",scalar(x,"select count(*) from opportunity.opportunity where tenant_id='"+h.tenant+"'"));
+            assertEquals("OPEN:0",scalar(x,"select state||':'||revision from responsibility.task_occurrence where tenant_id='"+h.tenant+"'"));
+            assertEquals("DRAFT:0",scalar(x,"select state||':'||revision from responsibility.action_draft where tenant_id='"+h.tenant+"'"));return null;
+        });}
+    }
+    List<String> contactBusinessRows(ContactHandler h)throws Exception {
+        try(var c=database.apiConnection()){return inTransaction(c,Capability.QUERY,x->{
+            var rows=new ArrayList<String>();
+            for(String table:List.of("lead.lead_contact_result","opportunity.opportunity","responsibility.task_occurrence","responsibility.action_draft"))
+                rows.add(scalar(x,"select row_to_json(f)::text from "+table+" f where tenant_id='"+h.tenant+"'"));
+            return rows;
         });}
     }
     @Test void contact_no_selects_retry_or_exhausted_and_suspect_has_one_event()throws Exception {

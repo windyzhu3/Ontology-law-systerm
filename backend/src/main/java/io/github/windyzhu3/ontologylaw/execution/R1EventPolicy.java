@@ -36,6 +36,7 @@ public final class R1EventPolicy {
     private R1EventFacts.Task beforeTask;
     private R1EventFacts.Wait beforeWait;
     private Subject beforeCapture;
+    private boolean beforeContactExists=true; // Absence must be observed for the locked Task.
     private boolean prepared;
     public R1EventPolicy(R1EventFacts facts){this.facts=facts;}
 
@@ -44,6 +45,7 @@ public final class R1EventPolicy {
         require(!prepared);prepared=true;
         if(facts==null)return; // A successful result still fails closed in validate.
         if(context.scope().taskId()!=null)beforeTask=facts.task(c,e.actor().tenantId(),context.scope().taskId());
+        if(e.type()==CommandEnvelope.Type.RECORD_CONTACT_RESULT && beforeTask!=null)beforeContactExists=facts.contactExistsForTask(c,e.actor().tenantId(),beforeTask.selector().id());
         if(e.type().recovery())beforeWait=facts.latestWait(c,e.actor().tenantId(),context.scope().taskId());
         if(context.binding() instanceof CommandAuthorizationBinding.Capture b)beforeCapture=facts.capturedLead(c,e.actor().tenantId(),b.sourceAccountCode(),b.sourceRecordKeyDigest());
     }
@@ -112,6 +114,7 @@ public final class R1EventPolicy {
                 var opportunity=facts.opportunityForContact(c,tenant,contact.selector().id());
                 outcome=contact.code();
                 if("CONNECTED_VALID".equals(outcome)) {
+                    require(!beforeContactExists);
                     require(opportunity!=null && opportunity.selector().revision()==0 && opportunity.leadId().equals(contact.leadId()) && opportunity.assignmentId().equals(contact.assignmentId()) && opportunity.contactId().equals(contact.selector().id()) && opportunity.owner().equals(assignment.owner()));
                     var beforeDraft=beforeTask.draft();var draft=task.draft();
                     require(beforeDraft!=null && "DRAFT".equals(beforeDraft.state()) && draft!=null && "CONFIRMED".equals(draft.state()));

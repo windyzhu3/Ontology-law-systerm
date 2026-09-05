@@ -24,6 +24,8 @@
 - `OpportunityOpened`指向不同来源`01900000-0000-7000-8000-000000000110@revision 0`；数据库Owner事实核对同Lead、Assignment、ContactResult及Owner路径。
 - Slot、Receipt、Audit、Event、Outbox的增量为`[1,1,1,2,2]`；同key重放仍为该计数；R2 Task增量为0。
 - 缺失/额外/重复事件、错误Opportunity/ContactResult/hash/Owner、缺失Opportunity、错误Opportunity revision、未完成Task或未确认Draft均以技术错误完整回滚，原Task/Draft状态与所有命令记录恢复为事务前状态。
+- 已在前一事务确认的Draft不能冒充本次确认；本次必须由同一Draft的DRAFT状态递增一个revision转为CONFIRMED。
+- 已在前一事务提交的ContactResult＋Opportunity不能冒充本次创建。运行时在既有根锁内、Handler写入前，通过Lead Owner查询准确Tenant＋Task是否已有ContactResult；CONNECTED_VALID要求此前不存在。实库回归在当前命令省略两次insert、仅完成Task和确认Draft时要求SQLState `22000`、命令差额`[0,0,0,0,0]`、既有两种事实逐列不变以及Task/Draft全部当前更改回滚。
 - 真正的第二条Event插入失败会回滚第一条Event和两种事实；Audit已追加后故障仍全部回滚；commit确认丢失后重试同key返回原Receipt，保持2/2计数。
 - NOT_CONNECTED联系次数1/2仅一条普通联系事件，次数3仅一条耗尽事件；SUSPECT_INVALID仅一条普通联系事件。调配分支按持久Decision code和content_digest选事件，不采信Handler单独声明的结果标签。
 
@@ -37,11 +39,13 @@ ContactResult/WaitReceipt不可变行哈希按[原规范](../contracts/r1/R1-TAS
 
 未改变13 Schema、52＋2物理合同、manifest、字段合同或V001–V850；一SPA、一OpenAPI、单Jar及api/worker互斥角色保留。新增SQL仅在各Owner的internal.persistence，execution-facing记录由下游lead组合，冻结模块DAG及架构门禁未修改。HTTP operation、ETag、scope字段和摘要向量、错误公开形态、依赖版本未修改。Event payload始终为`{}`，schemaVersion=1，每条仅`R1_PROJECTION` Outbox；不增加通用事件平台或R2消费者。
 
-## 验证命令和观察结果
+## 历史验证命令和观察结果
+
+下表保留Task 3修复前`3110f97dffb1f20d3715a98b615ebd8c278519b1`的实施验证记录。其中55 unit＋93 integration是该修复前代码边界的结果，不能代表随后新增回归和最终修复后的完整后端执行次数；最终修复的实测提交边界另列。
 
 | 验证 | 命令 | 结果 |
 |---|---|---|
-| 后端完整门禁 | `./mvnw.cmd -f backend/pom.xml verify -Pit` | exit 0；55 unit＋93 integration executions；failure/error/skipped全部为0；含12项ArchitectureTest、16项OpenApiContractTest及真实jOOQ生成验证 |
+| 修复前后端完整门禁（`3110f97`） | `./mvnw.cmd -f backend/pom.xml verify -Pit` | exit 0；55 unit＋93 integration executions；failure/error/skipped全部为0；含12项ArchitectureTest、16项OpenApiContractTest及真实jOOQ生成验证 |
 | Linux完整baseline测试 | `python -m unittest discover -s scripts/baseline/tests -v` | exit 0；199 test executions，195.291秒，无跳过；discovery含被导入的合同测试重复执行，不代表199个独立案例 |
 | Schema生成与测试 | `python generate.py --check`；`python -m unittest discover -s tests -v` | exit 0；生成无漂移，57 tests通过 |
 | PostgreSQL静态解析 | `python scripts/verify_generated_sql.py` | exit 0；20 migrations、24 PL/pgSQL functions解析通过 |
