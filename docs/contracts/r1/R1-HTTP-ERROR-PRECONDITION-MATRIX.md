@@ -212,6 +212,8 @@ digest43    = 43(ALPHA / DIGIT / "-" / "_")
 
 capture 不对尚不存在的资源要求 `If-Match`。Draft 首次创建使用 `If-None-Match: *`，更新使用 Draft ETag。Task command 使用 Task ETag；服务端仍在锁内重验 subject revision、Assignment、causal Fact 和 Actor authority，不能把 Task ETag 当成 subject ETag。
 
+按[ADR-0006](../../adr/ADR-0006-command-runtime-authorization-boundary.md)，授权自然有效期在最终持Tenant授权共享事务锁、使用新鲜数据库`clock_timestamp()`完整复验时裁定，不保证物理COMMIT瞬间仍未过期。所有Identity写者使用配对排他锁，复验前已提交的撤销/DENY/组织变化被观察，之后写者等待。COMMIT确认丢失不能解释成确定失败或Receipt不存在；客户端保留相同Idempotency-Key和原请求重试恢复原Receipt，不产生FAILED/UNKNOWN命令回执。
+
 ## Error registry
 
 `Problem` 的 shape 和 requiredness 固定如下；没有值的 extension 必须省略，不能返回 `null` 或空数组：

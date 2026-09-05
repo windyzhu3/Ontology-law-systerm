@@ -13,7 +13,8 @@ from scripts.baseline.verify_baseline import HISTORICAL_BANNER, verify_repositor
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "verify_baseline.py"
-CANONICAL_BASELINE_ID = "MVP-2026-08-28.1"
+CANONICAL_BASELINE_ID = "MVP-2026-09-05.1"
+HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 CANONICAL_MATTER_PUBLICATION_CLAUSE = (
     "同一本地事务必须写入完整MatterRef槽：稳定`matter_id`、`matter_no`、类型、"
     "能力包版本和可信创建时间，并发布`MatterCreated`事实通知供Post-MVP消费者使用。"
@@ -700,9 +701,10 @@ class VerifyBaselineTest(unittest.TestCase):
                 "[V840](../../database/schema-contract-52-plus-2/generated/db/migration/V840__schema_contract_validation.sql); `merge-commit=abcdef0`",
                 "none", "—",
             ),
-            markdown_row("BASE-CLOSURE-DESIGN", "PR2", "Closure design", "Docs", "[Closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md)", "Product", CANONICAL_BASELINE_ID, "PR2 merge", "MERGED", "[confirmed closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md); `merge-commit=abcdef0`", "none", "—"),
+            markdown_row("BASE-CLOSURE-DESIGN", "PR2", "Closure design", "Docs", "[Closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md)", "Product", HISTORICAL_BASELINE_ID, "PR2 merge", "MERGED", "[confirmed closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md); `merge-commit=abcdef0`", "none", "—"),
             markdown_row("BASE-PR2-CLOSURE-PLAN", "PR2", "Closure plan", "Plan", "[PR2 plan](../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md)", "Product", "2026-08-28", "PR2 merge", "MERGED", "[plan](../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md); `merge-commit=abcdef0`", "none", "—"),
-            markdown_row("BASE-CURRENT-MVP", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", CANONICAL_BASELINE_ID, "PR2 merge", "MERGED", "[closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md); `merge-commit=abcdef0`", "none", "—"),
+            markdown_row("BASE-CURRENT-MVP", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", HISTORICAL_BASELINE_ID, "PR2 merge", "MERGED", "[closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05"),
+            markdown_row("BASE-CURRENT-MVP-2026-09-05", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", CANONICAL_BASELINE_ID, "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "—"),
             markdown_row("R1-IMPLEMENTATION-PLAN", "R1", "Lead-contact plan", "Plan", "[R1 plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Engineering", "2026-08-28", "R1 implementation", "FROZEN", "[plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Production code is not yet implemented", "—"),
             markdown_row("R1-IMPLEMENTATION-CONTRACT", "R1", "R1 scaffold, HTTP, task, and workbench contract", "Docs", "[ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)", "Engineering", "r1-contract-v1", "R1 implementation", "FROZEN", "[ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md); [task matrix](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md); [HTTP matrix](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md); [workbench contract](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)", "Production scaffold is not yet implemented", "—"),
             markdown_row("DB-52P2-PG18-RUNTIME-PLAN", "MVP", "PostgreSQL runtime plan", "Plan", "[runtime plan](../superpowers/plans/2026-08-28-postgresql-runtime-verification-plan.md)", "Database", "2026-08-28", "R1 implementation", "DRAFT", "[plan](../superpowers/plans/2026-08-28-postgresql-runtime-verification-plan.md)", "Plan is not runtime evidence", "—"),
@@ -981,6 +983,26 @@ class VerifyBaselineTest(unittest.TestCase):
                 "Current baseline must declare Baseline ID: "
                 f"{CANONICAL_BASELINE_ID}",
             )
+
+    def test_runtime_baseline_version_accepts_only_the_approved_successor(self) -> None:
+        for version, valid in [("MVP-2026-09-05.1", True), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.2", False), ("MVP-2026-09-05.10", False)]:
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                baseline = root / "docs/baseline/CURRENT-MVP-BASELINE.md"
+                baseline.parent.mkdir(parents=True)
+                baseline.write_text(f"Baseline ID: {version}\n", encoding="utf-8")
+                findings = []
+                verify_baseline_module.verify_canonical_baseline(root, findings)
+                self.assertEqual(not findings, valid)
+
+    def test_current_baseline_cannot_bypass_the_required_successor_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            ledger = root / "docs/progress/MVP-DELIVERY-LEDGER.md"
+            ledger.write_text(ledger.read_text(encoding="utf-8").replace(
+                "| none | BASE-CURRENT-MVP-2026-09-05 |", "| none | — |"), encoding="utf-8")
+            self.assert_finding(root, "Delivery ledger BASE-CURRENT-MVP must point to BASE-CURRENT-MVP-2026-09-05")
 
     def test_unapproved_closure_spec_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -2781,8 +2803,8 @@ class VerifyBaselineTest(unittest.TestCase):
             for index, line in enumerate(lines):
                 if "BASE-CLOSURE-DESIGN" in line:
                     lines[index] = line.replace("| — |", "| BASE-CURRENT-MVP |")
-                if "BASE-CURRENT-MVP" in line:
-                    lines[index] = line.replace("| — |", "| BASE-CLOSURE-DESIGN |")
+                if line.startswith("| BASE-CURRENT-MVP |"):
+                    lines[index] = line.replace("| BASE-CURRENT-MVP-2026-09-05 |", "| BASE-CLOSURE-DESIGN |")
             ledger.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
             self.assert_finding(

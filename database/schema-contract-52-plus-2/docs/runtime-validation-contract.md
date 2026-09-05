@@ -36,6 +36,8 @@
 
 授权判定只允许一个可审计路径，例如 `DIRECT`、`DELEGATED`、`OBJECT` 或受控 `SYSTEM`。不得拼接两条各自不完整的路径来满足一个命令。提交时在 `AuditEntry` 冻结实际 Actor/Appointment、on-behalf-of、唯一授权槽、路径、Scope、准确授权 Fact 和 `authorization_snapshot_digest`。
 
+Command的自然有效期按[ADR-0006](../../../docs/adr/ADR-0006-command-runtime-authorization-boundary.md)在最终持锁完整复验的`clock_timestamp()`裁定，不保证物理COMMIT瞬间仍有效。最终复验前取得具名Tenant共享advisory事务锁，持有至事务结束。所有未来Identity writer须在任何身份变更之前取得对应排他锁，之后不得获取业务锁；复验前已提交的撤销、新DENY、组织重挂必须被观察，复验后的写者等待。禁止使用事务起点`now()`代替新鲜时钟，也不得宣称锁阻止自然到期。
+
 下列时点必须重新执行完整四轴判定：业务写提交前、Evidence 最终晋级、Evidence 下载、Finding/审计披露、审计查询或导出，以及任何依赖既有 Decision 的最终放行。授权在请求开始后被撤销、Appointment 失效、组织树变化或 Subject revision/hash 变化时，当前操作必须拒绝或回滚。
 
 ## 4. 类型化准确引用
@@ -57,7 +59,9 @@ Resolver 失败属于拒绝或技术失败，绝不能降级为只按 `(type,id)
 
 四类命令信封、Handler、Fact Resolver、事件 Schema、路由与重试策略只能由代码注册。信封至少携带 Tenant、静态类型、CommandId、Correlation、Actor/Appointment、预期 Subject 选择器、命令 Scope 摘要和规范 payload 摘要。
 
-`CommandExecutionSlot` 以 Tenant、静态信封类型、命令 Scope 摘要和 CommandId 形成永久占位。相同占位键与相同 `payloadDigest` 返回既有终局；相同键但摘要不同必须拒绝并审计，不能覆盖 Slot 或另建等价幂等表。
+R1静态映射：INTERNAL_TASK对应七个Task主命令与SAVE_ACTION_DRAFT，INTERNAL_ADMIN仅对应CAPTURE_LEAD且不赋管理员权力，SERVICE_ACTOR对应两个具名恢复命令并要求真实SERVICE Principal及完整授权；CUSTOMER_GRANT没有R1命令。缺失Handler或静态policy失败关闭，不能由调用方选择信封、authority或事件描述。
+
+`CommandExecutionSlot` 以 Tenant、静态信封类型、命令 Scope 摘要和 CommandId 形成永久占位。相同占位键与相同 `payloadDigest` 返回既有终局；同Tenant CommandId的payload、Scope或信封冲突返回原Receipt安全引用，所有新增delta（包括Audit）为零，不能覆盖Slot或另建等价幂等表。
 
 ### 5.2 短事务
 
@@ -72,7 +76,9 @@ Resolver 失败属于拒绝或技术失败，绝不能降级为只按 `(type,id)
 
 这些写入在同一 `READ COMMITTED` 短事务一次提交。`NO_CHANGE` 必须解析并引用既有准确结果 Fact，不为“无变化”伪造新事实或事件；`REJECTED` 只提交永久 Slot、拒绝 Audit 和无结果 Fact 的 Receipt，不生成虚假领域事件或 Outbox。并发正确性使用唯一约束、显式行锁、预期 `revision` 和 Fact Owner 自然幂等键；不依赖提高全局隔离级别。
 
-`CommandReceipt` 只有 `SUCCEEDED`、`NO_CHANGE`、`REJECTED` 三个终态。前两者必须准确引用一个结果 Fact；`REJECTED` 不得引用结果 Fact。连接中断、锁超时、进程崩溃、SQL/对象存储/Provider 技术故障使事务整体回滚，不生成 Receipt；调用方用同一 CommandId 和相同摘要安全重试。
+`CommandReceipt` 只有 `SUCCEEDED`、`NO_CHANGE`、`REJECTED` 三个终态。前两者必须准确引用一个结果 Fact；`REJECTED` 不得引用结果 Fact。确认提交前的连接中断、锁超时、进程崩溃、SQL等技术故障整体回滚，不生成Receipt；但COMMIT确认丢失无法证明数据库未提交，只能用同一CommandId和相同摘要恢复原Receipt。不得伪造FAILED/UNKNOWN Receipt或把确认丢失宣称为已证明全零。
+
+Handler的NO_CHANGE或post-write业务拒绝必须先回滚领域savepoint，不能残留暂存Fact/Task/Draft/Event写入。成功通知为不可变列表，各项可有独立准确sourceFact；Receipt仍只有一个结果Fact，所有通知及对应Outbox同事务提交。当前事件描述只允许Task矩阵具名事件，版本1、空对象通知payload、R1_PROJECTION Owner；非完成命令与OpportunityOpened的完整生产描述未冻结前不注册对应成功Handler。
 
 `DomainEvent` 是事实通知，不复制领域真相，不承担事件溯源。它的 Outbox 只做 Owner 定向的 at-least-once 投递；消费者必须按准确来源 Fact 自行读取当前可见结果。
 
@@ -81,7 +87,7 @@ Resolver 失败属于拒绝或技术失败，绝不能降级为只按 `(type,id)
 所有业务写及其结果、授权/管理事件、高风险拒绝、敏感读取、Decision 与授权依据、审计查询和导出都追加一条不可变 `AuditEntry`：
 
 - 业务写的审计必须由固定 AuditAppender 在同一短事务同步追加，失败则业务写回滚。
-- 拒绝、敏感读取、Finding/Evidence/审计披露和审计导出必须先提交审计事务，再返回结果或字节；审计提交失败时不披露。
+- 需要审计的拒绝、敏感读取、Finding/Evidence/审计披露和审计导出必须先提交审计事务，再返回结果或字节；审计提交失败时不披露。同key重放/冲突以及C0明确的pre-insert零写拒绝不新增Audit，不受本句扩大解释。
 - 记录只含准确 Scope/Tenant、实际 Actor/Appointment、on-behalf-of、Action、Subject 版本、Command/Correlation、唯一授权路径快照、结果、可信执行上下文和允许列表摘要。
 - 不得保存完整领域事实、原始请求/响应、密码、Token、Secret、文档正文或非必要案情。
 - 修正只追加 `CORRECTION` 并引用链上最近一条记录；原记录不得更新、隐藏或删除。
