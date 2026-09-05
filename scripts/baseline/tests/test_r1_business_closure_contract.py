@@ -90,6 +90,18 @@ class R1BusinessClosureContractTest(unittest.TestCase):
     def test_internal_problem_enums_are_exact(self):
         self.mutation(API, "enum: ['NO', FIRST_PAGE, AFTER_REAUTH, BACKOFF]", "enum: ['NO', FIRST_PAGE, BACKOFF]")
 
+    def test_internal_problem_type_and_exact_properties_are_required(self):
+        self.mutation(API, "InternalProblem:\n      type: object", "InternalProblem:\n      type: string")
+        self.mutation(API, "correlationId: { $ref: '#/components/schemas/Uuid' }", "correlationId: { $ref: '#/components/schemas/Uuid' }\n        leakedTenant: { type: string }")
+
+    def test_internal_problem_scalar_schemas_are_exact(self):
+        self.mutation(API, "type: { type: string, format: uri }", "type: { type: string }")
+        self.mutation(API, "title: { type: string }", "title: { type: integer }")
+        self.mutation(API, "status: { type: integer, enum: [400, 401, 403, 404, 409, 422, 429, 500, 503] }", "status: { type: string, enum: [400, 401, 403, 404, 409, 422, 429, 500, 503] }")
+
+    def test_internal_problem_correlation_ref_is_exact(self):
+        self.mutation(API, "correlationId: { $ref: '#/components/schemas/Uuid' }", "correlationId: { type: string }")
+
     def test_internal_operation_response_refs_are_exact(self):
         self.mutation(API, "'409': { $ref: '#/components/responses/InternalConflictProblem' }", "'409': { $ref: '#/components/responses/InternalBadRequestProblem' }")
 

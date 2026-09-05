@@ -151,12 +151,18 @@ def validate(root: Path) -> list[str]:
         findings.append("R1 TechnicalIdentifier differs from exact contract")
     consume_properties = {"domainEventOutboxId": ref("Uuid"), "domainEventId": ref("Uuid"), "expectedOutboxRevision": ref("Revision"), "leaseOwner": ref("TechnicalIdentifier"), "fencingToken": {"type": "integer", "format": "int64", "minimum": 1, "maximum": 9007199254740991}}
     closed_schema("ConsumeR1ProjectionV1", list(consume_properties), consume_properties)
-    problem_properties = schemas.get("InternalProblem", {}).get("properties", {})
     expected_problem_required = ["type", "title", "status", "code", "retryPolicy", "correlationId"]
-    if schemas.get("InternalProblem", {}).get("required") != expected_problem_required or schemas.get("InternalProblem", {}).get("additionalProperties") is not False:
-        findings.append("R1 InternalProblem closure or required fields differ")
-    if problem_properties.get("status", {}).get("enum") != [400, 401, 403, 404, 409, 422, 429, 500, 503] or problem_properties.get("code", {}).get("enum") != ["VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND", "STALE_OUTBOX_CLAIM", "PROJECTION_EVENT_INVALID", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE"] or problem_properties.get("retryPolicy", {}).get("enum") != ["NO", "FIRST_PAGE", "AFTER_REAUTH", "BACKOFF"]:
-        findings.append("R1 InternalProblem status/code/retry enums differ")
+    expected_problem_properties = {
+        "type": {"type": "string", "format": "uri"},
+        "title": {"type": "string"},
+        "status": {"type": "integer", "enum": [400, 401, 403, 404, 409, 422, 429, 500, 503]},
+        "code": {"type": "string", "enum": ["VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND", "STALE_OUTBOX_CLAIM", "PROJECTION_EVENT_INVALID", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE"]},
+        "retryPolicy": {"type": "string", "enum": ["NO", "FIRST_PAGE", "AFTER_REAUTH", "BACKOFF"]},
+        "correlationId": ref("Uuid"),
+    }
+    expected_problem = {"type": "object", "additionalProperties": False, "required": expected_problem_required, "properties": expected_problem_properties}
+    if schemas.get("InternalProblem") != expected_problem:
+        findings.append("R1 InternalProblem differs from exact frozen schema")
     response_components = {400: "InternalBadRequestProblem", 401: "InternalClosureUnauthorizedProblem", 403: "InternalForbiddenProblem", 404: "InternalNotFoundProblem", 409: "InternalConflictProblem", 422: "InternalUnprocessableProblem", 429: "InternalRateLimitedProblem", 500: "InternalServerProblem", 503: "InternalUnavailableProblem"}
     for status, name in response_components.items():
         expected = {"description": responses.get(name, {}).get("description"), "content": {"application/problem+json": {"schema": ref("InternalProblem")}}}

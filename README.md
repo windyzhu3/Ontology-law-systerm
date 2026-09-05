@@ -143,6 +143,14 @@ Windows PowerShell 使用 `.\mvnw.cmd -f backend/pom.xml package`。只有在有
 
 `contracts/openapi/ontology-law-api.yaml` 及其 `examples/` 是唯一人工维护的 HTTP 合同源。`apps/workbench/src/generated/api/schema.d.ts` 是必须提交的确定性生成物，不得手工编辑；`backend/target/generated-sources/openapi` 是 Maven 构建产物，不得提交或移动进领域包。CI 会在前端 typecheck 之前执行漂移检查，并通过后端 `package` 证明生成代码可编译、合同测试可运行。
 
+基线验证器使用仓库固定的 PyYAML 6.0.3 严格解析 OpenAPI；本地或 CI 运行前必须先安装同一份依赖：
+
+```bash
+python3 -m pip install -r scripts/baseline/requirements.txt
+python3 -m unittest discover -s scripts/baseline/tests -v
+python3 scripts/baseline/verify_baseline.py
+```
+
 数据库合同使用独立的确定性生成与验证入口：
 
 ```bash
