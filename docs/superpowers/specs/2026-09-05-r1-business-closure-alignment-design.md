@@ -149,7 +149,7 @@ SERVICE 除了准确 ACTIVE Principal、有效服务 Appointment、有效组织�
 
 请求的 `sourceAccountCode` 必须同时存在于该 SERVICE 的绑定集合及 `R1SourcePolicyRegistryV1`。随后按 source policy 在当前 Tenant 唯一解析 ACTIVE `sourceIntakeRootCode`，直接 Grant scope 必须覆盖该组织；不回退到服务任职组织、调用方组织或任意父组织。
 
-新建 Lead 前，以 `identity.organization_unit@revision` 作为准确授权及 Audit subject。自然键已存在或命令重放时，还要重验准确现有 Lead 的可见性与 LEAD_CAPTURE DENY。初始授权、工作前复验及最终 identity shared 锁下复验覆盖 Principal、Appointment、Grant、组织、source binding、组织/Lead DENY 和准确 selector；等待锁期间撤权、到期、新 DENY 或组织重挂必须阻止披露或提交。
+新建 Lead 前，以 `identity.organization_unit@revision` 作为准确授权及 Audit subject。该锚点只用于组织链、scope、Grant 状态/有效期/撤销复验；它不在不变的物理 `BUSINESS_SUBJECT_TYPES` allowlist 内，因此不伪造 organization_unit ObjectAccessGrant DENY。ObjectAccessGrant DENY 仅应用于 allowlist 内的真实业务 Subject。自然键已存在或命令重放时，还要重验准确现有 Lead 的可见性与 LEAD_CAPTURE DENY。初始授权、工作前复验及最终 identity shared 锁下复验覆盖 Principal、Appointment、Grant、组织链/scope、source binding、Lead DENY 和准确 selector；等待锁期间撤权、到期、新 Lead DENY 或组织重挂必须阻止披露或提交。
 
 成功沿用原 capture Handler、scope、Receipt、`LeadCapturedV1` 和 `R1_PROJECTION` 路由。Audit 冻结实际 SERVICE Principal/Appointment、空 on-behalf-of、SYSTEM、SOURCE_INTAKE_OWNER、准确 Grant/组织 subject 及授权摘要；不保存 token、secret、外部 subject 原文或联系方式正文。
 
@@ -159,7 +159,7 @@ SERVICE 除了准确 ACTIVE Principal、有效服务 Appointment、有效组织�
 - 未知 issuer、错 audience、过期/伪签 token、歧义映射、数据库 kind 不一致和自报 Tenant/Principal/Appointment；相同 issuer/subject 在两个 Tenant 有登记时不得默认选择第一项，伪造 tenant claim 不得扩大候选，登记 Appointment 与 Principal 不匹配必须失败。
 - 同一 intake root 下另一个未绑定 sourceAccountCode，及来源 root 不存在、关闭、跨 Tenant 或 revision 改变。
 - SERVICE 的 DIRECT/DELEGATED/OBJECT、HUMAN 的 SYSTEM、SERVICE on-behalf、仅 recovery Grant、仅 OBJECT ALLOW 全部拒绝。
-- 组织及现有 Lead DENY、等待锁期间撤权/新 DENY、失效 Appointment/Principal/Grant。
+- 组织链/scope/Grant 状态、有效期与撤销，以及现有 Lead DENY；等待锁期间撤权/新 Lead DENY、失效 Appointment/Principal/Grant。组织不伪造为对象 DENY Subject。
 - 同 key 正常重放零新增；payload/source/envelope 改变 conflict；重放不能披露已经失去访问权的原结果。
 - HUMAN DIRECT/DELEGATED 既有行为不回归；Bearer SERVICE 不能调用 mTLS recovery，SERVICE 不能进入 Draft/Task/Workbench。
 - Fact、Receipt、Audit、Event、Outbox 任一点故障全部回滚；提交确认丢失只允许以原 key 恢复。

@@ -407,7 +407,7 @@ R1_AUTHENTICATION_CHALLENGE_CONTRACTS = {
         "HTTP_401_PROBLEM_WITH_WWW_AUTHENTICATE_BEARER",
     ),
     "internalMutualTls": (
-        "reopenDueContactTasks,reopenDueRoutingReviewTasks",
+        "listDueR1Tasks,consumeR1Projection,reopenDueContactTasks,reopenDueRoutingReviewTasks",
         "TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE",
     ),
 }
@@ -521,6 +521,7 @@ R1_ERROR_CONTRACTS = {
     "APPOINTMENT_INACTIVE": ("403", "NO", "NONE", "NONE"),
     "NOT_FOUND": ("404", "NO", "NONE", "NONE"),
     "COMMAND_PAYLOAD_CONFLICT": ("409", "NO", "NONE", "NONE"),
+    "STALE_OUTBOX_CLAIM": ("409", "NO", "NONE", "NONE"),
     "TASK_NOT_OPEN": ("409", "NO", "NONE", "TASK"),
     "TASK_ALREADY_COMPLETED": ("409", "NO", "NONE", "TASK"),
     "DRAFT_DIGEST_MISMATCH": ("409", "NEW_KEY_AFTER_REFRESH", "NONE", "DRAFT"),
@@ -532,6 +533,7 @@ R1_ERROR_CONTRACTS = {
     "SOURCE_INTAKE_OWNER_UNRESOLVED": (
         "422", "NEW_KEY_AFTER_ADMIN_FIX", "NONE", "NONE"
     ),
+    "PROJECTION_EVENT_INVALID": ("422", "NO", "NONE", "NONE"),
     "DRAFT_PRECONDITION_REQUIRED": ("428", "SAME_KEY_AFTER_FIX", "NONE", "DRAFT"),
     "TASK_PRECONDITION_REQUIRED": ("428", "SAME_KEY_AFTER_FIX", "NONE", "TASK"),
     "RATE_LIMITED": ("429", "SAME_KEY_AFTER_BACKOFF", "NONE", "NONE"),
@@ -638,6 +640,14 @@ R1_OPERATION_CONTRACTS = {
         "DUE_CUTOFF_AND_OWNER_QUEUE",
         "200",
     ),
+    "listDueR1Tasks": (
+        "GET", "/internal/v1/tasks/due", "NONE", "RECOVERY_TYPE_LIMIT_CURSOR",
+        "DUE_TASK_OWNER_SCOPE", "200",
+    ),
+    "consumeR1Projection": (
+        "POST", "/internal/v1/projections/r1/consume", "NONE", "OUTBOX_REVISION_LEASE_FENCE",
+        "EVENT_OUTBOX_CURRENT_OWNER_FACTS", "204",
+    ),
 }
 R1_IDEMPOTENCY_BINDING = {
     "Header": "Idempotency-Key",
@@ -649,6 +659,15 @@ R1_IDEMPOTENCY_BINDING = {
     "PayloadConflict": "ORIGINAL_RECEIPT_NO_NEW_WRITES",
 }
 R1_OPERATION_ERRORS = {
+    "listDueR1Tasks": {
+        "VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "RATE_LIMITED",
+        "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "consumeR1Projection": {
+        "VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND",
+        "STALE_OUTBOX_CLAIM", "PROJECTION_EVENT_INVALID", "RATE_LIMITED",
+        "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
     "captureLead": {
         "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
         "UNAUTHENTICATED", "NOT_AUTHORIZED", "APPOINTMENT_INACTIVE",

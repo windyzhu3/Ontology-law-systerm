@@ -463,6 +463,8 @@ class VerifyBaselineTest(unittest.TestCase):
             ("getCommandReceipt", "GET", "/api/v1/commands/{commandId}/receipt", "ACTOR_CONTEXT", "NONE", "NONE", "COMMAND_ID_AND_ACTOR_SCOPE", "200"),
             ("reopenDueContactTasks", "POST", "/internal/v1/tasks/commands/reopen-due-contact-tasks", "ACTOR_CONTEXT", "REQUIRED", "NONE", "DUE_CUTOFF_AND_OWNER_QUEUE", "200"),
             ("reopenDueRoutingReviewTasks", "POST", "/internal/v1/tasks/commands/reopen-due-routing-review-tasks", "ACTOR_CONTEXT", "REQUIRED", "NONE", "DUE_CUTOFF_AND_OWNER_QUEUE", "200"),
+            ("listDueR1Tasks", "GET", "/internal/v1/tasks/due", "ACTOR_CONTEXT", "NONE", "RECOVERY_TYPE_LIMIT_CURSOR", "DUE_TASK_OWNER_SCOPE", "200"),
+            ("consumeR1Projection", "POST", "/internal/v1/projections/r1/consume", "ACTOR_CONTEXT", "NONE", "OUTBOX_REVISION_LEASE_FENCE", "EVENT_OUTBOX_CURRENT_OWNER_FACTS", "204"),
         ]
         operation_lines = [
             markdown_row(*operation_header),
@@ -493,7 +495,7 @@ class VerifyBaselineTest(unittest.TestCase):
             ),
             markdown_row(
                 "internalMutualTls",
-                "reopenDueContactTasks,reopenDueRoutingReviewTasks",
+                "listDueR1Tasks,consumeR1Projection,reopenDueContactTasks,reopenDueRoutingReviewTasks",
                 "TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE",
             ),
         ]
@@ -1003,7 +1005,7 @@ class VerifyBaselineTest(unittest.TestCase):
             )
 
     def test_runtime_baseline_version_accepts_only_the_approved_successor(self) -> None:
-        for version, valid in [("MVP-2026-09-05.2", True), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.1", False), ("MVP-2026-09-05.10", False)]:
+        for version, valid in [("MVP-2026-09-05.3", True), ("MVP-2026-09-05.2", False), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.1", False), ("MVP-2026-09-05.10", False)]:
             with self.subTest(version=version), tempfile.TemporaryDirectory() as temp_dir:
                 root = Path(temp_dir)
                 baseline = root / "docs/baseline/CURRENT-MVP-BASELINE.md"

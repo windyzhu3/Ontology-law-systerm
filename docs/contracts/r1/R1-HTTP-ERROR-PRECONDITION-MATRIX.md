@@ -29,6 +29,8 @@ Status: FROZEN
 | getCommandReceipt | GET | /api/v1/commands/{commandId}/receipt | ACTOR_CONTEXT | NONE | NONE | COMMAND_ID_AND_ACTOR_SCOPE | 200 | UNAUTHENTICATED,NOT_AUTHORIZED,NOT_FOUND,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 | reopenDueContactTasks | POST | /internal/v1/tasks/commands/reopen-due-contact-tasks | ACTOR_CONTEXT | REQUIRED | NONE | DUE_CUTOFF_AND_OWNER_QUEUE | 200 | VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,COMMAND_PAYLOAD_CONFLICT,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 | reopenDueRoutingReviewTasks | POST | /internal/v1/tasks/commands/reopen-due-routing-review-tasks | ACTOR_CONTEXT | REQUIRED | NONE | DUE_CUTOFF_AND_OWNER_QUEUE | 200 | VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,COMMAND_PAYLOAD_CONFLICT,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
+| listDueR1Tasks | GET | /internal/v1/tasks/due | ACTOR_CONTEXT | NONE | RECOVERY_TYPE_LIMIT_CURSOR | DUE_TASK_OWNER_SCOPE | 200 | VALIDATION_FAILED,UNAUTHENTICATED,NOT_AUTHORIZED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
+| consumeR1Projection | POST | /internal/v1/projections/r1/consume | ACTOR_CONTEXT | NONE | OUTBOX_REVISION_LEASE_FENCE | EVENT_OUTBOX_CURRENT_OWNER_FACTS | 204 | VALIDATION_FAILED,UNAUTHENTICATED,NOT_AUTHORIZED,NOT_FOUND,STALE_OUTBOX_CLAIM,PROJECTION_EVENT_INVALID,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 
 TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提供 Tenant，并用于授权、查询和 SQL 绑定。公共调用方不能提交或覆盖 Tenant；内部入口只接受 mTLS worker 身份并映射到受限 ActorContext。
 
@@ -65,6 +67,8 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 | getCommandReceipt | `commandId: Uuid` | `Authorization: Bearer …` | none |
 | reopenDueContactTasks | none | mutual-TLS client identity; `Idempotency-Key: Uuid` | `ReopenDueContactTaskV1` |
 | reopenDueRoutingReviewTasks | none | mutual-TLS client identity; `Idempotency-Key: Uuid` | `ReopenDueRoutingReviewTaskV1` |
+| listDueR1Tasks | none | mutual-TLS client identity; query `recoveryType`, optional `limit`, optional opaque `cursor` | none |
+| consumeR1Projection | none | mutual-TLS client identity | `ConsumeR1ProjectionV1` |
 
 “same command headers”恰指表中三项，不允许额外的 Tenant、subject revision、Draft ETag 或自由 command/action header。`If-Match`、`If-None-Match` 都只接受一个标签，不接受逗号列表、弱标签或 `If-Match: *`。`reopenDueContactTasks` 保留冻结的 operationId/path，但一次请求准确恢复一张 Task，不是批处理。
 
@@ -99,6 +103,8 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 | `ReviewLeadValidityV1` | Draft confirmation fields (各 1), `triggeringContactResultId: Uuid` (1), `triggeringContactResultHash: Digest32` (1), `decisionCode` (1), `rationaleSummary: SafeText500` (1) | `decisionCode ∈ {CONFIRM_INVALID,CLOSE_UNREACHED,REOPEN_CONTACT}`；ContactResult selector 必须等于 Task 创建时按 Task 合同确定、提交时重验的触发结果 |
 | `ReopenDueContactTaskV1` | `taskId: Uuid` (1), `expectedTaskRevision: Revision` (1), `waitReceiptId: Uuid` (1), `waitReceiptHash: Digest32` (1), `dueCutoff: Instant` (1) | Task 必须为 WAITING `CONTACT_LEAD`；最新 WaitReceipt 必须绑定 expected revision 且 `resumeDueAt <= dueCutoff <=` 服务端事务可信当前时间；恰做一次 WAITING→OPEN CAS。若同一 selector 已使 Task 成为 OPEN/revision=`expectedTaskRevision+1`，返回 NO_CHANGE；不允许空批成功 |
 | `ReopenDueRoutingReviewTaskV1` | `taskId: Uuid` (1), `expectedTaskRevision: Revision` (1), `waitReceiptId: Uuid` (1), `waitReceiptHash: Digest32` (1), `dueCutoff: Instant` (1) | Task 必须为 WAITING `RESOLVE_LEAD_ROUTING_GAP`且最新WaitReceipt为`R1_ROUTING_REVIEW_WAIT_V1`；其余due、CAS和NO_CHANGE语义与contact恢复相同 |
+| `DueR1TaskPageV1` | `candidates: DueR1TaskCandidateV1[]` (1), `nextCursor` (0..1) | candidate 恰含 recoveryType/taskId/expectedTaskRevision/waitReceiptId/waitReceiptHash/dueCutoff/idempotencyKey；不得含 Tenant/Grant/organization 或展示内容 |
+| `ConsumeR1ProjectionV1` | `domainEventOutboxId: Uuid`, `domainEventId: Uuid`, `expectedOutboxRevision: Revision`, `leaseOwner: TechnicalIdentifier64`, `fencingToken: 1..9007199254740991` (all 1) | 恰五字段，拒绝未知字段；Tenant 只来自 mTLS ActorContext |
 
 七种 TaskOccurrence 的唯一持久 `subject` 均为 `lead.lead@revision`（revision 必填、hash 为空）。RESOLVE 的 candidate Lead/Party、ACK 的 causal Decision、CONTACT 的 LeadAssignment、REVIEW 的 triggering ContactResult 是具名次级 command-scope/提交前重验 selector，不得伪装成第二个 Task subject。scope digest 覆盖 commandType、taskId、准确持久 Lead selector 和按字段名排序的次级 selector。
 
@@ -116,6 +122,8 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 | getCommandReceipt | 200 | none | `CommandReceipt`，逐字段等于原终态 Receipt 投影 |
 | reopenDueContactTasks | 200 | `Location: /api/v1/commands/{commandId}/receipt`; `ETag: TaskETag` | `CommandReceipt`；resultFact 必须为恢复后的 `TASK_OCCURRENCE@postReopenRevision` |
 | reopenDueRoutingReviewTasks | 200 | `Location: /api/v1/commands/{commandId}/receipt`; `ETag: TaskETag` | `CommandReceipt`；resultFact 必须为恢复后的 `TASK_OCCURRENCE@postReopenRevision` |
+| listDueR1Tasks | 200 | none | `DueR1TaskPageV1` |
+| consumeR1Projection | 204 | none | no body |
 
 `ActionDraftWriteResult` 恰含 `receipt: CommandReceipt`、`draft: ActionDraftProjection` 和 `preconditions: PreconditionTokens`，三者均必填；其中 `preconditions.draftETag` 必须等于响应 `ETag`。七个 Task command 指 Operations 表中从 `resolveDuplicateLead` 到 `reviewLeadValidity` 的七行。
 
@@ -189,7 +197,7 @@ digest43    = 43(ALPHA / DIGIT / "-" / "_")
 | Scheme name | OpenAPI shape | Exact operation binding |
 |---|---|---|
 | `publicBearer` | `type: http`, `scheme: bearer` | 所有 `/api/v1/**` 十一个 operation 各自且只使用 `[{publicBearer: []}]` |
-| `internalMutualTls` | `type: mutualTLS` | 两个具名reopen operation各自且只使用 `[{internalMutualTls: []}]` |
+| `internalMutualTls` | `type: mutualTLS` | listDueR1Tasks,consumeR1Projection,reopenDueContactTasks,reopenDueRoutingReviewTasks 各自且只使用 `[{internalMutualTls: []}]` |
 
 不得使用空 security、两个 scheme 的 OR/AND 组合、API key、`X-Tenant-Id` 或浏览器持有的内部证书。mTLS 身份只在服务端映射受限 ActorContext；它不允许请求提交 Tenant。
 
@@ -198,7 +206,7 @@ digest43    = 43(ALPHA / DIGIT / "-" / "_")
 | SecurityScheme | Operations | UnauthenticatedTransport |
 |---|---|---|
 | publicBearer | /api/v1/** | HTTP_401_PROBLEM_WITH_WWW_AUTHENTICATE_BEARER |
-| internalMutualTls | reopenDueContactTasks,reopenDueRoutingReviewTasks | TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE |
+| internalMutualTls | listDueR1Tasks,consumeR1Projection,reopenDueContactTasks,reopenDueRoutingReviewTasks | TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE |
 
 公网Bearer operation的HTTP 401使用`application/problem+json`并带标准`WWW-Authenticate: Bearer` challenge。内部mTLS operation优先在TLS握手层拒绝无证书/无效证书；若证书已通过握手但服务端身份映射失败而产生HTTP 401，则仍返回Problem，但禁止发送Bearer challenge或任何`WWW-Authenticate` header。
 
@@ -249,6 +257,7 @@ capture 不对尚不存在的资源要求 `If-Match`。Draft 首次创建使用 
 | APPOINTMENT_INACTIVE | 403 | NO | NONE | NONE | 当前任职不可用于此操作 |
 | NOT_FOUND | 404 | NO | NONE | NONE | 资源不存在或不可见 |
 | COMMAND_PAYLOAD_CONFLICT | 409 | NO | NONE | NONE | 幂等键已绑定其他请求 |
+| STALE_OUTBOX_CLAIM | 409 | NO | NONE | NONE | 投影领取 revision、owner、token 或 lease 已失效 |
 | TASK_NOT_OPEN | 409 | NO | NONE | TASK | Task 当前不可执行 |
 | TASK_ALREADY_COMPLETED | 409 | NO | NONE | TASK | Task 已完成 |
 | DRAFT_DIGEST_MISMATCH | 409 | NEW_KEY_AFTER_REFRESH | NONE | DRAFT | 提交内容与草稿摘要不一致 |
@@ -258,6 +267,7 @@ capture 不对尚不存在的资源要求 `If-Match`。Draft 首次创建使用 
 | STALE_SUBJECT | 412 | NEW_KEY_AFTER_REFRESH | NONE | SUBJECT | 业务对象版本已变化 |
 | SUPERVISOR_UNRESOLVED | 422 | NEW_KEY_AFTER_ADMIN_FIX | NONE | NONE | 无法唯一解析准确主管 |
 | SOURCE_INTAKE_OWNER_UNRESOLVED | 422 | NEW_KEY_AFTER_ADMIN_FIX | NONE | NONE | 无法唯一解析准确来源接入负责人 |
+| PROJECTION_EVENT_INVALID | 422 | NO | NONE | NONE | Event/Outbox/source selector 不符合冻结投影合同 |
 | DRAFT_PRECONDITION_REQUIRED | 428 | SAME_KEY_AFTER_FIX | NONE | DRAFT | 缺少 Draft 创建或更新前置条件 |
 | TASK_PRECONDITION_REQUIRED | 428 | SAME_KEY_AFTER_FIX | NONE | TASK | 缺少 Task 命令前置条件 |
 | RATE_LIMITED | 429 | SAME_KEY_AFTER_BACKOFF | NONE | NONE | 请求过于频繁，请稍后重试 |

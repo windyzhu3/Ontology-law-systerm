@@ -24,7 +24,9 @@ The registry key is the composite `(CommandType, PrincipalKind)`. The runtime de
 
 每条策略都使用服务端确定的 Tenant、Principal、Appointment、准确授权事实、组织范围及有效期；对象 DENY 优先。OBJECT-only ALLOW 不替代直接 Grant 或合法一跳委托。初始授权、工作前复验和最终复验使用同一连接；最终复验持有 ADR-0006 的 Tenant identity shared lock 至事务结束，以新鲜 `clock_timestamp()`重读组织、Grant、委托及 DENY。重放和冲突重验当前访问权限，但不重新执行 Task CAS、Draft 可编辑性或 recovery 到期 eligibility。
 
-CAPTURE_LEAD 只接受 HUMAN 的 DIRECT 或合法一跳 DELEGATED；委托引用相同 LEAD_CAPTURE 原始 Grant。`R1SourcePolicyRegistryV1[sourceAccountCode].sourceIntakeRootCode`在当前 Tenant 必须解析为恰好一个 ACTIVE organization_unit，Grant scope 覆盖该 root。创建 Lead 前以该 organization_unit@revision 为授权和审计锚点；最终复验前 revision 变化失败关闭。来源自然键已存在或返回既有 Receipt 时，额外检查准确既有 Lead 的 LEAD_CAPTURE DENY 和 Tenant 安全可见性。SERVICE、SYSTEM、CUSTOMER_GRANT、请求组织或任意 fallback 均不允许。
+CAPTURE_LEAD 由已验证 PrincipalKind 选择唯一实例信封：HUMAN 为 INTERNAL_ADMIN 且仅 DIRECT 或合法一跳 DELEGATED；SERVICE 为 SERVICE_ACTOR 且仅 SYSTEM、on-behalf-of 为空。SERVICE 还必须通过 `R1_TRUSTED_SERVICE_SOURCE_BINDING_V1` 的受信 issuer、audience、identity provider code、准确 tenantId/principalId/appointmentId 及非空 sourceAccountCode 集合绑定；请求不能选择身份、信封、路径、Tenant、Grant 或组织。`R1SourcePolicyRegistryV1[sourceAccountCode].sourceIntakeRootCode`在当前 Tenant 必须解析为恰好一个 ACTIVE organization_unit，Grant scope 覆盖该 root。创建 Lead 前以该 organization_unit@revision 为授权和审计锚点；最终复验前 revision 变化失败关闭。来源自然键已存在或返回既有 Receipt 时，额外检查准确既有 Lead 的 LEAD_CAPTURE DENY 和 Tenant 安全可见性。CUSTOMER_GRANT、SERVICE DIRECT/DELEGATED/OBJECT、HUMAN SYSTEM 或任意 fallback 均不允许。同 CommandId/scope/payload/envelope 才能重放原 Receipt；PrincipalKind 导致的实例信封变化是 conflict。
+
+`organization_unit@revision` 是授权/Audit 锚点，仅用于组织链、scope 和 Grant 状态/有效期/撤销复验；它不在不变的物理 `BUSINESS_SUBJECT_TYPES` allowlist 内，不得伪造组织 ObjectAccessGrant DENY。ObjectAccessGrant DENY 仅应用于 allowlist 内的真实业务 Subject；capture 保留现有 Lead DENY 和最终 scope 复验。
 
 SAVE_ACTION_DRAFT 先从真实 TaskType 选择下表权限；actionCode 必须等于 Task PrimaryCommand。DIRECT Appointment 或 DELEGATED onBehalf Appointment 必须等于 Task Owner。scope 是真实 Task Owner Appointment 的组织；准确 Task 和 Lead 均检查适用于所选权限的 DENY。只可保存准确 OPEN Task 的唯一 DRAFT；同时复验 Task/action/Lead/Draft/Schema/revision。保存仅改变候选值，不确认 Draft、不完成 Task。
 

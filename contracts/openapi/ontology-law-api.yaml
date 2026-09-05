@@ -853,7 +853,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/DueR1TaskPageV1' }
         '400': { $ref: '#/components/responses/InternalBadRequestProblem' }
-        '401': { $ref: '#/components/responses/InternalUnauthorizedProblem' }
+        '401': { $ref: '#/components/responses/InternalClosureUnauthorizedProblem' }
         '403': { $ref: '#/components/responses/InternalForbiddenProblem' }
         '429': { $ref: '#/components/responses/InternalRateLimitedProblem' }
         '500': { $ref: '#/components/responses/InternalServerProblem' }
@@ -875,7 +875,7 @@ paths:
       responses:
         '204': { description: Current facts were validated for the active claim; no response body. }
         '400': { $ref: '#/components/responses/InternalBadRequestProblem' }
-        '401': { $ref: '#/components/responses/InternalUnauthorizedProblem' }
+        '401': { $ref: '#/components/responses/InternalClosureUnauthorizedProblem' }
         '403': { $ref: '#/components/responses/InternalForbiddenProblem' }
         '404': { $ref: '#/components/responses/InternalNotFoundProblem' }
         '409': { $ref: '#/components/responses/InternalConflictProblem' }
@@ -1014,6 +1014,9 @@ components:
   responses:
     InternalBadRequestProblem:
       description: Internal request validation failed.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/InternalProblem' } } }
+    InternalClosureUnauthorizedProblem:
+      description: The mTLS identity could not be mapped to a ready internal ActorContext.
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/InternalProblem' } } }
     InternalForbiddenProblem:
       description: Internal actor is not authorized.
@@ -1209,7 +1212,7 @@ components:
         code:
           type: string
           enum: [VALIDATION_FAILED, UNAUTHENTICATED, NOT_AUTHORIZED, NOT_FOUND, STALE_OUTBOX_CLAIM, PROJECTION_EVENT_INVALID, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE]
-        retryPolicy: { type: string, enum: [NO, FIRST_PAGE, AFTER_REAUTH, BACKOFF] }
+        retryPolicy: { type: string, enum: ['NO', FIRST_PAGE, AFTER_REAUTH, BACKOFF] }
         correlationId: { $ref: '#/components/schemas/Uuid' }
     # Scalar wire types
     Uuid:

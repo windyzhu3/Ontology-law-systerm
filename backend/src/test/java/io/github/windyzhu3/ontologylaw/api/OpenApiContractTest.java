@@ -397,10 +397,11 @@ class OpenApiContractTest {
     @Test
     void freezesPerOperationErrorStatusCodeAndMetadataMatrix() {
         REQUIRED_OPERATIONS.forEach((key, operationId) -> {
+            JsonNode operation = operationNode(key);
             if (Set.of("listDueR1Tasks", "consumeR1Projection").contains(operationId)) {
+                assertInternalClosureErrors(operationId, operation);
                 return;
             }
-            JsonNode operation = operationNode(key);
             Map<String, Set<String>> expectedByStatus = expectedErrorsByStatus(operationId);
             assertEquals(
                     ERROR_CODES_BY_OPERATION.get(operationId),
@@ -514,6 +515,16 @@ class OpenApiContractTest {
         assertEquals(Set.of("recoveryType", "taskId", "expectedTaskRevision", "waitReceiptId",
                 "waitReceiptHash", "dueCutoff", "idempotencyKey"), stringSet(candidate.path("required")));
         assertEquals(7, candidate.path("properties").size());
+        JsonNode page = document.path("components").path("schemas").path("DueR1TaskPageV1");
+        assertFalse(page.path("additionalProperties").asBoolean());
+        assertEquals(Set.of("candidates"), stringSet(page.path("required")));
+        assertEquals(Set.of("candidates", "nextCursor"), fieldNames(page.path("properties")));
+        JsonNode limit = dereference(document.path("components").path("parameters").path("DueLimitQuery"));
+        assertEquals(1L, limit.path("schema").path("minimum").asLong());
+        assertEquals(100L, limit.path("schema").path("maximum").asLong());
+        assertEquals(50L, limit.path("schema").path("default").asLong());
+        JsonNode recoveryType = document.path("components").path("schemas").path("RecoveryTypeV1");
+        assertEquals(Set.of("CONTACT_TASK", "ROUTING_REVIEW_TASK"), stringSet(recoveryType.path("enum")));
         JsonNode consume = document.path("components").path("schemas").path("ConsumeR1ProjectionV1");
         assertFalse(consume.path("additionalProperties").asBoolean());
         assertEquals(Set.of("domainEventOutboxId", "domainEventId", "expectedOutboxRevision",
@@ -532,6 +543,48 @@ class OpenApiContractTest {
                 "STALE_OUTBOX_CLAIM", "PROJECTION_EVENT_INVALID", "RATE_LIMITED", "INTERNAL_ERROR",
                 "SERVICE_UNAVAILABLE"),
                 stringSet(operationNode(operationKey("consumeR1Projection")).path("x-error-codes")));
+        JsonNode internalProblem = document.path("components").path("schemas").path("InternalProblem");
+        assertFalse(internalProblem.path("additionalProperties").asBoolean());
+        assertEquals(Set.of("type", "title", "status", "code", "retryPolicy", "correlationId"),
+                stringSet(internalProblem.path("required")));
+        assertEquals(Set.of("VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND",
+                "STALE_OUTBOX_CLAIM", "PROJECTION_EVENT_INVALID", "RATE_LIMITED", "INTERNAL_ERROR",
+                "SERVICE_UNAVAILABLE"), stringSet(internalProblem.path("properties").path("code").path("enum")));
+        assertEquals(Set.of("NO", "FIRST_PAGE", "AFTER_REAUTH", "BACKOFF"),
+                stringSet(internalProblem.path("properties").path("retryPolicy").path("enum")));
+        assertEquals(Set.of("400", "401", "403", "404", "409", "422", "429", "500", "503"),
+                longStringSet(internalProblem.path("properties").path("status").path("enum")));
+    }
+
+    private static void assertInternalClosureErrors(String operationId, JsonNode operation) {
+        Map<String, String> components = operationId.equals("listDueR1Tasks")
+                ? Map.of("400", "InternalBadRequestProblem", "401", "InternalClosureUnauthorizedProblem",
+                "403", "InternalForbiddenProblem", "429", "InternalRateLimitedProblem",
+                "500", "InternalServerProblem", "503", "InternalUnavailableProblem")
+                : Map.of("400", "InternalBadRequestProblem", "401", "InternalClosureUnauthorizedProblem",
+                "403", "InternalForbiddenProblem", "404", "InternalNotFoundProblem",
+                "409", "InternalConflictProblem", "422", "InternalUnprocessableProblem",
+                "429", "InternalRateLimitedProblem", "500", "InternalServerProblem",
+                "503", "InternalUnavailableProblem");
+        JsonNode responses = operation.path("responses");
+        assertEquals(components.keySet(), fieldNames(responses).stream()
+                .filter(status -> !status.startsWith("2")).collect(java.util.stream.Collectors.toSet()));
+        components.forEach((status, component) -> {
+            JsonNode response = responses.path(status);
+            assertEquals(RESPONSE_REF_PREFIX + component, response.path("$ref").asText());
+            JsonNode resolved = dereference(response);
+            assertEquals(SCHEMA_REF_PREFIX + "InternalProblem",
+                    resolved.path("content").path("application/problem+json").path("schema").path("$ref").asText());
+            assertEquals(0, resolved.path("headers").size());
+        });
+    }
+
+    private static Set<String> longStringSet(JsonNode node) {
+        Set<String> values = new HashSet<>();
+        for (JsonNode value : node) {
+            values.add(Long.toString(value.asLong()));
+        }
+        return Set.copyOf(values);
     }
 
     @Test

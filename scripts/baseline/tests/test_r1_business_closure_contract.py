@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[3]
 COMMAND = "docs/contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md"
 ADR = "docs/adr/ADR-0008-r1-business-closure-alignment.md"
 API = "contracts/openapi/ontology-law-api.yaml"
+HTTP = "docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md"
 
 
 def validate(root: Path) -> list[str]:
@@ -41,6 +42,15 @@ class R1BusinessClosureContractTest(unittest.TestCase):
     def test_service_direct_is_rejected(self):
         self.mutation(COMMAND, "| SERVICE_ACTOR | SERVICE | SYSTEM | SOURCE_INTAKE_OWNER |", "| SERVICE_ACTOR | SERVICE | DIRECT | SOURCE_INTAKE_OWNER |")
 
+    def test_obsolete_human_only_capture_prose_is_rejected(self):
+        self.mutation(COMMAND, "The registry key is the composite `(CommandType, PrincipalKind)`.", "CAPTURE_LEAD 只接受 HUMAN。")
+
+    def test_http_operations_table_requires_due_row(self):
+        self.mutation(HTTP, "| listDueR1Tasks | GET | /internal/v1/tasks/due |", "| wrongDueOperation | GET | /internal/v1/tasks/due |")
+
+    def test_http_security_table_requires_all_four_internal_operations(self):
+        self.mutation(HTTP, "listDueR1Tasks,consumeR1Projection,reopenDueContactTasks,reopenDueRoutingReviewTasks", "reopenDueContactTasks,reopenDueRoutingReviewTasks")
+
     def test_capture_envelope_mismatch_is_rejected(self):
         self.mutation(COMMAND, "| CAPTURE_LEAD | SERVICE_ACTOR |", "| CAPTURE_LEAD | INTERNAL_ADMIN |")
 
@@ -55,6 +65,15 @@ class R1BusinessClosureContractTest(unittest.TestCase):
 
     def test_public_error_allowlist_cannot_expand(self):
         self.mutation(API, "      x-error-codes:\n", "      x-error-codes:\n        - STALE_OUTBOX_CLAIM\n")
+
+    def test_due_limit_bounds_are_scoped_to_due_parameter(self):
+        self.mutation(API, "schema: { type: integer, minimum: 1, maximum: 100, default: 50 }", "schema: { type: integer, minimum: 1, maximum: 101, default: 50 }")
+
+    def test_due_candidate_exact_properties_are_scoped(self):
+        self.mutation(API, "required: [recoveryType, taskId, expectedTaskRevision, waitReceiptId, waitReceiptHash, dueCutoff, idempotencyKey]", "required: [recoveryType, taskId, expectedTaskRevision, waitReceiptId, waitReceiptHash, dueCutoff]")
+
+    def test_consume_exact_properties_are_scoped(self):
+        self.mutation(API, "required: [domainEventOutboxId, domainEventId, expectedOutboxRevision, leaseOwner, fencingToken]", "required: [domainEventOutboxId, domainEventId, expectedOutboxRevision, leaseOwner]")
 
     def test_projection_cannot_be_mutable(self):
         self.mutation(ADR, "| ProjectionStorage | NONE |", "| ProjectionStorage | MATERIALIZED |")

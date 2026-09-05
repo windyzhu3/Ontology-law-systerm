@@ -1424,6 +1424,15 @@ export interface components {
                 "application/problem+json": components["schemas"]["InternalProblem"];
             };
         };
+        /** @description The mTLS identity could not be mapped to a ready internal ActorContext. */
+        InternalClosureUnauthorizedProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["InternalProblem"];
+            };
+        };
         /** @description The projection claim is stale. */
         InternalConflictProblem: {
             headers: {
@@ -2028,7 +2037,7 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["InternalBadRequestProblem"];
-            401: components["responses"]["InternalUnauthorizedProblem"];
+            401: components["responses"]["InternalClosureUnauthorizedProblem"];
             403: components["responses"]["InternalForbiddenProblem"];
             404: components["responses"]["InternalNotFoundProblem"];
             409: components["responses"]["InternalConflictProblem"];
@@ -2131,7 +2140,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["InternalBadRequestProblem"];
-            401: components["responses"]["InternalUnauthorizedProblem"];
+            401: components["responses"]["InternalClosureUnauthorizedProblem"];
             403: components["responses"]["InternalForbiddenProblem"];
             429: components["responses"]["InternalRateLimitedProblem"];
             500: components["responses"]["InternalServerProblem"];
