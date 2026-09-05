@@ -93,6 +93,16 @@ class ArchitectureTest {
     }
 
     @Test
+    void generated_persistence_does_not_enable_active_records_or_daos() {
+        noClasses().that().resideInAPackage(ROOT + "..internal.persistence.jooq..")
+                .should().beAssignableTo(org.jooq.TableRecord.class)
+                .allowEmptyShould(false).check(productionClasses);
+        noClasses().that().resideInAPackage(ROOT + "..internal.persistence.jooq..")
+                .should().beAssignableTo(org.jooq.DAO.class)
+                .allowEmptyShould(false).check(productionClasses);
+    }
+
+    @Test
     void api_surface_does_not_expose_persistence_records_repositories_or_internal_commands() {
         noClasses().that().resideInAPackage(ROOT + ".api..")
                 .should().dependOnClassesThat().resideInAnyPackage(
