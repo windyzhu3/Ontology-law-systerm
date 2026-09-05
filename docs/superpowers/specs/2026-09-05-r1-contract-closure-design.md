@@ -1,10 +1,10 @@
 # R1 授权与事件合同收口设计
 
-日期：2026-09-05。状态：DRAFT（四类授权边界及事件映射的方向已获用户确认；本书面规格等待确认）。
+日期：2026-09-05。状态：APPROVED（用户已确认书面规格；MVP-2026-09-05.2由ADR-0007承接）。
 
 基准提交：`5b21dbfc06e4d278f8b5097209e2fd76a8465c00`。
 
-本文件不自行替代当前基线。实施时以新的 ADR-0007 和基线版本 MVP-2026-09-05.2 显式承接新增语义，并同步合同、运行时和验证器；现行权威仍是[当前基线](../../baseline/CURRENT-MVP-BASELINE.md)、[ADR-0006](../../adr/ADR-0006-command-runtime-authorization-boundary.md)、[Task 矩阵](../../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)及[HTTP 矩阵](../../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md)。
+本文件的书面规格已获用户确认；新增语义由[ADR-0007](../../adr/ADR-0007-r1-command-policy-event-closure.md)、基线版本MVP-2026-09-05.2和[R1命令授权及事件合同](../../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)显式承接。活动权威仍以[当前基线](../../baseline/CURRENT-MVP-BASELINE.md)、ADR及实施合同为准。
 
 ## 1. 目标和交付边界
 
@@ -196,7 +196,7 @@ R2 按其新阶段合同启用自己的静态消费路径；本轮不注册无�
 | 能力 | 后端/合同 | 前端 | 联调/整体可用性 |
 |---|---|---|---|
 | 数据结构、单制品工程、能力角色、CommandRuntime/授权/Audit 底座 | A/B/C0/C/D 及对应证据已合并；四类命令目前仍有注册门禁 | 单 SPA 壳、生成类型和客户端底座 | 基础设施证据不等于业务 E2E |
-| 本轮四类授权及五个事件描述 | 本文件是待确认书面设计；生产修改未实施 | 不新增页面；实施时验证合同兼容 | 尚未完成本轮收口 |
+| 本轮四类授权及五个事件描述 | 书面设计已确认；静态合同和基线已冻结，生产运行时接入仍待后续任务 | 不新增页面；合同变更不提升SPA状态 | 合同门禁已收口，真实业务联调尚未完成 |
 | R1 接入至首联完整业务 | 原 Task 5–8 的业务 Owner、API 和 Worker 仍须交付 | 原 Task 9 的 CurrentCard、Draft 和恢复交互仍须交付 | 原 Task 10 黄金/失败 E2E 尚未完成 |
 | 后续销售 MVP | 继续按阶段门禁推进 | 不把冻结视觉当实现 | R1 未整体验收前不启动 R2 实施 |
 | ADM-01～07 | 身份数据模型和授权原语不等于管理 CRUD | 七项视觉设计不等于可操作页面 | 不作为本轮必要验收项；仍单独报告未交付 |
@@ -210,4 +210,4 @@ R2 按其新阶段合同启用自己的静态消费路径；本轮不注册无�
 - 空 payload 不承诺历史快照；R2 交接明确历史覆盖与业务幂等，但不声称其消费代码已实现。
 - 原始拓扑、表数、迁移、角色隔离、Task 真源、AI 权限及完整 MVP 终点保持不变；新增语义必须由实施 ADR 和新基线显式记录。
 
-书面规格阶段验证记录：仅新增本文件，未修改活动合同或生产代码；本文件的 5 个本地 Markdown 链接均可解析。Windows 基线测试在 `test_artifact_rejects_absolute_outside_and_symlink_paths` 的 `Path.symlink_to` 处因 WinError 1314 失败，单项重跑复现；完整套件已停止，不声称其通过。未修改测试、权限或门禁绕过该失败。生产实施前须在满足符号链接能力的受支持环境重新取得完整基线测试证据。
+批准前书面规格阶段的历史验证记录：当时仅新增本文件，未修改活动合同或生产代码；本文件的5个本地Markdown链接均可解析。Windows基线测试在`test_artifact_rejects_absolute_outside_and_symlink_paths`的`Path.symlink_to`处因WinError 1314失败，单项重跑复现；当时完整套件停止且未声称通过，也未修改测试、权限或门禁绕过该失败。实施验证另由Task报告记录，并在支持符号链接的Python 3.12 Linux环境执行完整基线套件。

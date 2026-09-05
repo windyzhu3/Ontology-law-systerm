@@ -98,6 +98,8 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 
 七种 TaskOccurrence 的唯一持久 `subject` 均为 `lead.lead@revision`（revision 必填、hash 为空）。RESOLVE 的 candidate Lead/Party、ACK 的 causal Decision、CONTACT 的 LeadAssignment、REVIEW 的 triggering ContactResult 是具名次级 command-scope/提交前重验 selector，不得伪装成第二个 Task subject。scope digest 覆盖 commandType、taskId、准确持久 Lead selector 和按字段名排序的次级 selector。
 
+四类非完成命令的Actor路径、专属权限、Owner组织scope、DENY、TaskType/WaitProfile和成功事件映射以[R1命令授权及事件合同](R1-COMMAND-POLICY-EVENT-CONTRACT.md)为准。HTTP调用方不能提交这些值；内部两种recovery的Owner Appointment、Owner Principal或组织失效统一使用本合同既有NOT_AUTHORIZED，不向内部operation扩散APPOINTMENT_INACTIVE。
+
 ## Successful response projections
 
 | OperationId | Status | Headers | Exact body |
