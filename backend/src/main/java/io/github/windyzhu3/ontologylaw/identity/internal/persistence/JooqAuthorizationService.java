@@ -85,7 +85,8 @@ public final class JooqAuthorizationService implements AuthorizationService {
             if(!appointment(actor.principalId(),actor.appointmentId()))return "APPOINTMENT_INACTIVE";
             Record principal=row(PRINCIPAL,"principal_id",actor.principalId());
             boolean system=request.requirement().path()==Path.SYSTEM;
-            if(!Objects.equals(principal.get("principal_kind"),system?"SERVICE":"HUMAN"))return "NOT_AUTHORIZED";
+            if(!Objects.equals(principal.get("principal_kind"),actor.principalKind().name())
+                    || actor.principalKind()!=(system?PrincipalKind.SERVICE:PrincipalKind.HUMAN))return "NOT_AUTHORIZED";
             if(actor.onBehalfPrincipalId()!=null && !appointment(actor.onBehalfPrincipalId(),actor.onBehalfAppointmentId()))return "APPOINTMENT_INACTIVE";
             if(ancestry(request.scopeOrganizationId())==null)return "NOT_AUTHORIZED";
             var g=OBJECT_ACCESS_GRANT;

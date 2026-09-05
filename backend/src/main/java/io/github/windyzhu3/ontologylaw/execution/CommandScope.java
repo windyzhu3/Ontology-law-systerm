@@ -21,7 +21,7 @@ public final class CommandScope {
         return new CommandScope(tenant,CommandEnvelope.Type.CAPTURE_LEAD,Map.of("profile","R1_CAPTURE_SCOPE_V1","tenantId",tenant.toString(),"sourceAccountCode",sourceAccountCode,"sourceRecordKeyDigest",sourceRecordKeyDigest));
     }
     public static CommandScope draft(UUID tenant,UUID task,CommandEnvelope.Type primary){
-        if(primary.envelope()!=CommandEnvelope.Envelope.INTERNAL_TASK || primary==CommandEnvelope.Type.SAVE_ACTION_DRAFT)throw new IllegalArgumentException("Draft requires a primary Task command");
+        if(R1CommandPolicy.primaryPolicy(primary)==null)throw new IllegalArgumentException("Draft requires a primary Task command");
         return new CommandScope(tenant,CommandEnvelope.Type.SAVE_ACTION_DRAFT,Map.of("profile","R1_DRAFT_SCOPE_V1","tenantId",tenant.toString(),"taskId",task.toString(),"actionCode",primary.name()));
     }
     public static CommandScope reopen(UUID tenant,CommandEnvelope.Type type,UUID task,UUID wait,String hash){

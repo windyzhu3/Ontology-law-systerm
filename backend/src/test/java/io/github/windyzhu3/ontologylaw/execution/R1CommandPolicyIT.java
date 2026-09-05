@@ -77,7 +77,7 @@ class R1CommandPolicyIT extends CommandRuntimeIT {
         mutate(h,"insert into identity.principal (tenant_id,principal_id,principal_kind,identity_provider_code,external_subject_hmac,display_name,state,created_at) values (?,?,?,?,decode(repeat('02',32),'hex'),'service','ACTIVE',clock_timestamp())",h.seed.tenant(),principal,kind,principal.toString());
         mutate(h,"insert into identity.appointment (tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) values (?,?,?,?,'SERVICE',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",h.seed.tenant(),app,principal,appointmentOrg);
         mutate(h,"insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values (?,?,?,?,?,?,clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",h.seed.tenant(),grant,app,h.seed.appointment(),scope,code);
-        return new Service(new Actor(h.seed.tenant(),principal,app,null,null),grant);
+        return new Service(new Actor(h.seed.tenant(),principal,app,null,null,PrincipalKind.valueOf(kind)),grant);
     }
     CommandHandler.Context recovery(Handler h,Service service,CommandEnvelope.Type type,String code) {
         UUID wait=UUID.randomUUID();String hash=hash("wait");
@@ -187,7 +187,7 @@ class R1CommandPolicyIT extends CommandRuntimeIT {
             var wrong=request(context,service.actor(),h.seed.org(),new Requirement("CONTACT_TASK_RECOVER".equals(code)?"ROUTING_REVIEW_TASK_RECOVER":"CONTACT_TASK_RECOVER","SYSTEM_RECOVERY",Path.SYSTEM,service.grant()));
             assertFalse(decision(e,wrong).allowed());
             var human=request(context,h.seed.request().actor(),h.seed.org(),new Requirement(code,"SYSTEM_RECOVERY",Path.SYSTEM,h.seed.grant()));
-            assertFalse(decision(recoveryEnvelope(h,human),human).allowed());
+            assertThrows(IllegalArgumentException.class,()->recoveryEnvelope(h,human));
             mutate(h,"update identity.appointment set state='SUSPENDED',revision=revision+1 where tenant_id=? and appointment_id=?",h.seed.tenant(),h.seed.appointment());
             var result=decision(e,context);assertFalse(result.allowed());assertEquals("NOT_AUTHORIZED",result.rejectionCode());
             assertEquals(List.of(0L,0L,0L,0L,0L),counts(h).subList(0,5));

@@ -197,6 +197,10 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
             });}
         }
         @Override public CommandEnvelope.Type type(){return CommandEnvelope.Type.REOPEN_DUE_CONTACT_TASKS;}
+        @Override CommandEnvelope envelope(UUID command,Object payload) {
+            var actor=new AuthorizationService.Actor(seed.tenant(),seed.principal(),seed.appointment(),null,null,AuthorizationService.PrincipalKind.SERVICE);
+            return new CommandEnvelope(type(),command,UUID.randomUUID(),actor,payload);
+        }
         String waitHash(Connection c)throws SQLException {
             try(var p=c.prepareStatement("select * from responsibility.wait_receipt where tenant_id=? and wait_receipt_id=?")) {
                 p.setObject(1,seed.tenant());p.setObject(2,wait);
@@ -320,13 +324,19 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
     }
     @Test void dedicated_command_missing_binding_fails_closed_even_for_no_change()throws Exception {
         for(var type:List.of(CommandEnvelope.Type.CAPTURE_LEAD,CommandEnvelope.Type.SAVE_ACTION_DRAFT,CommandEnvelope.Type.REOPEN_DUE_CONTACT_TASKS,CommandEnvelope.Type.REOPEN_DUE_ROUTING_REVIEW_TASKS)) {
-            Handler h=new Handler(){@Override public CommandEnvelope.Type type(){return type;}
+            Handler h=new Handler(AuthorizationServiceIT.seed(database,type.recovery()?"SERVICE":"HUMAN")){
+                @Override public CommandEnvelope.Type type(){return type;}
+                @Override CommandEnvelope envelope(UUID command,Object payload) {
+                    var actor=new AuthorizationService.Actor(seed.tenant(),seed.principal(),seed.appointment(),null,null,type.recovery()?AuthorizationService.PrincipalKind.SERVICE:AuthorizationService.PrincipalKind.HUMAN);
+                    return new CommandEnvelope(type,command,UUID.randomUUID(),actor,payload);
+                }
                 @Override public Context resolve(Connection c,CommandEnvelope e) {
                     String hash=Base64.getUrlEncoder().withoutPadding().encodeToString(CanonicalJson.digest("fixture"));
                     var scope=type==CommandEnvelope.Type.CAPTURE_LEAD?CommandScope.capture(seed.tenant(),"FIXTURE",hash)
                             :type==CommandEnvelope.Type.SAVE_ACTION_DRAFT?CommandScope.draft(seed.tenant(),task,CommandEnvelope.Type.COMPLETE_LEAD_INGRESS)
                             :CommandScope.reopen(seed.tenant(),type,task,UUID.randomUUID(),hash);
-                    return new Context(scope,seed.request());
+                    var r=seed.request();return new Context(scope,new AuthorizationService.Request(e.actor(),r.subject(),r.scopeOrganizationId(),
+                            new AuthorizationService.Requirement(r.requirement().authorityCode(),r.requirement().slot(),type.recovery()?AuthorizationService.Path.SYSTEM:AuthorizationService.Path.DIRECT,seed.grant())));
                 }
             };
             h.mode=Mode.NO_CHANGE;

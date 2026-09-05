@@ -33,7 +33,7 @@ public final class JooqCommandStore {
         var slot=slots.getFirst();
         var receipt=db.selectFrom(r).where(r.TENANT_ID.eq(e.actor().tenantId())).and(r.COMMAND_EXECUTION_SLOT_ID.eq(slot.get(s.COMMAND_EXECUTION_SLOT_ID))).fetchOne();
         if(receipt==null)throw new SQLException("Orphan command slot","23000");
-        boolean conflict=!e.type().envelope().name().equals(slot.get(s.ENVELOPE_TYPE)) || !e.type().name().equals(slot.get(s.COMMAND_TYPE))
+        boolean conflict=!e.envelope().name().equals(slot.get(s.ENVELOPE_TYPE)) || !e.type().name().equals(slot.get(s.COMMAND_TYPE))
                 || !Arrays.equals(scope.digest(),slot.get(s.COMMAND_SCOPE_DIGEST)) || !Arrays.equals(payloadDigest,slot.get(s.PAYLOAD_DIGEST));
         if(conflict)return new CommandResult.Conflict(receipt.get(r.COMMAND_RECEIPT_ID));
         Subject fact=receipt.get(r.RESULT_FACT_TYPE)==null?null:new Subject(receipt.get(r.RESULT_FACT_TYPE),receipt.get(r.RESULT_FACT_ID),receipt.get(r.RESULT_FACT_REVISION),receipt.get(r.RESULT_FACT_HASH)==null?null:Base64.getUrlEncoder().withoutPadding().encodeToString(receipt.get(r.RESULT_FACT_HASH)));
@@ -41,7 +41,7 @@ public final class JooqCommandStore {
     }
     public UUID occupy(CommandEnvelope e,CommandScope scope,byte[] payload)throws SQLException {
         UUID id=newId();var s=COMMAND_EXECUTION_SLOT;
-        db.insertInto(s).set(s.TENANT_ID,e.actor().tenantId()).set(s.COMMAND_EXECUTION_SLOT_ID,id).set(s.COMMAND_ID,e.commandId()).set(s.ENVELOPE_TYPE,e.type().envelope().name()).set(s.COMMAND_TYPE,e.type().name()).set(s.COMMAND_SCOPE_DIGEST,scope.digest()).set(s.PAYLOAD_DIGEST,payload).set(s.OCCUPIED_AT,now()).execute();return id;
+        db.insertInto(s).set(s.TENANT_ID,e.actor().tenantId()).set(s.COMMAND_EXECUTION_SLOT_ID,id).set(s.COMMAND_ID,e.commandId()).set(s.ENVELOPE_TYPE,e.envelope().name()).set(s.COMMAND_TYPE,e.type().name()).set(s.COMMAND_SCOPE_DIGEST,scope.digest()).set(s.PAYLOAD_DIGEST,payload).set(s.OCCUPIED_AT,now()).execute();return id;
     }
     public CommandOutcome receipt(CommandEnvelope e,UUID slot,CommandOutcome.Status status,Subject fact,String rejection)throws SQLException {
         UUID id=newId();var r=COMMAND_RECEIPT;

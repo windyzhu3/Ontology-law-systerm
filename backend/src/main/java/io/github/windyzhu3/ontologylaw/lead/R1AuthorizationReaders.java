@@ -8,7 +8,10 @@ import io.github.windyzhu3.ontologylaw.responsibility.AuthorizationTaskReader;
 public final class R1AuthorizationReaders {
     private R1AuthorizationReaders() {}
     public static R1AuthorizationFacts databaseBacked(R1SourcePolicyRegistry sources) {
+        return databaseBacked(sources,null);
+    }
+    public static R1AuthorizationFacts databaseBacked(R1SourcePolicyRegistry sources,R1ServiceSourceBinding services) {
         return new io.github.windyzhu3.ontologylaw.lead.internal.persistence.JooqR1AuthorizationFacts(
-                sources, AuthorizationTaskReader.databaseBacked(), AuthorizationIdentityReader.databaseBacked());
+                sources, AuthorizationTaskReader.databaseBacked(), AuthorizationIdentityReader.databaseBacked(),services);
     }
 }

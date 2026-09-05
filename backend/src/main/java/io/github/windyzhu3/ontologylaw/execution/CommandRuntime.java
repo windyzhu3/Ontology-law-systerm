@@ -42,6 +42,10 @@ public final class CommandRuntime {
                     || !context.authorization().actor().equals(envelope.actor()))throw new CommandHandler.Rejected("NOT_AUTHORIZED");
             AuthorizationSnapshot initial=policy.authorize(c,envelope,context,false);
             if(!initial.allowed())throw new CommandHandler.Rejected(initial.rejectionCode());
+            R1BusinessFence.databaseBacked().exclusive(c,envelope.actor().tenantId());
+            // The fence may have waited while identity or source facts changed. No roots or writes yet.
+            var afterFence=policy.authorize(c,envelope,context,false);
+            if(!afterFence.allowed())throw new CommandHandler.Rejected(afterFence.rejectionCode());
             setLocalRole(c,Capability.COMMAND);handler.lockRoots(c,envelope,context);
             var store=new JooqCommandStore(c);store.lockCommand(envelope);
             var existing=store.existingOrValidateNew(envelope,context.scope(),payload,x->{handler.recoveryEligibility(x,envelope,context);return null;});

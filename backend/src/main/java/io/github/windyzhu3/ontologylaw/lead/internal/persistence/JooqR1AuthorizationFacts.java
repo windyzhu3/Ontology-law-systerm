@@ -3,6 +3,7 @@ package io.github.windyzhu3.ontologylaw.lead.internal.persistence;
 import io.github.windyzhu3.ontologylaw.execution.R1AuthorizationFacts;
 import io.github.windyzhu3.ontologylaw.identity.*;
 import io.github.windyzhu3.ontologylaw.lead.R1SourcePolicyRegistry;
+import io.github.windyzhu3.ontologylaw.lead.R1ServiceSourceBinding;
 import io.github.windyzhu3.ontologylaw.responsibility.AuthorizationTaskReader;
 import java.sql.*;
 import java.time.Instant;
@@ -15,8 +16,15 @@ public final class JooqR1AuthorizationFacts implements R1AuthorizationFacts {
     private final R1SourcePolicyRegistry sources;
     private final AuthorizationTaskReader tasks;
     private final AuthorizationIdentityReader identities;
+    private final R1ServiceSourceBinding services;
     public JooqR1AuthorizationFacts(R1SourcePolicyRegistry sources,AuthorizationTaskReader tasks,AuthorizationIdentityReader identities) {
-        this.sources=Objects.requireNonNull(sources);this.tasks=Objects.requireNonNull(tasks);this.identities=Objects.requireNonNull(identities);
+        this(sources,tasks,identities,null);
+    }
+    public JooqR1AuthorizationFacts(R1SourcePolicyRegistry sources,AuthorizationTaskReader tasks,AuthorizationIdentityReader identities,R1ServiceSourceBinding services) {
+        this.sources=Objects.requireNonNull(sources);this.tasks=Objects.requireNonNull(tasks);this.identities=Objects.requireNonNull(identities);this.services=services;
+    }
+    public boolean serviceSourceAllowed(Connection c,AuthorizationService.Actor actor,String account)throws SQLException {
+        return sources.contains(account) && services!=null && services.allows(c,actor,account);
     }
     public Capture capture(Connection c,UUID tenant,String account,String digest) throws SQLException {
         var policy=sources.find(account);

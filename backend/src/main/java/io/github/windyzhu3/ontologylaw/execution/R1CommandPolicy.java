@@ -43,7 +43,10 @@ public final class R1CommandPolicy {
                             && request.scopeOrganizationId().equals(current.organization().id())
                             && context.scope().canonical().equals(CommandScope.capture(e.actor().tenantId(),b.sourceAccountCode(),b.sourceRecordKeyDigest()).canonical())
                             && e.payload() instanceof Map<?,?> payload && b.sourceAccountCode().equals(payload.get("sourceAccountCode"))
-                            && human(request,"SOURCE_INTAKE_OWNER","LEAD_CAPTURE");
+                            && (e.actor().principalKind()==PrincipalKind.HUMAN?human(request,"SOURCE_INTAKE_OWNER","LEAD_CAPTURE"):
+                                request.requirement().path()==Path.SYSTEM && e.actor().onBehalfPrincipalId()==null
+                                && "SOURCE_INTAKE_OWNER".equals(request.requirement().slot()) && "LEAD_CAPTURE".equals(request.requirement().authorityCode())
+                                && facts.serviceSourceAllowed(c,e.actor(),b.sourceAccountCode()));
                     ownerEvidence="binding="+b+";scope="+context.scope().canonical()+";facts="+current;
                     if(!matches)failure="NOT_AUTHORIZED";
                     if(current!=null && current.existingLead()!=null)add(c,checks,request,current.existingLead());

@@ -5,10 +5,17 @@ import java.util.*;
 
 public interface AuthorizationService {
     enum Path { DIRECT, DELEGATED, OBJECT, SYSTEM }
-    record Actor(UUID tenantId, UUID principalId, UUID appointmentId, UUID onBehalfPrincipalId, UUID onBehalfAppointmentId) {
+    enum PrincipalKind { HUMAN, SERVICE }
+    record Actor(UUID tenantId, UUID principalId, UUID appointmentId, UUID onBehalfPrincipalId, UUID onBehalfAppointmentId, PrincipalKind principalKind) {
+        /** Compatibility callers are HUMAN; SERVICE must be supplied by a trusted adapter. */
+        public Actor(UUID tenantId,UUID principalId,UUID appointmentId,UUID onBehalfPrincipalId,UUID onBehalfAppointmentId) {
+            this(tenantId,principalId,appointmentId,onBehalfPrincipalId,onBehalfAppointmentId,PrincipalKind.HUMAN);
+        }
         public Actor {
             Objects.requireNonNull(tenantId); Objects.requireNonNull(principalId); Objects.requireNonNull(appointmentId);
+            Objects.requireNonNull(principalKind);
             if ((onBehalfPrincipalId == null) != (onBehalfAppointmentId == null)) throw new IllegalArgumentException("Incomplete represented actor");
+            if (principalKind==PrincipalKind.SERVICE && onBehalfPrincipalId!=null) throw new IllegalArgumentException("SERVICE cannot represent another actor");
         }
     }
     record Subject(String type, UUID id, Long revision, String hash) {
