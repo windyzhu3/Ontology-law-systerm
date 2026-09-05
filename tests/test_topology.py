@@ -671,6 +671,31 @@ class TopologyVerifierTest(unittest.TestCase):
         self._write(".github/workflows/scaffold-gate.yml", workflow)
         self.assertEqual([], self._verify())
 
+    def test_compiler_profile_requires_explicit_frozen_version(self) -> None:
+        for version in ("", "3.14.0", "3.14.1"):
+            with self.subTest(version=version):
+                version_element = f"<version>{version}</version>" if version else ""
+                profile = f"""
+                  <profiles><profile>
+                    <id>jooq-generation</id>
+                    <build><plugins><plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      {version_element}
+                      <configuration><skipMain>true</skipMain></configuration>
+                    </plugin></plugins></build>
+                  </profile></profiles>
+                """
+                self._write("backend/pom.xml", VALID_POM.replace("</project>", profile + "</project>"))
+                errors = self._verify()
+                if version == "3.14.1":
+                    self.assertEqual([], errors)
+                else:
+                    self.assertTrue(any(
+                        "Maven plugin maven-compiler-plugin must be exactly 3.14.1" in error
+                        for error in errors
+                    ), errors)
+
     def test_enforcer_fails_closed_for_toolchain_dependencies_and_dynamic_versions(self) -> None:
         rule_elements = {
             "requireJavaVersion": "<requireJavaVersion><version>[25.0.4-1]</version></requireJavaVersion>",
