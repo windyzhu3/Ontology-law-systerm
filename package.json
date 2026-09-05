@@ -10,8 +10,13 @@
     "apps/workbench"
   ],
   "scripts": {
+    "openapi:generate": "openapi-typescript contracts/openapi/ontology-law-api.yaml --output apps/workbench/src/generated/api/schema.d.ts --alphabetize",
+    "openapi:check": "openapi-typescript contracts/openapi/ontology-law-api.yaml --output apps/workbench/src/generated/api/schema.d.ts --alphabetize --check",
     "typecheck": "npm run typecheck --workspace apps/workbench",
     "test": "npm run test --workspace apps/workbench",
     "build": "npm run build --workspace apps/workbench"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0"
   }
 }

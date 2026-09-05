@@ -1,0 +1,13 @@
+{
+  "type": "https://api.ontology-law.example/problems/stale-task",
+  "title": "任务版本已变化",
+  "status": 412,
+  "code": "STALE_TASK",
+  "detail": "请刷新当前工作卡后使用新的幂等键重试。",
+  "instance": "/problems/occurrences/01J6YYC7Q8M4J5TPNX2ZK7J1AR",
+  "retryPolicy": "NEW_KEY_AFTER_REFRESH",
+  "currentETag": {
+    "resourceKind": "TASK",
+    "value": "\"task.HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH\""
+  }
+}

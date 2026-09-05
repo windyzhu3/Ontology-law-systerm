@@ -57,6 +57,7 @@ jobs:
       - name: Verify exact npm
         run: test "$(npm --version)" = "11.9.0"
       - run: npm ci
+      - run: npm run openapi:check
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
