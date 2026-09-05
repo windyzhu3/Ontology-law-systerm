@@ -15,11 +15,15 @@ public final class CommandRuntime {
     public CommandRuntime(Collection<CommandHandler> handlers,AuthorizationService authorization,String executionNodeCode) {this(handlers,authorization,AuditAppender.databaseBacked(executionNodeCode));}
     public CommandRuntime(Collection<CommandHandler> handlers,AuthorizationService authorization,AuditAppender audit) {
         var registry=new EnumMap<CommandEnvelope.Type,CommandHandler>(CommandEnvelope.Type.class);
-        for(var handler:handlers)if(registry.put(Objects.requireNonNull(handler.type()),handler)!=null)throw new IllegalArgumentException("Duplicate static handler");
+        for(var handler:handlers) {
+            var type=Objects.requireNonNull(handler.type());
+            if(primaryPolicy(type)==null)throw new IllegalArgumentException("Command-specific authority policy is not frozen");
+            if(registry.put(type,handler)!=null)throw new IllegalArgumentException("Duplicate static handler");
+        }
         this.handlers=Map.copyOf(registry);this.authorization=Objects.requireNonNull(authorization);this.audit=Objects.requireNonNull(audit);
     }
     /** Caller owns a fresh connection. Commit acknowledgement loss has unknown durability; retry the same key. */
-    public CommandOutcome execute(Connection connection,CommandEnvelope envelope) throws SQLException {
+    public CommandResult execute(Connection connection,CommandEnvelope envelope) throws SQLException {
         CommandHandler handler=handlers.get(envelope.type());
         if(handler==null)throw new CommandHandler.Rejected("VALIDATION_FAILED");
         byte[] payload=CanonicalJson.digest(CanonicalJson.encode(envelope.payload()));
@@ -32,8 +36,13 @@ public final class CommandRuntime {
             if(!initial.allowed())throw new CommandHandler.Rejected(initial.rejectionCode());
             setLocalRole(c,Capability.COMMAND);handler.lockRoots(c,envelope,context);
             var store=new JooqCommandStore(c);store.lockCommand(envelope);
-            var existing=store.existing(envelope,context.scope(),payload);if(existing!=null)return existing;
-            if(envelope.type().recovery())handler.recoveryEligibility(c,envelope,context);
+            var existing=store.existingOrValidateNew(envelope,context.scope(),payload,x->{handler.recoveryEligibility(x,envelope,context);return null;});
+            if(existing!=null) {
+                setLocalRole(c,Capability.QUERY);
+                var current=authorization.evaluate(c,context.authorization(),true);
+                if(!current.allowed())throw new CommandHandler.Rejected(current.rejectionCode());
+                return existing;
+            }
             UUID slot=store.occupy(envelope,context.scope(),payload);Savepoint business=c.setSavepoint();
             CommandHandler.Result result=null;String rejection=null;AuthorizationSnapshot terminal;
             try {
@@ -60,8 +69,8 @@ public final class CommandRuntime {
             return receipt;
         });
     }
-    private static void validatePolicy(CommandEnvelope.Type type,AuthorizationService.Requirement requirement) {
-        String expected=switch(type) {
+    private static String primaryPolicy(CommandEnvelope.Type type) {
+        return switch(type) {
             case RESOLVE_DUPLICATE_LEAD -> "SOURCE_INTAKE_OWNER:LEAD_INGRESS_RESOLVE";
             case COMPLETE_LEAD_INGRESS -> "SOURCE_INTAKE_OWNER:LEAD_INGRESS_COMPLETE";
             case ASSIGN_LEAD -> "ROUTING_SUPERVISOR:LEAD_ASSIGN";
@@ -71,8 +80,11 @@ public final class CommandRuntime {
             case REVIEW_LEAD_VALIDITY -> "ROUTING_SUPERVISOR:LEAD_VALIDITY_REVIEW";
             default -> null;
         };
-        if((type.recovery())!=(requirement.path()==AuthorizationService.Path.SYSTEM)
-                || (expected!=null && !expected.equals(requirement.slot()+":"+requirement.authorityCode())))throw new CommandHandler.Rejected("NOT_AUTHORIZED");
+    }
+    private static void validatePolicy(CommandEnvelope.Type type,AuthorizationService.Requirement requirement) {
+        String expected=primaryPolicy(type);
+        if(expected==null || requirement.path()==AuthorizationService.Path.SYSTEM
+                || !expected.equals(requirement.slot()+":"+requirement.authorityCode()))throw new CommandHandler.Rejected("NOT_AUTHORIZED");
     }
     private static void validateResult(CommandEnvelope.Type type,CommandHandler.Result result)throws SQLException {
         String expected=switch(type) {

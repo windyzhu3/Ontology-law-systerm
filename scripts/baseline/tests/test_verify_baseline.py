@@ -2331,7 +2331,7 @@ class VerifyBaselineTest(unittest.TestCase):
             self.assert_finding(
                 root,
                 "Delivery ledger row BASE-CLOSURE-DESIGN must record Version "
-                f"{CANONICAL_BASELINE_ID}",
+                f"{HISTORICAL_BASELINE_ID}",
             )
 
     def test_ledger_requires_every_contract_column_and_cell(self) -> None:
