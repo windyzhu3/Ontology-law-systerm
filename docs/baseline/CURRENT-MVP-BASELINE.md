@@ -1,10 +1,10 @@
 # 当前MVP基线
 
-Baseline ID: MVP-2026-08-28.1
+Baseline ID: MVP-2026-09-05.1
 
 状态：`FROZEN`
 
-确认日期：2026-08-28
+确认日期：2026-09-05；前版MVP-2026-08-28.1的已合并证据保留为历史。
 
 R1实施合同确认日期：2026-09-02
 
@@ -15,6 +15,8 @@ R1实施合同确认日期：2026-09-02
 本文件是当前销售MVP唯一人工阅读入口和语义总纲。未在本基线明确保留的历史语义不得自动复活；任何未决事项只能通过新的ADR和新的基线版本处理。[ADR-0001](../adr/ADR-0001-pr2-runtime-gate-order.md)冻结PR #2合并与后续PostgreSQL运行时门禁的执行顺序。
 
 ## authority-order
+
+[ADR-0006](../adr/ADR-0006-command-runtime-authorization-boundary.md)记录本版经用户确认的CommandRuntime授权裁定时点，以及Scope binding、静态信封和提交确认丢失的精确解释；52＋2物理合同、迁移、工程版本与产品范围不变。
 
 按以下顺序解释仓库；前项与后项冲突时以前项为准：
 
@@ -66,6 +68,8 @@ R1实施合同确认日期：2026-09-02
 ## task-waiting-contract
 
 R1 wire `Revision`固定为JSON安全整数`0..9007199254740991`；数据库`bigint`不变。超界输入和ETag revision必须在API边界拒绝且不得舍入；旧导入超界值不得发出。任何需要`revision+1`且当前已达上限的写入必须在持久化前以`INTERNAL_ERROR`原子失败，不留下slot或Receipt。内部恢复命令按责任类型具名分离：CONTACT_LEAD只接受`CONTACT_RETRY_V1`，RESOLVE_LEAD_ROUTING_GAP只接受`R1_ROUTING_REVIEW_WAIT_V1`；浏览器不得调用内部operation，恢复scope必须包含`commandType`。
+
+Command授权的自然有效期以最终持锁完整复验使用的数据库`clock_timestamp()`为裁定时点，不保证随后的物理COMMIT瞬间仍在有效期内；锁不能停止时间。Command从该复验前至事务结束持有具名Tenant共享advisory事务锁，所有未来Identity writer在任何身份变更之前取得同Tenant排他锁，之后不得再获取Lead/Task等业务锁。复验前已提交的撤销、新DENY及组织变更必须被观察；复验之后的这些写者等待本事务结束。授权失败回滚领域写入，按既有pre-slot/post-slot合同裁定。提交前技术故障全回滚；COMMIT确认丢失不能证明未提交，必须同key重试读取原Receipt，不制造FAILED/UNKNOWN Receipt。
 
 `TaskOccurrence.state`只有`OPEN`、`WAITING`、`DONE`和`CANCELLED`四态；`DONE`和`CANCELLED`为永久终态。
 
