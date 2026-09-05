@@ -2,7 +2,9 @@
 
 > 以准确业务事实驱动责任：**一张卡、一个 Owner、一个主命令、一个明确结果**。当一张卡无法维持这一约束时，拆分责任或后置能力，不增加通用流程结构。
 
-本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。当前最新基线已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同、V850 前向迁移及 PostgreSQL 18 v1.1 运行时证据。R1 的 A/B（脚手架、OpenAPI）、C0 合同修正及 C 数据库基础设施已合并；D 提供 CommandRuntime、实时授权与审计的基础设施源码和实库测试，不包含生产业务 Handler。完整 R1 后端业务、SPA业务生产能力及E2E仍未实现或验收；基础设施测试不提升完整 R1 交付门禁。
+本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。当前最新基线已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同、V850 前向迁移及 PostgreSQL 18 v1.1 运行时证据。R1 的 A/B（脚手架、OpenAPI）、C0 合同修正及 C 数据库基础设施已合并；D 的 CommandRuntime、实时授权与审计基础设施及实库测试已通过 PR #12 合并（`ae88e63257699715dc3ee0c139563f5bfafdb2b7`），不包含生产业务 Handler。完整 R1 后端业务、SPA业务生产能力及E2E仍未实现或验收；基础设施测试不提升完整 R1 交付门禁。
+
+下一业务接入门：冻结 capture、draft、两类 recovery 的命令专属授权及事件描述，并补齐 `OpportunityOpened` 的 Schema/Owner Outbox 映射；同时对齐 `CONNECTED_VALID` 多事件分支与 Task 矩阵当前单 Event/Outbox 的验收计数。上述均为后续工作，本次合并不实施或宣称完成。
 
 > 当前权威以当前MVP基线为准；历史规格仅保留为设计演进证据。销售MVP终点、P0验收映射及52＋2边界均由该基线统一解释。
 
