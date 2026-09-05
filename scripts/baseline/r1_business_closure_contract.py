@@ -4,6 +4,25 @@ import re
 from collections import Counter
 from pathlib import Path
 
+import yaml
+
+
+class _StrictSafeLoader(yaml.SafeLoader):
+    pass
+
+
+def _construct_mapping(loader: _StrictSafeLoader, node: yaml.MappingNode, deep: bool = False):
+    mapping = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in mapping:
+            raise yaml.constructor.ConstructorError(None, None, f"duplicate key: {key}", key_node.start_mark)
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+_StrictSafeLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
+
 
 def _read(root: Path, relative: str, findings: list[str]) -> str:
     path = root / relative
@@ -88,28 +107,87 @@ def validate(root: Path) -> list[str]:
     ):
         _require(adr, value, "ADR decision", findings)
     _require(baseline, "Baseline ID: MVP-2026-09-05.3", "active baseline id", findings)
-    _require(api, "version: 1.1.0", "OpenAPI version", findings)
-    operations = re.findall(r"(?m)^\s+operationId: (\S+)\s*$", api)
+    try:
+        document = yaml.load(api, Loader=_StrictSafeLoader)
+    except yaml.YAMLError as error:
+        findings.append(f"R1 OpenAPI is not strict YAML: {error}")
+        return findings
+    if not isinstance(document, dict) or document.get("info", {}).get("version") != "1.1.0":
+        findings.append("R1 OpenAPI version must be 1.1.0")
+        return findings
+    paths = document.get("paths", {})
+    operations = [operation.get("operationId") for item in paths.values() for operation in item.values() if isinstance(operation, dict)]
     if len(operations) != 15 or len(set(operations)) != 15:
         findings.append("R1 OpenAPI must expose exactly 15 unique operations")
-    for operation in ("listDueR1Tasks", "consumeR1Projection"):
-        _require(api, f"operationId: {operation}", "internal operation", findings)
-    if api.count("- internalMutualTls: []") != 4 or api.count("- publicBearer: []") != 11:
-        findings.append("R1 OpenAPI security split must be exactly 11 Bearer and 4 mutualTLS")
-    due_parameter = _indented_block(api, "DueLimitQuery:", 4, findings)
-    for value in ("minimum: 1", "maximum: 100", "default: 50"):
-        _require(due_parameter, value, "due limit constraint", findings)
-    candidate = _indented_block(api, "DueR1TaskCandidateV1:", 4, findings)
-    consume = _indented_block(api, "ConsumeR1ProjectionV1:", 4, findings)
-    for block, required, properties in (
-        (candidate, "required: [recoveryType, taskId, expectedTaskRevision, waitReceiptId, waitReceiptHash, dueCutoff, idempotencyKey]", ("recoveryType", "taskId", "expectedTaskRevision", "waitReceiptId", "waitReceiptHash", "dueCutoff", "idempotencyKey")),
-        (consume, "required: [domainEventOutboxId, domainEventId, expectedOutboxRevision, leaseOwner, fencingToken]", ("domainEventOutboxId", "domainEventId", "expectedOutboxRevision", "leaseOwner", "fencingToken")),
-    ):
-        _require(block, "additionalProperties: false", "closed internal DTO", findings)
-        _require(block, required, "exact internal DTO required fields", findings)
-        actual = re.findall(r"(?m)^        ([A-Za-z][A-Za-z0-9]*):", block)
-        if actual != list(properties):
-            findings.append("R1 internal DTO properties differ from exact scoped contract")
+    components = document.get("components", {})
+    schemas = components.get("schemas", {})
+    parameters = components.get("parameters", {})
+    responses = components.get("responses", {})
+    if parameters.get("RecoveryTypeQuery") != {"name": "recoveryType", "in": "query", "required": True, "schema": {"$ref": "#/components/schemas/RecoveryTypeV1"}}:
+        findings.append("R1 RecoveryTypeQuery differs from exact contract")
+    if parameters.get("DueLimitQuery") != {"name": "limit", "in": "query", "required": False, "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}}:
+        findings.append("R1 DueLimitQuery differs from exact contract")
+    if parameters.get("DueCursorQuery") != {"name": "cursor", "in": "query", "required": False, "schema": {"type": "string", "minLength": 1, "maxLength": 2048}}:
+        findings.append("R1 DueCursorQuery differs from exact contract")
+    if schemas.get("RecoveryTypeV1") != {"type": "string", "enum": ["CONTACT_TASK", "ROUTING_REVIEW_TASK"]}:
+        findings.append("R1 RecoveryTypeV1 differs from exact contract")
+
+    def closed_schema(name: str, required: list[str], properties: dict) -> None:
+        expected = {"type": "object", "additionalProperties": False, "required": required, "properties": properties}
+        if schemas.get(name) != expected:
+            findings.append(f"R1 {name} differs from exact scoped contract")
+
+    ref = lambda name: {"$ref": f"#/components/schemas/{name}"}
+    candidate_properties = {
+        "recoveryType": ref("RecoveryTypeV1"), "taskId": ref("Uuid"),
+        "expectedTaskRevision": ref("Revision"), "waitReceiptId": ref("Uuid"),
+        "waitReceiptHash": ref("Digest32"), "dueCutoff": {"type": "string", "format": "date-time"},
+        "idempotencyKey": ref("Uuid"),
+    }
+    closed_schema("DueR1TaskCandidateV1", list(candidate_properties), candidate_properties)
+    page_properties = {"candidates": {"type": "array", "maxItems": 100, "items": ref("DueR1TaskCandidateV1")}, "nextCursor": {"type": "string", "minLength": 1, "maxLength": 2048}}
+    closed_schema("DueR1TaskPageV1", ["candidates"], page_properties)
+    if schemas.get("TechnicalIdentifier") != {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"}:
+        findings.append("R1 TechnicalIdentifier differs from exact contract")
+    consume_properties = {"domainEventOutboxId": ref("Uuid"), "domainEventId": ref("Uuid"), "expectedOutboxRevision": ref("Revision"), "leaseOwner": ref("TechnicalIdentifier"), "fencingToken": {"type": "integer", "format": "int64", "minimum": 1, "maximum": 9007199254740991}}
+    closed_schema("ConsumeR1ProjectionV1", list(consume_properties), consume_properties)
+    problem_properties = schemas.get("InternalProblem", {}).get("properties", {})
+    expected_problem_required = ["type", "title", "status", "code", "retryPolicy", "correlationId"]
+    if schemas.get("InternalProblem", {}).get("required") != expected_problem_required or schemas.get("InternalProblem", {}).get("additionalProperties") is not False:
+        findings.append("R1 InternalProblem closure or required fields differ")
+    if problem_properties.get("status", {}).get("enum") != [400, 401, 403, 404, 409, 422, 429, 500, 503] or problem_properties.get("code", {}).get("enum") != ["VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND", "STALE_OUTBOX_CLAIM", "PROJECTION_EVENT_INVALID", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE"] or problem_properties.get("retryPolicy", {}).get("enum") != ["NO", "FIRST_PAGE", "AFTER_REAUTH", "BACKOFF"]:
+        findings.append("R1 InternalProblem status/code/retry enums differ")
+    response_components = {400: "InternalBadRequestProblem", 401: "InternalClosureUnauthorizedProblem", 403: "InternalForbiddenProblem", 404: "InternalNotFoundProblem", 409: "InternalConflictProblem", 422: "InternalUnprocessableProblem", 429: "InternalRateLimitedProblem", 500: "InternalServerProblem", 503: "InternalUnavailableProblem"}
+    for status, name in response_components.items():
+        expected = {"description": responses.get(name, {}).get("description"), "content": {"application/problem+json": {"schema": ref("InternalProblem")}}}
+        if responses.get(name) != expected:
+            findings.append(f"R1 internal response component differs: {name}")
+    expected_operations = {
+        ("/internal/v1/tasks/due", "get"): ("listDueR1Tasks", {"200": {"description": "Authorized due selectors ordered by resume due time and task UUID.", "content": {"application/json": {"schema": ref("DueR1TaskPageV1")}}}}, [400, 401, 403, 429, 500, 503]),
+        ("/internal/v1/projections/r1/consume", "post"): ("consumeR1Projection", {"204": {"description": "Current facts were validated for the active claim; no response body."}}, [400, 401, 403, 404, 409, 422, 429, 500, 503]),
+    }
+    for (path, method), (operation_id, successes, errors) in expected_operations.items():
+        operation = paths.get(path, {}).get(method, {})
+        if operation.get("operationId") != operation_id or operation.get("security") != [{"internalMutualTls": []}]:
+            findings.append(f"R1 internal operation identity/security differs: {operation_id}")
+        expected_responses = dict(successes)
+        expected_responses.update({str(status): {"$ref": f"#/components/responses/{response_components[status]}"} for status in errors})
+        if operation.get("responses") != expected_responses:
+            findings.append(f"R1 internal operation response set differs: {operation_id}")
+        expected_codes = {
+            "listDueR1Tasks": ["VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE"],
+            "consumeR1Projection": ["VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND", "STALE_OUTBOX_CLAIM", "PROJECTION_EVENT_INVALID", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE"],
+        }[operation_id]
+        if operation.get("x-error-codes") != expected_codes:
+            findings.append(f"R1 internal operation error allowlist differs: {operation_id}")
+        if operation_id == "listDueR1Tasks":
+            expected_parameters = [{"$ref": f"#/components/parameters/{name}"} for name in ("RecoveryTypeQuery", "DueLimitQuery", "DueCursorQuery")]
+            if operation.get("parameters") != expected_parameters or "requestBody" in operation:
+                findings.append("R1 listDueR1Tasks parameter/body contract differs")
+        else:
+            expected_body = {"required": True, "content": {"application/json": {"schema": ref("ConsumeR1ProjectionV1")}}}
+            if operation.get("requestBody") != expected_body or "parameters" in operation:
+                findings.append("R1 consumeR1Projection request contract differs")
     operations_rows = _markdown_rows(http, "Operations", findings)
     operations = {row[0]: row for row in operations_rows if len(row) == 9}
     expected_http = {

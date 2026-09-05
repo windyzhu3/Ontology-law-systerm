@@ -1,6 +1,0 @@
-Task 1 fix round 1 pinned Python evidence
-Image: python@sha256:581429e3df12d76e6af4be5ab7d0e7fc2013eb57dc23d2de691411c8efdbb970
-Command: python -m unittest scripts.baseline.tests.test_verify_baseline scripts.baseline.tests.test_r1_command_contract scripts.baseline.tests.test_r1_business_closure_contract -q
-Test count (same loader/names): 220
-Exit code: 0
-Output: empty under unittest -q on success

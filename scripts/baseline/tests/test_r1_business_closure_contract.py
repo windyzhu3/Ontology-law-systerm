@@ -69,11 +69,41 @@ class R1BusinessClosureContractTest(unittest.TestCase):
     def test_due_limit_bounds_are_scoped_to_due_parameter(self):
         self.mutation(API, "schema: { type: integer, minimum: 1, maximum: 100, default: 50 }", "schema: { type: integer, minimum: 1, maximum: 101, default: 50 }")
 
+    def test_recovery_type_query_ref_is_exact(self):
+        self.mutation(API, "schema: { $ref: '#/components/schemas/RecoveryTypeV1' }", "schema: { type: string }")
+
+    def test_cursor_constraints_are_scoped(self):
+        self.mutation(API, "schema: { type: string, minLength: 1, maxLength: 2048 }", "schema: { type: string, minLength: 0, maxLength: 2048 }")
+
     def test_due_candidate_exact_properties_are_scoped(self):
         self.mutation(API, "required: [recoveryType, taskId, expectedTaskRevision, waitReceiptId, waitReceiptHash, dueCutoff, idempotencyKey]", "required: [recoveryType, taskId, expectedTaskRevision, waitReceiptId, waitReceiptHash, dueCutoff]")
 
     def test_consume_exact_properties_are_scoped(self):
         self.mutation(API, "required: [domainEventOutboxId, domainEventId, expectedOutboxRevision, leaseOwner, fencingToken]", "required: [domainEventOutboxId, domainEventId, expectedOutboxRevision, leaseOwner]")
+
+    def test_due_page_must_be_closed_and_require_candidates(self):
+        self.mutation(API, "DueR1TaskPageV1:\n      type: object\n      additionalProperties: false", "DueR1TaskPageV1:\n      type: object\n      additionalProperties: true")
+
+    def test_candidate_property_refs_are_exact(self):
+        self.mutation(API, "waitReceiptHash: { $ref: '#/components/schemas/Digest32' }", "waitReceiptHash: { $ref: '#/components/schemas/Uuid' }")
+
+    def test_internal_problem_enums_are_exact(self):
+        self.mutation(API, "enum: ['NO', FIRST_PAGE, AFTER_REAUTH, BACKOFF]", "enum: ['NO', FIRST_PAGE, BACKOFF]")
+
+    def test_internal_operation_response_refs_are_exact(self):
+        self.mutation(API, "'409': { $ref: '#/components/responses/InternalConflictProblem' }", "'409': { $ref: '#/components/responses/InternalBadRequestProblem' }")
+
+    def test_due_operation_parameter_refs_are_exact(self):
+        self.mutation(API, "- $ref: '#/components/parameters/DueCursorQuery'", "- $ref: '#/components/parameters/DueLimitQuery'")
+
+    def test_consume_operation_body_ref_is_exact(self):
+        self.mutation(API, "schema: { $ref: '#/components/schemas/ConsumeR1ProjectionV1' }", "schema: { $ref: '#/components/schemas/DueR1TaskPageV1' }")
+
+    def test_internal_operation_error_allowlist_is_scoped(self):
+        self.mutation(API, "x-error-codes: [VALIDATION_FAILED, UNAUTHENTICATED, NOT_AUTHORIZED, NOT_FOUND, STALE_OUTBOX_CLAIM, PROJECTION_EVENT_INVALID, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE]", "x-error-codes: [VALIDATION_FAILED, UNAUTHENTICATED, NOT_AUTHORIZED, NOT_FOUND, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE]")
+
+    def test_duplicate_yaml_keys_are_rejected(self):
+        self.mutation(API, "DueLimitQuery:\n", "DueLimitQuery:\n      name: shadow\n")
 
     def test_projection_cannot_be_mutable(self):
         self.mutation(ADR, "| ProjectionStorage | NONE |", "| ProjectionStorage | MATERIALIZED |")
