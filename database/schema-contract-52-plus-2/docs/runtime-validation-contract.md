@@ -59,9 +59,9 @@ Resolver 失败属于拒绝或技术失败，绝不能降级为只按 `(type,id)
 
 四类命令信封、Handler、Fact Resolver、事件 Schema、路由与重试策略只能由代码注册。信封至少携带 Tenant、静态类型、CommandId、Correlation、Actor/Appointment、预期 Subject 选择器、命令 Scope 摘要和规范 payload 摘要。
 
-R1静态映射：INTERNAL_TASK对应七个Task主命令与SAVE_ACTION_DRAFT，INTERNAL_ADMIN仅对应CAPTURE_LEAD且不赋管理员权力，SERVICE_ACTOR对应两个具名恢复命令并要求真实SERVICE Principal及完整授权；CUSTOMER_GRANT没有R1命令。缺失Handler或静态policy失败关闭，不能由调用方选择信封、authority或事件描述。
+R1静态映射：INTERNAL_TASK对应七个Task主命令与SAVE_ACTION_DRAFT，INTERNAL_ADMIN仅对应CAPTURE_LEAD且不赋管理员权力，SERVICE_ACTOR对应两个具名恢复命令并要求真实SERVICE Principal及完整授权；CUSTOMER_GRANT没有R1命令。缺失Handler或静态policy失败关闭，未冻结策略不能注册或执行（包括NO_CHANGE），不能由调用方选择信封、authority或事件描述。
 
-`CommandExecutionSlot` 以 Tenant、静态信封类型、命令 Scope 摘要和 CommandId 形成永久占位。相同占位键与相同 `payloadDigest` 返回既有终局；同Tenant CommandId的payload、Scope或信封冲突返回原Receipt安全引用，所有新增delta（包括Audit）为零，不能覆盖Slot或另建等价幂等表。
+`CommandExecutionSlot` 以 Tenant、静态信封类型、命令 Scope 摘要和 CommandId 形成永久占位。相同占位键与相同 `payloadDigest` 返回既有终局；同Tenant CommandId的payload、Scope或信封冲突只返回冲突码及原Receipt安全ID，不返回原status、rejectionCode或resultFact。重放/冲突返回前仍须在等待锁后完成最终持锁授权复验，但不重跑业务CAS/恢复eligibility。所有新增delta（包括Audit）为零，不能覆盖Slot或另建等价幂等表。
 
 ### 5.2 短事务
 

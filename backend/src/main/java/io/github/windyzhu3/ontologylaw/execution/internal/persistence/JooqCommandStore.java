@@ -19,7 +19,13 @@ public final class JooqCommandStore {
         long key=ByteBuffer.wrap(CanonicalJson.digest("R1_COMMAND_UUID_LOCK_V1:"+e.actor().tenantId()+":"+e.commandId())).getLong();
         try(var p=connection.prepareStatement("select pg_advisory_xact_lock(?)")){p.setLong(1,key);p.execute();}
     }
-    public CommandOutcome existing(CommandEnvelope e,CommandScope scope,byte[] payloadDigest)throws SQLException {
+    /** Caller already authorized and locked roots/command. Existing keys never rerun new recovery eligibility. */
+    public CommandResult existingOrValidateNew(CommandEnvelope e,CommandScope scope,byte[] payloadDigest,CapabilityRoleExecutor.SqlWork<Void> recoveryEligibility)throws SQLException {
+        var existing=existing(e,scope,payloadDigest);
+        if(existing==null && e.type().recovery())recoveryEligibility.run(connection);
+        return existing;
+    }
+    private CommandResult existing(CommandEnvelope e,CommandScope scope,byte[] payloadDigest)throws SQLException {
         var s=COMMAND_EXECUTION_SLOT;var r=COMMAND_RECEIPT;
         var slots=db.selectFrom(s).where(s.TENANT_ID.eq(e.actor().tenantId())).and(s.COMMAND_ID.eq(e.commandId())).fetch();
         if(slots.isEmpty())return null;
@@ -29,8 +35,9 @@ public final class JooqCommandStore {
         if(receipt==null)throw new SQLException("Orphan command slot","23000");
         boolean conflict=!e.type().envelope().name().equals(slot.get(s.ENVELOPE_TYPE)) || !e.type().name().equals(slot.get(s.COMMAND_TYPE))
                 || !Arrays.equals(scope.digest(),slot.get(s.COMMAND_SCOPE_DIGEST)) || !Arrays.equals(payloadDigest,slot.get(s.PAYLOAD_DIGEST));
+        if(conflict)return new CommandResult.Conflict(receipt.get(r.COMMAND_RECEIPT_ID));
         Subject fact=receipt.get(r.RESULT_FACT_TYPE)==null?null:new Subject(receipt.get(r.RESULT_FACT_TYPE),receipt.get(r.RESULT_FACT_ID),receipt.get(r.RESULT_FACT_REVISION),receipt.get(r.RESULT_FACT_HASH)==null?null:Base64.getUrlEncoder().withoutPadding().encodeToString(receipt.get(r.RESULT_FACT_HASH)));
-        return new CommandOutcome(receipt.get(r.COMMAND_RECEIPT_ID),CommandOutcome.Status.valueOf(receipt.get(r.OUTCOME)),fact,receipt.get(r.REJECTION_CODE),conflict);
+        return new CommandOutcome(receipt.get(r.COMMAND_RECEIPT_ID),CommandOutcome.Status.valueOf(receipt.get(r.OUTCOME)),fact,receipt.get(r.REJECTION_CODE));
     }
     public UUID occupy(CommandEnvelope e,CommandScope scope,byte[] payload)throws SQLException {
         UUID id=newId();var s=COMMAND_EXECUTION_SLOT;
@@ -40,7 +47,7 @@ public final class JooqCommandStore {
         UUID id=newId();var r=COMMAND_RECEIPT;
         db.insertInto(r).set(r.TENANT_ID,e.actor().tenantId()).set(r.COMMAND_RECEIPT_ID,id).set(r.COMMAND_EXECUTION_SLOT_ID,slot).set(r.OUTCOME,status.name()).set(r.REJECTION_CODE,rejection).set(r.COMPLETED_AT,now())
                 .set(r.RESULT_FACT_TYPE,fact==null?null:fact.type()).set(r.RESULT_FACT_ID,fact==null?null:fact.id()).set(r.RESULT_FACT_REVISION,fact==null?null:fact.revision()).set(r.RESULT_FACT_HASH,fact==null || fact.hash()==null?null:Base64.getUrlDecoder().decode(fact.hash())).execute();
-        return new CommandOutcome(id,status,fact,rejection,false);
+        return new CommandOutcome(id,status,fact,rejection);
     }
     public void event(CommandEnvelope e,CommandHandler.Result result)throws SQLException {
         for(var notification:result.notifications())event(e,notification);

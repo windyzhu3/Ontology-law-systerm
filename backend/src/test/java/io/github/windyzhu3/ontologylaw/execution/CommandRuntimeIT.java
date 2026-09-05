@@ -58,7 +58,8 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
     }
     static String scalar(Connection c,String query)throws SQLException {try(var s=c.createStatement();var r=s.executeQuery(query)){assertTrue(r.next());return r.getString(1);}}
     CommandRuntime runtime(Handler h){return new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),"POSTGRES_IT");}
-    CommandOutcome run(CommandRuntime runtime,CommandEnvelope e)throws Exception {try(var c=database.apiConnection()){return runtime.execute(c,e);}}
+    CommandResult runResult(CommandRuntime runtime,CommandEnvelope e)throws Exception {try(var c=database.apiConnection()){return runtime.execute(c,e);}}
+    CommandOutcome run(CommandRuntime runtime,CommandEnvelope e)throws Exception {return assertInstanceOf(CommandOutcome.class,runResult(runtime,e));}
     List<Long> counts(Handler h)throws Exception {
         try(var c=database.apiConnection()) {return inTransaction(c,Capability.QUERY,x->{
             List<Long> result=new ArrayList<>();
@@ -75,7 +76,7 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
             assertEquals("DIRECT:SOURCE_INTAKE_OWNER:identity.authority_grant:"+h.seed.grant()+":0:32",scalar(x,"select authorization_path_code||':'||authorization_slot_code||':'||authorization_fact_type||':'||authorization_fact_id||':'||authorization_fact_revision||':'||octet_length(authorization_snapshot_digest) from audit.audit_entry_classified_v where tenant_id='"+h.seed.tenant()+"'"));return null;
         });}
         assertEquals(List.of(1L,1L,1L,1L,1L,1L),counts(h));assertEquals(first,run(runtime,e));assertEquals(List.of(1L,1L,1L,1L,1L,1L),counts(h));
-        var conflict=run(runtime,h.envelope(e.commandId(),Map.of("phone","+124")));assertTrue(conflict.payloadConflict());assertEquals(first.receiptId(),conflict.receiptId());assertEquals(List.of(1L,1L,1L,1L,1L,1L),counts(h));
+        var conflict=assertInstanceOf(CommandResult.Conflict.class,runResult(runtime,h.envelope(e.commandId(),Map.of("phone","+124"))));assertEquals("COMMAND_PAYLOAD_CONFLICT",conflict.code());assertEquals(first.receiptId(),conflict.receiptId());assertEquals(List.of(1L,1L,1L,1L,1L,1L),counts(h));
     }
     @Test void no_change_discards_tentative_fact_writes_and_has_no_event_or_outbox()throws Exception {
         Handler h=new Handler();h.mode=Mode.NO_CHANGE;
@@ -134,9 +135,9 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
     @Test void concurrent_same_tenant_uuid_across_scopes_has_one_conflict_and_no_second_slot()throws Exception {
         Handler a=new Handler();var s=a.seed;Handler b=new Handler(new AuthorizationServiceIT.Seed(s.tenant(),s.principal(),s.appointment(),s.org(),s.grant(),UUID.randomUUID()));UUID command=UUID.randomUUID();
         try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)) {
-            var first=pool.submit(()->run(runtime(a),a.envelope(command,Map.of())));var second=pool.submit(()->run(runtime(b),b.envelope(command,Map.of())));
+            var first=pool.submit(()->runResult(runtime(a),a.envelope(command,Map.of())));var second=pool.submit(()->runResult(runtime(b),b.envelope(command,Map.of())));
             var x=first.get(15,java.util.concurrent.TimeUnit.SECONDS);var y=second.get(15,java.util.concurrent.TimeUnit.SECONDS);
-            assertEquals(x.receiptId(),y.receiptId());assertNotEquals(x.payloadConflict(),y.payloadConflict());
+            assertEquals(x.receiptId(),y.receiptId());assertNotEquals(x instanceof CommandResult.Conflict,y instanceof CommandResult.Conflict);
         }
         assertEquals(List.of(1L,1L,1L,1L,1L),counts(a).subList(0,5));assertEquals(1L,counts(a).getLast()+counts(b).getLast());
     }
@@ -229,20 +230,34 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
             assertEquals("2",scalar(c,"select revision from responsibility.task_occurrence where tenant_id='"+seed.tenant()+"' and task_occurrence_id='"+task+"'"));
         }
     }
+    /** Test-only low-level phase harness: NOT CommandRuntime or a production policy override. */
+    CommandResult recoveryPhase(RecoveryHandler h,CommandEnvelope e)throws Exception {
+        try(var c=database.apiConnection()){return inTransaction(c,Capability.QUERY,x->{
+            var context=h.resolve(x,e);var auth=AuthorizationService.databaseBacked();
+            assertTrue(auth.evaluate(x,context.authorization(),false).allowed());
+            setLocalRole(x,Capability.COMMAND);h.lockRoots(x,e,context);
+            var store=new io.github.windyzhu3.ontologylaw.execution.internal.persistence.JooqCommandStore(x);store.lockCommand(e);
+            var existing=store.existingOrValidateNew(e,context.scope(),CanonicalJson.digest(CanonicalJson.encode(e.payload())),q->{h.recoveryEligibility(q,e,context);return null;});
+            if(existing!=null)return existing;
+            var slot=store.occupy(e,context.scope(),CanonicalJson.digest(CanonicalJson.encode(e.payload())));
+            var result=h.execute(x,e,context);
+            return store.receipt(e,slot,result.status(),result.fact(),null);
+        });}
+    }
     @Test void recovery_new_key_early_wrong_type_and_stale_selectors_are_all_zero()throws Exception {
         for(int scenario=0;scenario<3;scenario++) {
             var h=new RecoveryHandler(scenario==0,scenario==1,false);if(scenario==2)h.expected=0;
-            var error=assertThrows(CommandHandler.Rejected.class,()->run(runtime(h),h.envelope(UUID.randomUUID(),Map.of())));assertEquals("VALIDATION_FAILED",error.code());assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));
+            var error=assertThrows(CommandHandler.Rejected.class,()->recoveryPhase(h,h.envelope(UUID.randomUUID(),Map.of())));assertEquals("VALIDATION_FAILED",error.code());assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));
         }
     }
     @Test void recovery_replay_precedes_new_key_eligibility_after_task_advances()throws Exception {
-        var h=new RecoveryHandler(false,false,true);var runtime=runtime(h);var e=h.envelope(UUID.randomUUID(),Map.of("expectedTaskRevision",1L));
-        var first=run(runtime,e);assertEquals(CommandOutcome.Status.NO_CHANGE,first.status());assertEquals(h.task,first.resultFact().id());assertEquals(2L,first.resultFact().revision());
+        var h=new RecoveryHandler(false,false,true);var e=h.envelope(UUID.randomUUID(),Map.of("expectedTaskRevision",1L));
+        var first=assertInstanceOf(CommandOutcome.class,recoveryPhase(h,e));assertEquals(CommandOutcome.Status.NO_CHANGE,first.status());assertEquals(h.task,first.resultFact().id());assertEquals(2L,first.resultFact().revision());
         try(var c=database.apiConnection()){inTransaction(c,Capability.COMMAND,x->{
             sql(x,"update responsibility.task_occurrence set state='WAITING',revision=revision+1 where tenant_id=? and task_occurrence_id=?",h.seed.tenant(),h.task);
             sql(x,"insert into responsibility.wait_receipt (tenant_id,wait_receipt_id,task_occurrence_id,task_revision,wait_sequence,wait_reason_code,wait_contract_code,wait_contract_version,entered_waiting_at,resume_due_at,recorded_by_appointment_id) values (?,?,?,3,2,'CONTACT_RETRY','CONTACT_RETRY_V1',1,clock_timestamp(),clock_timestamp()+interval '1 hour',?)",h.seed.tenant(),UUID.randomUUID(),h.task,h.seed.appointment());return null;
         });}
-        assertEquals(first,run(runtime,e));assertTrue(run(runtime,h.envelope(e.commandId(),Map.of("expectedTaskRevision",0L))).payloadConflict());assertEquals(List.of(1L,1L,1L,0L,0L,0L),counts(h));
+        assertEquals(first,recoveryPhase(h,e));assertInstanceOf(CommandResult.Conflict.class,recoveryPhase(h,h.envelope(e.commandId(),Map.of("expectedTaskRevision",0L))));assertEquals(List.of(1L,1L,0L,0L,0L,0L),counts(h));
     }
     @Test void failure_on_later_notification_rolls_back_earlier_event_and_all_facts()throws Exception {
         Handler other=new Handler();var s=other.seed;
@@ -275,5 +290,45 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
         Handler h=new Handler();var runtime=new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("NODE_A"));
         run(runtime,h.envelope(UUID.randomUUID(),Map.of()));
         try(var observer=database.migratorConnection()){assertEquals("NODE_A",scalar(observer,"select execution_node_code from audit.audit_entry where tenant_id='"+h.seed.tenant()+"'"));}
+    }
+    @Test void cross_scope_conflict_never_discloses_original_terminal_fields()throws Exception {
+        Handler original=new Handler();var s=original.seed;
+        Handler other=new Handler(new AuthorizationServiceIT.Seed(s.tenant(),s.principal(),s.appointment(),s.org(),s.grant(),UUID.randomUUID()));
+        UUID command=UUID.randomUUID();var receipt=run(runtime(original),original.envelope(command,Map.of()));
+        var conflict=assertInstanceOf(CommandResult.Conflict.class,runResult(runtime(other),other.envelope(command,Map.of())));
+        assertEquals(receipt.receiptId(),conflict.receiptId());assertEquals("COMMAND_PAYLOAD_CONFLICT",conflict.code());
+        assertFalse(conflict.toString().contains(original.seed.subject().toString()));
+        assertEquals(List.of(1L,1L,1L,1L,1L),counts(other).subList(0,5));assertEquals(0L,counts(other).getLast());
+    }
+    @Test void replay_and_conflict_reauthorize_after_waiting_for_root_lock()throws Exception {
+        for(boolean conflict:List.of(false,true)) {
+            var waiting=new java.util.concurrent.CountDownLatch(1);var armed=new java.util.concurrent.atomic.AtomicBoolean();
+            Handler h=new Handler(){@Override public void lockRoots(Connection c,CommandEnvelope e,Context context)throws SQLException {
+                if(armed.get())waiting.countDown();super.lockRoots(c,e,context);
+            }};
+            var runtime=runtime(h);var e=h.envelope(UUID.randomUUID(),Map.of());run(runtime,e);armed.set(true);
+            try(var pool=java.util.concurrent.Executors.newSingleThreadExecutor();var blocker=database.apiConnection()) {
+                var pending=inTransaction(blocker,Capability.COMMAND,b->{
+                    try(var p=b.prepareStatement("select lead_id from lead.lead where tenant_id=? and lead_id=? for update")){p.setObject(1,h.seed.tenant());p.setObject(2,h.seed.subject());p.executeQuery().close();}
+                    var future=pool.submit(()->runResult(runtime,conflict?h.envelope(e.commandId(),Map.of("changed",true)):e));
+                    try{assertTrue(waiting.await(10,java.util.concurrent.TimeUnit.SECONDS));}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new SQLException(interrupted);}
+                    try(var writer=database.apiConnection()){inTransaction(writer,Capability.COMMAND,w->{
+                        AuthorizationService.databaseBacked().lockForMutation(w,h.seed.tenant());
+                        sql(w,"update identity.authority_grant set state='REVOKED',revoked_at=clock_timestamp(),revocation_reason_code='TEST',revision=revision+1 where tenant_id=? and authority_grant_id=?",h.seed.tenant(),h.seed.grant());return null;
+                    });}
+                    return future;
+                });
+                var failure=assertThrows(java.util.concurrent.ExecutionException.class,()->pending.get(10,java.util.concurrent.TimeUnit.SECONDS));
+                assertInstanceOf(CommandHandler.Rejected.class,failure.getCause());
+            }
+            assertEquals(List.of(1L,1L,1L,1L,1L,1L),counts(h));
+        }
+    }
+    @Test void unresolved_command_policy_cannot_register_even_a_no_change_handler()throws Exception {
+        for(var type:List.of(CommandEnvelope.Type.CAPTURE_LEAD,CommandEnvelope.Type.SAVE_ACTION_DRAFT,CommandEnvelope.Type.REOPEN_DUE_CONTACT_TASKS,CommandEnvelope.Type.REOPEN_DUE_ROUTING_REVIEW_TASKS)) {
+            Handler h=new Handler(){@Override public CommandEnvelope.Type type(){return type;}};
+            h.mode=Mode.NO_CHANGE;
+            assertThrows(IllegalArgumentException.class,()->runtime(h));assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));
+        }
     }
 }
