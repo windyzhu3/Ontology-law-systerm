@@ -40,7 +40,17 @@ Task行的自然幂等槽是Tenant＋Task subject scope＋调用方UUID `Idempot
 
 以上“最大”比较先按`timestamptz(6)`、再按UUID的RFC 4122网络字节无符号字典序；不得按数据库未指定collation或显示文本排序。所有SecondaryBinding都进入对应Task唯一ActionDraft的candidate payload；主命令成功时该Draft以同一事务`DRAFT→CONFIRMED`，使`confirmed_payload_digest=candidate_payload_digest`。它们仍须由Fact Owner重验，不能把Draft当业务真相。任何selector缺失、不匹配或已失效都拒绝，不能降级到只按ID、最新任意行或UUID第一项。
 
-`R1_COMMAND_SCOPE_V1`固定为RFC 8785 JCS对象的UTF-8字节之SHA-256原始32字节：`{"profile":"R1_COMMAND_SCOPE_V1","tenantId":...,"commandType":...,"taskId":...,"lead":{"type":"lead.lead","id":...,"revision":...},"bindings":[...]}`。`bindings`按上表固定名称字节升序排列；revision用JSON整数，hash用无padding base64url，NONE时为空数组。Tenant、commandType、Task、Lead selector或任一secondary selector不同即scope不同；调用方不得提交scope或digest。
+`R1_COMMAND_SCOPE_V1`固定为RFC 8785 JCS对象的UTF-8字节之SHA-256原始32字节：`{"profile":"R1_COMMAND_SCOPE_V1","tenantId":...,"commandType":...,"taskId":...,"lead":{"type":"lead.lead","id":...,"revision":...},"bindings":[...]}`。`bindings`每项必须且只含`{"name":fieldName,"value":scalarValue}`，按上表固定名称ASCII字节升序排列；不得分组、别名、重复或添加字段。UUID是小写连字符字符串，revision用安全JSON整数，hash用无padding base64url，NONE时为空数组。Tenant、commandType、Task、Lead selector或任一secondary selector不同即scope不同；调用方不得提交scope或digest。
+
+固定回归向量（UTF-8、无末尾换行）的canonical bytes：
+
+```json
+{"bindings":[{"name":"leadAssignmentId","value":"0198e4c0-0000-7000-8000-000000000004"},{"name":"leadAssignmentRevision","value":5}],"commandType":"RECORD_CONTACT_RESULT","lead":{"id":"0198e4c0-0000-7000-8000-000000000003","revision":9007199254740991,"type":"lead.lead"},"profile":"R1_COMMAND_SCOPE_V1","taskId":"0198e4c0-0000-7000-8000-000000000002","tenantId":"0198e4c0-0000-7000-8000-000000000001"}
+```
+
+SHA-256 hex：`61f1239c8e8e1d03bde88452a61321bbfa66cabbc72e32242d87de9cf58f89ca`。R1当前JSON数值Schema只有整数，规范器拒绝浮点类型和不安全整数，不进行有损转换；属性按RFC8785 UTF-16排序，Unicode不隐式规范化。
+
+静态信封及授权裁定时点采用[ADR-0006](../../adr/ADR-0006-command-runtime-authorization-boundary.md)。七个主命令/SAVE_ACTION_DRAFT为INTERNAL_TASK，capture为无管理员授权含义的INTERNAL_ADMIN，两种恢复为SERVICE_ACTOR，CUSTOMER_GRANT在R1不注册命令。每个成功通知单独携带准确sourceFact，可与唯一Receipt结果不同，并在同一事务写全部Event/Outbox；NO_CHANGE/REJECTED通知为空。非完成命令以及OpportunityOpened的完整生产policy/事件描述仍为后续Handler接入门，不以D基础设施测试宣称业务完成。
 
 ### Non-completion command Receipt results
 
@@ -134,6 +144,7 @@ Receipt outcome 的封闭集合只有 `SUCCEEDED`、`NO_CHANGE`、`REJECTED`。C
 ### Canonicalization, digest and HMAC registry
 
 - 所有UUID先校验RFC 4122文本，再转成小写连字符形式；时间统一为UTC、六位小数和`Z`；写入`varchar(64)`的code只接受`^[A-Z][A-Z0-9_]{0,63}$`且不大小写折叠。HTTP中的32字节digest/hash用无padding base64url，数据库保存解码后的原始32字节。
+- 上述大写code规则不改写EventType：事件必须保留Completion branches明确列出的PascalCase精确名称，不转换大小写或创建别名。
 - `R1_JSON_JCS_SHA256_V1`是RFC 8785 JCS结果UTF-8字节的SHA-256。命令`payload_digest`覆盖请求body全部业务字段，但排除HTTP `Idempotency-Key`、认证、条件header及服务端ActorContext；ActionDraft `candidate_payload_digest`只覆盖对应具名主命令的candidate values，不覆盖`draftId`、`expectedDraftRevision`或回传的`draftDigest`。
 - phone采用`R1_PHONE_E164_V1`：输入必须已是`+`及1至15位十进制数字，首位数字1至9；验证后原样作为规范值。email采用`R1_EMAIL_V1`：先Unicode NFC并删除两端Unicode White_Space；必须恰有一个`@`，local-part以Unicode默认无区域小写，domain按IDNA2008转ASCII并小写；空值与空串均视为缺失。其他受保护文本采用`R1_TEXT_NFC_V1`：CRLF/CR转LF、Unicode NFC、删除两端Unicode White_Space、拒绝除LF/TAB外的C0/C1控制符，不作大小写折叠。
 - 三种盲索引用途封闭为`LEAD_PHONE_EXACT`、`LEAD_EMAIL_EXACT`、`SOURCE_RECORD_KEY`。KMS/Secret Manager按Tenant＋用途提供独立`R1_HMAC_SHA256_V1`密钥；HMAC输入为UTF-8 JCS对象`{"profile":"R1_HMAC_SHA256_V1","purpose":...,"sourceAccountCode":...或null,"value":...}`。phone/email的`sourceAccountCode=null`，使捕获值与V850补全值可安全精确比较；source record key按请求中区分大小写、不trim的原始Unicode标量串并带准确sourceAccountCode计算。R1不轮换或双写key version，也不保存明文、密钥或可逆输入。
@@ -206,7 +217,7 @@ Task registry的`TaskType`、`PrimaryCommand`、`PayloadSchema`、`CompletionFac
 - 成功：completion Fact 1、原 Task `DONE/revision+1`、Receipt 1、DomainEvent 1、对应 Owner Outbox 1、Audit `SUCCEEDED` 1，全部同事务。
 - 同一 UUID `Idempotency-Key` 和同规范化 payload：返回原 Receipt，所有持久 delta 为 0。
 - 同 key 异 payload或异 Scope：`COMMAND_PAYLOAD_CONFLICT`；返回指向原终态 Receipt 的安全引用，Slot/Receipt/Fact/Task/Event/Outbox/Audit 全部新增 0。一个既有 slot 的唯一 Receipt 永不被第二张 REJECTED Receipt替换或追加。
-- 业务拒绝：Fact/Task/Event/Outbox 为0；按上述阶段要么pre-slot命令写入全0，要么post-slot的Slot/`REJECTED` Receipt/Audit各1，禁止“已占slot但允许同key重试执行”的中间语义。技术异常、Audit失败、锁超时和连接中断使整个当前事务回滚，Slot/Receipt/Fact/Task/Event/Outbox/Audit全部0。
+- 业务拒绝：Fact/Task/Event/Outbox 为0；按上述阶段要么pre-slot命令写入全0，要么post-slot的Slot/`REJECTED` Receipt/Audit各1，禁止“已占slot但允许同key重试执行”的中间语义。确认提交前的技术异常、Audit失败、锁超时和连接中断使整个当前事务回滚，Slot/Receipt/Fact/Task/Event/Outbox/Audit全部0；COMMIT确认丢失则不能断言未提交，使用原key恢复唯一Receipt且不新增副作用。
 - 所有读取和写入绑定 ActorContext Tenant；另一个 Tenant 对 Task、Fact、Receipt、Audit、Event、Outbox 的可见和可写 delta 均为 0。
 
 ## E2E deltas

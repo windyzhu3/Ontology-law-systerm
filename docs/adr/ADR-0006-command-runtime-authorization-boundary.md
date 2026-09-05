@@ -1,0 +1,19 @@
+# ADR-0006：CommandRuntime授权裁定与静态表示
+
+日期：2026-09-05。状态：ACCEPTED。语义基线：MVP-2026-09-05.1。
+
+用户明确批准授权自然有效期以最终持锁完整授权复验的可信数据库当前时间为裁定点，不要求物理COMMIT瞬间的有效期保证。READ COMMITTED事务用同一连接执行初始授权、业务锁及工作、最终授权、Audit与提交；最终复验用`clock_timestamp()`，不能用事务开始时间`now()`。共享锁不冻结时间。
+
+Identity协议固定为SHA-256 UTF-8 `R1_IDENTITY_TENANT_LOCK_V1:<canonical tenant UUID>`前8字节按大端有符号bigint解释的advisory事务锁。Command在最终复验前取得shared锁并持有至事务结束；每个未来Identity writer在任何Tenant/Principal/Appointment/组织树/直接授权/委托/对象规则变更之前取得同Tenant exclusive锁，并且之后不得再获取业务锁。先前已提交变更会被复验观察，之后的写者等待。此协议是未来Identity写端的强制接入合同，非数据库触发器替代品；未遵循协议的直接写入不在应用并发保证内。正常业务锁仍为LEAD→TASK→COMMAND_SLOT，Command锁使用独立`R1_COMMAND_UUID_LOCK_V1:<tenant UUID>:<command UUID>`前8摘要字节；哈希碰撞至多导致额外竞争及可重试技术失败，不能授权越权。
+
+静态信封由封闭CommandType映射，不接受调用方选择：七个主命令和SAVE_ACTION_DRAFT映射INTERNAL_TASK；CAPTURE_LEAD映射INTERNAL_ADMIN；两个具名恢复命令映射SERVICE_ACTOR。CUSTOMER_GRANT只保留枚举、没有R1命令。INTERNAL_ADMIN仅表示非Task内部接入分类，不赋管理员权力。SERVICE_ACTOR要求真实SERVICE Principal和完整数据库授权，绝不以SYSTEM路径绕过授权。历史规格中的Activation、fence表或独立channel拓扑均未恢复。
+
+R1_COMMAND_SCOPE_V1的bindings是按ASCII字段名排序的`{"name":fieldName,"value":scalarValue}`数组，准确字段集合以Task矩阵为准。UUID小写、hash无padding base64url、revision为安全整数。R1规范JSON只支持当前Schema的整数数值子集，按RFC8785规则排序UTF-16属性并处理Unicode/转义，不宣称支持通用浮点序列化；非整数类型和不安全数值失败关闭。HTTP解析器须在构造类型化JSON树前拒绝重复属性名。
+
+同Tenant同Command UUID跨Scope冲突以及重放均零新增，包括Audit。冲突是独立结果类型，只含COMMAND_PAYLOAD_CONFLICT和安全Receipt ID，不携带原终态、原拒绝码或原结果Fact；重放及冲突在可能等待业务/Command锁之后，仍须最终持锁完整授权复验，但不重新执行业务CAS或恢复eligibility。post-slot业务拒绝使用savepoint撤销所有暂存领域写入，只提交Slot/REJECTED Receipt/Audit；NO_CHANGE也撤销暂存领域写入并重验既有准确结果，不生成Event/Outbox。提交确认丢失时只能判断原事务原子地全部提交或全部未提交，不能声称已回滚；使用原key恢复原Receipt，不引入第四终态。
+
+一个成功结果携带唯一Receipt resultFact和不可变通知列表；每个通知各自引用准确sourceFact，可与Receipt结果不同，所有Event和Owner Outbox同事务提交。每个当前注册事件使用版本1、空对象通知payload和R1_PROJECTION路由，准确来源在类型化source字段，通知不复制领域内容。新增事件描述必须经静态合同审核。
+
+尚未闭合的后续业务门：CAPTURE_LEAD、SAVE_ACTION_DRAFT及两种恢复命令的生产authority policy和SUCCEEDED事件type/schema/queue-owner映射尚未完整冻结；OpportunityOpened虽是当前业务边界，其完整事件描述亦待冻结。CommandRuntime拒绝注册这些未冻结策略的Handler，执行时也失败关闭，NO_CHANGE不例外；不得借用无关主命令grant。不编造事件/权限代码，后续PR须先补齐静态描述。低层接口保留恢复命令先重放、后NEW-key eligibility的阶段顺序，仅由测试目录的阶段harness证明，不作为生产授权旁路；将来ContactResult和Opportunity各自来源的原子多事件仍受独立静态描述门约束。这不表示相关业务已实现。
+
+本ADR不变更52-plus-2-v1.1、manifest或V001–V850字节，不增加表、业务HTTP入口、生产测试Handler或R2业务，不变更已冻结工具版本、模块DAG及权限角色。Foundation集成测试不等于R1-BACKEND、SPA或E2E交付。

@@ -2,7 +2,7 @@
 
 > 以准确业务事实驱动责任：**一张卡、一个 Owner、一个主命令、一个明确结果**。当一张卡无法维持这一约束时，拆分责任或后置能力，不增加通用流程结构。
 
-本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。当前最新基线已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同、V850 前向迁移及 PostgreSQL 18 v1.1 运行时证据。R1 工程脚手架与PR #9 OpenAPI制品已合并，但 R1 后端、SPA业务生产能力及E2E尚未实现或验收。
+本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。当前最新基线已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同、V850 前向迁移及 PostgreSQL 18 v1.1 运行时证据。R1 的 A/B（脚手架、OpenAPI）、C0 合同修正及 C 数据库基础设施已合并；D 提供 CommandRuntime、实时授权与审计的基础设施源码和实库测试，不包含生产业务 Handler。完整 R1 后端业务、SPA业务生产能力及E2E仍未实现或验收；基础设施测试不提升完整 R1 交付门禁。
 
 > 当前权威以当前MVP基线为准；历史规格仅保留为设计演进证据。销售MVP终点、P0验收映射及52＋2边界均由该基线统一解释。
 
@@ -100,7 +100,7 @@ Lead接入 → Assignment分配 → ContactResult联系结果
 ```text
 .
 ├── README.md
-├── backend/                            # Spring Boot 模块化单体脚手架；尚无 R1 业务实现
+├── backend/                            # 模块化单体与数据库/命令运行时基础设施；尚无完整 R1 业务实现
 ├── apps/workbench/                     # React/Vite 工作台脚手架；尚无 R1 业务实现
 ├── contracts/openapi/                  # 唯一 R1 HTTP 契约、示例与前后端生成源
 ├── docs/

@@ -39,7 +39,8 @@ TARGET_GATE_STATES = {
 VISUAL_BUNDLE_VERSION = "visual-bundle-2026-08-27"
 VISUAL_OWNER = "Product Design"
 VISUAL_CONFIRMATION_DATE = "2026-08-27"
-CANONICAL_BASELINE_ID = "MVP-2026-08-28.1"
+CANONICAL_BASELINE_ID = "MVP-2026-09-05.1"
+HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 HISTORICAL_BANNER = "历史规格（HISTORICAL_SUPERSEDED）"
 HISTORICAL_WARNING = (
     "> [!WARNING]\n"
@@ -835,9 +836,10 @@ EXPECTED_VISUAL_ROWS = expected_visual_rows()
 REQUIRED_NONVISUAL_ROWS = {
     "DB-52P2-CONTRACT": ("MVP", "MERGED", "52-plus-2-v1", "../../database/schema-contract-52-plus-2/contract/schema_contract.py"),
     "DB-52P2-MIGRATIONS": ("MVP", "MERGED", "52-plus-2-v1", "../../database/schema-contract-52-plus-2/generated/db/migration/V840__schema_contract_validation.sql"),
-    "BASE-CLOSURE-DESIGN": ("PR2", "FROZEN", CANONICAL_BASELINE_ID, "../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md"),
+    "BASE-CLOSURE-DESIGN": ("PR2", "FROZEN", HISTORICAL_BASELINE_ID, "../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md"),
     "BASE-PR2-CLOSURE-PLAN": ("PR2", "FROZEN", "2026-08-28", "../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md"),
-    "BASE-CURRENT-MVP": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP": ("MVP", "FROZEN", HISTORICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
     "R1-IMPLEMENTATION-PLAN": ("R1", "FROZEN", "2026-08-28", "../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md"),
     "R1-IMPLEMENTATION-CONTRACT": ("R1", "FROZEN", "r1-contract-v1", "../adr/ADR-0004-r1-scaffold-and-http-contract.md"),
     "DB-52P2-PG18-RUNTIME-PLAN": ("MVP", "DRAFT", "2026-08-28", "../superpowers/plans/2026-08-28-postgresql-runtime-verification-plan.md"),
@@ -1069,7 +1071,7 @@ def verify_canonical_baseline(root: Path, findings: list[str]) -> str | None:
     if baseline_text is None:
         findings.append(f"Missing canonical baseline: {CANONICAL_BASELINE.as_posix()}")
         return None
-    if f"Baseline ID: {CANONICAL_BASELINE_ID}" not in baseline_text:
+    if re.findall(r"(?m)^Baseline ID:[ \t]*(.*)$", baseline_text) != [CANONICAL_BASELINE_ID]:
         findings.append(
             f"Current baseline must declare Baseline ID: {CANONICAL_BASELINE_ID}"
         )
@@ -2517,6 +2519,10 @@ def verify_delivery_ledger(root: Path, findings: list[str]) -> list[str] | None:
         if artifact_target not in markdown_links(row["Artifact"]):
             findings.append(f"Delivery ledger row {row_id} must link its required artifact")
             return
+
+    if superseded_by(rows_by_id["BASE-CURRENT-MVP"]) != "BASE-CURRENT-MVP-2026-09-05":
+        findings.append("Delivery ledger BASE-CURRENT-MVP must point to BASE-CURRENT-MVP-2026-09-05")
+        return
 
     visual_row_ids = {row_id for row_id in rows_by_id if row_id.startswith("VIS-")}
     unexpected_visual_ids = sorted(visual_row_ids - set(EXPECTED_VISUAL_ROWS))
