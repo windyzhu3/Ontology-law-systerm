@@ -170,6 +170,8 @@ git commit -m "build: scaffold single-artifact R1 topology"
 
 ## Task 2: OpenAPI-first冻结R1命令与查询
 
+> 状态：初始12-operation OpenAPI制品已由PR #9合并；2026-09-05按ADR-0005增加第13个具名routing recovery operation并收紧Revision安全整数边界，不改变其余12项行为。
+
 **Files:**
 
 - Create: `contracts/openapi/ontology-law-api.yaml`
@@ -185,6 +187,7 @@ git commit -m "build: scaffold single-artifact R1 topology"
 - Create: `contracts/openapi/examples/review-lead-validity.request.json`
 - Create: `contracts/openapi/examples/command-receipt.response.json`
 - Create: `contracts/openapi/examples/reopen-due-contact-tasks.request.json`
+- Create: `contracts/openapi/examples/reopen-due-routing-review-tasks.request.json`
 - Create: `contracts/openapi/examples/problem.response.json`
 - Create: `backend/src/test/java/io/github/windyzhu3/ontologylaw/api/OpenApiContractTest.java`
 - Create: `apps/workbench/src/generated/api/schema.d.ts`
@@ -212,8 +215,11 @@ git commit -m "build: scaffold single-artifact R1 topology"
 | POST | `/api/v1/tasks/{taskId}/commands/review-lead-validity` | `reviewLeadValidity` |
 | GET | `/api/v1/commands/{commandId}/receipt` | `getCommandReceipt` |
 | POST | `/internal/v1/tasks/commands/reopen-due-contact-tasks` | `reopenDueContactTasks` |
+| POST | `/internal/v1/tasks/commands/reopen-due-routing-review-tasks` | `reopenDueRoutingReviewTasks` |
 
 `reopenDueContactTasks`名称保留复数仅表示Worker逐项调用；一次HTTP请求、一个CommandId和一张Receipt只恢复一张由Task合同准确绑定的WAITING Task，禁止空批成功。
+
+`reopenDueRoutingReviewTasks`同样是单Task静态命令，只恢复`RESOLVE_LEAD_ROUTING_GAP`及最新`R1_ROUTING_REVIEW_WAIT_V1`；两种恢复scope都包含`commandType`。wire Revision只接受`0..9007199254740991`，数据库bigint不变；超界与递增溢出按ADR-0005拒绝。
 
 - [ ] `CurrentWorkCardEnvelope`固定包含一句`todaySummary`、零或一张完整`currentCard`、最多两条`nextSummaries`、`waitingCount`和一个固定底部`chatComposer`；精确基数与路由模式由Workbench合同控制。卡片冻结taskId/revision、Subject选择器、Owner Appointment、businessPurpose、primaryCommand、expectedCompletionFact、SLA及版本化表单Schema。`currentCard.actionDraft`固定为null或当前Task唯一已授权草稿，字段恰为`draftId`、`draftRevision`、`actionCode`、`schemaVersion`、`values`、`digest`、`updatedAt`、`editable`；刷新恢复只通过`GET /api/v1/workcards/current`完成，不新增第二个Draft读取端点。
 

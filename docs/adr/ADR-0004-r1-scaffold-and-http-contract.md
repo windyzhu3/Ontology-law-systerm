@@ -6,6 +6,8 @@ Contract ID: R1-SCAFFOLD-V1
 
 日期：2026-09-02
 
+2026-09-05 amendment：ADR-0005在不改变本ADR工程、物理数据库或既有12项operation行为的前提下，增加具名`reopenDueRoutingReviewTasks`，并把wire Revision收紧到JSON安全整数范围。OpenAPI、安全绑定和verifier registry必须同时包含两个mTLS恢复operation。
+
 ## Context
 
 当前基线已经冻结“一份 OpenAPI、一个响应式 SPA、一个 Spring Boot 模块化单体 Jar，以及 `api` / `worker` 两种互斥启动角色”。历史规格中的三 SPA、四 OpenAPI、`APP_ROLE`、Control CLI、多 Maven 模块、按模块复制迁移和提前建立 Matter/AI/Admin 空壳均为历史证据，不能继续决定代码结构。

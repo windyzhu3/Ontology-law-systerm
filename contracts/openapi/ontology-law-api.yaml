@@ -6,7 +6,7 @@ info:
   description: >-
     The single executable R1 HTTP contract for Lead intake, task completion,
     ActionDraft persistence, Current Work Card projection, receipt recovery,
-    and the mutually authenticated due-contact worker command.
+    and the mutually authenticated named due-task recovery commands.
 
 tags:
   - name: Leads
@@ -777,6 +777,63 @@ paths:
         '503':
           $ref: '#/components/responses/UnavailableProblem'
 
+  /internal/v1/tasks/commands/reopen-due-routing-review-tasks:
+    post:
+      tags: [InternalTaskCommands]
+      operationId: reopenDueRoutingReviewTasks
+      summary: Reopen one exact due RESOLVE_LEAD_ROUTING_GAP Task
+      security:
+        - internalMutualTls: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: DUE_CUTOFF_AND_OWNER_QUEUE
+      x-error-codes:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_INVALID
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - COMMAND_PAYLOAD_CONFLICT
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReopenDueRoutingReviewTaskV1'
+            examples:
+              reopenDueRoutingReviewTask:
+                $ref: '#/components/examples/ReopenDueRoutingReviewTasksRequest'
+      responses:
+        '200':
+          description: The exact waiting routing-review Task is reopened or was already reopened by the same selector.
+          headers:
+            Location:
+              $ref: '#/components/headers/ReceiptLocation'
+            ETag:
+              $ref: '#/components/headers/TaskETagHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskOccurrenceCommandReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
+        '401':
+          $ref: '#/components/responses/InternalUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
 components:
   securitySchemes:
     publicBearer:
@@ -884,6 +941,8 @@ components:
       externalValue: ./examples/command-receipt.response.json
     ReopenDueContactTasksRequest:
       externalValue: ./examples/reopen-due-contact-tasks.request.json
+    ReopenDueRoutingReviewTasksRequest:
+      externalValue: ./examples/reopen-due-routing-review-tasks.request.json
     ProblemResponse:
       externalValue: ./examples/problem.response.json
 
@@ -1018,7 +1077,8 @@ components:
       type: integer
       format: int64
       minimum: 0
-      maximum: 9223372036854775807
+      maximum: 9007199254740991
+      description: JSON safe integer revision; values outside this range are rejected without coercion.
     Instant:
       type: string
       format: date-time
@@ -1944,6 +2004,22 @@ components:
         - waitReceiptId
         - waitReceiptHash
         - dueCutoff
+      properties:
+        taskId:
+          $ref: '#/components/schemas/Uuid'
+        expectedTaskRevision:
+          $ref: '#/components/schemas/Revision'
+        waitReceiptId:
+          $ref: '#/components/schemas/Uuid'
+        waitReceiptHash:
+          $ref: '#/components/schemas/Digest32'
+        dueCutoff:
+          $ref: '#/components/schemas/Instant'
+
+    ReopenDueRoutingReviewTaskV1:
+      type: object
+      additionalProperties: false
+      required: [taskId, expectedTaskRevision, waitReceiptId, waitReceiptHash, dueCutoff]
       properties:
         taskId:
           $ref: '#/components/schemas/Uuid'
