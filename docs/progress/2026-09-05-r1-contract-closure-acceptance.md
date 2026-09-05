@@ -1,14 +1,14 @@
 # R1 授权与事件合同收口验收记录
 
-验证日期：2026-09-05。版本：MVP-2026-09-05.2。分支：`codex/r1-contract-closure`。
+验证日期：2026-09-05。版本：MVP-2026-09-05.2。功能源分支：`codex/r1-contract-closure`。功能PR：[#14](https://github.com/windyzhu3/Ontology-law-systerm/pull/14)。
 
-本记录证明合同收口及可复用运行时机制的本地验证；合并、完整GitHub checkout CI和真实业务验收分别记账，不将测试Handler视为已交付业务入口。
+本记录把合同收口及可复用运行时机制的本地验证、exact-head托管CI、PR test-merge和最终功能合并分别绑定到准确提交及tree。功能合并不等于真实业务验收，不将测试Handler视为已交付业务入口。
 
 ## 分层状态
 
 | 层次 | 本轮观察到的交付 | 尚未完成的门禁 |
 |---|---|---|
-| 合同 | [ADR-0007](../adr/ADR-0007-r1-command-policy-event-closure.md)、[静态策略/事件/分支合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)、共享空payload Schema及机器验证器 | 合同冻结不代表生产业务可用；分支最终审查、完整checkout CI和合并由控制者单独记录 |
+| 合同 | [ADR-0007](../adr/ADR-0007-r1-command-policy-event-closure.md)、[静态策略/事件/分支合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)、共享空payload Schema及机器验证器；PR #14 exact-head托管CI和功能合并证据见下文 | 合同及机制已合并不代表生产业务可用；完整业务Handler/Controller、SPA和浏览器E2E仍属后续门禁 |
 | 可复用后端 | 四类专属授权；14个准确事件描述、19个成功分支集合；真实Owner读接口；CommandRuntime在同连接、同事务验证持久来源、Task前后状态和准确selector | 原计划Task 5–8的业务Owner Handler、HTTP adapter、真实Bearer/mTLS映射、受控身份配置及Worker仍未交付 |
 | 前端 | 既有单SPA壳、生成API类型和客户端；OpenAPI检查、类型检查、7个客户端测试及构建通过 | CurrentCard、Draft、恢复交互和可用工作台仍属Task 9；本轮没有新增业务页面 |
 | 实库集成 | PostgreSQL上的真实Identity/Grant/Owner facts；capture、draft、两种恢复成功事件；ContactResult/Opportunity双来源原子事务和失败回滚 | 测试业务写入器仅在test源码；没有浏览器业务E2E，不覆盖完整后继责任选择/联系人加密/法律需求确认等原业务Handler验收 |
@@ -79,12 +79,32 @@ Ran 188 tests in 195.072s
 OK
 ```
 
-该命令exit 0，无failure/error/skip，包含新增数值Schema回归及Linux符号链接检查。它是baseline测试套件通过的证据；稀疏本地checkout仍缺历史merge对象和34张PNG，不能据此宣称本地完整`verify_baseline.py`检查或完整GitHub checkout CI通过。最终schema/frontend检查、全分支复审、发布tree比较、hosted CI和merge/head证据仍由控制者后续执行；本次未推进任何业务交付状态。
+该命令exit 0，无failure/error/skip，包含新增数值Schema回归及Linux符号链接检查。它只是上述本地源提交的baseline测试套件证据；稀疏本地checkout仍缺历史merge对象和34张PNG，不能据此宣称该环境的完整`verify_baseline.py`检查通过，也不能把其执行次数归到后续PR head。最终PR head/tree、hosted CI和功能merge另按下节证据记账；这些证据不推进任何完整业务交付状态。
 
 工具链为冻结的JDK 25.0.4.1+1、Maven 3.9.16、Node 24.20.0、npm 11.9.0。Linux测试使用`python@sha256:581429e3df12d76e6af4be5ab7d0e7fc2013eb57dc23d2de691411c8efdbb970`和只读`/repo`挂载；Windows账户缺少symlink权限，没有跳过该测试。SQL解析器在一次性容器安装现有`requirements-dev.txt`的pglast 7.10/PyYAML 6.0.3后执行；首次裸镜像缺pglast的失败不记为通过。前端首次嵌套npm因手工PATH指向错误shim目录失败，改为固定npm CLI直接运行workspace脚本后通过，仓库未为此修改。
 
-成功日志不声明pristine：保留既有OpenAPI生成器mutualTLS error-level消息、OpenAPI 3.1/oneOf/discriminator及模型命名警告、JooqAuditAppender的JAXB annotation编译警告和Flyway already-exists警告；没有升级依赖或加入抑制。它们仍须最终审查分类，生成/测试成功不等于真实mTLS接入已完成。
+成功日志不声明pristine：保留既有OpenAPI生成器mutualTLS error-level消息、OpenAPI 3.1/oneOf/discriminator及模型命名警告、JooqAuditAppender的JAXB annotation编译警告和Flyway already-exists警告；没有升级依赖或加入抑制。最终审查已将它们分类为已披露、未改变且不阻塞本次功能合并；生成/测试成功不等于真实mTLS接入已完成。
 
-稀疏本地checkout缺历史merge对象及34张PNG，完整`verify_baseline.py`在此环境的这些检查不能记为PASS。完整GitHub checkout中的Baseline consistency、R1 foundation、Scaffold gate及Schema静态/实库CI、最终审查和merge/head证据是后续合并门禁，由控制者记录。本记录不提前声明已合并。
+稀疏本地checkout缺历史merge对象及34张PNG，完整`verify_baseline.py`在该环境的这些检查不能记为PASS。该历史本地限制不替代、也不否定下节独立记录的完整GitHub checkout托管CI。
+
+## 托管CI与功能合并证据
+
+[功能PR #14](https://github.com/windyzhu3/Ontology-law-systerm/pull/14)的证据边界如下：
+
+- 托管CI链接修正前，经本地复审的源head为`58c648ccc9e9b749507b64b571d17458751361d2`，source tree为`148eb2340885d52f86e76a5cc4ad957b2b652557`。上文55 unit＋95 integration及其他本地执行次数仍只绑定到各段明确列出的`2fb596a6aac91072264f91f3d42dd3391ea5ce72`或更早revision，不外推到该review head、最终PR head或merge提交。
+- GitHub功能PR最终head为`4b8b4454ff6203b1f712bb261f7833fdc9162161`，final tree为`cce1415703d44a4b7510ba2371133f50e40c305a`。
+- GitHub托管PR test-merge为`a39777bf499251ef1c9b99042d5c219f0af71407`，parents为`5b21dbfc06e4d278f8b5097209e2fd76a8465c00`和`4b8b4454ff6203b1f712bb261f7833fdc9162161`，tree为`cce1415703d44a4b7510ba2371133f50e40c305a`。
+- 最终功能合并为`037b3f9f547493153c2edaffabdd53904c752e64`，parents同为`5b21dbfc06e4d278f8b5097209e2fd76a8465c00`和`4b8b4454ff6203b1f712bb261f7833fdc9162161`，tree为`cce1415703d44a4b7510ba2371133f50e40c305a`。
+
+下列均为`pull_request`触发、attempt 1、准确绑定最终PR head `4b8b4454ff6203b1f712bb261f7833fdc9162161`的成功托管运行：
+
+| Workflow/run | 成功jobs |
+|---|---|
+| [Baseline consistency / 33961945619](https://github.com/windyzhu3/Ontology-law-systerm/actions/runs/33961945619) | `verify-baseline` |
+| [R1 foundation gate / 33961945635](https://github.com/windyzhu3/Ontology-law-systerm/actions/runs/33961945635) | `postgres-jooq-foundation` |
+| [Scaffold gate / 33961945618](https://github.com/windyzhu3/Ontology-law-systerm/actions/runs/33961945618) | `topology`、`backend`、`workbench`、`scaffold-gate` |
+| [schema-contract-52-plus-2 / 33961945598](https://github.com/windyzhu3/Ontology-law-systerm/actions/runs/33961945598) | `verify`、`runtime-postgresql-18` |
+
+这些托管CI和功能合并证据只把`BASE-CURRENT-MVP-2026-09-05`及`R1-COMMAND-POLICY-EVENT-CONTRACT`推进到`MERGED`。`R1-IMPLEMENTATION-PLAN`和`R1-IMPLEMENTATION-CONTRACT`仍为`FROZEN`，`R1-OPENAPI`保持既有状态；生产业务Handler/Controller、业务SPA和浏览器E2E尚未交付，因此不创建或推进`R1-BACKEND`、`R1-SPA`、`R1-E2E-GOLDEN`、`R1-E2E-FAILURES`行。ADM-01～07仍不可操作，R2/R3没有交付或推进，完整业务门禁仍未满足。
 
 下一工作仍为[原R1计划](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)Task 5：Lead接入及P0-01～P0-04，随后Task 6–10。R2启用时须覆盖已经被R1投影消费的历史OpportunityOpened、并发新事件、重复、乱序、中断重试，以及Tenant＋Opportunity＋首个推进责任类型的至多一次业务约束；该交接验收本轮未执行。
