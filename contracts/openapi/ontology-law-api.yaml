@@ -1,0 +1,3710 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  title: Ontology Law System R1 API
+  version: 1.0.0
+  description: >-
+    The single executable R1 HTTP contract for Lead intake, task completion,
+    ActionDraft persistence, Current Work Card projection, receipt recovery,
+    and the mutually authenticated due-contact worker command.
+
+tags:
+  - name: Leads
+  - name: Workbench
+  - name: TaskDrafts
+  - name: TaskCommands
+  - name: CommandReceipts
+  - name: InternalTaskCommands
+
+paths:
+  /api/v1/leads:
+    post:
+      tags: [Leads]
+      operationId: captureLead
+      summary: Capture one Lead from a source account
+      security:
+        - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: SOURCE_NATURAL_KEY
+      x-error-codes:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_INVALID
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - APPOINTMENT_INACTIVE
+        - COMMAND_PAYLOAD_CONFLICT
+        - SUPERVISOR_UNRESOLVED
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CaptureLeadV1'
+            examples:
+              captureLead:
+                $ref: '#/components/examples/CaptureLeadRequest'
+      responses:
+        '201':
+          description: Lead capture reached a terminal receipt.
+          headers:
+            Location:
+              $ref: '#/components/headers/ReceiptLocation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeadCommandReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
+        '401':
+          $ref: '#/components/responses/PublicUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '422':
+          $ref: '#/components/responses/UnprocessableProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
+  /api/v1/workcards/current:
+    get:
+      tags: [Workbench]
+      operationId: getCurrentWorkCard
+      summary: Read the current Actor-scoped Workbench envelope
+      security:
+        - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: ACTOR_SCOPE
+      x-error-codes:
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - NOT_FOUND
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/WorkbenchIfNoneMatch'
+      responses:
+        '200':
+          description: Current Workbench envelope.
+          headers:
+            ETag:
+              $ref: '#/components/headers/WorkbenchETagHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentWorkCardEnvelope'
+              examples:
+                currentWorkCard:
+                  $ref: '#/components/examples/CurrentWorkCardResponse'
+        '304':
+          description: The Actor-scoped Workbench projection is unchanged.
+          headers:
+            ETag:
+              $ref: '#/components/headers/WorkbenchETagHeader'
+        '401':
+          $ref: '#/components/responses/PublicUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
+  /api/v1/tasks/{taskId}/draft:
+    put:
+      tags: [TaskDrafts]
+      operationId: saveActionDraft
+      summary: Create or update the current Task ActionDraft
+      security:
+        - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: TASK_AND_DRAFT
+      x-precondition-mode: exactly-one-of-if-none-match-star-or-if-match-draft-etag
+      x-error-codes:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_INVALID
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - APPOINTMENT_INACTIVE
+        - NOT_FOUND
+        - COMMAND_PAYLOAD_CONFLICT
+        - TASK_NOT_OPEN
+        - TASK_ALREADY_COMPLETED
+        - DRAFT_DIGEST_MISMATCH
+        - STALE_TASK
+        - STALE_DRAFT
+        - DRAFT_PRECONDITION_REQUIRED
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/TaskIdPath'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/DraftIfMatch'
+        - $ref: '#/components/parameters/DraftCreateIfNoneMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveActionDraftV1'
+            examples:
+              saveActionDraft:
+                $ref: '#/components/examples/SaveActionDraftRequest'
+      responses:
+        '200':
+          description: Existing Draft updated.
+          headers:
+            Location:
+              $ref: '#/components/headers/ReceiptLocation'
+            ETag:
+              $ref: '#/components/headers/DraftETagHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionDraftWriteResult'
+        '201':
+          description: Draft created.
+          headers:
+            Location:
+              $ref: '#/components/headers/ReceiptLocation'
+            ETag:
+              $ref: '#/components/headers/DraftETagHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionDraftWriteResult'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
+        '401':
+          $ref: '#/components/responses/PublicUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '412':
+          $ref: '#/components/responses/PreconditionFailedProblem'
+        '428':
+          $ref: '#/components/responses/PreconditionRequiredProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
+  /api/v1/tasks/{taskId}/commands/resolve-duplicate-lead:
+    post:
+      tags: [TaskCommands]
+      operationId: resolveDuplicateLead
+      summary: Resolve the frozen duplicate Lead candidate
+      security:
+        - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: TASK_AND_LEAD_REVISION
+      x-error-codes:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_INVALID
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - APPOINTMENT_INACTIVE
+        - NOT_FOUND
+        - COMMAND_PAYLOAD_CONFLICT
+        - TASK_NOT_OPEN
+        - TASK_ALREADY_COMPLETED
+        - DRAFT_DIGEST_MISMATCH
+        - STALE_TASK
+        - STALE_DRAFT
+        - STALE_SUBJECT
+        - SUPERVISOR_UNRESOLVED
+        - TASK_PRECONDITION_REQUIRED
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/TaskIdPath'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TaskIfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveDuplicateLeadV1'
+            examples:
+              resolveDuplicateLead:
+                $ref: '#/components/examples/ResolveDuplicateLeadRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/DecisionRecordCommandSucceeded'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
+        '401':
+          $ref: '#/components/responses/PublicUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '412':
+          $ref: '#/components/responses/PreconditionFailedProblem'
+        '422':
+          $ref: '#/components/responses/UnprocessableProblem'
+        '428':
+          $ref: '#/components/responses/PreconditionRequiredProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
+  /api/v1/tasks/{taskId}/commands/complete-lead-ingress:
+    post:
+      tags: [TaskCommands]
+      operationId: completeLeadIngress
+      summary: Fill the one-time Lead ingress completion slot
+      security:
+        - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: TASK_AND_LEAD_REVISION
+      x-error-codes:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_INVALID
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - APPOINTMENT_INACTIVE
+        - NOT_FOUND
+        - COMMAND_PAYLOAD_CONFLICT
+        - TASK_NOT_OPEN
+        - TASK_ALREADY_COMPLETED
+        - DRAFT_DIGEST_MISMATCH
+        - INGRESS_COMPLETION_ALREADY_RECORDED
+        - STALE_TASK
+        - STALE_DRAFT
+        - STALE_SUBJECT
+        - SUPERVISOR_UNRESOLVED
+        - TASK_PRECONDITION_REQUIRED
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/TaskIdPath'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TaskIfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteLeadIngressV1'
+            examples:
+              completeLeadIngress:
+                $ref: '#/components/examples/CompleteLeadIngressRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/LeadCommandSucceeded'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
+        '401':
+          $ref: '#/components/responses/PublicUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '412':
+          $ref: '#/components/responses/PreconditionFailedProblem'
+        '422':
+          $ref: '#/components/responses/UnprocessableProblem'
+        '428':
+          $ref: '#/components/responses/PreconditionRequiredProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
+  /api/v1/tasks/{taskId}/commands/assign-lead:
+    post:
+      tags: [TaskCommands]
+      operationId: assignLead
+      summary: Assign the Lead to one eligible Appointment
+      security:
+        - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: TASK_LEAD_AND_ASSIGNMENT
+      x-error-codes:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_INVALID
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - APPOINTMENT_INACTIVE
+        - NOT_FOUND
+        - COMMAND_PAYLOAD_CONFLICT
+        - TASK_NOT_OPEN
+        - TASK_ALREADY_COMPLETED
+        - DRAFT_DIGEST_MISMATCH
+        - STALE_TASK
+        - STALE_DRAFT
+        - STALE_SUBJECT
+        - TASK_PRECONDITION_REQUIRED
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/TaskIdPath'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TaskIfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignLeadV1'
+            examples:
+              assignLead:
+                $ref: '#/components/examples/AssignLeadRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/LeadAssignmentCommandSucceeded'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
+        '401':
+          $ref: '#/components/responses/PublicUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '412':
+          $ref: '#/components/responses/PreconditionFailedProblem'
+        '428':
+          $ref: '#/components/responses/PreconditionRequiredProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
+  /api/v1/tasks/{taskId}/commands/record-routing-disposition:
+    post:
+      tags: [TaskCommands]
+      operationId: recordRoutingDisposition
+      summary: Record the controlled routing-gap disposition
+      security:
+        - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: TASK_AND_LEAD_REVISION
+      x-error-codes:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_INVALID
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - APPOINTMENT_INACTIVE
+        - NOT_FOUND
+        - COMMAND_PAYLOAD_CONFLICT
+        - TASK_NOT_OPEN
+        - TASK_ALREADY_COMPLETED
+        - DRAFT_DIGEST_MISMATCH
+        - STALE_TASK
+        - STALE_DRAFT
+        - STALE_SUBJECT
+        - SOURCE_INTAKE_OWNER_UNRESOLVED
+        - TASK_PRECONDITION_REQUIRED
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/TaskIdPath'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TaskIfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordRoutingDispositionV1'
+            examples:
+              recordRoutingDisposition:
+                $ref: '#/components/examples/RecordRoutingDispositionRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/DecisionRecordCommandSucceeded'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
+        '401':
+          $ref: '#/components/responses/PublicUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '412':
+          $ref: '#/components/responses/PreconditionFailedProblem'
+        '422':
+          $ref: '#/components/responses/UnprocessableProblem'
+        '428':
+          $ref: '#/components/responses/PreconditionRequiredProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
+  /api/v1/tasks/{taskId}/commands/acknowledge-source-intake-stop-request:
+    post:
+      tags: [TaskCommands]
+      operationId: acknowledgeSourceIntakeStopRequest
+      summary: Acknowledge the exact source-intake stop request
+      security:
+        - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: TASK_AND_CAUSAL_DECISION
+      x-error-codes:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_INVALID
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - APPOINTMENT_INACTIVE
+        - NOT_FOUND
+        - COMMAND_PAYLOAD_CONFLICT
+        - TASK_NOT_OPEN
+        - TASK_ALREADY_COMPLETED
+        - DRAFT_DIGEST_MISMATCH
+        - STALE_TASK
+        - STALE_DRAFT
+        - STALE_SUBJECT
+        - TASK_PRECONDITION_REQUIRED
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/TaskIdPath'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TaskIfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestV1'
+            examples:
+              acknowledgeSourceIntakeStopRequest:
+                $ref: '#/components/examples/AcknowledgeSourceIntakeStopRequestRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/DecisionRecordCommandSucceeded'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
+        '401':
+          $ref: '#/components/responses/PublicUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '412':
+          $ref: '#/components/responses/PreconditionFailedProblem'
+        '428':
+          $ref: '#/components/responses/PreconditionRequiredProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
+  /api/v1/tasks/{taskId}/commands/record-contact-result:
+    post:
+      tags: [TaskCommands]
+      operationId: recordContactResult
+      summary: Record one real Lead contact result
+      security:
+        - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: TASK_LEAD_AND_ASSIGNMENT
+      x-error-codes:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_INVALID
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - APPOINTMENT_INACTIVE
+        - NOT_FOUND
+        - COMMAND_PAYLOAD_CONFLICT
+        - TASK_NOT_OPEN
+        - TASK_ALREADY_COMPLETED
+        - DRAFT_DIGEST_MISMATCH
+        - STALE_TASK
+        - STALE_DRAFT
+        - STALE_SUBJECT
+        - SUPERVISOR_UNRESOLVED
+        - TASK_PRECONDITION_REQUIRED
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/TaskIdPath'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TaskIfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordContactResultV1'
+            examples:
+              recordContactResult:
+                $ref: '#/components/examples/RecordContactResultRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/LeadContactResultCommandSucceeded'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
+        '401':
+          $ref: '#/components/responses/PublicUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '412':
+          $ref: '#/components/responses/PreconditionFailedProblem'
+        '422':
+          $ref: '#/components/responses/UnprocessableProblem'
+        '428':
+          $ref: '#/components/responses/PreconditionRequiredProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
+  /api/v1/tasks/{taskId}/commands/review-lead-validity:
+    post:
+      tags: [TaskCommands]
+      operationId: reviewLeadValidity
+      summary: Review Lead validity from the exact causal contact result
+      security:
+        - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: TASK_AND_CAUSAL_RESULT
+      x-error-codes:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_INVALID
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - APPOINTMENT_INACTIVE
+        - NOT_FOUND
+        - COMMAND_PAYLOAD_CONFLICT
+        - TASK_NOT_OPEN
+        - TASK_ALREADY_COMPLETED
+        - DRAFT_DIGEST_MISMATCH
+        - STALE_TASK
+        - STALE_DRAFT
+        - STALE_SUBJECT
+        - TASK_PRECONDITION_REQUIRED
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/TaskIdPath'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/TaskIfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewLeadValidityV1'
+            examples:
+              reviewLeadValidity:
+                $ref: '#/components/examples/ReviewLeadValidityRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/DecisionRecordCommandSucceeded'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
+        '401':
+          $ref: '#/components/responses/PublicUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '412':
+          $ref: '#/components/responses/PreconditionFailedProblem'
+        '428':
+          $ref: '#/components/responses/PreconditionRequiredProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
+  /api/v1/commands/{commandId}/receipt:
+    get:
+      tags: [CommandReceipts]
+      operationId: getCommandReceipt
+      summary: Recover the terminal receipt for one caller command UUID
+      security:
+        - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: COMMAND_ID_AND_ACTOR_SCOPE
+      x-error-codes:
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - NOT_FOUND
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/CommandIdPath'
+      responses:
+        '200':
+          description: Original terminal receipt projection.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommandReceipt'
+              examples:
+                receipt:
+                  $ref: '#/components/examples/CommandReceiptResponse'
+        '401':
+          $ref: '#/components/responses/PublicUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
+  /internal/v1/tasks/commands/reopen-due-contact-tasks:
+    post:
+      tags: [InternalTaskCommands]
+      operationId: reopenDueContactTasks
+      summary: Reopen one exact due CONTACT_LEAD Task
+      security:
+        - internalMutualTls: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: DUE_CUTOFF_AND_OWNER_QUEUE
+      x-error-codes:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_INVALID
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - COMMAND_PAYLOAD_CONFLICT
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReopenDueContactTaskV1'
+            examples:
+              reopenDueContactTask:
+                $ref: '#/components/examples/ReopenDueContactTasksRequest'
+      responses:
+        '200':
+          description: The exact waiting Task is reopened or was already reopened by the same selector.
+          headers:
+            Location:
+              $ref: '#/components/headers/ReceiptLocation'
+            ETag:
+              $ref: '#/components/headers/TaskETagHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskOccurrenceCommandReceipt'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
+        '401':
+          $ref: '#/components/responses/InternalUnauthorizedProblem'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '429':
+          $ref: '#/components/responses/RateLimitedProblem'
+        '500':
+          $ref: '#/components/responses/InternalProblem'
+        '503':
+          $ref: '#/components/responses/UnavailableProblem'
+
+components:
+  securitySchemes:
+    publicBearer:
+      type: http
+      scheme: bearer
+    internalMutualTls:
+      type: mutualTLS
+
+  parameters:
+    TaskIdPath:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    CommandIdPath:
+      name: commandId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    TaskIfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema:
+        $ref: '#/components/schemas/TaskETag'
+    DraftIfMatch:
+      name: If-Match
+      in: header
+      required: false
+      schema:
+        $ref: '#/components/schemas/DraftETag'
+    DraftCreateIfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      schema:
+        type: string
+        enum: ['*']
+    WorkbenchIfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      schema:
+        $ref: '#/components/schemas/WorkbenchETag'
+
+  headers:
+    ReceiptLocation:
+      description: Relative URI of the original terminal CommandReceipt.
+      schema:
+        type: string
+        pattern: '^/api/v1/commands/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/receipt$'
+    WorkbenchETagHeader:
+      description: Strong Actor-scoped Workbench projection tag.
+      schema:
+        $ref: '#/components/schemas/WorkbenchETag'
+    TaskETagHeader:
+      description: Strong Task state and revision tag.
+      schema:
+        $ref: '#/components/schemas/TaskETag'
+    DraftETagHeader:
+      description: Strong ActionDraft state and revision tag.
+      schema:
+        $ref: '#/components/schemas/DraftETag'
+    PublicBearerChallenge:
+      description: Standard Bearer authentication challenge.
+      schema:
+        type: string
+        pattern: '^Bearer(?: .+)?$'
+    RetryAfter:
+      description: Non-negative integer seconds before retry.
+      schema:
+        type: integer
+        minimum: 0
+
+  examples:
+    CaptureLeadRequest:
+      externalValue: ./examples/capture-lead.request.json
+    CurrentWorkCardResponse:
+      externalValue: ./examples/current-work-card.response.json
+    SaveActionDraftRequest:
+      externalValue: ./examples/save-action-draft.request.json
+    ResolveDuplicateLeadRequest:
+      externalValue: ./examples/resolve-duplicate-lead.request.json
+    CompleteLeadIngressRequest:
+      externalValue: ./examples/complete-lead-ingress.request.json
+    AssignLeadRequest:
+      externalValue: ./examples/assign-lead.request.json
+    RecordRoutingDispositionRequest:
+      externalValue: ./examples/record-routing-disposition.request.json
+    AcknowledgeSourceIntakeStopRequestRequest:
+      externalValue: ./examples/acknowledge-source-intake-stop-request.request.json
+    RecordContactResultRequest:
+      externalValue: ./examples/record-contact-result.request.json
+    ReviewLeadValidityRequest:
+      externalValue: ./examples/review-lead-validity.request.json
+    CommandReceiptResponse:
+      externalValue: ./examples/command-receipt.response.json
+    ReopenDueContactTasksRequest:
+      externalValue: ./examples/reopen-due-contact-tasks.request.json
+    ProblemResponse:
+      externalValue: ./examples/problem.response.json
+
+  responses:
+    DecisionRecordCommandSucceeded:
+      description: The Task command completed with a Decision Record fact.
+      headers:
+        Location:
+          $ref: '#/components/headers/ReceiptLocation'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/DecisionRecordCommandReceipt'
+    LeadCommandSucceeded:
+      description: The Task command completed with a Lead revision fact.
+      headers:
+        Location:
+          $ref: '#/components/headers/ReceiptLocation'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LeadCommandReceipt'
+    LeadAssignmentCommandSucceeded:
+      description: The Task command completed with a Lead Assignment revision fact.
+      headers:
+        Location:
+          $ref: '#/components/headers/ReceiptLocation'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LeadAssignmentCommandReceipt'
+    LeadContactResultCommandSucceeded:
+      description: The Task command completed with a Lead Contact Result digest fact.
+      headers:
+        Location:
+          $ref: '#/components/headers/ReceiptLocation'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LeadContactResultCommandReceipt'
+    BadRequestProblem:
+      description: Request validation or idempotency header failure.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PublicUnauthorizedProblem:
+      description: A valid public Bearer identity is required.
+      headers:
+        WWW-Authenticate:
+          $ref: '#/components/headers/PublicBearerChallenge'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalUnauthorizedProblem:
+      description: The mTLS identity passed transport but could not be mapped to an ActorContext.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ForbiddenProblem:
+      description: The authenticated Actor is not authorized for the operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFoundProblem:
+      description: The resource does not exist or is not visible to the Actor.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ConflictProblem:
+      description: The request conflicts with a terminal command, Task, Draft, or subject state.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionFailedProblem:
+      description: A supplied strong precondition no longer matches.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            staleTask:
+              $ref: '#/components/examples/ProblemResponse'
+    UnprocessableProblem:
+      description: A required deterministic owner cannot be resolved uniquely.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    PreconditionRequiredProblem:
+      description: A required Task or Draft precondition header is missing.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    RateLimitedProblem:
+      description: The caller is rate limited.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalProblem:
+      description: The service could not complete the request.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    UnavailableProblem:
+      description: The service is temporarily unavailable.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    # Scalar wire types
+    Uuid:
+      type: string
+      format: uuid
+    Revision:
+      type: integer
+      format: int64
+      minimum: 0
+      maximum: 9223372036854775807
+    Instant:
+      type: string
+      format: date-time
+    Code64:
+      type: string
+      pattern: '^[A-Z][A-Z0-9_]{0,63}$'
+    OpaqueRef:
+      type: string
+      minLength: 16
+      maxLength: 512
+    Digest32:
+      type: string
+      pattern: '^[A-Za-z0-9_-]{43}$'
+    SafeText200:
+      type: string
+      minLength: 1
+      maxLength: 200
+      pattern: '^[^\u0000-\u001F\u007F-\u009F]+$'
+    SafeText500:
+      type: string
+      minLength: 1
+      maxLength: 500
+      pattern: '^[^\u0000-\u001F\u007F-\u009F]+$'
+    SafeText2000:
+      type: string
+      minLength: 1
+      maxLength: 2000
+      pattern: '^[^\u0000-\u001F\u007F-\u009F]+$'
+    DraftText200:
+      type: string
+      maxLength: 200
+      pattern: '^[^\u0000-\u001F\u007F-\u009F]*$'
+    DraftText500:
+      type: string
+      maxLength: 500
+      pattern: '^[^\u0000-\u001F\u007F-\u009F]*$'
+    DraftText2000:
+      type: string
+      maxLength: 2000
+      pattern: '^[^\u0000-\u001F\u007F-\u009F]*$'
+    WorkbenchETag:
+      type: string
+      pattern: '^"wb\.[A-Za-z0-9_-]{43}"$'
+    TaskETag:
+      type: string
+      pattern: '^"task\.[A-Za-z0-9_-]{43}"$'
+    DraftETag:
+      type: string
+      pattern: '^"draft\.[A-Za-z0-9_-]{43}"$'
+    SubjectETag:
+      type: string
+      pattern: '^"subject\.[A-Za-z0-9_-]{43}"$'
+
+    CaptureLeadV1:
+      type: object
+      additionalProperties: false
+      required:
+        - sourceChannelCode
+        - sourceAccountCode
+        - sourceRecordKey
+        - capturedAt
+        - serviceCategoryCode
+        - jurisdictionCode
+        - urgencyCode
+        - legalNeedSummary
+      properties:
+        sourceChannelCode:
+          $ref: '#/components/schemas/Code64'
+        sourceAccountCode:
+          type: string
+          minLength: 1
+          maxLength: 128
+        sourceRecordKey:
+          type: string
+          minLength: 1
+          maxLength: 256
+        capturedAt:
+          $ref: '#/components/schemas/Instant'
+        capturedName:
+          $ref: '#/components/schemas/SafeText200'
+        phone:
+          type: string
+          minLength: 2
+          maxLength: 16
+          pattern: '^\+[1-9][0-9]{0,14}$'
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 320
+        cityCode:
+          $ref: '#/components/schemas/Code64'
+        serviceCategoryCode:
+          $ref: '#/components/schemas/Code64'
+        jurisdictionCode:
+          $ref: '#/components/schemas/Code64'
+        urgencyCode:
+          $ref: '#/components/schemas/Code64'
+        legalNeedSummary:
+          $ref: '#/components/schemas/SafeText2000'
+
+    ResolveDuplicateLeadValuesV1:
+      type: object
+      additionalProperties: false
+      required:
+        - decisionCode
+        - candidateLeadId
+        - candidateLeadRevision
+        - partyId
+        - partyRevision
+        - rationaleSummary
+      properties:
+        decisionCode:
+          type: string
+          enum: [LINK_EXISTING_PARTY, KEEP_SEPARATE]
+        candidateLeadId:
+          $ref: '#/components/schemas/Uuid'
+        candidateLeadRevision:
+          $ref: '#/components/schemas/Revision'
+        partyId:
+          $ref: '#/components/schemas/Uuid'
+        partyRevision:
+          $ref: '#/components/schemas/Revision'
+        rationaleSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    CompleteLeadIngressValuesV1:
+      type: object
+      additionalProperties: false
+      required: [sourceCode, sourceSummary]
+      properties:
+        phone:
+          type: string
+          minLength: 2
+          maxLength: 16
+          pattern: '^\+[1-9][0-9]{0,14}$'
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 320
+        sourceCode:
+          $ref: '#/components/schemas/LeadIngressSourceCode'
+        sourceSummary:
+          $ref: '#/components/schemas/SafeText500'
+      oneOf:
+        - $ref: '#/components/schemas/CompleteLeadIngressPhoneOnlyValuesV1'
+        - $ref: '#/components/schemas/CompleteLeadIngressEmailOnlyValuesV1'
+        - $ref: '#/components/schemas/CompleteLeadIngressPhoneAndEmailValuesV1'
+
+    CompleteLeadIngressPhoneOnlyValuesV1:
+      type: object
+      additionalProperties: false
+      required: [phone, sourceCode, sourceSummary]
+      properties:
+        phone:
+          type: string
+          minLength: 2
+          maxLength: 16
+          pattern: '^\+[1-9][0-9]{0,14}$'
+        sourceCode:
+          $ref: '#/components/schemas/LeadIngressSourceCode'
+        sourceSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    CompleteLeadIngressEmailOnlyValuesV1:
+      type: object
+      additionalProperties: false
+      required: [email, sourceCode, sourceSummary]
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 320
+        sourceCode:
+          $ref: '#/components/schemas/LeadIngressSourceCode'
+        sourceSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    CompleteLeadIngressPhoneAndEmailValuesV1:
+      type: object
+      additionalProperties: false
+      required: [phone, email, sourceCode, sourceSummary]
+      properties:
+        phone:
+          type: string
+          minLength: 2
+          maxLength: 16
+          pattern: '^\+[1-9][0-9]{0,14}$'
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 320
+        sourceCode:
+          $ref: '#/components/schemas/LeadIngressSourceCode'
+        sourceSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    AssignLeadValuesV1:
+      type: object
+      additionalProperties: false
+      required: [ownerAppointmentId]
+      properties:
+        ownerAppointmentId:
+          $ref: '#/components/schemas/Uuid'
+
+    RecordRoutingDispositionValuesV1:
+      type: object
+      additionalProperties: false
+      required: [decisionCode, rationaleSummary]
+      properties:
+        decisionCode:
+          type: string
+          enum:
+            - SCHEDULE_ROUTING_REVIEW
+            - RETRY_ASSIGNMENT_NOW
+            - REQUEST_SOURCE_INTAKE_STOP
+        rationaleSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    AcknowledgeSourceIntakeStopRequestValuesV1:
+      type: object
+      additionalProperties: false
+      required: [causalDecisionId, causalDecisionHash, rationaleSummary]
+      properties:
+        causalDecisionId:
+          $ref: '#/components/schemas/Uuid'
+        causalDecisionHash:
+          $ref: '#/components/schemas/Digest32'
+        rationaleSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    RecordContactResultValuesV1:
+      type: object
+      additionalProperties: false
+      required:
+        - leadAssignmentId
+        - leadAssignmentRevision
+        - contactChannelCode
+        - resultCode
+      properties:
+        leadAssignmentId:
+          $ref: '#/components/schemas/Uuid'
+        leadAssignmentRevision:
+          $ref: '#/components/schemas/Revision'
+        contactChannelCode:
+          type: string
+          enum: [PHONE, EMAIL]
+        resultCode:
+          $ref: '#/components/schemas/ContactResultCode'
+        resultSummary:
+          $ref: '#/components/schemas/SafeText500'
+        legalNeed:
+          $ref: '#/components/schemas/SafeText2000'
+        evidenceSubmissionId:
+          $ref: '#/components/schemas/Uuid'
+      allOf:
+        - if:
+            properties:
+              resultCode:
+                enum: [CONNECTED_VALID]
+            required: [resultCode]
+          then:
+            required: [legalNeed]
+          else:
+            not:
+              required: [legalNeed]
+      discriminator:
+        propertyName: resultCode
+        mapping:
+          CONNECTED_VALID: '#/components/schemas/ConnectedValidRecordContactResultValuesV1'
+          NOT_CONNECTED: '#/components/schemas/NotConnectedRecordContactResultValuesV1'
+          SUSPECT_INVALID: '#/components/schemas/SuspectInvalidRecordContactResultValuesV1'
+      oneOf:
+        - $ref: '#/components/schemas/ConnectedValidRecordContactResultValuesV1'
+        - $ref: '#/components/schemas/NotConnectedRecordContactResultValuesV1'
+        - $ref: '#/components/schemas/SuspectInvalidRecordContactResultValuesV1'
+
+    ConnectedValidRecordContactResultValuesV1:
+      type: object
+      additionalProperties: false
+      required: [leadAssignmentId, leadAssignmentRevision, contactChannelCode, resultCode, legalNeed]
+      properties:
+        leadAssignmentId:
+          $ref: '#/components/schemas/Uuid'
+        leadAssignmentRevision:
+          $ref: '#/components/schemas/Revision'
+        contactChannelCode:
+          type: string
+          enum: [PHONE, EMAIL]
+        resultCode:
+          $ref: '#/components/schemas/ContactResultCode'
+          const: CONNECTED_VALID
+        resultSummary:
+          $ref: '#/components/schemas/SafeText500'
+        legalNeed:
+          $ref: '#/components/schemas/SafeText2000'
+        evidenceSubmissionId:
+          $ref: '#/components/schemas/Uuid'
+
+    NotConnectedRecordContactResultValuesV1:
+      type: object
+      additionalProperties: false
+      required: [leadAssignmentId, leadAssignmentRevision, contactChannelCode, resultCode]
+      properties:
+        leadAssignmentId:
+          $ref: '#/components/schemas/Uuid'
+        leadAssignmentRevision:
+          $ref: '#/components/schemas/Revision'
+        contactChannelCode:
+          type: string
+          enum: [PHONE, EMAIL]
+        resultCode:
+          $ref: '#/components/schemas/ContactResultCode'
+          const: NOT_CONNECTED
+        resultSummary:
+          $ref: '#/components/schemas/SafeText500'
+        legalNeed: false
+        evidenceSubmissionId:
+          $ref: '#/components/schemas/Uuid'
+
+    SuspectInvalidRecordContactResultValuesV1:
+      type: object
+      additionalProperties: false
+      required: [leadAssignmentId, leadAssignmentRevision, contactChannelCode, resultCode]
+      properties:
+        leadAssignmentId:
+          $ref: '#/components/schemas/Uuid'
+        leadAssignmentRevision:
+          $ref: '#/components/schemas/Revision'
+        contactChannelCode:
+          type: string
+          enum: [PHONE, EMAIL]
+        resultCode:
+          $ref: '#/components/schemas/ContactResultCode'
+          const: SUSPECT_INVALID
+        resultSummary:
+          $ref: '#/components/schemas/SafeText500'
+        legalNeed: false
+        evidenceSubmissionId:
+          $ref: '#/components/schemas/Uuid'
+
+    ReviewLeadValidityValuesV1:
+      type: object
+      additionalProperties: false
+      required:
+        - triggeringContactResultId
+        - triggeringContactResultHash
+        - decisionCode
+        - rationaleSummary
+      properties:
+        triggeringContactResultId:
+          $ref: '#/components/schemas/Uuid'
+        triggeringContactResultHash:
+          $ref: '#/components/schemas/Digest32'
+        decisionCode:
+          type: string
+          enum: [CONFIRM_INVALID, CLOSE_UNREACHED, REOPEN_CONTACT]
+        rationaleSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    ActionCode:
+      type: string
+      enum:
+        - RESOLVE_DUPLICATE_LEAD
+        - COMPLETE_LEAD_INGRESS
+        - ASSIGN_LEAD
+        - RECORD_ROUTING_DISPOSITION
+        - ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST
+        - RECORD_CONTACT_RESULT
+        - REVIEW_LEAD_VALIDITY
+
+    ContactResultCode:
+      type: string
+      enum: [CONNECTED_VALID, NOT_CONNECTED, SUSPECT_INVALID]
+
+    LeadIngressSourceCode:
+      type: string
+      enum: [OWNER_CONFIRMED, CUSTOMER_PROVIDED]
+
+    DraftLeadIngressSourceCode:
+      type: string
+      enum: ['', OWNER_CONFIRMED, CUSTOMER_PROVIDED]
+
+    PublicFactType:
+      type: string
+      enum:
+        - LEAD
+        - ACTION_DRAFT
+        - TASK_OCCURRENCE
+        - DECISION_RECORD
+        - LEAD_ASSIGNMENT
+        - LEAD_CONTACT_RESULT
+
+    TaskType:
+      type: string
+      enum:
+        - RESOLVE_LEAD_DUPLICATE
+        - COMPLETE_LEAD_INGRESS
+        - ASSIGN_LEAD
+        - RESOLVE_LEAD_ROUTING_GAP
+        - ACK_SOURCE_INTAKE_STOP_REQUEST
+        - CONTACT_LEAD
+        - REVIEW_LEAD_VALIDITY
+
+    SchemaVersionV1:
+      type: integer
+      enum: [1]
+
+    SaveActionDraftV1:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          oneOf:
+            - $ref: '#/components/schemas/ResolveDuplicateLeadValuesV1'
+            - $ref: '#/components/schemas/CompleteLeadIngressValuesV1'
+            - $ref: '#/components/schemas/AssignLeadValuesV1'
+            - $ref: '#/components/schemas/RecordRoutingDispositionValuesV1'
+            - $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestValuesV1'
+            - $ref: '#/components/schemas/RecordContactResultValuesV1'
+            - $ref: '#/components/schemas/ReviewLeadValidityValuesV1'
+      discriminator:
+        propertyName: actionCode
+        mapping:
+          RESOLVE_DUPLICATE_LEAD: '#/components/schemas/ResolveDuplicateLeadDraftBinding'
+          COMPLETE_LEAD_INGRESS: '#/components/schemas/CompleteLeadIngressDraftBinding'
+          ASSIGN_LEAD: '#/components/schemas/AssignLeadDraftBinding'
+          RECORD_ROUTING_DISPOSITION: '#/components/schemas/RecordRoutingDispositionDraftBinding'
+          ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST: '#/components/schemas/AcknowledgeSourceIntakeStopRequestDraftBinding'
+          RECORD_CONTACT_RESULT: '#/components/schemas/RecordContactResultDraftBinding'
+          REVIEW_LEAD_VALIDITY: '#/components/schemas/ReviewLeadValidityDraftBinding'
+      oneOf:
+        - $ref: '#/components/schemas/ResolveDuplicateLeadDraftBinding'
+        - $ref: '#/components/schemas/CompleteLeadIngressDraftBinding'
+        - $ref: '#/components/schemas/AssignLeadDraftBinding'
+        - $ref: '#/components/schemas/RecordRoutingDispositionDraftBinding'
+        - $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestDraftBinding'
+        - $ref: '#/components/schemas/RecordContactResultDraftBinding'
+        - $ref: '#/components/schemas/ReviewLeadValidityDraftBinding'
+
+    ResolveDuplicateLeadDraftBinding:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: RESOLVE_DUPLICATE_LEAD
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/ResolveDuplicateLeadValuesV1'
+
+    CompleteLeadIngressDraftBinding:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: COMPLETE_LEAD_INGRESS
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/CompleteLeadIngressValuesV1'
+
+    AssignLeadDraftBinding:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: ASSIGN_LEAD
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/AssignLeadValuesV1'
+
+    RecordRoutingDispositionDraftBinding:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: RECORD_ROUTING_DISPOSITION
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/RecordRoutingDispositionValuesV1'
+
+    AcknowledgeSourceIntakeStopRequestDraftBinding:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestValuesV1'
+
+    RecordContactResultDraftBinding:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: RECORD_CONTACT_RESULT
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/RecordContactResultValuesV1'
+
+    ReviewLeadValidityDraftBinding:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: REVIEW_LEAD_VALIDITY
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/ReviewLeadValidityValuesV1'
+
+    DraftConfirmationV1:
+      type: object
+      additionalProperties: false
+      required: [draftId, expectedDraftRevision, draftDigest]
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+
+    ResolveDuplicateLeadV1:
+      type: object
+      additionalProperties: false
+      required:
+        - draftId
+        - expectedDraftRevision
+        - draftDigest
+        - decisionCode
+        - candidateLeadId
+        - candidateLeadRevision
+        - partyId
+        - partyRevision
+        - rationaleSummary
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        decisionCode:
+          type: string
+          enum: [LINK_EXISTING_PARTY, KEEP_SEPARATE]
+        candidateLeadId:
+          $ref: '#/components/schemas/Uuid'
+        candidateLeadRevision:
+          $ref: '#/components/schemas/Revision'
+        partyId:
+          $ref: '#/components/schemas/Uuid'
+        partyRevision:
+          $ref: '#/components/schemas/Revision'
+        rationaleSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    CompleteLeadIngressV1:
+      type: object
+      additionalProperties: false
+      required:
+        - draftId
+        - expectedDraftRevision
+        - draftDigest
+        - sourceCode
+        - sourceSummary
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        phone:
+          type: string
+          minLength: 2
+          maxLength: 16
+          pattern: '^\+[1-9][0-9]{0,14}$'
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 320
+        sourceCode:
+          $ref: '#/components/schemas/LeadIngressSourceCode'
+        sourceSummary:
+          $ref: '#/components/schemas/SafeText500'
+      oneOf:
+        - $ref: '#/components/schemas/CompleteLeadIngressPhoneOnlyV1'
+        - $ref: '#/components/schemas/CompleteLeadIngressEmailOnlyV1'
+        - $ref: '#/components/schemas/CompleteLeadIngressPhoneAndEmailV1'
+
+    CompleteLeadIngressPhoneOnlyV1:
+      type: object
+      additionalProperties: false
+      required: [draftId, expectedDraftRevision, draftDigest, phone, sourceCode, sourceSummary]
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        phone:
+          type: string
+          minLength: 2
+          maxLength: 16
+          pattern: '^\+[1-9][0-9]{0,14}$'
+        sourceCode:
+          $ref: '#/components/schemas/LeadIngressSourceCode'
+        sourceSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    CompleteLeadIngressEmailOnlyV1:
+      type: object
+      additionalProperties: false
+      required: [draftId, expectedDraftRevision, draftDigest, email, sourceCode, sourceSummary]
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 320
+        sourceCode:
+          $ref: '#/components/schemas/LeadIngressSourceCode'
+        sourceSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    CompleteLeadIngressPhoneAndEmailV1:
+      type: object
+      additionalProperties: false
+      required: [draftId, expectedDraftRevision, draftDigest, phone, email, sourceCode, sourceSummary]
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        phone:
+          type: string
+          minLength: 2
+          maxLength: 16
+          pattern: '^\+[1-9][0-9]{0,14}$'
+        email:
+          type: string
+          format: email
+          minLength: 1
+          maxLength: 320
+        sourceCode:
+          $ref: '#/components/schemas/LeadIngressSourceCode'
+        sourceSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    AssignLeadV1:
+      type: object
+      additionalProperties: false
+      required: [draftId, expectedDraftRevision, draftDigest, ownerAppointmentId]
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        ownerAppointmentId:
+          $ref: '#/components/schemas/Uuid'
+
+    RecordRoutingDispositionV1:
+      type: object
+      additionalProperties: false
+      required:
+        - draftId
+        - expectedDraftRevision
+        - draftDigest
+        - decisionCode
+        - rationaleSummary
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        decisionCode:
+          type: string
+          enum:
+            - SCHEDULE_ROUTING_REVIEW
+            - RETRY_ASSIGNMENT_NOW
+            - REQUEST_SOURCE_INTAKE_STOP
+        rationaleSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    AcknowledgeSourceIntakeStopRequestV1:
+      type: object
+      additionalProperties: false
+      required:
+        - draftId
+        - expectedDraftRevision
+        - draftDigest
+        - causalDecisionId
+        - causalDecisionHash
+        - rationaleSummary
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        causalDecisionId:
+          $ref: '#/components/schemas/Uuid'
+        causalDecisionHash:
+          $ref: '#/components/schemas/Digest32'
+        rationaleSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    RecordContactResultV1:
+      type: object
+      additionalProperties: false
+      required:
+        - draftId
+        - expectedDraftRevision
+        - draftDigest
+        - leadAssignmentId
+        - leadAssignmentRevision
+        - contactChannelCode
+        - resultCode
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        leadAssignmentId:
+          $ref: '#/components/schemas/Uuid'
+        leadAssignmentRevision:
+          $ref: '#/components/schemas/Revision'
+        contactChannelCode:
+          type: string
+          enum: [PHONE, EMAIL]
+        resultCode:
+          $ref: '#/components/schemas/ContactResultCode'
+        resultSummary:
+          $ref: '#/components/schemas/SafeText500'
+        legalNeed:
+          $ref: '#/components/schemas/SafeText2000'
+        evidenceSubmissionId:
+          $ref: '#/components/schemas/Uuid'
+      allOf:
+        - if:
+            properties:
+              resultCode:
+                enum: [CONNECTED_VALID]
+            required: [resultCode]
+          then:
+            required: [legalNeed]
+          else:
+            not:
+              required: [legalNeed]
+      discriminator:
+        propertyName: resultCode
+        mapping:
+          CONNECTED_VALID: '#/components/schemas/ConnectedValidRecordContactResultV1'
+          NOT_CONNECTED: '#/components/schemas/NotConnectedRecordContactResultV1'
+          SUSPECT_INVALID: '#/components/schemas/SuspectInvalidRecordContactResultV1'
+      oneOf:
+        - $ref: '#/components/schemas/ConnectedValidRecordContactResultV1'
+        - $ref: '#/components/schemas/NotConnectedRecordContactResultV1'
+        - $ref: '#/components/schemas/SuspectInvalidRecordContactResultV1'
+
+    ConnectedValidRecordContactResultV1:
+      type: object
+      additionalProperties: false
+      required: [draftId, expectedDraftRevision, draftDigest, leadAssignmentId, leadAssignmentRevision, contactChannelCode, resultCode, legalNeed]
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        leadAssignmentId:
+          $ref: '#/components/schemas/Uuid'
+        leadAssignmentRevision:
+          $ref: '#/components/schemas/Revision'
+        contactChannelCode:
+          type: string
+          enum: [PHONE, EMAIL]
+        resultCode:
+          $ref: '#/components/schemas/ContactResultCode'
+          const: CONNECTED_VALID
+        resultSummary:
+          $ref: '#/components/schemas/SafeText500'
+        legalNeed:
+          $ref: '#/components/schemas/SafeText2000'
+        evidenceSubmissionId:
+          $ref: '#/components/schemas/Uuid'
+
+    NotConnectedRecordContactResultV1:
+      type: object
+      additionalProperties: false
+      required: [draftId, expectedDraftRevision, draftDigest, leadAssignmentId, leadAssignmentRevision, contactChannelCode, resultCode]
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        leadAssignmentId:
+          $ref: '#/components/schemas/Uuid'
+        leadAssignmentRevision:
+          $ref: '#/components/schemas/Revision'
+        contactChannelCode:
+          type: string
+          enum: [PHONE, EMAIL]
+        resultCode:
+          $ref: '#/components/schemas/ContactResultCode'
+          const: NOT_CONNECTED
+        resultSummary:
+          $ref: '#/components/schemas/SafeText500'
+        legalNeed: false
+        evidenceSubmissionId:
+          $ref: '#/components/schemas/Uuid'
+
+    SuspectInvalidRecordContactResultV1:
+      type: object
+      additionalProperties: false
+      required: [draftId, expectedDraftRevision, draftDigest, leadAssignmentId, leadAssignmentRevision, contactChannelCode, resultCode]
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        leadAssignmentId:
+          $ref: '#/components/schemas/Uuid'
+        leadAssignmentRevision:
+          $ref: '#/components/schemas/Revision'
+        contactChannelCode:
+          type: string
+          enum: [PHONE, EMAIL]
+        resultCode:
+          $ref: '#/components/schemas/ContactResultCode'
+          const: SUSPECT_INVALID
+        resultSummary:
+          $ref: '#/components/schemas/SafeText500'
+        legalNeed: false
+        evidenceSubmissionId:
+          $ref: '#/components/schemas/Uuid'
+
+    ReviewLeadValidityV1:
+      type: object
+      additionalProperties: false
+      required:
+        - draftId
+        - expectedDraftRevision
+        - draftDigest
+        - triggeringContactResultId
+        - triggeringContactResultHash
+        - decisionCode
+        - rationaleSummary
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        expectedDraftRevision:
+          $ref: '#/components/schemas/Revision'
+        draftDigest:
+          $ref: '#/components/schemas/Digest32'
+        triggeringContactResultId:
+          $ref: '#/components/schemas/Uuid'
+        triggeringContactResultHash:
+          $ref: '#/components/schemas/Digest32'
+        decisionCode:
+          type: string
+          enum: [CONFIRM_INVALID, CLOSE_UNREACHED, REOPEN_CONTACT]
+        rationaleSummary:
+          $ref: '#/components/schemas/SafeText500'
+
+    ReopenDueContactTaskV1:
+      type: object
+      additionalProperties: false
+      required:
+        - taskId
+        - expectedTaskRevision
+        - waitReceiptId
+        - waitReceiptHash
+        - dueCutoff
+      properties:
+        taskId:
+          $ref: '#/components/schemas/Uuid'
+        expectedTaskRevision:
+          $ref: '#/components/schemas/Revision'
+        waitReceiptId:
+          $ref: '#/components/schemas/Uuid'
+        waitReceiptHash:
+          $ref: '#/components/schemas/Digest32'
+        dueCutoff:
+          $ref: '#/components/schemas/Instant'
+
+    PartialResolveDuplicateLeadValuesV1:
+      type: object
+      additionalProperties: false
+      required: [candidateLeadId, candidateLeadRevision, partyId, partyRevision]
+      properties:
+        decisionCode:
+          type: string
+          enum: ['', LINK_EXISTING_PARTY, KEEP_SEPARATE]
+        candidateLeadId:
+          $ref: '#/components/schemas/Uuid'
+        candidateLeadRevision:
+          $ref: '#/components/schemas/Revision'
+        partyId:
+          $ref: '#/components/schemas/Uuid'
+        partyRevision:
+          $ref: '#/components/schemas/Revision'
+        rationaleSummary:
+          $ref: '#/components/schemas/DraftText500'
+
+    PartialCompleteLeadIngressValuesV1:
+      type: object
+      additionalProperties: false
+      properties:
+        phone:
+          oneOf:
+            - type: string
+              maxLength: 0
+            - type: string
+              minLength: 2
+              maxLength: 16
+              pattern: '^\+[1-9][0-9]{0,14}$'
+        email:
+          oneOf:
+            - type: string
+              maxLength: 0
+            - type: string
+              format: email
+              minLength: 1
+              maxLength: 320
+        sourceCode:
+          $ref: '#/components/schemas/DraftLeadIngressSourceCode'
+        sourceSummary:
+          $ref: '#/components/schemas/DraftText500'
+
+    PartialAssignLeadValuesV1:
+      type: object
+      additionalProperties: false
+      properties:
+        ownerAppointmentId:
+          oneOf:
+            - type: string
+              maxLength: 0
+            - $ref: '#/components/schemas/Uuid'
+
+    PartialRecordRoutingDispositionValuesV1:
+      type: object
+      additionalProperties: false
+      properties:
+        decisionCode:
+          type: string
+          enum:
+            - ''
+            - SCHEDULE_ROUTING_REVIEW
+            - RETRY_ASSIGNMENT_NOW
+            - REQUEST_SOURCE_INTAKE_STOP
+        rationaleSummary:
+          $ref: '#/components/schemas/DraftText500'
+
+    PartialAcknowledgeSourceIntakeStopRequestValuesV1:
+      type: object
+      additionalProperties: false
+      required: [causalDecisionId, causalDecisionHash]
+      properties:
+        causalDecisionId:
+          $ref: '#/components/schemas/Uuid'
+        causalDecisionHash:
+          $ref: '#/components/schemas/Digest32'
+        rationaleSummary:
+          $ref: '#/components/schemas/DraftText500'
+
+    PartialRecordContactResultValuesV1:
+      type: object
+      additionalProperties: false
+      required: [leadAssignmentId, leadAssignmentRevision]
+      properties:
+        leadAssignmentId:
+          $ref: '#/components/schemas/Uuid'
+        leadAssignmentRevision:
+          $ref: '#/components/schemas/Revision'
+        contactChannelCode:
+          type: string
+          enum: ['', PHONE, EMAIL]
+        resultCode:
+          type: string
+          enum: ['', CONNECTED_VALID, NOT_CONNECTED, SUSPECT_INVALID]
+        resultSummary:
+          $ref: '#/components/schemas/DraftText500'
+        legalNeed:
+          $ref: '#/components/schemas/DraftText2000'
+        evidenceSubmissionId:
+          oneOf:
+            - type: string
+              maxLength: 0
+            - $ref: '#/components/schemas/Uuid'
+      allOf:
+        - if:
+            properties:
+              resultCode:
+                enum: [NOT_CONNECTED, SUSPECT_INVALID]
+            required: [resultCode]
+          then:
+            not:
+              required: [legalNeed]
+
+    PartialReviewLeadValidityValuesV1:
+      type: object
+      additionalProperties: false
+      required: [triggeringContactResultId, triggeringContactResultHash]
+      properties:
+        triggeringContactResultId:
+          $ref: '#/components/schemas/Uuid'
+        triggeringContactResultHash:
+          $ref: '#/components/schemas/Digest32'
+        decisionCode:
+          type: string
+          enum: ['', CONFIRM_INVALID, CLOSE_UNREACHED, REOPEN_CONTACT]
+        rationaleSummary:
+          $ref: '#/components/schemas/DraftText500'
+
+    FormOption:
+      type: object
+      additionalProperties: false
+      required: [value, label, disabled]
+      properties:
+        value:
+          type: string
+          minLength: 1
+          maxLength: 512
+        label:
+          $ref: '#/components/schemas/SafeText200'
+        disabled:
+          type: boolean
+
+    FormField:
+      type: object
+      additionalProperties: false
+      required: [name, label, control, required, readOnly, options]
+      properties:
+        name:
+          type: string
+          enum:
+            - decisionCode
+            - rationaleSummary
+            - phone
+            - email
+            - sourceCode
+            - sourceSummary
+            - ownerAppointmentId
+            - contactChannelCode
+            - resultCode
+            - resultSummary
+            - legalNeed
+            - evidenceSubmissionId
+        label:
+          $ref: '#/components/schemas/SafeText200'
+        control:
+          type: string
+          enum: [TEXT, TEXTAREA, SELECT, EMAIL, TEL]
+        required:
+          type: boolean
+        readOnly:
+          type: boolean
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/FormOption'
+      allOf:
+        - if:
+            properties:
+              control:
+                enum: [SELECT]
+            required: [control]
+          then:
+            properties:
+              options:
+                minItems: 1
+          else:
+            properties:
+              options:
+                maxItems: 0
+
+    CommandForm:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values, fields]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          oneOf:
+            - $ref: '#/components/schemas/PartialResolveDuplicateLeadValuesV1'
+            - $ref: '#/components/schemas/PartialCompleteLeadIngressValuesV1'
+            - $ref: '#/components/schemas/PartialAssignLeadValuesV1'
+            - $ref: '#/components/schemas/PartialRecordRoutingDispositionValuesV1'
+            - $ref: '#/components/schemas/PartialAcknowledgeSourceIntakeStopRequestValuesV1'
+            - $ref: '#/components/schemas/PartialRecordContactResultValuesV1'
+            - $ref: '#/components/schemas/PartialReviewLeadValidityValuesV1'
+        fields:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/FormField'
+      discriminator:
+        propertyName: actionCode
+        mapping:
+          RESOLVE_DUPLICATE_LEAD: '#/components/schemas/ResolveDuplicateLeadCommandForm'
+          COMPLETE_LEAD_INGRESS: '#/components/schemas/CompleteLeadIngressCommandForm'
+          ASSIGN_LEAD: '#/components/schemas/AssignLeadCommandForm'
+          RECORD_ROUTING_DISPOSITION: '#/components/schemas/RecordRoutingDispositionCommandForm'
+          ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST: '#/components/schemas/AcknowledgeSourceIntakeStopRequestCommandForm'
+          RECORD_CONTACT_RESULT: '#/components/schemas/RecordContactResultCommandForm'
+          REVIEW_LEAD_VALIDITY: '#/components/schemas/ReviewLeadValidityCommandForm'
+      oneOf:
+        - $ref: '#/components/schemas/ResolveDuplicateLeadCommandForm'
+        - $ref: '#/components/schemas/CompleteLeadIngressCommandForm'
+        - $ref: '#/components/schemas/AssignLeadCommandForm'
+        - $ref: '#/components/schemas/RecordRoutingDispositionCommandForm'
+        - $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestCommandForm'
+        - $ref: '#/components/schemas/RecordContactResultCommandForm'
+        - $ref: '#/components/schemas/ReviewLeadValidityCommandForm'
+
+    ResolveDuplicateLeadCommandForm:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values, fields]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: RESOLVE_DUPLICATE_LEAD
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/PartialResolveDuplicateLeadValuesV1'
+        fields:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/FormField'
+
+    CompleteLeadIngressCommandForm:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values, fields]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: COMPLETE_LEAD_INGRESS
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/PartialCompleteLeadIngressValuesV1'
+        fields:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/FormField'
+
+    AssignLeadCommandForm:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values, fields]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: ASSIGN_LEAD
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/PartialAssignLeadValuesV1'
+        fields:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/FormField'
+
+    RecordRoutingDispositionCommandForm:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values, fields]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: RECORD_ROUTING_DISPOSITION
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/PartialRecordRoutingDispositionValuesV1'
+        fields:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/FormField'
+
+    AcknowledgeSourceIntakeStopRequestCommandForm:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values, fields]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/PartialAcknowledgeSourceIntakeStopRequestValuesV1'
+        fields:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/FormField'
+
+    RecordContactResultCommandForm:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values, fields]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: RECORD_CONTACT_RESULT
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/PartialRecordContactResultValuesV1'
+        fields:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/FormField'
+
+    ReviewLeadValidityCommandForm:
+      type: object
+      additionalProperties: false
+      required: [actionCode, schemaVersion, values, fields]
+      properties:
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: REVIEW_LEAD_VALIDITY
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          $ref: '#/components/schemas/PartialReviewLeadValidityValuesV1'
+        fields:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/FormField'
+
+    ActionDraftProjection:
+      type: object
+      additionalProperties: false
+      required:
+        - draftId
+        - draftRevision
+        - actionCode
+        - schemaVersion
+        - values
+        - digest
+        - updatedAt
+        - editable
+      properties:
+        draftId:
+          $ref: '#/components/schemas/Uuid'
+        draftRevision:
+          $ref: '#/components/schemas/Revision'
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+        schemaVersion:
+          $ref: '#/components/schemas/SchemaVersionV1'
+        values:
+          oneOf:
+            - $ref: '#/components/schemas/ResolveDuplicateLeadValuesV1'
+            - $ref: '#/components/schemas/CompleteLeadIngressValuesV1'
+            - $ref: '#/components/schemas/AssignLeadValuesV1'
+            - $ref: '#/components/schemas/RecordRoutingDispositionValuesV1'
+            - $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestValuesV1'
+            - $ref: '#/components/schemas/RecordContactResultValuesV1'
+            - $ref: '#/components/schemas/ReviewLeadValidityValuesV1'
+        digest:
+          $ref: '#/components/schemas/Digest32'
+        updatedAt:
+          $ref: '#/components/schemas/Instant'
+        editable:
+          type: boolean
+      discriminator:
+        propertyName: actionCode
+        mapping:
+          RESOLVE_DUPLICATE_LEAD: '#/components/schemas/ResolveDuplicateLeadDraftProjection'
+          COMPLETE_LEAD_INGRESS: '#/components/schemas/CompleteLeadIngressDraftProjection'
+          ASSIGN_LEAD: '#/components/schemas/AssignLeadDraftProjection'
+          RECORD_ROUTING_DISPOSITION: '#/components/schemas/RecordRoutingDispositionDraftProjection'
+          ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST: '#/components/schemas/AcknowledgeSourceIntakeStopRequestDraftProjection'
+          RECORD_CONTACT_RESULT: '#/components/schemas/RecordContactResultDraftProjection'
+          REVIEW_LEAD_VALIDITY: '#/components/schemas/ReviewLeadValidityDraftProjection'
+      oneOf:
+        - $ref: '#/components/schemas/ResolveDuplicateLeadDraftProjection'
+        - $ref: '#/components/schemas/CompleteLeadIngressDraftProjection'
+        - $ref: '#/components/schemas/AssignLeadDraftProjection'
+        - $ref: '#/components/schemas/RecordRoutingDispositionDraftProjection'
+        - $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestDraftProjection'
+        - $ref: '#/components/schemas/RecordContactResultDraftProjection'
+        - $ref: '#/components/schemas/ReviewLeadValidityDraftProjection'
+
+    ResolveDuplicateLeadDraftProjection:
+      type: object
+      additionalProperties: false
+      required: [draftId, draftRevision, actionCode, schemaVersion, values, digest, updatedAt, editable]
+      properties:
+        draftId: { $ref: '#/components/schemas/Uuid' }
+        draftRevision: { $ref: '#/components/schemas/Revision' }
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: RESOLVE_DUPLICATE_LEAD
+        schemaVersion: { $ref: '#/components/schemas/SchemaVersionV1' }
+        values: { $ref: '#/components/schemas/ResolveDuplicateLeadValuesV1' }
+        digest: { $ref: '#/components/schemas/Digest32' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        editable: { type: boolean }
+
+    CompleteLeadIngressDraftProjection:
+      type: object
+      additionalProperties: false
+      required: [draftId, draftRevision, actionCode, schemaVersion, values, digest, updatedAt, editable]
+      properties:
+        draftId: { $ref: '#/components/schemas/Uuid' }
+        draftRevision: { $ref: '#/components/schemas/Revision' }
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: COMPLETE_LEAD_INGRESS
+        schemaVersion: { $ref: '#/components/schemas/SchemaVersionV1' }
+        values: { $ref: '#/components/schemas/CompleteLeadIngressValuesV1' }
+        digest: { $ref: '#/components/schemas/Digest32' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        editable: { type: boolean }
+
+    AssignLeadDraftProjection:
+      type: object
+      additionalProperties: false
+      required: [draftId, draftRevision, actionCode, schemaVersion, values, digest, updatedAt, editable]
+      properties:
+        draftId: { $ref: '#/components/schemas/Uuid' }
+        draftRevision: { $ref: '#/components/schemas/Revision' }
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: ASSIGN_LEAD
+        schemaVersion: { $ref: '#/components/schemas/SchemaVersionV1' }
+        values: { $ref: '#/components/schemas/AssignLeadValuesV1' }
+        digest: { $ref: '#/components/schemas/Digest32' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        editable: { type: boolean }
+
+    RecordRoutingDispositionDraftProjection:
+      type: object
+      additionalProperties: false
+      required: [draftId, draftRevision, actionCode, schemaVersion, values, digest, updatedAt, editable]
+      properties:
+        draftId: { $ref: '#/components/schemas/Uuid' }
+        draftRevision: { $ref: '#/components/schemas/Revision' }
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: RECORD_ROUTING_DISPOSITION
+        schemaVersion: { $ref: '#/components/schemas/SchemaVersionV1' }
+        values: { $ref: '#/components/schemas/RecordRoutingDispositionValuesV1' }
+        digest: { $ref: '#/components/schemas/Digest32' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        editable: { type: boolean }
+
+    AcknowledgeSourceIntakeStopRequestDraftProjection:
+      type: object
+      additionalProperties: false
+      required: [draftId, draftRevision, actionCode, schemaVersion, values, digest, updatedAt, editable]
+      properties:
+        draftId: { $ref: '#/components/schemas/Uuid' }
+        draftRevision: { $ref: '#/components/schemas/Revision' }
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST
+        schemaVersion: { $ref: '#/components/schemas/SchemaVersionV1' }
+        values: { $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestValuesV1' }
+        digest: { $ref: '#/components/schemas/Digest32' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        editable: { type: boolean }
+
+    RecordContactResultDraftProjection:
+      type: object
+      additionalProperties: false
+      required: [draftId, draftRevision, actionCode, schemaVersion, values, digest, updatedAt, editable]
+      properties:
+        draftId: { $ref: '#/components/schemas/Uuid' }
+        draftRevision: { $ref: '#/components/schemas/Revision' }
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: RECORD_CONTACT_RESULT
+        schemaVersion: { $ref: '#/components/schemas/SchemaVersionV1' }
+        values: { $ref: '#/components/schemas/RecordContactResultValuesV1' }
+        digest: { $ref: '#/components/schemas/Digest32' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        editable: { type: boolean }
+
+    ReviewLeadValidityDraftProjection:
+      type: object
+      additionalProperties: false
+      required: [draftId, draftRevision, actionCode, schemaVersion, values, digest, updatedAt, editable]
+      properties:
+        draftId: { $ref: '#/components/schemas/Uuid' }
+        draftRevision: { $ref: '#/components/schemas/Revision' }
+        actionCode:
+          $ref: '#/components/schemas/ActionCode'
+          const: REVIEW_LEAD_VALIDITY
+        schemaVersion: { $ref: '#/components/schemas/SchemaVersionV1' }
+        values: { $ref: '#/components/schemas/ReviewLeadValidityValuesV1' }
+        digest: { $ref: '#/components/schemas/Digest32' }
+        updatedAt: { $ref: '#/components/schemas/Instant' }
+        editable: { type: boolean }
+
+    SubjectSummary:
+      type: object
+      additionalProperties: false
+      required: [subjectType, subjectRef, subjectRevision, title]
+      properties:
+        subjectType:
+          type: string
+          enum: [LEAD]
+        subjectRef:
+          $ref: '#/components/schemas/OpaqueRef'
+        subjectRevision:
+          $ref: '#/components/schemas/Revision'
+        title:
+          $ref: '#/components/schemas/SafeText200'
+        subtitle:
+          type: string
+          minLength: 1
+          maxLength: 300
+          pattern: '^[^\u0000-\u001F\u007F-\u009F]+$'
+
+    OwnerSummary:
+      type: object
+      additionalProperties: false
+      required: [displayName, organizationLabel]
+      properties:
+        displayName:
+          $ref: '#/components/schemas/SafeText200'
+        organizationLabel:
+          $ref: '#/components/schemas/SafeText200'
+
+    LabeledCode:
+      type: object
+      additionalProperties: false
+      required: [code, label]
+      properties:
+        code:
+          $ref: '#/components/schemas/Code64'
+        label:
+          $ref: '#/components/schemas/SafeText200'
+
+    PrimaryCommand:
+      type: object
+      additionalProperties: false
+      required: [code, label, enabled]
+      properties:
+        code:
+          $ref: '#/components/schemas/Code64'
+        label:
+          $ref: '#/components/schemas/SafeText200'
+        enabled:
+          type: boolean
+
+    ResolveLeadDuplicateBusinessPurpose:
+      type: object
+      additionalProperties: false
+      required: [code, label]
+      properties:
+        code: { type: string, enum: [RESOLVE_LEAD_DUPLICATE] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+
+    CompleteLeadIngressBusinessPurpose:
+      type: object
+      additionalProperties: false
+      required: [code, label]
+      properties:
+        code: { type: string, enum: [COMPLETE_LEAD_INGRESS] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+
+    AssignLeadBusinessPurpose:
+      type: object
+      additionalProperties: false
+      required: [code, label]
+      properties:
+        code: { type: string, enum: [ASSIGN_LEAD] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+
+    ResolveLeadRoutingGapBusinessPurpose:
+      type: object
+      additionalProperties: false
+      required: [code, label]
+      properties:
+        code: { type: string, enum: [RESOLVE_LEAD_ROUTING_GAP] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+
+    AcknowledgeSourceIntakeStopRequestBusinessPurpose:
+      type: object
+      additionalProperties: false
+      required: [code, label]
+      properties:
+        code: { type: string, enum: [ACK_SOURCE_INTAKE_STOP_REQUEST] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+
+    ContactLeadBusinessPurpose:
+      type: object
+      additionalProperties: false
+      required: [code, label]
+      properties:
+        code: { type: string, enum: [CONTACT_LEAD] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+
+    ReviewLeadValidityBusinessPurpose:
+      type: object
+      additionalProperties: false
+      required: [code, label]
+      properties:
+        code: { type: string, enum: [REVIEW_LEAD_VALIDITY] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+
+    ResolveDuplicateLeadPrimaryCommand:
+      type: object
+      additionalProperties: false
+      required: [code, label, enabled]
+      properties:
+        code: { type: string, enum: [RESOLVE_DUPLICATE_LEAD] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+        enabled: { type: boolean }
+
+    CompleteLeadIngressPrimaryCommand:
+      type: object
+      additionalProperties: false
+      required: [code, label, enabled]
+      properties:
+        code: { type: string, enum: [COMPLETE_LEAD_INGRESS] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+        enabled: { type: boolean }
+
+    AssignLeadPrimaryCommand:
+      type: object
+      additionalProperties: false
+      required: [code, label, enabled]
+      properties:
+        code: { type: string, enum: [ASSIGN_LEAD] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+        enabled: { type: boolean }
+
+    RecordRoutingDispositionPrimaryCommand:
+      type: object
+      additionalProperties: false
+      required: [code, label, enabled]
+      properties:
+        code: { type: string, enum: [RECORD_ROUTING_DISPOSITION] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+        enabled: { type: boolean }
+
+    AcknowledgeSourceIntakeStopRequestPrimaryCommand:
+      type: object
+      additionalProperties: false
+      required: [code, label, enabled]
+      properties:
+        code: { type: string, enum: [ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+        enabled: { type: boolean }
+
+    RecordContactResultPrimaryCommand:
+      type: object
+      additionalProperties: false
+      required: [code, label, enabled]
+      properties:
+        code: { type: string, enum: [RECORD_CONTACT_RESULT] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+        enabled: { type: boolean }
+
+    ReviewLeadValidityPrimaryCommand:
+      type: object
+      additionalProperties: false
+      required: [code, label, enabled]
+      properties:
+        code: { type: string, enum: [REVIEW_LEAD_VALIDITY] }
+        label: { $ref: '#/components/schemas/SafeText200' }
+        enabled: { type: boolean }
+
+    SlaSummary:
+      type: object
+      additionalProperties: false
+      required: [code, dueAt, status, timeHint]
+      properties:
+        code:
+          $ref: '#/components/schemas/Code64'
+        dueAt:
+          $ref: '#/components/schemas/Instant'
+        status:
+          type: string
+          enum: [ON_TRACK, DUE_SOON, OVERDUE]
+        timeHint:
+          $ref: '#/components/schemas/SafeText200'
+
+    PreconditionTokens:
+      type: object
+      additionalProperties: false
+      required: [taskETag, subjectETag, draftETag]
+      properties:
+        taskETag:
+          $ref: '#/components/schemas/TaskETag'
+        subjectETag:
+          $ref: '#/components/schemas/SubjectETag'
+        draftETag:
+          oneOf:
+            - $ref: '#/components/schemas/DraftETag'
+            - type: 'null'
+
+    NextSummary:
+      type: object
+      additionalProperties: false
+      required: [taskId, businessPurpose, priority, timeHint]
+      properties:
+        taskId:
+          $ref: '#/components/schemas/Uuid'
+        businessPurpose:
+          $ref: '#/components/schemas/LabeledCode'
+        priority:
+          type: string
+          enum: [URGENT, NORMAL]
+        timeHint:
+          $ref: '#/components/schemas/SafeText200'
+
+    ChatComposer:
+      type: object
+      additionalProperties: false
+      required: [mode, targetTaskId, placeholder, enabled]
+      properties:
+        mode:
+          type: string
+          enum: [ACTION_DRAFT]
+        targetTaskId:
+          oneOf:
+            - $ref: '#/components/schemas/Uuid'
+            - type: 'null'
+        placeholder:
+          $ref: '#/components/schemas/SafeText200'
+        enabled:
+          type: boolean
+
+    CurrentCard:
+      type: object
+      additionalProperties: false
+      required:
+        - taskId
+        - taskType
+        - taskRevision
+        - subject
+        - owner
+        - businessPurpose
+        - primaryCommand
+        - expectedCompletionFact
+        - sla
+        - versionStatus
+        - commandForm
+        - actionDraft
+        - preconditions
+      properties:
+        taskId:
+          $ref: '#/components/schemas/Uuid'
+        taskType:
+          $ref: '#/components/schemas/TaskType'
+        taskRevision:
+          $ref: '#/components/schemas/Revision'
+        subject:
+          $ref: '#/components/schemas/SubjectSummary'
+        owner:
+          $ref: '#/components/schemas/OwnerSummary'
+        businessPurpose:
+          $ref: '#/components/schemas/LabeledCode'
+        primaryCommand:
+          $ref: '#/components/schemas/PrimaryCommand'
+        expectedCompletionFact:
+          $ref: '#/components/schemas/Code64'
+        sla:
+          $ref: '#/components/schemas/SlaSummary'
+        versionStatus:
+          type: string
+          enum: [CURRENT, REFRESH_RECOMMENDED]
+        commandForm:
+          $ref: '#/components/schemas/CommandForm'
+        actionDraft:
+          oneOf:
+            - $ref: '#/components/schemas/ActionDraftProjection'
+            - type: 'null'
+        preconditions:
+          $ref: '#/components/schemas/PreconditionTokens'
+      discriminator:
+        propertyName: taskType
+        mapping:
+          RESOLVE_LEAD_DUPLICATE: '#/components/schemas/ResolveLeadDuplicateCurrentCard'
+          COMPLETE_LEAD_INGRESS: '#/components/schemas/CompleteLeadIngressCurrentCard'
+          ASSIGN_LEAD: '#/components/schemas/AssignLeadCurrentCard'
+          RESOLVE_LEAD_ROUTING_GAP: '#/components/schemas/ResolveLeadRoutingGapCurrentCard'
+          ACK_SOURCE_INTAKE_STOP_REQUEST: '#/components/schemas/AcknowledgeSourceIntakeStopRequestCurrentCard'
+          CONTACT_LEAD: '#/components/schemas/ContactLeadCurrentCard'
+          REVIEW_LEAD_VALIDITY: '#/components/schemas/ReviewLeadValidityCurrentCard'
+      oneOf:
+        - $ref: '#/components/schemas/ResolveLeadDuplicateCurrentCard'
+        - $ref: '#/components/schemas/CompleteLeadIngressCurrentCard'
+        - $ref: '#/components/schemas/AssignLeadCurrentCard'
+        - $ref: '#/components/schemas/ResolveLeadRoutingGapCurrentCard'
+        - $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestCurrentCard'
+        - $ref: '#/components/schemas/ContactLeadCurrentCard'
+        - $ref: '#/components/schemas/ReviewLeadValidityCurrentCard'
+
+    ResolveLeadDuplicateCurrentCard:
+      type: object
+      additionalProperties: false
+      required: [taskId, taskType, taskRevision, subject, owner, businessPurpose, primaryCommand, expectedCompletionFact, sla, versionStatus, commandForm, actionDraft, preconditions]
+      properties:
+        taskId: { $ref: '#/components/schemas/Uuid' }
+        taskType:
+          $ref: '#/components/schemas/TaskType'
+          const: RESOLVE_LEAD_DUPLICATE
+        taskRevision: { $ref: '#/components/schemas/Revision' }
+        subject: { $ref: '#/components/schemas/SubjectSummary' }
+        owner: { $ref: '#/components/schemas/OwnerSummary' }
+        businessPurpose: { $ref: '#/components/schemas/ResolveLeadDuplicateBusinessPurpose' }
+        primaryCommand: { $ref: '#/components/schemas/ResolveDuplicateLeadPrimaryCommand' }
+        expectedCompletionFact:
+          $ref: '#/components/schemas/Code64'
+          const: DECISION_RECORD
+        sla: { $ref: '#/components/schemas/SlaSummary' }
+        versionStatus:
+          type: string
+          enum: [CURRENT, REFRESH_RECOMMENDED]
+        commandForm: { $ref: '#/components/schemas/ResolveDuplicateLeadCommandForm' }
+        actionDraft:
+          oneOf:
+            - $ref: '#/components/schemas/ResolveDuplicateLeadDraftProjection'
+            - type: 'null'
+        preconditions: { $ref: '#/components/schemas/PreconditionTokens' }
+
+    CompleteLeadIngressCurrentCard:
+      type: object
+      additionalProperties: false
+      required: [taskId, taskType, taskRevision, subject, owner, businessPurpose, primaryCommand, expectedCompletionFact, sla, versionStatus, commandForm, actionDraft, preconditions]
+      properties:
+        taskId: { $ref: '#/components/schemas/Uuid' }
+        taskType:
+          $ref: '#/components/schemas/TaskType'
+          const: COMPLETE_LEAD_INGRESS
+        taskRevision: { $ref: '#/components/schemas/Revision' }
+        subject: { $ref: '#/components/schemas/SubjectSummary' }
+        owner: { $ref: '#/components/schemas/OwnerSummary' }
+        businessPurpose: { $ref: '#/components/schemas/CompleteLeadIngressBusinessPurpose' }
+        primaryCommand: { $ref: '#/components/schemas/CompleteLeadIngressPrimaryCommand' }
+        expectedCompletionFact:
+          $ref: '#/components/schemas/Code64'
+          const: LEAD
+        sla: { $ref: '#/components/schemas/SlaSummary' }
+        versionStatus:
+          type: string
+          enum: [CURRENT, REFRESH_RECOMMENDED]
+        commandForm: { $ref: '#/components/schemas/CompleteLeadIngressCommandForm' }
+        actionDraft:
+          oneOf:
+            - $ref: '#/components/schemas/CompleteLeadIngressDraftProjection'
+            - type: 'null'
+        preconditions: { $ref: '#/components/schemas/PreconditionTokens' }
+
+    AssignLeadCurrentCard:
+      type: object
+      additionalProperties: false
+      required: [taskId, taskType, taskRevision, subject, owner, businessPurpose, primaryCommand, expectedCompletionFact, sla, versionStatus, commandForm, actionDraft, preconditions]
+      properties:
+        taskId: { $ref: '#/components/schemas/Uuid' }
+        taskType:
+          $ref: '#/components/schemas/TaskType'
+          const: ASSIGN_LEAD
+        taskRevision: { $ref: '#/components/schemas/Revision' }
+        subject: { $ref: '#/components/schemas/SubjectSummary' }
+        owner: { $ref: '#/components/schemas/OwnerSummary' }
+        businessPurpose: { $ref: '#/components/schemas/AssignLeadBusinessPurpose' }
+        primaryCommand: { $ref: '#/components/schemas/AssignLeadPrimaryCommand' }
+        expectedCompletionFact:
+          $ref: '#/components/schemas/Code64'
+          const: LEAD_ASSIGNMENT
+        sla: { $ref: '#/components/schemas/SlaSummary' }
+        versionStatus:
+          type: string
+          enum: [CURRENT, REFRESH_RECOMMENDED]
+        commandForm: { $ref: '#/components/schemas/AssignLeadCommandForm' }
+        actionDraft:
+          oneOf:
+            - $ref: '#/components/schemas/AssignLeadDraftProjection'
+            - type: 'null'
+        preconditions: { $ref: '#/components/schemas/PreconditionTokens' }
+
+    ResolveLeadRoutingGapCurrentCard:
+      type: object
+      additionalProperties: false
+      required: [taskId, taskType, taskRevision, subject, owner, businessPurpose, primaryCommand, expectedCompletionFact, sla, versionStatus, commandForm, actionDraft, preconditions]
+      properties:
+        taskId: { $ref: '#/components/schemas/Uuid' }
+        taskType:
+          $ref: '#/components/schemas/TaskType'
+          const: RESOLVE_LEAD_ROUTING_GAP
+        taskRevision: { $ref: '#/components/schemas/Revision' }
+        subject: { $ref: '#/components/schemas/SubjectSummary' }
+        owner: { $ref: '#/components/schemas/OwnerSummary' }
+        businessPurpose: { $ref: '#/components/schemas/ResolveLeadRoutingGapBusinessPurpose' }
+        primaryCommand: { $ref: '#/components/schemas/RecordRoutingDispositionPrimaryCommand' }
+        expectedCompletionFact:
+          $ref: '#/components/schemas/Code64'
+          const: DECISION_RECORD
+        sla: { $ref: '#/components/schemas/SlaSummary' }
+        versionStatus:
+          type: string
+          enum: [CURRENT, REFRESH_RECOMMENDED]
+        commandForm: { $ref: '#/components/schemas/RecordRoutingDispositionCommandForm' }
+        actionDraft:
+          oneOf:
+            - $ref: '#/components/schemas/RecordRoutingDispositionDraftProjection'
+            - type: 'null'
+        preconditions: { $ref: '#/components/schemas/PreconditionTokens' }
+
+    AcknowledgeSourceIntakeStopRequestCurrentCard:
+      type: object
+      additionalProperties: false
+      required: [taskId, taskType, taskRevision, subject, owner, businessPurpose, primaryCommand, expectedCompletionFact, sla, versionStatus, commandForm, actionDraft, preconditions]
+      properties:
+        taskId: { $ref: '#/components/schemas/Uuid' }
+        taskType:
+          $ref: '#/components/schemas/TaskType'
+          const: ACK_SOURCE_INTAKE_STOP_REQUEST
+        taskRevision: { $ref: '#/components/schemas/Revision' }
+        subject: { $ref: '#/components/schemas/SubjectSummary' }
+        owner: { $ref: '#/components/schemas/OwnerSummary' }
+        businessPurpose: { $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestBusinessPurpose' }
+        primaryCommand: { $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestPrimaryCommand' }
+        expectedCompletionFact:
+          $ref: '#/components/schemas/Code64'
+          const: DECISION_RECORD
+        sla: { $ref: '#/components/schemas/SlaSummary' }
+        versionStatus:
+          type: string
+          enum: [CURRENT, REFRESH_RECOMMENDED]
+        commandForm: { $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestCommandForm' }
+        actionDraft:
+          oneOf:
+            - $ref: '#/components/schemas/AcknowledgeSourceIntakeStopRequestDraftProjection'
+            - type: 'null'
+        preconditions: { $ref: '#/components/schemas/PreconditionTokens' }
+
+    ContactLeadCurrentCard:
+      type: object
+      additionalProperties: false
+      required: [taskId, taskType, taskRevision, subject, owner, businessPurpose, primaryCommand, expectedCompletionFact, sla, versionStatus, commandForm, actionDraft, preconditions]
+      properties:
+        taskId: { $ref: '#/components/schemas/Uuid' }
+        taskType:
+          $ref: '#/components/schemas/TaskType'
+          const: CONTACT_LEAD
+        taskRevision: { $ref: '#/components/schemas/Revision' }
+        subject: { $ref: '#/components/schemas/SubjectSummary' }
+        owner: { $ref: '#/components/schemas/OwnerSummary' }
+        businessPurpose: { $ref: '#/components/schemas/ContactLeadBusinessPurpose' }
+        primaryCommand: { $ref: '#/components/schemas/RecordContactResultPrimaryCommand' }
+        expectedCompletionFact:
+          $ref: '#/components/schemas/Code64'
+          const: LEAD_CONTACT_RESULT
+        sla: { $ref: '#/components/schemas/SlaSummary' }
+        versionStatus:
+          type: string
+          enum: [CURRENT, REFRESH_RECOMMENDED]
+        commandForm: { $ref: '#/components/schemas/RecordContactResultCommandForm' }
+        actionDraft:
+          oneOf:
+            - $ref: '#/components/schemas/RecordContactResultDraftProjection'
+            - type: 'null'
+        preconditions: { $ref: '#/components/schemas/PreconditionTokens' }
+
+    ReviewLeadValidityCurrentCard:
+      type: object
+      additionalProperties: false
+      required: [taskId, taskType, taskRevision, subject, owner, businessPurpose, primaryCommand, expectedCompletionFact, sla, versionStatus, commandForm, actionDraft, preconditions]
+      properties:
+        taskId: { $ref: '#/components/schemas/Uuid' }
+        taskType:
+          $ref: '#/components/schemas/TaskType'
+          const: REVIEW_LEAD_VALIDITY
+        taskRevision: { $ref: '#/components/schemas/Revision' }
+        subject: { $ref: '#/components/schemas/SubjectSummary' }
+        owner: { $ref: '#/components/schemas/OwnerSummary' }
+        businessPurpose: { $ref: '#/components/schemas/ReviewLeadValidityBusinessPurpose' }
+        primaryCommand: { $ref: '#/components/schemas/ReviewLeadValidityPrimaryCommand' }
+        expectedCompletionFact:
+          $ref: '#/components/schemas/Code64'
+          const: DECISION_RECORD
+        sla: { $ref: '#/components/schemas/SlaSummary' }
+        versionStatus:
+          type: string
+          enum: [CURRENT, REFRESH_RECOMMENDED]
+        commandForm: { $ref: '#/components/schemas/ReviewLeadValidityCommandForm' }
+        actionDraft:
+          oneOf:
+            - $ref: '#/components/schemas/ReviewLeadValidityDraftProjection'
+            - type: 'null'
+        preconditions: { $ref: '#/components/schemas/PreconditionTokens' }
+
+    CurrentWorkCardEnvelope:
+      type: object
+      additionalProperties: false
+      required: [todaySummary, currentCard, nextSummaries, waitingCount, chatComposer]
+      properties:
+        todaySummary:
+          $ref: '#/components/schemas/SafeText500'
+        currentCard:
+          oneOf:
+            - $ref: '#/components/schemas/CurrentCard'
+            - type: 'null'
+        nextSummaries:
+          type: array
+          minItems: 0
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/NextSummary'
+        waitingCount:
+          type: integer
+          minimum: 0
+        chatComposer:
+          $ref: '#/components/schemas/ChatComposer'
+      x-cross-field-invariant: >-
+        If currentCard is null then chatComposer.targetTaskId is null and enabled is false;
+        otherwise targetTaskId equals currentCard.taskId.
+      allOf:
+        - if:
+            properties:
+              currentCard: { const: null }
+            required: [currentCard]
+          then:
+            properties:
+              chatComposer:
+                properties:
+                  targetTaskId: { const: null }
+                  enabled: { const: false }
+          else:
+            properties:
+              chatComposer:
+                properties:
+                  targetTaskId:
+                    not: { const: null }
+                  enabled: { const: true }
+
+    ActionDraftWriteResult:
+      type: object
+      additionalProperties: false
+      required: [receipt, draft, preconditions]
+      properties:
+        receipt:
+          $ref: '#/components/schemas/ActionDraftCommandReceipt'
+        draft:
+          $ref: '#/components/schemas/ActionDraftProjection'
+        preconditions:
+          $ref: '#/components/schemas/PreconditionTokens'
+
+    PublicFactRef:
+      oneOf:
+        - $ref: '#/components/schemas/LeadFactRef'
+        - $ref: '#/components/schemas/ActionDraftFactRef'
+        - $ref: '#/components/schemas/TaskOccurrenceFactRef'
+        - $ref: '#/components/schemas/DecisionRecordFactRef'
+        - $ref: '#/components/schemas/LeadAssignmentFactRef'
+        - $ref: '#/components/schemas/LeadContactResultFactRef'
+
+    LeadFactRef:
+      type: object
+      additionalProperties: false
+      required: [factType, factRef, revision]
+      properties:
+        factType:
+          type: string
+          const: LEAD
+        factRef:
+          $ref: '#/components/schemas/OpaqueRef'
+        revision:
+          $ref: '#/components/schemas/Revision'
+
+    ActionDraftFactRef:
+      type: object
+      additionalProperties: false
+      required: [factType, factRef, revision]
+      properties:
+        factType:
+          type: string
+          const: ACTION_DRAFT
+        factRef:
+          $ref: '#/components/schemas/OpaqueRef'
+        revision:
+          $ref: '#/components/schemas/Revision'
+
+    TaskOccurrenceFactRef:
+      type: object
+      additionalProperties: false
+      required: [factType, factRef, revision]
+      properties:
+        factType:
+          type: string
+          const: TASK_OCCURRENCE
+        factRef:
+          $ref: '#/components/schemas/OpaqueRef'
+        revision:
+          $ref: '#/components/schemas/Revision'
+
+    DecisionRecordFactRef:
+      type: object
+      additionalProperties: false
+      required: [factType, factRef, digest]
+      properties:
+        factType:
+          type: string
+          const: DECISION_RECORD
+        factRef:
+          $ref: '#/components/schemas/OpaqueRef'
+        digest:
+          $ref: '#/components/schemas/Digest32'
+
+    LeadAssignmentFactRef:
+      type: object
+      additionalProperties: false
+      required: [factType, factRef, revision]
+      properties:
+        factType:
+          type: string
+          const: LEAD_ASSIGNMENT
+        factRef:
+          $ref: '#/components/schemas/OpaqueRef'
+        revision:
+          $ref: '#/components/schemas/Revision'
+
+    LeadContactResultFactRef:
+      type: object
+      additionalProperties: false
+      required: [factType, factRef, digest]
+      properties:
+        factType:
+          type: string
+          const: LEAD_CONTACT_RESULT
+        factRef:
+          $ref: '#/components/schemas/OpaqueRef'
+        digest:
+          $ref: '#/components/schemas/Digest32'
+
+    ReceiptRef:
+      type: object
+      additionalProperties: false
+      required: [commandId, href]
+      properties:
+        commandId:
+          $ref: '#/components/schemas/Uuid'
+        href:
+          type: string
+          pattern: '^/api/v1/commands/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/receipt$'
+
+    ErrorCode:
+      type: string
+      enum:
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REQUIRED
+        - IDEMPOTENCY_KEY_INVALID
+        - UNAUTHENTICATED
+        - NOT_AUTHORIZED
+        - APPOINTMENT_INACTIVE
+        - NOT_FOUND
+        - COMMAND_PAYLOAD_CONFLICT
+        - TASK_NOT_OPEN
+        - TASK_ALREADY_COMPLETED
+        - DRAFT_DIGEST_MISMATCH
+        - INGRESS_COMPLETION_ALREADY_RECORDED
+        - STALE_TASK
+        - STALE_DRAFT
+        - STALE_SUBJECT
+        - SUPERVISOR_UNRESOLVED
+        - SOURCE_INTAKE_OWNER_UNRESOLVED
+        - DRAFT_PRECONDITION_REQUIRED
+        - TASK_PRECONDITION_REQUIRED
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
+
+    TerminalRejectionCode:
+      type: string
+      description: >-
+        Post-slot business rejection codes that may be persisted in a terminal
+        REJECTED CommandReceipt. Pre-slot, payload-conflict, rate-limit, and
+        technical failures never create a new receipt.
+      enum:
+        - NOT_AUTHORIZED
+        - APPOINTMENT_INACTIVE
+        - TASK_NOT_OPEN
+        - TASK_ALREADY_COMPLETED
+        - DRAFT_DIGEST_MISMATCH
+        - INGRESS_COMPLETION_ALREADY_RECORDED
+        - STALE_TASK
+        - STALE_DRAFT
+        - STALE_SUBJECT
+        - SUPERVISOR_UNRESOLVED
+        - SOURCE_INTAKE_OWNER_UNRESOLVED
+
+    RetryPolicy:
+      type: string
+      enum:
+        - 'NO'
+        - SAME_KEY_AFTER_FIX
+        - SAME_KEY_AFTER_REAUTH
+        - NEW_KEY_AFTER_REFRESH
+        - NEW_KEY_AFTER_ADMIN_FIX
+        - SAME_KEY_AFTER_BACKOFF
+
+    SuccessfulCommandReceipt:
+      type: object
+      additionalProperties: false
+      required: [commandId, receiptId, outcome, completedAt, resultFact]
+      properties:
+        commandId:
+          $ref: '#/components/schemas/Uuid'
+        receiptId:
+          $ref: '#/components/schemas/Uuid'
+        outcome:
+          type: string
+          enum: [SUCCEEDED, NO_CHANGE]
+        completedAt:
+          $ref: '#/components/schemas/Instant'
+        resultFact:
+          $ref: '#/components/schemas/PublicFactRef'
+
+    RejectedCommandReceipt:
+      type: object
+      additionalProperties: false
+      required: [commandId, receiptId, outcome, completedAt, rejectionCode]
+      properties:
+        commandId:
+          $ref: '#/components/schemas/Uuid'
+        receiptId:
+          $ref: '#/components/schemas/Uuid'
+        outcome:
+          type: string
+          const: REJECTED
+        completedAt:
+          $ref: '#/components/schemas/Instant'
+        rejectionCode:
+          $ref: '#/components/schemas/TerminalRejectionCode'
+
+    CommandReceipt:
+      oneOf:
+        - $ref: '#/components/schemas/SuccessfulCommandReceipt'
+        - $ref: '#/components/schemas/RejectedCommandReceipt'
+
+    LeadCommandReceipt:
+      type: object
+      additionalProperties: false
+      required: [commandId, receiptId, outcome, completedAt, resultFact]
+      properties:
+        commandId:
+          $ref: '#/components/schemas/Uuid'
+        receiptId:
+          $ref: '#/components/schemas/Uuid'
+        outcome:
+          type: string
+          enum: [SUCCEEDED, NO_CHANGE]
+        completedAt:
+          $ref: '#/components/schemas/Instant'
+        resultFact:
+          $ref: '#/components/schemas/LeadFactRef'
+
+    ActionDraftCommandReceipt:
+      type: object
+      additionalProperties: false
+      required: [commandId, receiptId, outcome, completedAt, resultFact]
+      properties:
+        commandId:
+          $ref: '#/components/schemas/Uuid'
+        receiptId:
+          $ref: '#/components/schemas/Uuid'
+        outcome:
+          type: string
+          enum: [SUCCEEDED, NO_CHANGE]
+        completedAt:
+          $ref: '#/components/schemas/Instant'
+        resultFact:
+          $ref: '#/components/schemas/ActionDraftFactRef'
+
+    TaskOccurrenceCommandReceipt:
+      type: object
+      additionalProperties: false
+      required: [commandId, receiptId, outcome, completedAt, resultFact]
+      properties:
+        commandId:
+          $ref: '#/components/schemas/Uuid'
+        receiptId:
+          $ref: '#/components/schemas/Uuid'
+        outcome:
+          type: string
+          enum: [SUCCEEDED, NO_CHANGE]
+        completedAt:
+          $ref: '#/components/schemas/Instant'
+        resultFact:
+          $ref: '#/components/schemas/TaskOccurrenceFactRef'
+
+    DecisionRecordCommandReceipt:
+      type: object
+      additionalProperties: false
+      required: [commandId, receiptId, outcome, completedAt, resultFact]
+      properties:
+        commandId:
+          $ref: '#/components/schemas/Uuid'
+        receiptId:
+          $ref: '#/components/schemas/Uuid'
+        outcome:
+          type: string
+          enum: [SUCCEEDED, NO_CHANGE]
+        completedAt:
+          $ref: '#/components/schemas/Instant'
+        resultFact:
+          $ref: '#/components/schemas/DecisionRecordFactRef'
+
+    LeadAssignmentCommandReceipt:
+      type: object
+      additionalProperties: false
+      required: [commandId, receiptId, outcome, completedAt, resultFact]
+      properties:
+        commandId:
+          $ref: '#/components/schemas/Uuid'
+        receiptId:
+          $ref: '#/components/schemas/Uuid'
+        outcome:
+          type: string
+          enum: [SUCCEEDED, NO_CHANGE]
+        completedAt:
+          $ref: '#/components/schemas/Instant'
+        resultFact:
+          $ref: '#/components/schemas/LeadAssignmentFactRef'
+
+    LeadContactResultCommandReceipt:
+      type: object
+      additionalProperties: false
+      required: [commandId, receiptId, outcome, completedAt, resultFact]
+      properties:
+        commandId:
+          $ref: '#/components/schemas/Uuid'
+        receiptId:
+          $ref: '#/components/schemas/Uuid'
+        outcome:
+          type: string
+          enum: [SUCCEEDED, NO_CHANGE]
+        completedAt:
+          $ref: '#/components/schemas/Instant'
+        resultFact:
+          $ref: '#/components/schemas/LeadContactResultFactRef'
+
+    FieldError:
+      type: object
+      additionalProperties: false
+      required: [pointer, code, detail]
+      properties:
+        pointer:
+          type: string
+          format: json-pointer
+          minLength: 1
+          maxLength: 512
+        code:
+          type: string
+          enum: [REQUIRED, INVALID_FORMAT, OUT_OF_RANGE, NOT_ALLOWED, CONDITION_FAILED]
+        detail:
+          $ref: '#/components/schemas/SafeText200'
+
+    ResourceKind:
+      type: string
+      enum: [WORKBENCH, TASK, DRAFT, SUBJECT]
+
+    ResourceETag:
+      type: string
+      minLength: 48
+      maxLength: 53
+      pattern: '^"(?:wb|task|draft|subject)\.[A-Za-z0-9_-]{43}"$'
+
+    CurrentETag:
+      type: object
+      additionalProperties: false
+      required: [resourceKind, value]
+      properties:
+        resourceKind:
+          $ref: '#/components/schemas/ResourceKind'
+        value:
+          $ref: '#/components/schemas/ResourceETag'
+      allOf:
+        - if:
+            properties:
+              resourceKind: { const: WORKBENCH }
+            required: [resourceKind]
+          then:
+            properties:
+              value: { $ref: '#/components/schemas/WorkbenchETag' }
+        - if:
+            properties:
+              resourceKind: { const: TASK }
+            required: [resourceKind]
+          then:
+            properties:
+              value: { $ref: '#/components/schemas/TaskETag' }
+        - if:
+            properties:
+              resourceKind: { const: DRAFT }
+            required: [resourceKind]
+          then:
+            properties:
+              value: { $ref: '#/components/schemas/DraftETag' }
+        - if:
+            properties:
+              resourceKind: { const: SUBJECT }
+            required: [resourceKind]
+          then:
+            properties:
+              value: { $ref: '#/components/schemas/SubjectETag' }
+
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, code, detail, instance, retryPolicy]
+      properties:
+        type:
+          type: string
+          format: uri
+          pattern: '^[A-Za-z][A-Za-z0-9+.-]*://'
+          maxLength: 512
+        title:
+          $ref: '#/components/schemas/SafeText200'
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        detail:
+          $ref: '#/components/schemas/SafeText500'
+        instance:
+          type: string
+          format: uri-reference
+          pattern: '^/'
+          maxLength: 512
+        retryPolicy:
+          $ref: '#/components/schemas/RetryPolicy'
+        fieldErrors:
+          type: array
+          minItems: 1
+          maxItems: 64
+          items:
+            $ref: '#/components/schemas/FieldError'
+        currentETag:
+          $ref: '#/components/schemas/CurrentETag'
+        receiptRef:
+          $ref: '#/components/schemas/ReceiptRef'
+      allOf:
+        - if:
+            properties:
+              code:
+                enum: [VALIDATION_FAILED]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [400]
+              retryPolicy:
+                enum: [SAME_KEY_AFTER_FIX]
+            required: [fieldErrors]
+          else:
+            not:
+              required: [fieldErrors]
+        - if:
+            properties:
+              code:
+                enum: [IDEMPOTENCY_KEY_REQUIRED, IDEMPOTENCY_KEY_INVALID]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [400]
+              retryPolicy:
+                enum: [SAME_KEY_AFTER_FIX]
+        - if:
+            properties:
+              code:
+                enum: [UNAUTHENTICATED]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [401]
+              retryPolicy:
+                enum: [SAME_KEY_AFTER_REAUTH]
+        - if:
+            properties:
+              code:
+                enum: [NOT_AUTHORIZED, APPOINTMENT_INACTIVE]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [403]
+              retryPolicy:
+                enum: ['NO']
+        - if:
+            properties:
+              code:
+                enum: [NOT_FOUND]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [404]
+              retryPolicy:
+                enum: ['NO']
+        - if:
+            properties:
+              code:
+                enum: [COMMAND_PAYLOAD_CONFLICT]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [409]
+              retryPolicy:
+                enum: ['NO']
+            required: [receiptRef]
+        - if:
+            properties:
+              code:
+                enum: [TASK_NOT_OPEN, TASK_ALREADY_COMPLETED]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [409]
+              retryPolicy:
+                enum: ['NO']
+              currentETag:
+                allOf:
+                  - $ref: '#/components/schemas/CurrentETag'
+                  - properties:
+                      resourceKind:
+                        enum: [TASK]
+            required: [currentETag]
+        - if:
+            properties:
+              code:
+                enum: [DRAFT_DIGEST_MISMATCH]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [409]
+              retryPolicy:
+                enum: [NEW_KEY_AFTER_REFRESH]
+              currentETag:
+                allOf:
+                  - $ref: '#/components/schemas/CurrentETag'
+                  - properties:
+                      resourceKind:
+                        enum: [DRAFT]
+            required: [currentETag]
+        - if:
+            properties:
+              code:
+                enum: [INGRESS_COMPLETION_ALREADY_RECORDED]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [409]
+              retryPolicy:
+                enum: ['NO']
+              currentETag:
+                allOf:
+                  - $ref: '#/components/schemas/CurrentETag'
+                  - properties:
+                      resourceKind:
+                        enum: [SUBJECT]
+            required: [currentETag]
+        - if:
+            properties:
+              code:
+                enum: [STALE_TASK]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [412]
+              retryPolicy:
+                enum: [NEW_KEY_AFTER_REFRESH]
+              currentETag:
+                allOf:
+                  - $ref: '#/components/schemas/CurrentETag'
+                  - properties:
+                      resourceKind:
+                        enum: [TASK]
+            required: [currentETag]
+        - if:
+            properties:
+              code:
+                enum: [STALE_DRAFT]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [412]
+              retryPolicy:
+                enum: [NEW_KEY_AFTER_REFRESH]
+              currentETag:
+                allOf:
+                  - $ref: '#/components/schemas/CurrentETag'
+                  - properties:
+                      resourceKind:
+                        enum: [DRAFT]
+            required: [currentETag]
+        - if:
+            properties:
+              code:
+                enum: [STALE_SUBJECT]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [412]
+              retryPolicy:
+                enum: [NEW_KEY_AFTER_REFRESH]
+              currentETag:
+                allOf:
+                  - $ref: '#/components/schemas/CurrentETag'
+                  - properties:
+                      resourceKind:
+                        enum: [SUBJECT]
+            required: [currentETag]
+        - if:
+            properties:
+              code:
+                enum: [SUPERVISOR_UNRESOLVED, SOURCE_INTAKE_OWNER_UNRESOLVED]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [422]
+              retryPolicy:
+                enum: [NEW_KEY_AFTER_ADMIN_FIX]
+        - if:
+            properties:
+              code:
+                enum: [DRAFT_PRECONDITION_REQUIRED]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [428]
+              retryPolicy:
+                enum: [SAME_KEY_AFTER_FIX]
+              currentETag:
+                allOf:
+                  - $ref: '#/components/schemas/CurrentETag'
+                  - properties:
+                      resourceKind:
+                        enum: [DRAFT]
+        - if:
+            properties:
+              code:
+                enum: [TASK_PRECONDITION_REQUIRED]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [428]
+              retryPolicy:
+                enum: [SAME_KEY_AFTER_FIX]
+              currentETag:
+                allOf:
+                  - $ref: '#/components/schemas/CurrentETag'
+                  - properties:
+                      resourceKind:
+                        enum: [TASK]
+            required: [currentETag]
+        - if:
+            properties:
+              code:
+                enum: [RATE_LIMITED]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [429]
+              retryPolicy:
+                enum: [SAME_KEY_AFTER_BACKOFF]
+        - if:
+            properties:
+              code:
+                enum: [INTERNAL_ERROR]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [500]
+              retryPolicy:
+                enum: [SAME_KEY_AFTER_BACKOFF]
+        - if:
+            properties:
+              code:
+                enum: [SERVICE_UNAVAILABLE]
+            required: [code]
+          then:
+            properties:
+              status:
+                enum: [503]
+              retryPolicy:
+                enum: [SAME_KEY_AFTER_BACKOFF]
+        - if:
+            properties:
+              code:
+                enum:
+                  - VALIDATION_FAILED
+                  - IDEMPOTENCY_KEY_REQUIRED
+                  - IDEMPOTENCY_KEY_INVALID
+                  - UNAUTHENTICATED
+                  - NOT_AUTHORIZED
+                  - APPOINTMENT_INACTIVE
+                  - NOT_FOUND
+                  - COMMAND_PAYLOAD_CONFLICT
+                  - SUPERVISOR_UNRESOLVED
+                  - SOURCE_INTAKE_OWNER_UNRESOLVED
+                  - RATE_LIMITED
+                  - INTERNAL_ERROR
+                  - SERVICE_UNAVAILABLE
+            required: [code]
+          then:
+            not:
+              required: [currentETag]

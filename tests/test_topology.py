@@ -55,6 +55,7 @@ jobs:
       - run: npm install --global npm@11.9.0
       - run: test "$(npm --version)" = "11.9.0"
       - run: npm ci
+      - run: npm run openapi:check
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
@@ -71,6 +72,48 @@ jobs:
           test "$TOPOLOGY_RESULT" = success
           test "$BACKEND_RESULT" = success
           test "$WORKBENCH_RESULT" = success
+"""
+
+
+VALID_OPENAPI_GENERATOR_PLUGIN = """
+    <plugin>
+      <groupId>org.openapitools</groupId>
+      <artifactId>openapi-generator-maven-plugin</artifactId>
+      <version>${openapi-generator.version}</version>
+      <executions>
+        <execution>
+          <id>generate-r1-openapi-contract</id>
+          <phase>generate-sources</phase>
+          <goals><goal>generate</goal></goals>
+          <configuration>
+            <inputSpec>${project.basedir}/../contracts/openapi/ontology-law-api.yaml</inputSpec>
+            <generatorName>spring</generatorName>
+            <library>spring-boot</library>
+            <output>${project.build.directory}/generated-sources/openapi</output>
+            <apiPackage>io.github.windyzhu3.ontologylaw.api.adapter.generated.api</apiPackage>
+            <modelPackage>io.github.windyzhu3.ontologylaw.api.adapter.generated.model</modelPackage>
+            <generateApis>true</generateApis>
+            <generateModels>true</generateModels>
+            <generateSupportingFiles>false</generateSupportingFiles>
+            <generateApiDocumentation>false</generateApiDocumentation>
+            <generateModelDocumentation>false</generateModelDocumentation>
+            <generateApiTests>false</generateApiTests>
+            <generateModelTests>false</generateModelTests>
+            <addCompileSourceRoot>true</addCompileSourceRoot>
+            <skipValidateSpec>false</skipValidateSpec>
+            <configOptions>
+              <interfaceOnly>true</interfaceOnly>
+              <skipDefaultInterface>true</skipDefaultInterface>
+              <useJakartaEe>true</useJakartaEe>
+              <openApiNullable>false</openApiNullable>
+              <documentationProvider>none</documentationProvider>
+              <annotationLibrary>swagger2</annotationLibrary>
+              <useTags>true</useTags>
+            </configOptions>
+          </configuration>
+        </execution>
+      </executions>
+    </plugin>
 """
 
 
@@ -91,6 +134,7 @@ VALID_POM = """
     <openapi-generator.version>7.25.0</openapi-generator.version>
   </properties>
   <build><plugins>
+""" + VALID_OPENAPI_GENERATOR_PLUGIN + """
     <plugin>
       <groupId>org.apache.maven.plugins</groupId>
       <artifactId>maven-compiler-plugin</artifactId><version>3.14.1</version>
@@ -162,6 +206,8 @@ class TopologyVerifierTest(unittest.TestCase):
             "engines": {"node": "24.20.0", "npm": "11.9.0"},
             "workspaces": ["apps/workbench"],
             "scripts": {
+                "openapi:generate": "openapi-typescript contracts/openapi/ontology-law-api.yaml --output apps/workbench/src/generated/api/schema.d.ts --alphabetize",
+                "openapi:check": "openapi-typescript contracts/openapi/ontology-law-api.yaml --output apps/workbench/src/generated/api/schema.d.ts --alphabetize --check",
                 "typecheck": "npm run typecheck --workspace apps/workbench",
                 "test": "npm run test --workspace apps/workbench",
                 "build": "npm run build --workspace apps/workbench",
@@ -467,6 +513,25 @@ class TopologyVerifierTest(unittest.TestCase):
         errors = self._verify()
         self.assertTrue(any("root script 'typecheck'" in error for error in errors), errors)
 
+    def test_openapi_generation_scripts_cannot_be_removed_or_replaced_by_noops(self) -> None:
+        mutations = {
+            "missing generator": ("openapi:generate", None),
+            "generator drift": ("openapi:generate", "openapi-typescript other.yaml --output stale.d.ts"),
+            "missing check": ("openapi:check", None),
+            "check no-op": ("openapi:check", "true"),
+        }
+        for name, (script_name, replacement) in mutations.items():
+            with self.subTest(name=name):
+                self._write_valid_project()
+                root_package = json.loads((self.root / "package.json").read_text(encoding="utf-8"))
+                if replacement is None:
+                    del root_package["scripts"][script_name]
+                else:
+                    root_package["scripts"][script_name] = replacement
+                self._write("package.json", json.dumps(root_package))
+                errors = self._verify()
+                self.assertTrue(any(f"root script '{script_name}'" in error for error in errors), errors)
+
     def test_workflow_has_no_path_filter_and_has_unskippable_aggregate(self) -> None:
         self._write(
             ".github/workflows/scaffold-gate.yml",
@@ -534,6 +599,78 @@ class TopologyVerifierTest(unittest.TestCase):
             errors,
         )
 
+    def test_workflow_checks_openapi_generated_types_before_typecheck(self) -> None:
+        openapi_check = "      - run: npm run openapi:check\n"
+        typecheck = "      - run: npm run typecheck\n"
+        mutations = {
+            "missing check": VALID_WORKFLOW.replace(openapi_check, ""),
+            "check after typecheck": VALID_WORKFLOW.replace(
+                openapi_check + typecheck,
+                typecheck + openapi_check,
+            ),
+        }
+        for name, workflow in mutations.items():
+            with self.subTest(name=name):
+                self._write(".github/workflows/scaffold-gate.yml", workflow)
+                errors = self._verify()
+                self.assertTrue(
+                    any("OpenAPI generated types" in error and "before typecheck" in error for error in errors),
+                    errors,
+                )
+
+    def test_required_jobs_and_steps_reject_failure_suppression_and_nondefault_conditions(self) -> None:
+        mutations = {
+            "step continue-on-error": (
+                VALID_WORKFLOW.replace(
+                    "      - run: npm run openapi:check\n",
+                    "      - run: npm run openapi:check\n        continue-on-error: true\n",
+                ),
+                "workbench step",
+            ),
+            "step nondefault if": (
+                VALID_WORKFLOW.replace(
+                    "      - run: npm run openapi:check\n",
+                    "      - run: npm run openapi:check\n        if: ${{ always() }}\n",
+                ),
+                "workbench step",
+            ),
+            "job continue-on-error": (
+                VALID_WORKFLOW.replace(
+                    "  workbench:\n    runs-on: ubuntu-latest\n",
+                    "  workbench:\n    continue-on-error: true\n    runs-on: ubuntu-latest\n",
+                ),
+                "workbench job",
+            ),
+            "job nondefault if": (
+                VALID_WORKFLOW.replace(
+                    "  workbench:\n    runs-on: ubuntu-latest\n",
+                    "  workbench:\n    if: ${{ always() }}\n    runs-on: ubuntu-latest\n",
+                ),
+                "workbench job",
+            ),
+        }
+        for name, (workflow, expected_error) in mutations.items():
+            with self.subTest(name=name):
+                self._write(".github/workflows/scaffold-gate.yml", workflow)
+                errors = self._verify()
+                self.assertTrue(
+                    any(expected_error in error and (
+                        "continue-on-error" in error or "default success()" in error
+                    ) for error in errors),
+                    errors,
+                )
+
+    def test_explicit_default_success_conditions_do_not_trip_the_workflow_gate(self) -> None:
+        workflow = VALID_WORKFLOW.replace(
+            "  workbench:\n    runs-on: ubuntu-latest\n",
+            "  workbench:\n    if: ${{ success() }}\n    runs-on: ubuntu-latest\n",
+        ).replace(
+            "      - run: npm run openapi:check\n",
+            "      - run: npm run openapi:check\n        if: ${{ success() }}\n",
+        )
+        self._write(".github/workflows/scaffold-gate.yml", workflow)
+        self.assertEqual([], self._verify())
+
     def test_enforcer_fails_closed_for_toolchain_dependencies_and_dynamic_versions(self) -> None:
         rule_elements = {
             "requireJavaVersion": "<requireJavaVersion><version>[25.0.4-1]</version></requireJavaVersion>",
@@ -562,6 +699,185 @@ class TopologyVerifierTest(unittest.TestCase):
         )
         errors = self._verify()
         self.assertTrue(any("banDynamicVersions" in error for error in errors), errors)
+
+    def test_openapi_generator_plugin_is_required(self) -> None:
+        self._write("backend/pom.xml", VALID_POM.replace(VALID_OPENAPI_GENERATOR_PLUGIN, ""))
+        errors = self._verify()
+        self.assertTrue(any("OpenAPI Generator plugin" in error for error in errors), errors)
+
+    def test_openapi_generator_execution_rejects_phase_goal_path_and_package_drift(self) -> None:
+        mutations = {
+            "groupId": ("<groupId>org.openapitools</groupId>", "<groupId>example.invalid</groupId>", "groupId"),
+            "version": (
+                "<version>${openapi-generator.version}</version>",
+                "<version>7.24.0</version>",
+                "version",
+            ),
+            "execution id": (
+                "<id>generate-r1-openapi-contract</id>",
+                "<id>generate-other-contract</id>",
+                "execution id",
+            ),
+            "phase": ("<phase>generate-sources</phase>", "<phase>compile</phase>", "phase"),
+            "goal": ("<goal>generate</goal>", "<goal>help</goal>", "goals"),
+            "inputSpec": (
+                "${project.basedir}/../contracts/openapi/ontology-law-api.yaml",
+                "${project.basedir}/../contracts/openapi/other.yaml",
+                "inputSpec",
+            ),
+            "output": (
+                "${project.build.directory}/generated-sources/openapi",
+                "${project.basedir}/src/main/java",
+                "output",
+            ),
+            "apiPackage": (
+                "io.github.windyzhu3.ontologylaw.api.adapter.generated.api",
+                "io.github.windyzhu3.ontologylaw.lead.generated.api",
+                "apiPackage",
+            ),
+            "modelPackage": (
+                "io.github.windyzhu3.ontologylaw.api.adapter.generated.model",
+                "io.github.windyzhu3.ontologylaw.lead.generated.model",
+                "modelPackage",
+            ),
+        }
+        for name, (original, replacement, expected_error) in mutations.items():
+            with self.subTest(name=name):
+                self._write("backend/pom.xml", VALID_POM.replace(original, replacement))
+                errors = self._verify()
+                self.assertTrue(
+                    any("OpenAPI Generator" in error and expected_error in error for error in errors),
+                    errors,
+                )
+
+    def test_openapi_generator_rejects_api_model_scope_and_critical_option_drift(self) -> None:
+        mutations = {
+            "generatorName": ("<generatorName>spring</generatorName>", "<generatorName>java</generatorName>"),
+            "library": ("<library>spring-boot</library>", "<library>spring-http-interface</library>"),
+            "generateApis": ("<generateApis>true</generateApis>", "<generateApis>false</generateApis>"),
+            "generateModels": ("<generateModels>true</generateModels>", "<generateModels>false</generateModels>"),
+            "generateSupportingFiles": (
+                "<generateSupportingFiles>false</generateSupportingFiles>",
+                "<generateSupportingFiles>true</generateSupportingFiles>",
+            ),
+            "generateApiDocumentation": (
+                "<generateApiDocumentation>false</generateApiDocumentation>",
+                "<generateApiDocumentation>true</generateApiDocumentation>",
+            ),
+            "generateModelDocumentation": (
+                "<generateModelDocumentation>false</generateModelDocumentation>",
+                "<generateModelDocumentation>true</generateModelDocumentation>",
+            ),
+            "generateApiTests": (
+                "<generateApiTests>false</generateApiTests>",
+                "<generateApiTests>true</generateApiTests>",
+            ),
+            "generateModelTests": (
+                "<generateModelTests>false</generateModelTests>",
+                "<generateModelTests>true</generateModelTests>",
+            ),
+            "addCompileSourceRoot": (
+                "<addCompileSourceRoot>true</addCompileSourceRoot>",
+                "<addCompileSourceRoot>false</addCompileSourceRoot>",
+            ),
+            "skipValidateSpec": (
+                "<skipValidateSpec>false</skipValidateSpec>",
+                "<skipValidateSpec>true</skipValidateSpec>",
+            ),
+            "interfaceOnly": ("<interfaceOnly>true</interfaceOnly>", "<interfaceOnly>false</interfaceOnly>"),
+            "skipDefaultInterface": (
+                "<skipDefaultInterface>true</skipDefaultInterface>",
+                "<skipDefaultInterface>false</skipDefaultInterface>",
+            ),
+            "useJakartaEe": ("<useJakartaEe>true</useJakartaEe>", "<useJakartaEe>false</useJakartaEe>"),
+            "openApiNullable": (
+                "<openApiNullable>false</openApiNullable>",
+                "<openApiNullable>true</openApiNullable>",
+            ),
+            "documentationProvider": (
+                "<documentationProvider>none</documentationProvider>",
+                "<documentationProvider>springdoc</documentationProvider>",
+            ),
+            "annotationLibrary": (
+                "<annotationLibrary>swagger2</annotationLibrary>",
+                "<annotationLibrary>none</annotationLibrary>",
+            ),
+            "useTags": ("<useTags>true</useTags>", "<useTags>false</useTags>"),
+        }
+        for name, (original, replacement) in mutations.items():
+            with self.subTest(name=name):
+                self._write("backend/pom.xml", VALID_POM.replace(original, replacement))
+                errors = self._verify()
+                self.assertTrue(
+                    any("OpenAPI Generator" in error and name in error for error in errors),
+                    errors,
+                )
+
+    def test_openapi_generator_rejects_profile_property_overrides_and_profile_plugins(self) -> None:
+        profile_property = """
+          <profiles><profile>
+            <id>override-generator-version</id>
+            <activation><activeByDefault>true</activeByDefault></activation>
+            <properties><openapi-generator.version>7.24.0</openapi-generator.version></properties>
+          </profile></profiles>
+        """
+        profile_plugin = """
+          <profiles><profile>
+            <id>add-generator-execution</id>
+            <activation><activeByDefault>true</activeByDefault></activation>
+            <build><plugins>
+        """ + VALID_OPENAPI_GENERATOR_PLUGIN.replace(
+            "<id>generate-r1-openapi-contract</id>",
+            "<id>generate-domain-sources</id>",
+        ).replace(
+            "${project.build.directory}/generated-sources/openapi",
+            "${project.basedir}/src/main/java",
+        ) + """
+            </plugins></build>
+          </profile></profiles>
+        """
+        mutations = {
+            "profile property": (profile_property, "openapi-generator.version"),
+            "profile plugin": (profile_plugin, "openapi-generator-maven-plugin"),
+        }
+        for name, (profile, expected_error) in mutations.items():
+            with self.subTest(name=name):
+                self._write("backend/pom.xml", VALID_POM.replace("</project>", profile + "</project>"))
+                errors = self._verify()
+                self.assertTrue(
+                    any("profile" in error and expected_error in error for error in errors),
+                    errors,
+                )
+
+    def test_openapi_generator_rejects_plugin_and_execution_level_merge_points(self) -> None:
+        mutations = {
+            "plugin configuration": (
+                "<version>${openapi-generator.version}</version>",
+                """<version>${openapi-generator.version}</version>
+                   <configuration><apiNameSuffix>Alternate</apiNameSuffix></configuration>""",
+                "plugin fields",
+            ),
+            "plugin inherited flag": (
+                "<version>${openapi-generator.version}</version>",
+                """<version>${openapi-generator.version}</version>
+                   <inherited>true</inherited>""",
+                "plugin fields",
+            ),
+            "execution inherited flag": (
+                "<phase>generate-sources</phase>",
+                """<phase>generate-sources</phase>
+                   <inherited>true</inherited>""",
+                "execution fields",
+            ),
+        }
+        for name, (original, replacement, expected_error) in mutations.items():
+            with self.subTest(name=name):
+                self._write("backend/pom.xml", VALID_POM.replace(original, replacement))
+                errors = self._verify()
+                self.assertTrue(
+                    any("OpenAPI Generator" in error and expected_error in error for error in errors),
+                    errors,
+                )
 
     def test_second_backend_or_frontend_project_is_rejected(self) -> None:
         self._write("other/pom.xml", VALID_POM)
