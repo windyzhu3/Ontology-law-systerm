@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class R1ContractClosureIT extends PostgresIntegrationTest {
     static UUID id(int n){return UUID.fromString("01900000-0000-7000-8000-"+String.format(Locale.ROOT,"%012d",n));}
     static String scalar(Connection c,String query)throws SQLException{try(var s=c.createStatement();var r=s.executeQuery(query)){assertTrue(r.next());return r.getString(1);}}
-    enum Fault { NONE, DROP_OPPORTUNITY, ADD_OPPORTUNITY, WRONG_OPPORTUNITY, WRONG_CONTACT, WRONG_HASH, DUPLICATE, WRONG_OWNER, MISSING_OPPORTUNITY, OPPORTUNITY_REVISION, MISSING_DONE, MISSING_CONFIRM }
+    enum Fault { NONE, DROP_OPPORTUNITY, ADD_OPPORTUNITY, WRONG_OPPORTUNITY, WRONG_CONTACT, WRONG_HASH, DUPLICATE, WRONG_OWNER, MISSING_OPPORTUNITY, OPPORTUNITY_REVISION, MISSING_DONE, MISSING_CONFIRM, ALREADY_CONFIRMED_NO_CONFIRM_WRITE }
     class ContactHandler implements CommandHandler {
         final UUID tenant,principal,owner,org,grant,lead,task,assignment,contact,opportunity,draft;
         final String code;final int number;final Fault fault;final String contactHash;
@@ -40,6 +40,9 @@ class R1ContractClosureIT extends PostgresIntegrationTest {
                 sql(x,"update lead.lead set current_assignment_id=?,revision=revision+1 where tenant_id=? and lead_id=?",assignment,tenant,lead);
                 sql(x,"insert into responsibility.task_occurrence (tenant_id,task_occurrence_id,owner_appointment_id,business_purpose_code,primary_command_code,expected_completion_fact_type,original_sla_code,original_sla_seconds,original_sla_due_at,state,created_at,subject_type,subject_id,subject_revision) values (?,?,?,'CONTACT_LEAD','RECORD_CONTACT_RESULT','lead.lead_contact_result','R1_CONTACT_30M_V1',1800,clock_timestamp()+interval '30 minutes','OPEN',clock_timestamp(),'lead.lead',?,1)",tenant,task,fault==Fault.WRONG_OWNER?id(base+12):owner,lead);
                 sql(x,"insert into responsibility.action_draft (tenant_id,action_draft_id,task_occurrence_id,action_code,payload_schema_code,payload_schema_version,candidate_payload,candidate_payload_digest,state,created_by_appointment_id,created_at,last_edited_at) values (?,?,?,'RECORD_CONTACT_RESULT','RecordContactResultV1',1,'{}',decode(repeat('00',32),'hex'),'DRAFT',?,clock_timestamp(),clock_timestamp())",tenant,draft,task,owner);return null;
+            });}
+            if(fault==Fault.ALREADY_CONFIRMED_NO_CONFIRM_WRITE)try(var c=database.apiConnection()){inTransaction(c,Capability.COMMAND,x->{
+                sql(x,"update responsibility.action_draft set state='CONFIRMED',revision=revision+1,confirmed_by_appointment_id=?,confirmed_at=clock_timestamp(),confirmed_payload_digest=candidate_payload_digest where tenant_id=? and action_draft_id=?",owner,tenant,draft);return null;
             });}
         }
         public CommandEnvelope.Type type(){return CommandEnvelope.Type.RECORD_CONTACT_RESULT;}
@@ -65,7 +68,7 @@ class R1ContractClosureIT extends PostgresIntegrationTest {
                 if(fault==Fault.OPPORTUNITY_REVISION)sql(c,"update opportunity.opportunity set revision=revision+1,close_outcome_code='FIXTURE',closed_at=clock_timestamp() where tenant_id=? and opportunity_id=?",tenant,opportunity);
             }
             if(fault!=Fault.MISSING_DONE)sql(c,"update responsibility.task_occurrence set state='DONE',revision=revision+1,completed_at=clock_timestamp(),completion_fact_type='lead.lead_contact_result',completion_fact_id=?,completion_fact_hash=? where tenant_id=? and task_occurrence_id=?",contact,Base64.getUrlDecoder().decode(contactHash),tenant,task);
-            if(fault!=Fault.MISSING_CONFIRM)sql(c,"update responsibility.action_draft set state='CONFIRMED',revision=revision+1,confirmed_by_appointment_id=?,confirmed_at=clock_timestamp(),confirmed_payload_digest=candidate_payload_digest where tenant_id=? and action_draft_id=?",owner,tenant,draft);
+            if(fault!=Fault.MISSING_CONFIRM && fault!=Fault.ALREADY_CONFIRMED_NO_CONFIRM_WRITE)sql(c,"update responsibility.action_draft set state='CONFIRMED',revision=revision+1,confirmed_by_appointment_id=?,confirmed_at=clock_timestamp(),confirmed_payload_digest=candidate_payload_digest where tenant_id=? and action_draft_id=?",owner,tenant,draft);
             var first=new Notification(number==3 && code.equals("NOT_CONNECTED")?Event.LeadContactRetryExhaustedV1:Event.LeadContactResultRecordedV1,receipt());
             var notifications=new ArrayList<Notification>();notifications.add(first);
             if(code.equals("CONNECTED_VALID") && fault!=Fault.DROP_OPPORTUNITY || fault==Fault.ADD_OPPORTUNITY)notifications.add(new Notification(Event.OpportunityOpened,new Subject("opportunity.opportunity",fault==Fault.WRONG_OPPORTUNITY?id(99998):opportunity,0L,null)));
@@ -114,6 +117,20 @@ class R1ContractClosureIT extends PostgresIntegrationTest {
             var h=new ContactHandler(10+fault.ordinal(),fault==Fault.ADD_OPPORTUNITY?"NOT_CONNECTED":"CONNECTED_VALID",1,fault);
             assertEquals("22000",assertThrows(SQLException.class,()->run(runtime(h),h.envelope()),fault.name()).getSQLState(),fault.name());assertRolledBack(h);
         }
+    }
+    @Test void previously_confirmed_draft_without_current_confirm_write_rolls_back_command()throws Exception {
+        var h=new ContactHandler(22,"CONNECTED_VALID",1,Fault.ALREADY_CONFIRMED_NO_CONFIRM_WRITE);
+        String before;
+        try(var c=database.apiConnection()){before=inTransaction(c,Capability.QUERY,x->scalar(x,"select row_to_json(d)::text from responsibility.action_draft d where tenant_id='"+h.tenant+"'"));}
+        var failure=assertThrows(SQLException.class,()->run(runtime(h),h.envelope()));
+        assertEquals("22000",failure.getSQLState());
+        assertEquals(List.of(0L,0L,0L,0L,0L),counts(h.tenant));
+        try(var c=database.apiConnection()){inTransaction(c,Capability.QUERY,x->{
+            assertEquals("0",scalar(x,"select count(*) from lead.lead_contact_result where tenant_id='"+h.tenant+"'"));
+            assertEquals("0",scalar(x,"select count(*) from opportunity.opportunity where tenant_id='"+h.tenant+"'"));
+            assertEquals("OPEN:0",scalar(x,"select state||':'||revision from responsibility.task_occurrence where tenant_id='"+h.tenant+"'"));
+            assertEquals(before,scalar(x,"select row_to_json(d)::text from responsibility.action_draft d where tenant_id='"+h.tenant+"'"));return null;
+        });}
     }
     @Test void contact_no_selects_retry_or_exhausted_and_suspect_has_one_event()throws Exception {
         String[][] rows={{"NOT_CONNECTED","1","LeadContactResultRecordedV1"},{"NOT_CONNECTED","2","LeadContactResultRecordedV1"},{"NOT_CONNECTED","3","LeadContactRetryExhaustedV1"},{"SUSPECT_INVALID","1","LeadContactResultRecordedV1"}};

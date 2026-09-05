@@ -113,7 +113,9 @@ public final class R1EventPolicy {
                 outcome=contact.code();
                 if("CONNECTED_VALID".equals(outcome)) {
                     require(opportunity!=null && opportunity.selector().revision()==0 && opportunity.leadId().equals(contact.leadId()) && opportunity.assignmentId().equals(contact.assignmentId()) && opportunity.contactId().equals(contact.selector().id()) && opportunity.owner().equals(assignment.owner()));
-                    require(task.draft()!=null && "CONFIRMED".equals(task.draft().state()));
+                    var beforeDraft=beforeTask.draft();var draft=task.draft();
+                    require(beforeDraft!=null && "DRAFT".equals(beforeDraft.state()) && draft!=null && "CONFIRMED".equals(draft.state()));
+                    require(beforeDraft.selector().id().equals(draft.selector().id()) && beforeDraft.selector().revision()!=null && draft.selector().revision()==CommandHandler.nextRevision(beforeDraft.selector().revision()));
                     expectedSources.put(OpportunityOpened,opportunity.selector());
                 } else {
                     require(opportunity==null);
