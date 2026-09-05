@@ -13,7 +13,8 @@ public interface CommandHandler {
         if(current<0 || current>=9007199254740991L)throw new SQLException("Revision cannot be safely incremented","22003");
         return current+1;
     }
-    record Context(CommandScope scope, AuthorizationService.Request authorization) {
+    record Context(CommandScope scope, AuthorizationService.Request authorization, CommandAuthorizationBinding binding) {
+        public Context(CommandScope scope, AuthorizationService.Request authorization) { this(scope,authorization,null); }
         public Context {Objects.requireNonNull(scope);Objects.requireNonNull(authorization);}
     }
     enum QueueOwner { R1_PROJECTION }

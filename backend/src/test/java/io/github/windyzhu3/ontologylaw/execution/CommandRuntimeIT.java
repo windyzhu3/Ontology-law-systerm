@@ -188,10 +188,13 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
     final class RecoveryHandler extends Handler {
         final UUID wait=UUID.randomUUID();String waitHash;long expected=1;
         RecoveryHandler(boolean early,boolean wrongType,boolean alreadyOpen)throws Exception {
+            this(early,wrongType,alreadyOpen,"CONTACT_RETRY_V1");
+        }
+        RecoveryHandler(boolean early,boolean wrongType,boolean alreadyOpen,String profile)throws Exception {
             super(AuthorizationServiceIT.seed(database,"SERVICE"),wrongType?"COMPLETE_LEAD_INGRESS":"CONTACT_LEAD",wrongType?"COMPLETE_LEAD_INGRESS":"RECORD_CONTACT_RESULT",wrongType?"lead.lead":"lead.lead_contact_result");
             try(var c=database.apiConnection()){inTransaction(c,Capability.COMMAND,x->{
                 sql(x,"update responsibility.task_occurrence set state='WAITING',revision=revision+1 where tenant_id=? and task_occurrence_id=?",seed.tenant(),task);
-                sql(x,"insert into responsibility.wait_receipt (tenant_id,wait_receipt_id,task_occurrence_id,task_revision,wait_sequence,wait_reason_code,wait_contract_code,wait_contract_version,entered_waiting_at,resume_due_at,recorded_by_appointment_id) values (?,?,?,1,1,'CONTACT_RETRY','CONTACT_RETRY_V1',1,clock_timestamp()-interval '2 hours',clock_timestamp()+ (? * interval '1 hour'),?)",seed.tenant(),wait,task,early?1:-1,seed.appointment());
+                sql(x,"insert into responsibility.wait_receipt (tenant_id,wait_receipt_id,task_occurrence_id,task_revision,wait_sequence,wait_reason_code,wait_contract_code,wait_contract_version,entered_waiting_at,resume_due_at,recorded_by_appointment_id) values (?,?,?,1,1,'CONTACT_RETRY',?,1,clock_timestamp()-interval '2 hours',clock_timestamp()+ (? * interval '1 hour'),?)",seed.tenant(),wait,task,profile,early?1:-1,seed.appointment());
                 if(alreadyOpen)sql(x,"update responsibility.task_occurrence set state='OPEN',revision=revision+1 where tenant_id=? and task_occurrence_id=?",seed.tenant(),task);
                 waitHash=waitHash(x);return null;
             });}
@@ -324,11 +327,21 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
             assertEquals(List.of(1L,1L,1L,1L,1L,1L),counts(h));
         }
     }
-    @Test void unresolved_command_policy_cannot_register_even_a_no_change_handler()throws Exception {
+    @Test void dedicated_command_missing_binding_fails_closed_even_for_no_change()throws Exception {
         for(var type:List.of(CommandEnvelope.Type.CAPTURE_LEAD,CommandEnvelope.Type.SAVE_ACTION_DRAFT,CommandEnvelope.Type.REOPEN_DUE_CONTACT_TASKS,CommandEnvelope.Type.REOPEN_DUE_ROUTING_REVIEW_TASKS)) {
-            Handler h=new Handler(){@Override public CommandEnvelope.Type type(){return type;}};
+            Handler h=new Handler(){@Override public CommandEnvelope.Type type(){return type;}
+                @Override public Context resolve(Connection c,CommandEnvelope e) {
+                    String hash=Base64.getUrlEncoder().withoutPadding().encodeToString(CanonicalJson.digest("fixture"));
+                    var scope=type==CommandEnvelope.Type.CAPTURE_LEAD?CommandScope.capture(seed.tenant(),"FIXTURE",hash)
+                            :type==CommandEnvelope.Type.SAVE_ACTION_DRAFT?CommandScope.draft(seed.tenant(),task,CommandEnvelope.Type.COMPLETE_LEAD_INGRESS)
+                            :CommandScope.reopen(seed.tenant(),type,task,UUID.randomUUID(),hash);
+                    return new Context(scope,seed.request());
+                }
+            };
             h.mode=Mode.NO_CHANGE;
-            assertThrows(IllegalArgumentException.class,()->runtime(h));assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));
+            var runtime=assertDoesNotThrow(()->runtime(h));
+            assertThrows(CommandHandler.Rejected.class,()->run(runtime,h.envelope(UUID.randomUUID(),Map.of())));
+            assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));
         }
     }
 }

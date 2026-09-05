@@ -10,17 +10,22 @@ import static io.github.windyzhu3.ontologylaw.execution.internal.persistence.Cap
 
 public final class CommandRuntime {
     private final Map<CommandEnvelope.Type,CommandHandler> handlers;
-    private final AuthorizationService authorization;
+    private final R1CommandPolicy policy;
     private final AuditAppender audit;
     public CommandRuntime(Collection<CommandHandler> handlers,AuthorizationService authorization,String executionNodeCode) {this(handlers,authorization,AuditAppender.databaseBacked(executionNodeCode));}
     public CommandRuntime(Collection<CommandHandler> handlers,AuthorizationService authorization,AuditAppender audit) {
+        this(handlers,authorization,audit,null);
+    }
+    public CommandRuntime(Collection<CommandHandler> handlers,AuthorizationService authorization,String executionNodeCode,R1AuthorizationFacts facts) {
+        this(handlers,authorization,AuditAppender.databaseBacked(executionNodeCode),facts);
+    }
+    public CommandRuntime(Collection<CommandHandler> handlers,AuthorizationService authorization,AuditAppender audit,R1AuthorizationFacts facts) {
         var registry=new EnumMap<CommandEnvelope.Type,CommandHandler>(CommandEnvelope.Type.class);
         for(var handler:handlers) {
             var type=Objects.requireNonNull(handler.type());
-            if(primaryPolicy(type)==null)throw new IllegalArgumentException("Command-specific authority policy is not frozen");
             if(registry.put(type,handler)!=null)throw new IllegalArgumentException("Duplicate static handler");
         }
-        this.handlers=Map.copyOf(registry);this.authorization=Objects.requireNonNull(authorization);this.audit=Objects.requireNonNull(audit);
+        this.handlers=Map.copyOf(registry);this.policy=new R1CommandPolicy(authorization,facts);this.audit=Objects.requireNonNull(audit);
     }
     /** Caller owns a fresh connection. Commit acknowledgement loss has unknown durability; retry the same key. */
     public CommandResult execute(Connection connection,CommandEnvelope envelope) throws SQLException {
@@ -31,32 +36,34 @@ public final class CommandRuntime {
             var context=handler.resolve(c,envelope);
             if(!context.scope().tenantId().equals(envelope.actor().tenantId()) || context.scope().type()!=envelope.type()
                     || !context.authorization().actor().equals(envelope.actor()))throw new CommandHandler.Rejected("NOT_AUTHORIZED");
-            validatePolicy(envelope.type(),context.authorization().requirement());
-            AuthorizationSnapshot initial=authorization.evaluate(c,context.authorization(),false);
+            AuthorizationSnapshot initial=policy.authorize(c,envelope,context,false);
             if(!initial.allowed())throw new CommandHandler.Rejected(initial.rejectionCode());
             setLocalRole(c,Capability.COMMAND);handler.lockRoots(c,envelope,context);
             var store=new JooqCommandStore(c);store.lockCommand(envelope);
             var existing=store.existingOrValidateNew(envelope,context.scope(),payload,x->{handler.recoveryEligibility(x,envelope,context);return null;});
             if(existing!=null) {
                 setLocalRole(c,Capability.QUERY);
-                var current=authorization.evaluate(c,context.authorization(),true);
+                var current=policy.authorize(c,envelope,context,true);
                 if(!current.allowed())throw new CommandHandler.Rejected(current.rejectionCode());
                 return existing;
             }
             UUID slot=store.occupy(envelope,context.scope(),payload);Savepoint business=c.setSavepoint();
-            CommandHandler.Result result=null;String rejection=null;AuthorizationSnapshot terminal;
+            CommandHandler.Result result=null;String rejection=null;AuthorizationSnapshot terminal=null;
             try {
                 setLocalRole(c,Capability.QUERY);
-                var before=authorization.evaluate(c,context.authorization(),false);if(!before.allowed())throw new CommandHandler.Rejected(before.rejectionCode());
+                terminal=policy.authorize(c,envelope,context,false);if(!terminal.allowed())throw new CommandHandler.Rejected(terminal.rejectionCode());
                 setLocalRole(c,Capability.COMMAND);handler.validateBeforeWork(c,envelope,context);result=handler.execute(c,envelope,context);
                 validateResult(envelope.type(),result);
                 if(result.status()==CommandOutcome.Status.NO_CHANGE)c.rollback(business);
                 setLocalRole(c,Capability.QUERY);handler.validateBeforeCommit(c,envelope,context,result);
-                terminal=authorization.evaluate(c,context.authorization(),true);
+                terminal=policy.authorize(c,envelope,context,true);
                 if(!terminal.allowed())throw new CommandHandler.Rejected(terminal.rejectionCode());
             } catch(CommandHandler.Rejected denied) {
                 c.rollback(business);setLocalRole(c,Capability.QUERY);result=null;rejection=denied.code();
-                terminal=authorization.evaluate(c,context.authorization(),true);
+                var current=policy.authorize(c,envelope,context,true);
+                // Never erase the denying evidence after rollback makes a later read allowed again.
+                if(terminal==null || terminal.allowed())terminal=current;
+                else terminal=R1CommandPolicy.retainDenial(terminal,current);
             }
             var status=result==null?CommandOutcome.Status.REJECTED:result.status();
             setLocalRole(c,Capability.COMMAND);
@@ -68,23 +75,6 @@ public final class CommandRuntime {
             audit.append(c,new AuditAppender.Entry(auditId,envelope.commandId(),envelope.type().name(),envelope.correlationId(),status.name(),terminal,summary,CanonicalJson.digest(summary)));
             return receipt;
         });
-    }
-    private static String primaryPolicy(CommandEnvelope.Type type) {
-        return switch(type) {
-            case RESOLVE_DUPLICATE_LEAD -> "SOURCE_INTAKE_OWNER:LEAD_INGRESS_RESOLVE";
-            case COMPLETE_LEAD_INGRESS -> "SOURCE_INTAKE_OWNER:LEAD_INGRESS_COMPLETE";
-            case ASSIGN_LEAD -> "ROUTING_SUPERVISOR:LEAD_ASSIGN";
-            case RECORD_ROUTING_DISPOSITION -> "ROUTING_SUPERVISOR:LEAD_ROUTING_DECIDE";
-            case ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST -> "SOURCE_INTAKE_OWNER:SOURCE_INTAKE_REQUEST_ACK";
-            case RECORD_CONTACT_RESULT -> "ASSIGNMENT_OWNER:SALES_CONTACT_OWNER";
-            case REVIEW_LEAD_VALIDITY -> "ROUTING_SUPERVISOR:LEAD_VALIDITY_REVIEW";
-            default -> null;
-        };
-    }
-    private static void validatePolicy(CommandEnvelope.Type type,AuthorizationService.Requirement requirement) {
-        String expected=primaryPolicy(type);
-        if(expected==null || requirement.path()==AuthorizationService.Path.SYSTEM
-                || !expected.equals(requirement.slot()+":"+requirement.authorityCode()))throw new CommandHandler.Rejected("NOT_AUTHORIZED");
     }
     private static void validateResult(CommandEnvelope.Type type,CommandHandler.Result result)throws SQLException {
         String expected=switch(type) {

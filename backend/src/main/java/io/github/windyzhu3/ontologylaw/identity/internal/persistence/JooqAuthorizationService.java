@@ -24,6 +24,7 @@ public final class JooqAuthorizationService implements AuthorizationService {
         return new AuthorizationSnapshot(request,now,rejection==null,rejection,check.selectedFact,evidence,hash(evidence));
     }
     public void lockForMutation(Connection connection, UUID tenantId) throws SQLException { requireTransaction(connection); lock(connection,tenantId,false); }
+    public void lockForEvaluation(Connection connection, UUID tenantId) throws SQLException { requireTransaction(connection); lock(connection,tenantId,true); }
     private static void requireTransaction(Connection c) throws SQLException {
         if(c.getAutoCommit() || c.getTransactionIsolation()!=Connection.TRANSACTION_READ_COMMITTED) throw new SQLException("Authorization requires READ COMMITTED transaction","25001");
     }
