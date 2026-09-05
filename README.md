@@ -2,7 +2,7 @@
 
 > 以准确业务事实驱动责任：**一张卡、一个 Owner、一个主命令、一个明确结果**。当一张卡无法维持这一约束时，拆分责任或后置能力，不增加通用流程结构。
 
-本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。当前最新基线已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同、V850 前向迁移及 PostgreSQL 18 v1.1 运行时证据。R1 的 A/B（脚手架、OpenAPI）、C0 合同修正及 C 数据库基础设施已合并；D 的 CommandRuntime、实时授权与审计基础设施及实库测试已通过 PR #12 合并（`ae88e63257699715dc3ee0c139563f5bfafdb2b7`），不包含生产业务 Handler。完整 R1 后端业务、SPA业务生产能力及E2E仍未实现或验收；基础设施测试不提升完整 R1 交付门禁。
+本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。[当前最新基线](docs/baseline/CURRENT-MVP-BASELINE.md)已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同、V850 前向迁移及 PostgreSQL 18 v1.1 运行时证据。R1 的 A/B（脚手架、OpenAPI）、C0 合同修正及 C 数据库基础设施已合并；D 的 CommandRuntime、实时授权与审计基础设施及实库测试已通过 PR #12 合并（`ae88e63257699715dc3ee0c139563f5bfafdb2b7`），不包含生产业务 Handler。完整 R1 后端业务、SPA业务生产能力及E2E仍未实现或验收；基础设施测试不提升完整 R1 交付门禁。
 
 MVP-2026-09-05.2现已冻结capture、draft、两类recovery的命令专属授权和完整R1成功事件集合，补齐`OpportunityOpened`的Schema/Owner Outbox映射，并把`CONNECTED_VALID`校正为2 Event/2 Outbox。本收口分支已将可复用授权与精确事件校验接入真实Owner facts及CommandRuntime，并完成实库机制验证，详见[分层验收记录](docs/progress/2026-09-05-r1-contract-closure-acceptance.md)。完整checkout CI和合并单独记账；下一业务工作仍是原计划Task 5，完整R1后端、SPA和浏览器E2E门禁未完成。
 
@@ -12,7 +12,7 @@ MVP-2026-09-05.2现已冻结capture、draft、两类recovery的命令专属授�
 
 最新权威交付物：
 
-- [当前MVP基线](docs/baseline/CURRENT-MVP-BASELINE.md)
+- 当前MVP基线（见上文）
 - [ADR-0007：R1命令授权与事件合同收口](docs/adr/ADR-0007-r1-command-policy-event-closure.md)
 - [R1命令授权及事件合同](docs/contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)
 - [R1 version-1空通知payload Schema](contracts/events/r1-domain-notification-v1.schema.json)
