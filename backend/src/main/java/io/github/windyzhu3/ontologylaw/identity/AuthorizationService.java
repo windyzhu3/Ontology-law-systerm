@@ -29,6 +29,10 @@ public interface AuthorizationService {
         public Request { Objects.requireNonNull(actor); Objects.requireNonNull(subject); Objects.requireNonNull(scopeOrganizationId); Objects.requireNonNull(requirement); }
     }
     AuthorizationSnapshot evaluate(Connection connection, Request request, boolean finalCheck) throws SQLException;
+    /** Acquired before reading current Owner/organization facts, retained until transaction completion. */
+    default void lockForEvaluation(Connection connection, UUID tenantId) throws SQLException {
+        throw new SQLException("Identity shared lock support required", "0A000");
+    }
     /** All identity writers call before any mutation, and never acquire business locks afterwards. */
     void lockForMutation(Connection connection, UUID tenantId) throws SQLException;
     static AuthorizationService databaseBacked() { return new io.github.windyzhu3.ontologylaw.identity.internal.persistence.JooqAuthorizationService(); }

@@ -50,7 +50,7 @@ Task行的自然幂等槽是Tenant＋Task subject scope＋调用方UUID `Idempot
 
 SHA-256 hex：`61f1239c8e8e1d03bde88452a61321bbfa66cabbc72e32242d87de9cf58f89ca`。R1当前JSON数值Schema只有整数，规范器拒绝浮点类型和不安全整数，不进行有损转换；属性按RFC8785 UTF-16排序，Unicode不隐式规范化。
 
-静态信封及授权裁定时点采用[ADR-0006](../../adr/ADR-0006-command-runtime-authorization-boundary.md)。七个主命令/SAVE_ACTION_DRAFT为INTERNAL_TASK，capture为无管理员授权含义的INTERNAL_ADMIN，两种恢复为SERVICE_ACTOR，CUSTOMER_GRANT在R1不注册命令。每个成功通知单独携带准确sourceFact，可与唯一Receipt结果不同，并在同一事务写全部Event/Outbox；NO_CHANGE/REJECTED通知为空。非完成命令以及OpportunityOpened的完整生产policy/事件描述仍为后续Handler接入门，不以D基础设施测试宣称业务完成。
+静态信封及授权裁定时点采用[ADR-0006](../../adr/ADR-0006-command-runtime-authorization-boundary.md)，四类专属授权及完整事件集合采用[ADR-0007](../../adr/ADR-0007-r1-command-policy-event-closure.md)和[R1命令授权及事件合同](R1-COMMAND-POLICY-EVENT-CONTRACT.md)。七个主命令/SAVE_ACTION_DRAFT为INTERNAL_TASK，capture为无管理员授权含义的INTERNAL_ADMIN，两种恢复为SERVICE_ACTOR，CUSTOMER_GRANT在R1不注册命令。每个成功通知单独携带准确sourceFact，可与唯一Receipt结果不同，并在同一事务写全部Event/Outbox；NO_CHANGE/REJECTED通知为空。合同冻结不以D基础设施测试宣称业务Handler或R1整体完成。
 
 ### Non-completion command Receipt results
 
@@ -81,7 +81,7 @@ SHA-256 hex：`61f1239c8e8e1d03bde88452a61321bbfa66cabbc72e32242d87de9cf58f89ca`
 | P0_04_RETRY_ASSIGNMENT_NOW | RESOLVE_LEAD_ROUTING_GAP | RETRY_ASSIGNMENT_NOW | SUCCEEDED | responsibility.decision_record | `LEAD_ROUTING_DISPOSITION@hash` | `LeadRoutingDispositionRecordedV1` | R1_PROJECTION | CONTACT_LEAD,RESOLVE_LEAD_ROUTING_GAP | R1_ASSIGNMENT_RETRY_V1 | POLICY_SELECTED |
 | P0_04_REQUEST_SOURCE_INTAKE_STOP | RESOLVE_LEAD_ROUTING_GAP | REQUEST_SOURCE_INTAKE_STOP | SUCCEEDED | responsibility.decision_record | `LEAD_ROUTING_DISPOSITION@hash` | `SourceIntakeStopRequestedV1` | R1_PROJECTION | ACK_SOURCE_INTAKE_STOP_REQUEST | DIRECT | SOURCE_INTAKE_OWNER |
 | ACK_SOURCE_INTAKE_STOP_REQUEST | ACK_SOURCE_INTAKE_STOP_REQUEST | SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED | SUCCEEDED | responsibility.decision_record | `SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED@hash` | `SourceIntakeStopRequestAcknowledgedV1` | R1_PROJECTION | NONE | NONE | NONE |
-| CONTACT_CONNECTED_VALID | CONTACT_LEAD | CONNECTED_VALID | SUCCEEDED | lead.lead_contact_result | `contactResult@hash` | `LeadContactResultRecordedV1` | R1_PROJECTION | NONE | OPPORTUNITY_BOUNDARY_V1 | NONE |
+| CONTACT_CONNECTED_VALID | CONTACT_LEAD | CONNECTED_VALID | SUCCEEDED | lead.lead_contact_result | `contactResult@hash` | `LeadContactResultRecordedV1,OpportunityOpened` | R1_PROJECTION | NONE | OPPORTUNITY_BOUNDARY_V1 | NONE |
 | CONTACT_NOT_CONNECTED_RETRY | CONTACT_LEAD | NOT_CONNECTED | SUCCEEDED | lead.lead_contact_result | `contactResult@hash; attemptNo<3` | `LeadContactResultRecordedV1` | R1_PROJECTION | CONTACT_LEAD | CONTACT_RETRY_V1 | SAME_ASSIGNMENT_OWNER |
 | CONTACT_NOT_CONNECTED_EXHAUSTED | CONTACT_LEAD | NOT_CONNECTED | SUCCEEDED | lead.lead_contact_result | `contactResult@hash; attemptNo=3` | `LeadContactRetryExhaustedV1` | R1_PROJECTION | REVIEW_LEAD_VALIDITY | CONTACT_RETRY_V1 | ROUTING_SUPERVISOR |
 | CONTACT_SUSPECT_INVALID | CONTACT_LEAD | SUSPECT_INVALID | SUCCEEDED | lead.lead_contact_result | `contactResult@hash` | `LeadContactResultRecordedV1` | R1_PROJECTION | REVIEW_LEAD_VALIDITY | DIRECT | ROUTING_SUPERVISOR |
@@ -150,6 +150,7 @@ Receipt outcome 的封闭集合只有 `SUCCEEDED`、`NO_CHANGE`、`REJECTED`。C
 - 三种盲索引用途封闭为`LEAD_PHONE_EXACT`、`LEAD_EMAIL_EXACT`、`SOURCE_RECORD_KEY`。KMS/Secret Manager按Tenant＋用途提供独立`R1_HMAC_SHA256_V1`密钥；HMAC输入为UTF-8 JCS对象`{"profile":"R1_HMAC_SHA256_V1","purpose":...,"sourceAccountCode":...或null,"value":...}`。phone/email的`sourceAccountCode=null`，使捕获值与V850补全值可安全精确比较；source record key按请求中区分大小写、不trim的原始Unicode标量串并带准确sourceAccountCode计算。R1不轮换或双写key version，也不保存明文、密钥或可逆输入。
 - `captured_content_digest`使用`R1_JSON_JCS_SHA256_V1`覆盖`sourceChannelCode,sourceAccountCode,sourceRecordKeyDigest,capturedAt,capturedName,phone,email,cityCode,serviceCategoryCode,jurisdictionCode,urgencyCode,legalNeedSummary`，其中受保护值先按上述profile规范化、digest以base64url放入JCS；不包含ciphertext、Lead ID、解析/处置/currentAssignment、revision或创建时间。`ingress_completion_digest`同法只覆盖`phone,email,sourceCode,sourceSummary,completedByAppointmentId,completedAt`。
 - Decision exact hash使用其持久化`content_digest`。`lead_contact_result`和`responsibility.wait_receipt`的exact hash使用`R1_JSON_JCS_SHA256_V1`覆盖该不可变行除`tenant_id`以外的全部持久字段，并把`tenantId`作为JCS顶层必填字段；NULL显式为JSON null。实现不得以序列化对象、数据库行文本或显示DTO临时计算替代。
+- 上述两种不可变行的JCS属性名使用准确SQL持久字段名（`snake_case`）；唯一重命名是`tenant_id`→`tenantId`。字段值按本节UUID、UTC六位小数时间、整数、无padding base64url二进制和显式null规则逐字段编码，不采用camelCase显示DTO别名。该说明落实既有“持久字段＋tenantId例外”规则，不改变命令scope或payload摘要向量。
 
 ### R1 code allowlists
 
@@ -214,7 +215,7 @@ Task registry的`TaskType`、`PrimaryCommand`、`PayloadSchema`、`CompletionFac
 - **Pre-slot gate：**静态路由、请求JSON/字段Schema、必填/格式、`Idempotency-Key`存在和UUID格式、认证、初始四轴授权与Appointment、Tenant安全可见性/NOT_FOUND、必需条件header、Draft存在性以及rate limit都在持有业务锁和尝试占slot之前完成。这里的拒绝不创建Slot或CommandReceipt；需要记录的安全审计不是该Command的终局Receipt。调用方修正请求或重新认证后可复用原key，但不得把pre-slot错误响应伪装为可查询Receipt。
 - **Slot acquisition：**业务根锁内已能由服务端构造准确scope与payload digest后，先按Tenant＋Command UUID取得事务级advisory lock，并在Tenant内查找任意既有slot。既有slot同envelope/scope/payload只返回其唯一终态Receipt；异任一项返回`COMMAND_PAYLOAD_CONFLICT`及原Receipt安全引用，新增写入全为0。不存在时插入唯一Slot，然后进入submit-time revalidation；Slot与终态Receipt必须在同一短事务提交，故不存在已提交的孤立Slot。
 - **Post-slot terminal gate：**Task/Draft/Subject CAS、当前授权复验、Task状态、重复/Assignment/causal Fact、Ingress槽、主管/来源Owner和其他领域前置条件在新Slot之后判定。失败只提交该Slot、无result Fact的REJECTED Receipt和REJECTED Audit各1；同key同scope同payload以后永久重放该拒绝，条件修复后必须使用新key。`COMMAND_PAYLOAD_CONFLICT`不为既有slot追加第二Receipt或Audit。
-- 成功：completion Fact 1、原 Task `DONE/revision+1`、Receipt 1、DomainEvent 1、对应 Owner Outbox 1、Audit `SUCCEEDED` 1，全部同事务。
+- 成功：completion Fact 1、原 Task `DONE/revision+1`、Receipt 1、Audit `SUCCEEDED` 1，全部同事务；EventCount等于该分支准确通知集合基数，OutboxCount等于每个事件静态QueueOwner数量之和。当前单事件分支为1/1，CONTACT_CONNECTED_VALID为2/2。
 - 同一 UUID `Idempotency-Key` 和同规范化 payload：返回原 Receipt，所有持久 delta 为 0。
 - 同 key 异 payload或异 Scope：`COMMAND_PAYLOAD_CONFLICT`；返回指向原终态 Receipt 的安全引用，Slot/Receipt/Fact/Task/Event/Outbox/Audit 全部新增 0。一个既有 slot 的唯一 Receipt 永不被第二张 REJECTED Receipt替换或追加。
 - 业务拒绝：Fact/Task/Event/Outbox 为0；按上述阶段要么pre-slot命令写入全0，要么post-slot的Slot/`REJECTED` Receipt/Audit各1，禁止“已占slot但允许同key重试执行”的中间语义。确认提交前的技术异常、Audit失败、锁超时和连接中断使整个当前事务回滚，Slot/Receipt/Fact/Task/Event/Outbox/Audit全部0；COMMIT确认丢失则不能断言未提交，使用原key恢复唯一Receipt且不新增副作用。
@@ -234,7 +235,7 @@ Task registry的`TaskType`、`PrimaryCommand`、`PayloadSchema`、`CompletionFac
 | E2E_P0_04_RETRY_EMPTY | P0_04_RETRY_ASSIGNMENT_NOW | `decision_record:+1; assignment:+0` | `current:DONE,r+1` | `routing task:+1,OPEN,r0` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `no-recursion:true; other-tenant:0; technical-failure:all-0` |
 | E2E_P0_04_STOP_REQUEST | P0_04_REQUEST_SOURCE_INTAKE_STOP | `decision_record:+1; source state:+0` | `current:DONE,r+1` | `ACK_SOURCE_INTAKE_STOP_REQUEST:+1,OPEN,r0` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `other-tenant:0; technical-failure:all-0` |
 | E2E_STOP_ACK | ACK_SOURCE_INTAKE_STOP_REQUEST | `decision_record:+1; source state:+0` | `current:DONE,r+1` | `NONE` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `other-tenant:0; technical-failure:all-0` |
-| E2E_CONTACT_CONNECTED | CONTACT_CONNECTED_VALID | `contact_result:+1; opportunity:+1` | `current:DONE,r+1` | `R2 task:+0` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `other-tenant:0; technical-failure:all-0` |
+| E2E_CONTACT_CONNECTED | CONTACT_CONNECTED_VALID | `contact_result:+1; opportunity:+1` | `current:DONE,r+1` | `R2 task:+0` | `receipt:+1,event:+2,outbox:+2,audit:+1` | `other-tenant:0; technical-failure:all-0` |
 | E2E_CONTACT_RETRY | CONTACT_NOT_CONNECTED_RETRY | `contact_result:+1; wait_receipt:+1` | `current:DONE,r+1` | `CONTACT_LEAD:+1,WAITING,r1` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `other-tenant:0; due-before-resume:0; technical-failure:all-0` |
 | E2E_CONTACT_EXHAUSTED | CONTACT_NOT_CONNECTED_EXHAUSTED | `contact_result:+1` | `current:DONE,r+1` | `REVIEW_LEAD_VALIDITY:+1,OPEN,r0` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `retry-task:+0; other-tenant:0; technical-failure:all-0` |
 | E2E_CONTACT_SUSPECT | CONTACT_SUSPECT_INVALID | `contact_result:+1` | `current:DONE,r+1` | `REVIEW_LEAD_VALIDITY:+1,OPEN,r0` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `other-tenant:0; technical-failure:all-0` |
@@ -242,4 +243,4 @@ Task registry的`TaskType`、`PrimaryCommand`、`PayloadSchema`、`CompletionFac
 | E2E_REVIEW_UNREACHED | REVIEW_CLOSE_UNREACHED | `decision_record:+1` | `current:DONE,r+1` | `NONE` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `other-tenant:0; technical-failure:all-0` |
 | E2E_REVIEW_REOPEN | REVIEW_REOPEN_CONTACT | `decision_record:+1` | `current:DONE,r+1` | `CONTACT_LEAD:+1,OPEN,r0` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `old-task-reopen:0; other-tenant:0; technical-failure:all-0` |
 
-每个 E2E 必须同时断言准确 Fact selector、原 Task ID/state/revision、后继 Task ID/state/revision/Owner、Receipt result selector、Event source Fact、Outbox owner、Audit result、同 key replay、异 payload rejection、Tenant 哨兵不可见以及技术失败全回滚。
+每个 E2E 必须同时断言准确 Fact selector、原 Task ID/state/revision、后继 Task ID/state/revision/Owner、Receipt result selector、分支中每个Event的准确source Fact、各Outbox owner、Audit result、同 key replay、异 payload rejection、Tenant 哨兵不可见以及技术失败全回滚。

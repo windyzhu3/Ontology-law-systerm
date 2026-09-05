@@ -1,14 +1,14 @@
 # 当前MVP基线
 
-Baseline ID: MVP-2026-09-05.1
+Baseline ID: MVP-2026-09-05.2
 
 状态：`FROZEN`
 
-确认日期：2026-09-05；前版MVP-2026-08-28.1的已合并证据保留为历史。
+确认日期：2026-09-05；前版MVP-2026-09-05.1与MVP-2026-08-28.1的已合并证据保留为历史。
 
 R1实施合同确认日期：2026-09-02
 
-当前数据库合同版本：`52-plus-2-v1.1`（静态合同；真实PostgreSQL 18运行证据完成前不得开始R1生产代码）
+当前数据库合同版本：`52-plus-2-v1.1`（静态合同与真实PostgreSQL 18 v1.1运行证据均已保持独立可定位）
 当前52＋2合同摘要：`0c04d48ddae6891b53fdacabdba34d1124e757b070a4c9018597e4e0a4674301`
 字段合同摘要：`f4c17c4c0a8697820b30adb61b8cdb209666a4672393d4f8fc9d73a5f169addf`
 
@@ -16,7 +16,7 @@ R1实施合同确认日期：2026-09-02
 
 ## authority-order
 
-[ADR-0006](../adr/ADR-0006-command-runtime-authorization-boundary.md)记录本版经用户确认的CommandRuntime授权裁定时点，以及Scope binding、静态信封和提交确认丢失的精确解释；52＋2物理合同、迁移、工程版本与产品范围不变。
+[ADR-0006](../adr/ADR-0006-command-runtime-authorization-boundary.md)记录CommandRuntime授权裁定时点、Scope binding、静态信封和提交确认丢失语义；[ADR-0007](../adr/ADR-0007-r1-command-policy-event-closure.md)与[R1命令授权及事件合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)承接四类专属授权和完整R1成功事件集合。52＋2物理合同、迁移、工程版本与产品范围不变。
 
 按以下顺序解释仓库；前项与后项冲突时以前项为准：
 
@@ -24,7 +24,7 @@ R1实施合同确认日期：2026-09-02
 2. `database/schema-contract-52-plus-2/contract/`：当前MVP数据结构唯一人工维护源。
 3. 由合同机械生成的manifest、字段合同和Flyway DDL。
 4. `database/schema-contract-52-plus-2/docs/runtime-validation-contract.md`：DDL无法证明的运行时规则。
-5. [ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)、[ADR-0005](../adr/ADR-0005-r1-foundation-readiness.md)、[R1 Task完成矩阵](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)、[R1 HTTP矩阵](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md)和[R1 Workbench合同](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)：决定R1工程、HTTP、责任完成与呈现语义；涉及持久化形态、唯一键或Receipt基数时必须服从第2至4项。
+5. [ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)、[ADR-0005](../adr/ADR-0005-r1-foundation-readiness.md)、[ADR-0006](../adr/ADR-0006-command-runtime-authorization-boundary.md)、[ADR-0007](../adr/ADR-0007-r1-command-policy-event-closure.md)、[R1命令授权及事件合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)、[R1 Task完成矩阵](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)、[R1 HTTP矩阵](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md)和[R1 Workbench合同](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)：决定R1工程、授权、事件、HTTP、责任完成与呈现语义；涉及持久化形态、唯一键或Receipt基数时必须服从第2至4项。
 6. [冻结R1计划](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)：只决定上述合同的实施顺序，不能覆盖合同或数据库权威。
 7. `docs/progress/MVP-DELIVERY-LEDGER.md`：仅记录交付状态，不改变产品或数据库语义。
 8. `docs/design/`：视觉验收证据，不产生领域规则。
@@ -56,13 +56,14 @@ R1实施合同确认日期：2026-09-02
 - 使用一个PostgreSQL数据库和13个受管Schema；jOOQ是唯一业务持久化范式，Flyway是唯一DDL真源。
 - SPA内部可有普通用户工作台、身份/授权/审计/运营管理模式和客户轻量安全入口三种受保护体验模式，但它们共享同一部署制品和OpenAPI；Provider Inbox不面向浏览器。
 - 历史“三SPA＋四OpenAPI”已被替代，不得按旧拓扑搭建工程。
-- R1代码框架精确采用ADR-0004的单Maven工程、单Jar、单npm workspace和`api|worker`互斥角色；文档冻结不等于脚手架或生产代码已经实现。
+- R1代码框架精确采用ADR-0004的单Maven工程、单Jar、单npm workspace和`api|worker`互斥角色；脚手架、OpenAPI及A/B/C0/C/D基础设施已合并，但不等于R1业务Owner Handler、SPA业务能力或E2E已经实现。
 
 ## r1-http-and-workbench-contract
 
 - Tenant只由认证后的服务端ActorContext提供；公共调用方不能提交或覆盖Tenant。写操作使用调用方生成的UUID `Idempotency-Key`，这是“业务UUID由服务端生成”的唯一例外并原样映射到现有`command_id`；Receipt与领域ID仍由服务端生成UUIDv7。同key同scope同payload只重放原Receipt；异scope或异payload返回冲突和原Receipt引用且新增delta为零。
 - capture没有不存在资源的`If-Match`。Draft创建、Draft更新、Task命令与subject重验分别使用HTTP矩阵冻结的前置条件和ETag种类，不得混用。
 - R1责任完成、后继Owner、Receipt result与E2E delta以Task完成矩阵为准；零分配候选完成P0-04正常分支，不是HTTP错误。
+- CAPTURE_LEAD、SAVE_ACTION_DRAFT及两种具名recovery的专属权限、Owner组织scope、DENY和Actor路径，以及所有R1成功分支的精确事件集合，以[R1命令授权及事件合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)为准。CONNECTED_VALID必须原子写两个事件和两个R1_PROJECTION Outbox，Receipt仍唯一且引用ContactResult。
 - Workbench envelope固定为一句`todaySummary`、零或一张完整`currentCard`、最多两条`nextSummaries`、一个`waitingCount`和一个固定`chatComposer`。普通`/workbench`无全局导航/侧栏；身份管理使用同一SPA的独立受保护route mode，生产CRUD不计入R1。
 
 ## task-waiting-contract
@@ -151,10 +152,12 @@ P0-01至P0-15是销售主链的冻结验收映射；历史七份规格文末P0�
 
 R1只覆盖Lead接入至首联结果：去重/缺失处理、唯一Owner分配或受控异常、创建`CONTACT_LEAD` TaskOccurrence、SPA显示唯一CurrentCard、保存/确认ActionDraft、写准确ContactResult、同事务写DomainEvent/AuditEntry/CommandReceipt并完成原Task；按结果创建重试或主管复核责任，有效接通形成R2可消费的`OpportunityOpened`边界。R1不实现Opportunity实质推进、报价、冲突审查、合同、签署、付款、转案、AI写入、客户入口、Provider真实发送、新表或通用平台组件。
 
+R1_PROJECTION对Lead、Draft、Task等可变source revision只重新读取当前Fact，必须容忍延迟、重复和乱序而不让旧事件倒退投影。R2以后启用OpportunityOpened具名消费者时，必须覆盖已被R1投影消费的历史事件、并发新增、重复、乱序和中断重试，并以Tenant＋Opportunity＋首个推进责任类型保证至多一次；本轮不注册R2 QueueOwner、不创建R2 Outbox或Task。
+
 PR #2只收口本基线、历史权威、五态台账、静态数据库验证和只读CI，可以在真实PostgreSQL运行时验证前合并。合并后必须先按运行时计划创建或推进独立`DB-52P2-PG18-RUNTIME`交付行至`RUNTIME_VERIFIED`；`DB-52P2-CONTRACT`和`DB-52P2-MIGRATIONS`保持`MERGED`。该独立运行时行存在并通过前，R1计划不得开始。
 
 R1生产代码不得开始，直到`docs/adr/ADR-0002-lead-ingress-completion-slot.md`、合同版本`52-plus-2-v1.1`、V850前向迁移及v1.1真实PostgreSQL证据全部完成。已确认的P0-02方案保持52＋2表数：在`lead.lead`增加类型化、一次写入的Ingress Completion槽；原始phone/email均缺失且整槽为空时才可写入至少一组联系方式，V850以前的迁移不可改写。该槽记录phone/email密文与HMAC配对、静态来源代码、加密来源说明、完成Appointment、完成时间和32字节完成摘要；不得改写原始渠道捕获值或将联系方式写入通用JSON、审计摘要或事件载荷。
 
 P0-04的`REQUEST_SOURCE_INTAKE_STOP`只表示请求，不证明来源已停用；R1形成绑定准确Lead和Task的`DecisionRecord(LEAD_ROUTING_DISPOSITION)`，并给准确Source Intake Owner创建`ACK_SOURCE_INTAKE_STOP_REQUEST`。只有该Owner执行具名确认命令并写`DecisionRecord(SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED)`后才完成后继责任，仍不改变SourceAccount状态。
 
-R2只有在收口设计、当前基线和PR #2视觉资产已进入`main`，R1计划与四份实施合同保持`FROZEN`且位于`main`，独立`DB-52P2-PG18-RUNTIME`行为`RUNTIME_VERIFIED`，`R1-OPENAPI`、`R1-BACKEND`、`R1-SPA`均为`IMPLEMENTED`，`R1-E2E-GOLDEN`和`R1-E2E-FAILURES`均为`RUNTIME_VERIFIED`，且未通过新增通用平台能力绕过冻结边界时才能开始。`FROZEN`文档只表示实现输入已确定，不表示生产能力已经实现。R3只能在R2以同样标准完成后开始；后续页面设计可处于`DRAFT`，不得标为已实现或驱动R1扩大范围。
+R2只有在收口设计、当前基线和PR #2视觉资产已进入`main`，R1计划与五份实施合同保持`FROZEN`且位于`main`，独立`DB-52P2-PG18-RUNTIME`行为`RUNTIME_VERIFIED`，`R1-OPENAPI`、`R1-BACKEND`、`R1-SPA`均为`IMPLEMENTED`，`R1-E2E-GOLDEN`和`R1-E2E-FAILURES`均为`RUNTIME_VERIFIED`，且未通过新增通用平台能力绕过冻结边界时才能开始。`FROZEN`文档只表示实现输入已确定，不表示生产能力已经实现。R3只能在R2以同样标准完成后开始；后续页面设计可处于`DRAFT`，不得标为已实现或驱动R1扩大范围。

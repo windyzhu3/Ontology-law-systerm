@@ -57,7 +57,7 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
         }
     }
     static String scalar(Connection c,String query)throws SQLException {try(var s=c.createStatement();var r=s.executeQuery(query)){assertTrue(r.next());return r.getString(1);}}
-    CommandRuntime runtime(Handler h){return new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),"POSTGRES_IT");}
+    CommandRuntime runtime(Handler h){return new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("POSTGRES_IT"),null,io.github.windyzhu3.ontologylaw.lead.R1EventReaders.databaseBacked());}
     CommandResult runResult(CommandRuntime runtime,CommandEnvelope e)throws Exception {try(var c=database.apiConnection()){return runtime.execute(c,e);}}
     CommandOutcome run(CommandRuntime runtime,CommandEnvelope e)throws Exception {return assertInstanceOf(CommandOutcome.class,runResult(runtime,e));}
     List<Long> counts(Handler h)throws Exception {
@@ -100,7 +100,7 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
     }
     @Test void audit_failure_after_real_append_rolls_back_every_effect()throws Exception {
         Handler h=new Handler();
-        var runtime=new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),(c,e)->{io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("POSTGRES_IT").append(c,e);throw new SQLException("Injected audit failure","08006");});
+        var runtime=new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),(c,e)->{io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("POSTGRES_IT").append(c,e);throw new SQLException("Injected audit failure","08006");},null,io.github.windyzhu3.ontologylaw.lead.R1EventReaders.databaseBacked());
         assertThrows(SQLException.class,()->run(runtime,h.envelope(UUID.randomUUID(),Map.of())));assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));
     }
     @Test void committed_revocation_after_fact_write_causes_only_terminal_rejection()throws Exception {
@@ -141,7 +141,7 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
         }
         assertEquals(List.of(1L,1L,1L,1L,1L),counts(a).subList(0,5));assertEquals(1L,counts(a).getLast()+counts(b).getLast());
     }
-    @Test void multiple_notifications_keep_distinct_exact_sources_in_the_same_atomic_commit()throws Exception {
+    @Test void duplicate_event_type_for_another_source_rolls_back_the_entire_command()throws Exception {
         Handler other=new Handler();var s=other.seed;
         Handler h=new Handler(new AuthorizationServiceIT.Seed(s.tenant(),s.principal(),s.appointment(),s.org(),s.grant(),UUID.randomUUID())) {
             @Override public Result execute(Connection c,CommandEnvelope e,Context context)throws SQLException {
@@ -149,11 +149,8 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
                 return new Result(result.status(),result.fact(),List.of(new Notification(Event.LeadIngressCompletedV1,result.fact()),new Notification(Event.LeadIngressCompletedV1,other.seed.request().subject())));
             }
         };
-        var result=run(runtime(h),h.envelope(UUID.randomUUID(),Map.of()));assertEquals(h.seed.subject(),result.resultFact().id());
-        assertEquals(List.of(1L,1L,1L,2L,2L,1L),counts(h));
-        try(var c=database.apiConnection()){inTransaction(c,Capability.QUERY,x->{
-            assertEquals("2",scalar(x,"select count(distinct source_fact_id) from execution.domain_event where tenant_id='"+s.tenant()+"'"));return null;
-        });}
+        assertThrows(SQLException.class,()->run(runtime(h),h.envelope(UUID.randomUUID(),Map.of())));
+        assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));
     }
     @Test void incorrect_result_type_or_event_descriptor_rolls_back_the_handler_writes()throws Exception {
         for(boolean wrongResult:List.of(true,false)) {
@@ -188,10 +185,13 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
     final class RecoveryHandler extends Handler {
         final UUID wait=UUID.randomUUID();String waitHash;long expected=1;
         RecoveryHandler(boolean early,boolean wrongType,boolean alreadyOpen)throws Exception {
+            this(early,wrongType,alreadyOpen,"CONTACT_RETRY_V1");
+        }
+        RecoveryHandler(boolean early,boolean wrongType,boolean alreadyOpen,String profile)throws Exception {
             super(AuthorizationServiceIT.seed(database,"SERVICE"),wrongType?"COMPLETE_LEAD_INGRESS":"CONTACT_LEAD",wrongType?"COMPLETE_LEAD_INGRESS":"RECORD_CONTACT_RESULT",wrongType?"lead.lead":"lead.lead_contact_result");
             try(var c=database.apiConnection()){inTransaction(c,Capability.COMMAND,x->{
                 sql(x,"update responsibility.task_occurrence set state='WAITING',revision=revision+1 where tenant_id=? and task_occurrence_id=?",seed.tenant(),task);
-                sql(x,"insert into responsibility.wait_receipt (tenant_id,wait_receipt_id,task_occurrence_id,task_revision,wait_sequence,wait_reason_code,wait_contract_code,wait_contract_version,entered_waiting_at,resume_due_at,recorded_by_appointment_id) values (?,?,?,1,1,'CONTACT_RETRY','CONTACT_RETRY_V1',1,clock_timestamp()-interval '2 hours',clock_timestamp()+ (? * interval '1 hour'),?)",seed.tenant(),wait,task,early?1:-1,seed.appointment());
+                sql(x,"insert into responsibility.wait_receipt (tenant_id,wait_receipt_id,task_occurrence_id,task_revision,wait_sequence,wait_reason_code,wait_contract_code,wait_contract_version,entered_waiting_at,resume_due_at,recorded_by_appointment_id) values (?,?,?,1,1,'CONTACT_RETRY',?,1,clock_timestamp()-interval '2 hours',clock_timestamp()+ (? * interval '1 hour'),?)",seed.tenant(),wait,task,profile,early?1:-1,seed.appointment());
                 if(alreadyOpen)sql(x,"update responsibility.task_occurrence set state='OPEN',revision=revision+1 where tenant_id=? and task_occurrence_id=?",seed.tenant(),task);
                 waitHash=waitHash(x);return null;
             });}
@@ -259,14 +259,8 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
         });}
         assertEquals(first,recoveryPhase(h,e));assertInstanceOf(CommandResult.Conflict.class,recoveryPhase(h,h.envelope(e.commandId(),Map.of("expectedTaskRevision",0L))));assertEquals(List.of(1L,1L,0L,0L,0L,0L),counts(h));
     }
-    @Test void failure_on_later_notification_rolls_back_earlier_event_and_all_facts()throws Exception {
-        Handler other=new Handler();var s=other.seed;
-        Handler h=new Handler(new AuthorizationServiceIT.Seed(s.tenant(),s.principal(),s.appointment(),s.org(),s.grant(),UUID.randomUUID())) {
-            @Override public Result execute(Connection c,CommandEnvelope e,Context context)throws SQLException {
-                Result result=super.execute(c,e,context);
-                return new Result(result.status(),result.fact(),List.of(new Notification(Event.LeadIngressCompletedV1,result.fact()),new Notification(Event.LeadIngressCompletedV1,other.seed.request().subject())));
-            }
-        };
+    @Test void failure_on_notification_insert_rolls_back_all_facts()throws Exception {
+        Handler h=new Handler();
         var inserts=new java.util.concurrent.atomic.AtomicInteger();
         try(var actual=database.apiConnection()) {
             Connection faulty=(Connection)java.lang.reflect.Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(proxy,method,args)->{
@@ -275,7 +269,7 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
                     if(method.getName().equals("prepareStatement") && ((String)args[0]).startsWith("insert into \"execution\".\"domain_event\" ")) {
                         var real=(PreparedStatement)value;
                         return java.lang.reflect.Proxy.newProxyInstance(PreparedStatement.class.getClassLoader(),new Class<?>[]{PreparedStatement.class},(p,m,a)->{
-                            if(m.getName().equals("execute") && inserts.incrementAndGet()==2)throw new SQLException("Injected second notification failure","08006");
+                            if(m.getName().equals("execute") && inserts.incrementAndGet()==1)throw new SQLException("Injected notification failure","08006");
                             try{return m.invoke(real,a);}catch(java.lang.reflect.InvocationTargetException failure){throw failure.getCause();}
                         });
                     }
@@ -284,10 +278,10 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
             });
             assertThrows(RuntimeException.class,()->runtime(h).execute(faulty,h.envelope(UUID.randomUUID(),Map.of())));
         }
-        assertEquals(2,inserts.get());assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(other));
+        assertEquals(1,inserts.get());assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));
     }
     @Test void audit_uses_the_explicit_trusted_deployment_node()throws Exception {
-        Handler h=new Handler();var runtime=new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("NODE_A"));
+        Handler h=new Handler();var runtime=new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("NODE_A"),null,io.github.windyzhu3.ontologylaw.lead.R1EventReaders.databaseBacked());
         run(runtime,h.envelope(UUID.randomUUID(),Map.of()));
         try(var observer=database.migratorConnection()){assertEquals("NODE_A",scalar(observer,"select execution_node_code from audit.audit_entry where tenant_id='"+h.seed.tenant()+"'"));}
     }
@@ -324,11 +318,21 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
             assertEquals(List.of(1L,1L,1L,1L,1L,1L),counts(h));
         }
     }
-    @Test void unresolved_command_policy_cannot_register_even_a_no_change_handler()throws Exception {
+    @Test void dedicated_command_missing_binding_fails_closed_even_for_no_change()throws Exception {
         for(var type:List.of(CommandEnvelope.Type.CAPTURE_LEAD,CommandEnvelope.Type.SAVE_ACTION_DRAFT,CommandEnvelope.Type.REOPEN_DUE_CONTACT_TASKS,CommandEnvelope.Type.REOPEN_DUE_ROUTING_REVIEW_TASKS)) {
-            Handler h=new Handler(){@Override public CommandEnvelope.Type type(){return type;}};
+            Handler h=new Handler(){@Override public CommandEnvelope.Type type(){return type;}
+                @Override public Context resolve(Connection c,CommandEnvelope e) {
+                    String hash=Base64.getUrlEncoder().withoutPadding().encodeToString(CanonicalJson.digest("fixture"));
+                    var scope=type==CommandEnvelope.Type.CAPTURE_LEAD?CommandScope.capture(seed.tenant(),"FIXTURE",hash)
+                            :type==CommandEnvelope.Type.SAVE_ACTION_DRAFT?CommandScope.draft(seed.tenant(),task,CommandEnvelope.Type.COMPLETE_LEAD_INGRESS)
+                            :CommandScope.reopen(seed.tenant(),type,task,UUID.randomUUID(),hash);
+                    return new Context(scope,seed.request());
+                }
+            };
             h.mode=Mode.NO_CHANGE;
-            assertThrows(IllegalArgumentException.class,()->runtime(h));assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));
+            var runtime=assertDoesNotThrow(()->runtime(h));
+            assertThrows(CommandHandler.Rejected.class,()->run(runtime,h.envelope(UUID.randomUUID(),Map.of())));
+            assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));
         }
     }
 }
