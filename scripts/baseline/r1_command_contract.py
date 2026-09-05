@@ -194,6 +194,21 @@ EXPECTED_SCHEMA = {
 }
 
 
+class _DuplicateJsonMember(ValueError):
+    pass
+
+
+def _reject_duplicate_json_members(
+    pairs: list[tuple[str, object]],
+) -> dict[str, object]:
+    value: dict[str, object] = {}
+    for key, member in pairs:
+        if key in value:
+            raise _DuplicateJsonMember(key)
+        value[key] = member
+    return value
+
+
 def _read_utf8(root: Path, relative_path: Path, findings: list[str]) -> str | None:
     path = root / relative_path
     if not path.is_file():
@@ -357,8 +372,11 @@ def validate_r1_command_contract(root: Path) -> list[str]:
                 findings.append(f"R1 success branch cardinality mismatch: {branch_id}")
 
     try:
-        schema = json.loads(schema_text)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+        schema = json.loads(
+            schema_text,
+            object_pairs_hook=_reject_duplicate_json_members,
+        )
+    except (json.JSONDecodeError, _DuplicateJsonMember):
         findings.append(f"Malformed R1 notification payload Schema: {SCHEMA_PATH.as_posix()}")
     else:
         if schema != EXPECTED_SCHEMA:

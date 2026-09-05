@@ -103,14 +103,35 @@ class R1CommandContractTest(unittest.TestCase):
         )
         self.assert_contract_mutation_fails(row, f"{row}\n{row}")
 
-    def test_payload_schema_cannot_become_permissive_or_nonempty(self) -> None:
+    def test_payload_schema_cannot_declare_nonempty_properties(self) -> None:
         temporary, root = self.copy_contract_fixture()
         with temporary:
             schema_path = root / SCHEMA
             schema = json.loads(schema_path.read_text(encoding="utf-8"))
             schema["properties"] = {"details": {"type": "string"}}
+            schema_path.write_text(json.dumps(schema), encoding="utf-8")
+            self.assertTrue(self.validator()(root))
+
+    def test_payload_schema_cannot_allow_additional_properties(self) -> None:
+        temporary, root = self.copy_contract_fixture()
+        with temporary:
+            schema_path = root / SCHEMA
+            schema = json.loads(schema_path.read_text(encoding="utf-8"))
             schema["additionalProperties"] = True
             schema_path.write_text(json.dumps(schema), encoding="utf-8")
+            self.assertTrue(self.validator()(root))
+
+    def test_payload_schema_rejects_duplicate_object_members(self) -> None:
+        temporary, root = self.copy_contract_fixture()
+        with temporary:
+            schema_path = root / SCHEMA
+            text = schema_path.read_text(encoding="utf-8")
+            old = '  "type": "object",'
+            self.assertEqual(text.count(old), 1)
+            schema_path.write_text(
+                text.replace(old, '  "type": "string",\n  "type": "object",'),
+                encoding="utf-8",
+            )
             self.assertTrue(self.validator()(root))
 
     def test_connected_branch_counts_are_two_events_and_two_outboxes(self) -> None:

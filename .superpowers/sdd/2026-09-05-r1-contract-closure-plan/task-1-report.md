@@ -90,3 +90,27 @@ Final output: exit 0 with no findings.
 - Windows cannot execute the symlink test without privilege (`WinError 1314`); no test was skipped or weakened. The pinned Linux suite is the full baseline evidence.
 - Direct `python scripts/baseline/verify_baseline.py` in this sparse worktree reports the known environmental findings: historical MERGED evidence cannot be resolved from the sparse history, and the omitted visual bundles contain 0/27 sales PNGs and 0/7 identity PNGs. These are not represented as a local repository-verifier PASS; the complete checkout remains the merge gate.
 - The authorized parent plan-only commit `661ae9393f5e1fddbe0dd011a51cfdd9efb36810` precedes this task commit and is not staged as part of Task 1.
+
+## Review fix round 1
+
+Base: `0c897c904065858ffbfd5ff68c1ee407fb67376e`.
+
+The Schema parser previously used `json.loads` last-member-wins behavior, so an artifact containing an invalid duplicate member followed by the expected value could collapse to `EXPECTED_SCHEMA`. A new real-fixture test writes duplicate `type` members and proves that ambiguity must fail closed. The parser now supplies an `object_pairs_hook` that rejects a repeated member at any JSON object depth before exact Schema comparison.
+
+The previous combined payload mutation was split into two independent tests: one changes only `properties` from empty to nonempty; the other changes only `additionalProperties` from `false` to `true`.
+
+RED command:
+
+```text
+python -m unittest scripts.baseline.tests.test_r1_command_contract -v
+```
+
+Observed before the parser fix: exit 1, `Ran 12 tests in 0.397s`, `FAILED (failures=1)`. The sole failure was `test_payload_schema_rejects_duplicate_object_members`, where `validate_r1_command_contract(root)` incorrectly returned `[]`.
+
+GREEN command:
+
+```text
+python -m unittest scripts.baseline.tests.test_r1_command_contract -v
+```
+
+Output after the minimal parser fix: exit 0, `Ran 12 tests in 0.322s`, `OK`. Per review scope, the full baseline suite was not rerun for this isolated parser change.
