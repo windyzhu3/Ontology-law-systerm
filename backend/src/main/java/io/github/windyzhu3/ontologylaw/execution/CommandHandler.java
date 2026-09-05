@@ -13,17 +13,22 @@ public interface CommandHandler {
         if(current<0 || current>=9007199254740991L)throw new SQLException("Revision cannot be safely incremented","22003");
         return current+1;
     }
-    record Context(CommandScope scope, AuthorizationService.Request authorization) {
+    record Context(CommandScope scope, AuthorizationService.Request authorization, CommandAuthorizationBinding binding) {
+        public Context(CommandScope scope, AuthorizationService.Request authorization) { this(scope,authorization,null); }
         public Context {Objects.requireNonNull(scope);Objects.requireNonNull(authorization);}
     }
     enum QueueOwner { R1_PROJECTION }
     enum Event {
-        LeadDuplicateResolutionRecordedV1("responsibility.decision_record"), LeadIngressCompletedV1("lead.lead"), LeadAssignedV1("lead.lead_assignment"),
-        LeadRoutingDispositionRecordedV1("responsibility.decision_record"), SourceIntakeStopRequestedV1("responsibility.decision_record"), SourceIntakeStopRequestAcknowledgedV1("responsibility.decision_record"),
-        LeadContactResultRecordedV1("lead.lead_contact_result"), LeadContactRetryExhaustedV1("lead.lead_contact_result"), LeadValidityReviewedV1("responsibility.decision_record");
-        private final String sourceFactType;
-        Event(String sourceFactType){this.sourceFactType=sourceFactType;}
+        LeadCapturedV1("lead.lead","revision:transaction-final"), ActionDraftSavedV1("responsibility.action_draft","revision:post-write"),
+        ContactTaskReopenedV1("responsibility.task_occurrence","revision:post-CAS"), RoutingReviewTaskReopenedV1("responsibility.task_occurrence","revision:post-CAS"),
+        LeadDuplicateResolutionRecordedV1("responsibility.decision_record","hash:content"), LeadIngressCompletedV1("lead.lead","revision:post-CAS"), LeadAssignedV1("lead.lead_assignment","revision:0"),
+        LeadRoutingDispositionRecordedV1("responsibility.decision_record","hash:content"), SourceIntakeStopRequestedV1("responsibility.decision_record","hash:content"), SourceIntakeStopRequestAcknowledgedV1("responsibility.decision_record","hash:content"),
+        LeadContactResultRecordedV1("lead.lead_contact_result","hash:immutable-row"), LeadContactRetryExhaustedV1("lead.lead_contact_result","hash:immutable-row"), LeadValidityReviewedV1("responsibility.decision_record","hash:content"),
+        OpportunityOpened("opportunity.opportunity","revision:0");
+        private final String sourceFactType,sourceSelector;
+        Event(String sourceFactType,String sourceSelector){this.sourceFactType=sourceFactType;this.sourceSelector=sourceSelector;}
         public String sourceFactType(){return sourceFactType;}
+        public String sourceSelector(){return sourceSelector;}
         public int schemaVersion(){return 1;}
         public Set<QueueOwner> queueOwners(){return Set.of(QueueOwner.R1_PROJECTION);}
     }

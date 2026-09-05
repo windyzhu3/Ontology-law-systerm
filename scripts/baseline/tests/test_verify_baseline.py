@@ -10,10 +10,11 @@ from unittest import mock
 
 from scripts.baseline import verify_baseline as verify_baseline_module
 from scripts.baseline.verify_baseline import HISTORICAL_BANNER, verify_repository
+from scripts.baseline.tests.test_r1_command_contract import R1CommandContractTest
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "verify_baseline.py"
-CANONICAL_BASELINE_ID = "MVP-2026-09-05.1"
+CANONICAL_BASELINE_ID = "MVP-2026-09-05.2"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 CANONICAL_MATTER_PUBLICATION_CLAUSE = (
     "同一本地事务必须写入完整MatterRef槽：稳定`matter_id`、`matter_no`、类型、"
@@ -658,6 +659,22 @@ class VerifyBaselineTest(unittest.TestCase):
             "# R1 plan\n\nStatus: FROZEN\n",
         )
         self.write_r1_contract_fixture(root)
+        repository_root = Path(__file__).resolve().parents[3]
+        for relative_path in (
+            Path("docs/adr/ADR-0007-r1-command-policy-event-closure.md"),
+            Path("docs/contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md"),
+            Path("contracts/events/r1-domain-notification-v1.schema.json"),
+        ):
+            self.write(
+                root,
+                relative_path.as_posix(),
+                (repository_root / relative_path).read_text(encoding="utf-8"),
+            )
+        self.write(
+            root,
+            "docs/superpowers/specs/2026-09-05-r1-contract-closure-design.md",
+            "# Approved R1 closure design\n",
+        )
         self.write(root, "docs/superpowers/plans/2026-08-28-postgresql-runtime-verification-plan.md", "# Runtime plan\n")
         self.write(root, "contracts/openapi/ontology-law-api.yaml", "openapi: 3.1.0\n")
         self.write(root, "contracts/openapi/tests/test_ontology_law_api.py", "# OpenAPI test\n")
@@ -705,6 +722,7 @@ class VerifyBaselineTest(unittest.TestCase):
             markdown_row("BASE-PR2-CLOSURE-PLAN", "PR2", "Closure plan", "Plan", "[PR2 plan](../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md)", "Product", "2026-08-28", "PR2 merge", "MERGED", "[plan](../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md); `merge-commit=abcdef0`", "none", "—"),
             markdown_row("BASE-CURRENT-MVP", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", HISTORICAL_BASELINE_ID, "PR2 merge", "MERGED", "[closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05"),
             markdown_row("BASE-CURRENT-MVP-2026-09-05", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", CANONICAL_BASELINE_ID, "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "—"),
+            markdown_row("R1-COMMAND-POLICY-EVENT-CONTRACT", "R1", "R1 command policy and event contract", "Docs", "[R1 command contract](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)", "Engineering", "r1-command-policy-event-v1", "R1 implementation", "FROZEN", "[R1 command contract](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)", "Runtime enforcement remains separate", "—"),
             markdown_row("R1-IMPLEMENTATION-PLAN", "R1", "Lead-contact plan", "Plan", "[R1 plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Engineering", "2026-08-28", "R1 implementation", "FROZEN", "[plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Production code is not yet implemented", "—"),
             markdown_row("R1-IMPLEMENTATION-CONTRACT", "R1", "R1 scaffold, HTTP, task, and workbench contract", "Docs", "[ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)", "Engineering", "r1-contract-v1", "R1 implementation", "FROZEN", "[ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md); [task matrix](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md); [HTTP matrix](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md); [workbench contract](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)", "Production scaffold is not yet implemented", "—"),
             markdown_row("DB-52P2-PG18-RUNTIME-PLAN", "MVP", "PostgreSQL runtime plan", "Plan", "[runtime plan](../superpowers/plans/2026-08-28-postgresql-runtime-verification-plan.md)", "Database", "2026-08-28", "R1 implementation", "DRAFT", "[plan](../superpowers/plans/2026-08-28-postgresql-runtime-verification-plan.md)", "Plan is not runtime evidence", "—"),
@@ -985,7 +1003,7 @@ class VerifyBaselineTest(unittest.TestCase):
             )
 
     def test_runtime_baseline_version_accepts_only_the_approved_successor(self) -> None:
-        for version, valid in [("MVP-2026-09-05.1", True), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.2", False), ("MVP-2026-09-05.10", False)]:
+        for version, valid in [("MVP-2026-09-05.2", True), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.1", False), ("MVP-2026-09-05.10", False)]:
             with self.subTest(version=version), tempfile.TemporaryDirectory() as temp_dir:
                 root = Path(temp_dir)
                 baseline = root / "docs/baseline/CURRENT-MVP-BASELINE.md"

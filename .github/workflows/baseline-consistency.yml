@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - README.md
+      - contracts/events/**
       - docs/**
       - database/schema-contract-52-plus-2/**
       - scripts/baseline/**
@@ -11,6 +12,7 @@ on:
   push:
     paths:
       - README.md
+      - contracts/events/**
       - docs/**
       - database/schema-contract-52-plus-2/**
       - scripts/baseline/**

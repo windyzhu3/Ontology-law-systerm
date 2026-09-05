@@ -15,6 +15,11 @@ from enum import Enum
 from pathlib import Path, PureWindowsPath
 from urllib.parse import unquote, urlsplit
 
+try:
+    from scripts.baseline.r1_command_contract import validate_r1_command_contract
+except ModuleNotFoundError:  # Direct script execution places this directory on sys.path.
+    from r1_command_contract import validate_r1_command_contract
+
 
 ALLOWED_STATES = {"DRAFT", "FROZEN", "MERGED", "IMPLEMENTED", "RUNTIME_VERIFIED"}
 LEDGER_COLUMNS = [
@@ -39,7 +44,7 @@ TARGET_GATE_STATES = {
 VISUAL_BUNDLE_VERSION = "visual-bundle-2026-08-27"
 VISUAL_OWNER = "Product Design"
 VISUAL_CONFIRMATION_DATE = "2026-08-27"
-CANONICAL_BASELINE_ID = "MVP-2026-09-05.1"
+CANONICAL_BASELINE_ID = "MVP-2026-09-05.2"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 HISTORICAL_BANNER = "历史规格（HISTORICAL_SUPERSEDED）"
 HISTORICAL_WARNING = (
@@ -147,6 +152,8 @@ CLOSURE_SPEC = Path("docs/superpowers/specs/2026-08-28-baseline-closure-and-r1-g
 DELIVERY_LEDGER = Path("docs/progress/MVP-DELIVERY-LEDGER.md")
 R1_PLAN = Path("docs/superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md")
 R1_SCAFFOLD_ADR = Path("docs/adr/ADR-0004-r1-scaffold-and-http-contract.md")
+R1_CLOSURE_ADR = Path("docs/adr/ADR-0007-r1-command-policy-event-closure.md")
+R1_COMMAND_CONTRACT = Path("docs/contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md")
 R1_TASK_CONTRACT = Path("docs/contracts/r1/R1-TASK-COMPLETION-MATRIX.md")
 R1_HTTP_CONTRACT = Path("docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md")
 R1_WORKBENCH_CONTRACT = Path("docs/contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md")
@@ -321,7 +328,8 @@ R1_BRANCH_DETAIL_CONTRACTS = {
         "`SourceIntakeStopRequestAcknowledgedV1`", "R1_PROJECTION",
     ),
     "CONTACT_CONNECTED_VALID": (
-        "SUCCEEDED", "`contactResult@hash`", "`LeadContactResultRecordedV1`", "R1_PROJECTION",
+        "SUCCEEDED", "`contactResult@hash`",
+        "`LeadContactResultRecordedV1,OpportunityOpened`", "R1_PROJECTION",
     ),
     "CONTACT_NOT_CONNECTED_RETRY": (
         "SUCCEEDED", "`contactResult@hash; attemptNo<3`",
@@ -467,7 +475,7 @@ R1_E2E_CONTRACTS = {
     ),
     "E2E_CONTACT_CONNECTED": (
         "CONTACT_CONNECTED_VALID", "`contact_result:+1; opportunity:+1`",
-        "`current:DONE,r+1`", "`R2 task:+0`", "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`current:DONE,r+1`", "`R2 task:+0`", "`receipt:+1,event:+2,outbox:+2,audit:+1`",
         "`other-tenant:0; technical-failure:all-0`",
     ),
     "E2E_CONTACT_RETRY": (
@@ -840,6 +848,10 @@ REQUIRED_NONVISUAL_ROWS = {
     "BASE-PR2-CLOSURE-PLAN": ("PR2", "FROZEN", "2026-08-28", "../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md"),
     "BASE-CURRENT-MVP": ("MVP", "FROZEN", HISTORICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
     "BASE-CURRENT-MVP-2026-09-05": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "R1-COMMAND-POLICY-EVENT-CONTRACT": (
+        "R1", "FROZEN", "r1-command-policy-event-v1",
+        "../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md",
+    ),
     "R1-IMPLEMENTATION-PLAN": ("R1", "FROZEN", "2026-08-28", "../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md"),
     "R1-IMPLEMENTATION-CONTRACT": ("R1", "FROZEN", "r1-contract-v1", "../adr/ADR-0004-r1-scaffold-and-http-contract.md"),
     "DB-52P2-PG18-RUNTIME-PLAN": ("MVP", "DRAFT", "2026-08-28", "../superpowers/plans/2026-08-28-postgresql-runtime-verification-plan.md"),
@@ -1021,6 +1033,8 @@ def iter_controlled_markdown_paths(root: Path) -> list[Path]:
         DELIVERY_LEDGER,
         R1_PLAN,
         R1_SCAFFOLD_ADR,
+        R1_CLOSURE_ADR,
+        R1_COMMAND_CONTRACT,
         R1_TASK_CONTRACT,
         R1_HTTP_CONTRACT,
         R1_WORKBENCH_CONTRACT,
@@ -2665,6 +2679,7 @@ def _verify_repository_result_unchecked(root: Path) -> VerificationResult:
     verify_waiting_contract(structural_findings, baseline_text)
     verify_matter_endpoint(structural_findings, baseline_text)
     verify_r1_contracts(root, structural_findings)
+    structural_findings.extend(validate_r1_command_contract(root))
     readiness_blockers = (
         verify_delivery_ledger(root, structural_findings) or []
     )

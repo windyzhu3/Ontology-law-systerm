@@ -21,6 +21,9 @@ public class AuthorizationServiceIT extends PostgresIntegrationTest {
         return seed(database,"HUMAN");
     }
     public static Seed seed(Database database,String kind) throws Exception {
+        return seed(database,kind,"LEAD_INGRESS_COMPLETE");
+    }
+    public static Seed seed(Database database,String kind,String authorityCode) throws Exception {
         Seed s = new Seed(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());
         try (var c = database.apiConnection()) {
             inTransaction(c, Capability.COMMAND, x -> {
@@ -28,7 +31,7 @@ public class AuthorizationServiceIT extends PostgresIntegrationTest {
                 sql(x, "insert into identity.principal (tenant_id,principal_id,principal_kind,identity_provider_code,external_subject_hmac,display_name,state,created_at) values (?,?,?,'FIXTURE',decode(repeat('00',32),'hex'),'fixture','ACTIVE',clock_timestamp())", s.tenant,s.principal,kind);
                 sql(x, "insert into identity.organization_unit (tenant_id,organization_unit_id,unit_code,display_name,state,created_at) values (?,?,'ROOT','fixture','ACTIVE',clock_timestamp())",s.tenant,s.org);
                 sql(x, "insert into identity.appointment (tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) values (?,?,?,?,'OWNER',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",s.tenant,s.appointment,s.principal,s.org);
-                sql(x, "insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values (?,?,?,?,?,'LEAD_INGRESS_COMPLETE',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",s.tenant,s.grant,s.appointment,s.appointment,s.org);
+                sql(x, "insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values (?,?,?,?,?,?,clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",s.tenant,s.grant,s.appointment,s.appointment,s.org,authorityCode);
                 return null;
             });
         }

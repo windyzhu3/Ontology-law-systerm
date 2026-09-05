@@ -14,6 +14,6 @@ R1_COMMAND_SCOPE_V1的bindings是按ASCII字段名排序的`{"name":fieldName,"v
 
 一个成功结果携带唯一Receipt resultFact和不可变通知列表；每个通知各自引用准确sourceFact，可与Receipt结果不同，所有Event和Owner Outbox同事务提交。每个当前注册事件使用版本1、空对象通知payload和R1_PROJECTION路由，准确来源在类型化source字段，通知不复制领域内容。新增事件描述必须经静态合同审核。
 
-尚未闭合的后续业务门：CAPTURE_LEAD、SAVE_ACTION_DRAFT及两种恢复命令的生产authority policy和SUCCEEDED事件type/schema/queue-owner映射尚未完整冻结；OpportunityOpened虽是当前业务边界，其完整事件描述亦待冻结。CommandRuntime拒绝注册这些未冻结策略的Handler，执行时也失败关闭，NO_CHANGE不例外；不得借用无关主命令grant。不编造事件/权限代码，后续PR须先补齐静态描述。低层接口保留恢复命令先重放、后NEW-key eligibility的阶段顺序，仅由测试目录的阶段harness证明，不作为生产授权旁路；将来ContactResult和Opportunity各自来源的原子多事件仍受独立静态描述门约束。这不表示相关业务已实现。
+[ADR-0007](ADR-0007-r1-command-policy-event-closure.md)以MVP-2026-09-05.2明确承接并仅替代本ADR当时尚未闭合的四项描述：CAPTURE_LEAD、SAVE_ACTION_DRAFT、两种恢复命令的生产authority policy及其SUCCEEDED事件映射，以及OpportunityOpened的完整事件描述。其静态值以[R1命令授权及事件合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)为准。未实现Handler仍由CommandRuntime失败关闭；低层接口继续保持恢复命令先重放、后NEW-key eligibility，ContactResult和Opportunity异源事实的原子多事件仍须生产运行时校验。本ADR其余锁、授权时点、Receipt、savepoint、失败差额和提交确认丢失规则继续有效；描述已冻结不表示相关业务已实现。
 
 本ADR不变更52-plus-2-v1.1、manifest或V001–V850字节，不增加表、业务HTTP入口、生产测试Handler或R2业务，不变更已冻结工具版本、模块DAG及权限角色。Foundation集成测试不等于R1-BACKEND、SPA或E2E交付。
