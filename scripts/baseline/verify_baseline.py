@@ -396,7 +396,7 @@ R1_AUTHENTICATION_CHALLENGE_CONTRACTS = {
         "HTTP_401_PROBLEM_WITH_WWW_AUTHENTICATE_BEARER",
     ),
     "internalMutualTls": (
-        "reopenDueContactTasks",
+        "reopenDueContactTasks,reopenDueRoutingReviewTasks",
         "TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE",
     ),
 }
@@ -432,6 +432,14 @@ R1_E2E_CONTRACTS = {
         "`current:DONE,r+1`", "`routing task:+1,WAITING,r1`",
         "`receipt:+1,event:+1,outbox:+1,audit:+1`",
         "`other-tenant:0; technical-failure:all-0`",
+    ),
+    "E2E_P0_04_ROUTING_REOPEN": (
+        "P0_04_SCHEDULE_ROUTING_REVIEW",
+        "`wait_receipt:+0`",
+        "`routing task:WAITING,r1→OPEN,r2`",
+        "`CurrentCard:RESOLVE_LEAD_ROUTING_GAP,r2; next disposition accepted`",
+        "`receipt:+1,event:+1,outbox:+1,audit:+1`",
+        "`before-due:all-0; wrong-type:all-0; stale-selector:all-0; replay:all-0`",
     ),
     "E2E_P0_04_RETRY_CANDIDATE": (
         "P0_04_RETRY_ASSIGNMENT_NOW",
@@ -611,6 +619,14 @@ R1_OPERATION_CONTRACTS = {
         "DUE_CUTOFF_AND_OWNER_QUEUE",
         "200",
     ),
+    "reopenDueRoutingReviewTasks": (
+        "POST",
+        "/internal/v1/tasks/commands/reopen-due-routing-review-tasks",
+        "REQUIRED",
+        "NONE",
+        "DUE_CUTOFF_AND_OWNER_QUEUE",
+        "200",
+    ),
 }
 R1_IDEMPOTENCY_BINDING = {
     "Header": "Idempotency-Key",
@@ -697,6 +713,11 @@ R1_OPERATION_ERRORS = {
         "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
     },
     "reopenDueContactTasks": {
+        "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
+        "UNAUTHENTICATED", "NOT_AUTHORIZED", "COMMAND_PAYLOAD_CONFLICT", "RATE_LIMITED",
+        "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
+    },
+    "reopenDueRoutingReviewTasks": {
         "VALIDATION_FAILED", "IDEMPOTENCY_KEY_REQUIRED", "IDEMPOTENCY_KEY_INVALID",
         "UNAUTHENTICATED", "NOT_AUTHORIZED", "COMMAND_PAYLOAD_CONFLICT", "RATE_LIMITED",
         "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",

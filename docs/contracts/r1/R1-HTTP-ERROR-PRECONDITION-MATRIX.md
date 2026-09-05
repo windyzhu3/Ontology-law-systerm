@@ -24,6 +24,7 @@ Status: FROZEN
 | reviewLeadValidity | POST | /api/v1/tasks/{taskId}/commands/review-lead-validity | ACTOR_CONTEXT | REQUIRED | TASK_ETAG | TASK_AND_CAUSAL_RESULT | 200 | VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,STALE_SUBJECT,TASK_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 | getCommandReceipt | GET | /api/v1/commands/{commandId}/receipt | ACTOR_CONTEXT | NONE | NONE | COMMAND_ID_AND_ACTOR_SCOPE | 200 | UNAUTHENTICATED,NOT_AUTHORIZED,NOT_FOUND,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 | reopenDueContactTasks | POST | /internal/v1/tasks/commands/reopen-due-contact-tasks | ACTOR_CONTEXT | REQUIRED | NONE | DUE_CUTOFF_AND_OWNER_QUEUE | 200 | VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,COMMAND_PAYLOAD_CONFLICT,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
+| reopenDueRoutingReviewTasks | POST | /internal/v1/tasks/commands/reopen-due-routing-review-tasks | ACTOR_CONTEXT | REQUIRED | NONE | DUE_CUTOFF_AND_OWNER_QUEUE | 200 | VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,COMMAND_PAYLOAD_CONFLICT,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 
 TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提供 Tenant，并用于授权、查询和 SQL 绑定。公共调用方不能提交或覆盖 Tenant；内部入口只接受 mTLS worker 身份并映射到受限 ActorContext。
 
@@ -34,7 +35,7 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 | WireType | Exact shape |
 |---|---|
 | `Uuid` | RFC 4122/9562 UUID 字符串；请求接受大小写，规范响应使用小写连字符形式 |
-| `Revision` | JSON integer，`0..9223372036854775807` |
+| `Revision` | JSON integer，`0..9007199254740991`；超界值在API边界拒绝且不得舍入，数据库`bigint`不变，旧导入超界值不得发出 |
 | `Instant` | RFC 3339 `date-time`，响应规范化为 UTC `Z`，最多微秒精度 |
 | `Code64` | 字符串，`^[A-Z][A-Z0-9_]{0,63}$` |
 | `OpaqueRef` | 服务端签发的 Actor-scoped 不透明字符串，长度 `16..512`；不是数据库 ID，也不能跨 Actor 重用 |
@@ -59,8 +60,11 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 | reviewLeadValidity | `taskId: Uuid` | same command headers | `ReviewLeadValidityV1` |
 | getCommandReceipt | `commandId: Uuid` | `Authorization: Bearer …` | none |
 | reopenDueContactTasks | none | mutual-TLS client identity; `Idempotency-Key: Uuid` | `ReopenDueContactTaskV1` |
+| reopenDueRoutingReviewTasks | none | mutual-TLS client identity; `Idempotency-Key: Uuid` | `ReopenDueRoutingReviewTaskV1` |
 
 “same command headers”恰指表中三项，不允许额外的 Tenant、subject revision、Draft ETag 或自由 command/action header。`If-Match`、`If-None-Match` 都只接受一个标签，不接受逗号列表、弱标签或 `If-Match: *`。`reopenDueContactTasks` 保留冻结的 operationId/path，但一次请求准确恢复一张 Task，不是批处理。
+
+两个具名internal reopen operation先在认证/授权及canonical scope后处理已有key：同scope同payload重放原Receipt，即使Task已越过OPEN；scope/payload冲突返回`COMMAND_PAYLOAD_CONFLICT`和原Receipt引用。新key才在`LEAD→TASK→COMMAND advisory lock`下进入pre-insert eligibility gate，验证Task类型、WAITING状态、expected revision、最新WaitReceipt ID/hash/profile和due条件。before-due、wrong-type和stale-selector返回`VALIDATION_FAILED`，且slot、Receipt、Audit及业务写入delta全部为0；通过验证后才插slot并CAS。
 
 ## Request DTO catalog
 
@@ -90,6 +94,7 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 | `RecordContactResultV1` | Draft confirmation fields (各 1), `leadAssignmentId: Uuid` (1), `leadAssignmentRevision: Revision` (1), `contactChannelCode: Code64` (1), `resultCode: Code64` (1), `resultSummary: SafeText500` (0..1), `legalNeed: SafeText2000` (0..1), `evidenceSubmissionId: Uuid` (0..1) | `contactChannelCode ∈ {PHONE,EMAIL}`；`resultCode ∈ {CONNECTED_VALID,NOT_CONNECTED,SUSPECT_INVALID}`；`legalNeed`在CONNECTED_VALID时必填并作为新Opportunity的受保护原始描述，在其他结果时禁止；Assignment selector 必须等于Task创建时按Task合同确定、提交时重验的绑定；Evidence若出现必须为同Tenant可见的准确Submission |
 | `ReviewLeadValidityV1` | Draft confirmation fields (各 1), `triggeringContactResultId: Uuid` (1), `triggeringContactResultHash: Digest32` (1), `decisionCode` (1), `rationaleSummary: SafeText500` (1) | `decisionCode ∈ {CONFIRM_INVALID,CLOSE_UNREACHED,REOPEN_CONTACT}`；ContactResult selector 必须等于 Task 创建时按 Task 合同确定、提交时重验的触发结果 |
 | `ReopenDueContactTaskV1` | `taskId: Uuid` (1), `expectedTaskRevision: Revision` (1), `waitReceiptId: Uuid` (1), `waitReceiptHash: Digest32` (1), `dueCutoff: Instant` (1) | Task 必须为 WAITING `CONTACT_LEAD`；最新 WaitReceipt 必须绑定 expected revision 且 `resumeDueAt <= dueCutoff <=` 服务端事务可信当前时间；恰做一次 WAITING→OPEN CAS。若同一 selector 已使 Task 成为 OPEN/revision=`expectedTaskRevision+1`，返回 NO_CHANGE；不允许空批成功 |
+| `ReopenDueRoutingReviewTaskV1` | `taskId: Uuid` (1), `expectedTaskRevision: Revision` (1), `waitReceiptId: Uuid` (1), `waitReceiptHash: Digest32` (1), `dueCutoff: Instant` (1) | Task 必须为 WAITING `RESOLVE_LEAD_ROUTING_GAP`且最新WaitReceipt为`R1_ROUTING_REVIEW_WAIT_V1`；其余due、CAS和NO_CHANGE语义与contact恢复相同 |
 
 七种 TaskOccurrence 的唯一持久 `subject` 均为 `lead.lead@revision`（revision 必填、hash 为空）。RESOLVE 的 candidate Lead/Party、ACK 的 causal Decision、CONTACT 的 LeadAssignment、REVIEW 的 triggering ContactResult 是具名次级 command-scope/提交前重验 selector，不得伪装成第二个 Task subject。scope digest 覆盖 commandType、taskId、准确持久 Lead selector 和按字段名排序的次级 selector。
 
@@ -104,6 +109,7 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 | seven Task commands | 200 | `Location: /api/v1/commands/{commandId}/receipt` | `CommandReceipt`；resultFact 按 Task 完成矩阵绑定准确 completion Fact |
 | getCommandReceipt | 200 | none | `CommandReceipt`，逐字段等于原终态 Receipt 投影 |
 | reopenDueContactTasks | 200 | `Location: /api/v1/commands/{commandId}/receipt`; `ETag: TaskETag` | `CommandReceipt`；resultFact 必须为恢复后的 `TASK_OCCURRENCE@postReopenRevision` |
+| reopenDueRoutingReviewTasks | 200 | `Location: /api/v1/commands/{commandId}/receipt`; `ETag: TaskETag` | `CommandReceipt`；resultFact 必须为恢复后的 `TASK_OCCURRENCE@postReopenRevision` |
 
 `ActionDraftWriteResult` 恰含 `receipt: CommandReceipt`、`draft: ActionDraftProjection` 和 `preconditions: PreconditionTokens`，三者均必填；其中 `preconditions.draftETag` 必须等于响应 `ETag`。七个 Task command 指 Operations 表中从 `resolveDuplicateLead` 到 `reviewLeadValidity` 的七行。
 
@@ -177,7 +183,7 @@ digest43    = 43(ALPHA / DIGIT / "-" / "_")
 | Scheme name | OpenAPI shape | Exact operation binding |
 |---|---|---|
 | `publicBearer` | `type: http`, `scheme: bearer` | 所有 `/api/v1/**` 十一个 operation 各自且只使用 `[{publicBearer: []}]` |
-| `internalMutualTls` | `type: mutualTLS` | `reopenDueContactTasks` 各自且只使用 `[{internalMutualTls: []}]` |
+| `internalMutualTls` | `type: mutualTLS` | 两个具名reopen operation各自且只使用 `[{internalMutualTls: []}]` |
 
 不得使用空 security、两个 scheme 的 OR/AND 组合、API key、`X-Tenant-Id` 或浏览器持有的内部证书。mTLS 身份只在服务端映射受限 ActorContext；它不允许请求提交 Tenant。
 
@@ -186,7 +192,7 @@ digest43    = 43(ALPHA / DIGIT / "-" / "_")
 | SecurityScheme | Operations | UnauthenticatedTransport |
 |---|---|---|
 | publicBearer | /api/v1/** | HTTP_401_PROBLEM_WITH_WWW_AUTHENTICATE_BEARER |
-| internalMutualTls | reopenDueContactTasks | TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE |
+| internalMutualTls | reopenDueContactTasks,reopenDueRoutingReviewTasks | TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE |
 
 公网Bearer operation的HTTP 401使用`application/problem+json`并带标准`WWW-Authenticate: Bearer` challenge。内部mTLS operation优先在TLS握手层拒绝无证书/无效证书；若证书已通过握手但服务端身份映射失败而产生HTTP 401，则仍返回Problem，但禁止发送Bearer challenge或任何`WWW-Authenticate` header。
 

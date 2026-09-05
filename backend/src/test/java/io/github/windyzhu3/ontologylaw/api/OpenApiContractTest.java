@@ -68,6 +68,7 @@ class OpenApiContractTest {
             "review-lead-validity.request.json",
             "command-receipt.response.json",
             "reopen-due-contact-tasks.request.json",
+            "reopen-due-routing-review-tasks.request.json",
             "problem.response.json"
     );
     private static final Set<String> FORBIDDEN_PUBLIC_NAMES = Set.of(
@@ -495,7 +496,7 @@ class OpenApiContractTest {
                 "getCurrentWorkCard If-None-Match"
         );
 
-        for (String operationId : Set.of("captureLead", "reopenDueContactTasks", "getCommandReceipt")) {
+        for (String operationId : Set.of("captureLead", "reopenDueContactTasks", "reopenDueRoutingReviewTasks", "getCommandReceipt")) {
             OperationKey key = operationKey(operationId);
             assertParameterAbsent(key, "If-Match");
             assertParameterAbsent(key, "If-None-Match");
@@ -523,10 +524,16 @@ class OpenApiContractTest {
         JsonNode retryAfter = document.at("/components/headers/RetryAfter/schema");
         assertEquals("integer", retryAfter.path("type").asText(), "Retry-After type");
         assertEquals(0L, retryAfter.path("minimum").asLong(), "Retry-After lower bound");
+
+        JsonNode revision = schema("Revision");
+        assertEquals(0L, revision.path("minimum").asLong(), "Revision lower bound");
+        assertEquals(9_007_199_254_740_991L, revision.path("maximum").asLong(), "Revision maximum safe integer");
+        assertSchemaAccepts(9_007_199_254_740_991L, revision, "maximum safe Revision");
+        assertSchemaRejects(9_007_199_254_740_992L, revision, "unsafe Revision");
     }
 
     @Test
-    void shipsMountsAndValidatesExactlyThirteenJsonExamples() throws IOException {
+    void shipsMountsAndValidatesExactlyFourteenJsonExamples() throws IOException {
         Path examplesDirectory = specPath.getParent().resolve("examples");
         assertTrue(Files.isDirectory(examplesDirectory), "OpenAPI examples directory is required");
 
@@ -539,7 +546,7 @@ class OpenApiContractTest {
                     .collect(java.util.stream.Collectors.toSet());
         }
         assertEquals(REQUIRED_EXAMPLES, actual, "The executable example set is a closed R1 contract");
-        assertEquals(13, EXAMPLE_CONTRACTS.size(), "Every example needs one exact mount contract");
+        assertEquals(14, EXAMPLE_CONTRACTS.size(), "Every example needs one exact mount contract");
         assertEquals(EXAMPLE_CONTRACTS.keySet(), fieldNames(document.at("/components/examples")),
                 "components.examples must equal the frozen executable set");
 
@@ -966,6 +973,7 @@ class OpenApiContractTest {
         assertResponseEtag("saveActionDraft", "200", "draft");
         assertResponseEtag("saveActionDraft", "201", "draft");
         assertResponseEtag("reopenDueContactTasks", "200", "task");
+        assertResponseEtag("reopenDueRoutingReviewTasks", "200", "task");
     }
 
     private static Path locateRepositoryRoot() {
@@ -993,6 +1001,7 @@ class OpenApiContractTest {
         operations.put(new OperationKey("POST", "/api/v1/tasks/{taskId}/commands/review-lead-validity"), "reviewLeadValidity");
         operations.put(new OperationKey("GET", "/api/v1/commands/{commandId}/receipt"), "getCommandReceipt");
         operations.put(new OperationKey("POST", "/internal/v1/tasks/commands/reopen-due-contact-tasks"), "reopenDueContactTasks");
+        operations.put(new OperationKey("POST", "/internal/v1/tasks/commands/reopen-due-routing-review-tasks"), "reopenDueRoutingReviewTasks");
         return Map.copyOf(operations);
     }
 
@@ -1042,6 +1051,12 @@ class OpenApiContractTest {
                 success("200", null, "TaskOccurrenceCommandReceipt",
                         headers("Location", "ReceiptLocation", "ETag", "TaskETagHeader"))
         ));
+        contracts.put("reopenDueRoutingReviewTasks", operationContract(
+                "ReopenDueRoutingReviewTaskV1",
+                parameters("IdempotencyKey"),
+                success("200", null, "TaskOccurrenceCommandReceipt",
+                        headers("Location", "ReceiptLocation", "ETag", "TaskETagHeader"))
+        ));
         return Map.copyOf(contracts);
     }
 
@@ -1085,6 +1100,9 @@ class OpenApiContractTest {
         examples.put("ReopenDueContactTasksRequest", example(
                 "reopen-due-contact-tasks.request.json", "ReopenDueContactTaskV1", "reopenDueContactTask",
                 "/paths/~1internal~1v1~1tasks~1commands~1reopen-due-contact-tasks/post/requestBody/content/application~1json"));
+        examples.put("ReopenDueRoutingReviewTasksRequest", example(
+                "reopen-due-routing-review-tasks.request.json", "ReopenDueRoutingReviewTaskV1", "reopenDueRoutingReviewTask",
+                "/paths/~1internal~1v1~1tasks~1commands~1reopen-due-routing-review-tasks/post/requestBody/content/application~1json"));
         examples.put("ProblemResponse", example(
                 "problem.response.json", "Problem", "staleTask",
                 "/components/responses/PreconditionFailedProblem/content/application~1problem+json"));
@@ -1182,6 +1200,7 @@ class OpenApiContractTest {
         errors.put("reviewLeadValidity", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,STALE_SUBJECT,TASK_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("getCommandReceipt", errors("UNAUTHENTICATED,NOT_AUTHORIZED,NOT_FOUND,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("reopenDueContactTasks", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,COMMAND_PAYLOAD_CONFLICT,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
+        errors.put("reopenDueRoutingReviewTasks", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,COMMAND_PAYLOAD_CONFLICT,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         return Map.copyOf(errors);
     }
 

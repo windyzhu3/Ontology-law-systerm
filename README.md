@@ -2,7 +2,7 @@
 
 > 以准确业务事实驱动责任：**一张卡、一个 Owner、一个主命令、一个明确结果**。当一张卡无法维持这一约束时，拆分责任或后置能力，不增加通用流程结构。
 
-本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。当前最新基线已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同、V850 前向迁移及 PostgreSQL 18 v1.1 运行时证据。R1 工程脚手架已存在，但 R1 业务生产能力尚未实现或验收。
+本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。当前最新基线已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同、V850 前向迁移及 PostgreSQL 18 v1.1 运行时证据。R1 工程脚手架与PR #9 OpenAPI制品已合并，但 R1 后端、SPA业务生产能力及E2E尚未实现或验收。
 
 > 当前权威以当前MVP基线为准；历史规格仅保留为设计演进证据。销售MVP终点、P0验收映射及52＋2边界均由该基线统一解释。
 
@@ -153,7 +153,7 @@ python3 scripts/verify_generated_sql.py
 
 当前数据库运行时证据口径为 `52-plus-2-v1.1`：20 个迁移、54 张受管表、13 个 Schema、207 个物理外键和53个 mutation guard，来自 PR #5 的 PostgreSQL 18 两次隔离空库运行。静态合同与生成物摘要、以及 v1 历史验证记录均保留在[验证报告](database/schema-contract-52-plus-2/VERIFICATION.md)中。
 
-当前本地构建环境仍未提供 Docker/Compose，因此没有本地 PostgreSQL/Flyway PASS；v1.1 的正式证据来自托管 PostgreSQL 18 执行器。受控发布仍须在专用 PostgreSQL 18 数据库以固定 Flyway 版本执行 `migrate` → strict `validate` → `info`，并确认应用制品摘要与 `52-plus-2-v1.1` manifest 匹配后，才可将`deployment_state`从`BLOCKED` CAS 切换为`ACTIVE`。
+当前开发环境可提供Docker；已冻结的v1.1正式证据仍来自PR #5 PostgreSQL 18执行器，后续本地实库检查不能替代受控发布门禁证据。受控发布仍须在专用 PostgreSQL 18 数据库以固定 Flyway 版本执行 `migrate` → strict `validate` → `info`，并确认应用制品摘要与 `52-plus-2-v1.1` manifest 匹配后，才可将`deployment_state`从`BLOCKED` CAS 切换为`ACTIVE`。
 
 ## 8. 历史规格阅读顺序
 

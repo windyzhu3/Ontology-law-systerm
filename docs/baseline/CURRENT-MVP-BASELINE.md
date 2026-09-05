@@ -22,7 +22,7 @@ R1实施合同确认日期：2026-09-02
 2. `database/schema-contract-52-plus-2/contract/`：当前MVP数据结构唯一人工维护源。
 3. 由合同机械生成的manifest、字段合同和Flyway DDL。
 4. `database/schema-contract-52-plus-2/docs/runtime-validation-contract.md`：DDL无法证明的运行时规则。
-5. [ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)、[R1 Task完成矩阵](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)、[R1 HTTP矩阵](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md)和[R1 Workbench合同](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)：决定R1工程、HTTP、责任完成与呈现语义；涉及持久化形态、唯一键或Receipt基数时必须服从第2至4项。
+5. [ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)、[ADR-0005](../adr/ADR-0005-r1-foundation-readiness.md)、[R1 Task完成矩阵](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)、[R1 HTTP矩阵](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md)和[R1 Workbench合同](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)：决定R1工程、HTTP、责任完成与呈现语义；涉及持久化形态、唯一键或Receipt基数时必须服从第2至4项。
 6. [冻结R1计划](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)：只决定上述合同的实施顺序，不能覆盖合同或数据库权威。
 7. `docs/progress/MVP-DELIVERY-LEDGER.md`：仅记录交付状态，不改变产品或数据库语义。
 8. `docs/design/`：视觉验收证据，不产生领域规则。
@@ -64,6 +64,8 @@ R1实施合同确认日期：2026-09-02
 - Workbench envelope固定为一句`todaySummary`、零或一张完整`currentCard`、最多两条`nextSummaries`、一个`waitingCount`和一个固定`chatComposer`。普通`/workbench`无全局导航/侧栏；身份管理使用同一SPA的独立受保护route mode，生产CRUD不计入R1。
 
 ## task-waiting-contract
+
+R1 wire `Revision`固定为JSON安全整数`0..9007199254740991`；数据库`bigint`不变。超界输入和ETag revision必须在API边界拒绝且不得舍入；旧导入超界值不得发出。任何需要`revision+1`且当前已达上限的写入必须在持久化前以`INTERNAL_ERROR`原子失败，不留下slot或Receipt。内部恢复命令按责任类型具名分离：CONTACT_LEAD只接受`CONTACT_RETRY_V1`，RESOLVE_LEAD_ROUTING_GAP只接受`R1_ROUTING_REVIEW_WAIT_V1`；浏览器不得调用内部operation，恢复scope必须包含`commandType`。
 
 `TaskOccurrence.state`只有`OPEN`、`WAITING`、`DONE`和`CANCELLED`四态；`DONE`和`CANCELLED`为永久终态。
 

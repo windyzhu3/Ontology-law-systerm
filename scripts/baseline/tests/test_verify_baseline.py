@@ -460,6 +460,7 @@ class VerifyBaselineTest(unittest.TestCase):
             ("reviewLeadValidity", "POST", "/api/v1/tasks/{taskId}/commands/review-lead-validity", "ACTOR_CONTEXT", "REQUIRED", "TASK_ETAG", "TASK_AND_CAUSAL_RESULT", "200"),
             ("getCommandReceipt", "GET", "/api/v1/commands/{commandId}/receipt", "ACTOR_CONTEXT", "NONE", "NONE", "COMMAND_ID_AND_ACTOR_SCOPE", "200"),
             ("reopenDueContactTasks", "POST", "/internal/v1/tasks/commands/reopen-due-contact-tasks", "ACTOR_CONTEXT", "REQUIRED", "NONE", "DUE_CUTOFF_AND_OWNER_QUEUE", "200"),
+            ("reopenDueRoutingReviewTasks", "POST", "/internal/v1/tasks/commands/reopen-due-routing-review-tasks", "ACTOR_CONTEXT", "REQUIRED", "NONE", "DUE_CUTOFF_AND_OWNER_QUEUE", "200"),
         ]
         operation_lines = [
             markdown_row(*operation_header),
@@ -490,7 +491,7 @@ class VerifyBaselineTest(unittest.TestCase):
             ),
             markdown_row(
                 "internalMutualTls",
-                "reopenDueContactTasks",
+                "reopenDueContactTasks,reopenDueRoutingReviewTasks",
                 "TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE",
             ),
         ]

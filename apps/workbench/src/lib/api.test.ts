@@ -1,4 +1,4 @@
-import { describe, expectTypeOf, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import type { Client } from "openapi-fetch";
 
 import type { components, paths } from "../generated/api/schema";
@@ -20,6 +20,8 @@ const fields: Schemas["FormField"][] = [
 ];
 
 describe("apiClient", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it("exposes the canonical OpenAPI paths through openapi-fetch", () => {
     expectTypeOf(apiClient).toMatchTypeOf<Client<paths>>();
   });
@@ -218,5 +220,47 @@ describe("apiClient", () => {
     void leadWithDigest;
     void leadWithBoth;
     void preSlotRejection;
+  });
+
+  it("exposes the dedicated routing-review recovery operation", () => {
+    type RoutingReopen = paths["/internal/v1/tasks/commands/reopen-due-routing-review-tasks"]["post"];
+    expectTypeOf<RoutingReopen>().not.toBeUnknown();
+  });
+
+  it("round-trips the maximum safe revision through fetch response and request serialization", async () => {
+    const maximumSafeRevision = 9007199254740991;
+    const fetchStub = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      expect(await request.clone().json()).toEqual({
+        taskId: uuid,
+        expectedTaskRevision: maximumSafeRevision,
+        waitReceiptId: uuid,
+        waitReceiptHash: digest,
+        dueCutoff: "2026-09-05T00:00:00Z",
+      });
+      return new Response(JSON.stringify({
+        commandId: uuid,
+        receiptId: uuid,
+        outcome: "SUCCEEDED",
+        completedAt: "2026-09-05T00:00:00Z",
+        resultFact: { factType: "TASK_OCCURRENCE", factRef: "task-ref", revision: maximumSafeRevision },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchStub);
+
+    const { data } = await apiClient.POST("/internal/v1/tasks/commands/reopen-due-contact-tasks", {
+      baseUrl: "https://api.example.test",
+      fetch: fetchStub,
+      params: { header: { "Idempotency-Key": uuid } },
+      body: {
+        taskId: uuid,
+        expectedTaskRevision: maximumSafeRevision,
+        waitReceiptId: uuid,
+        waitReceiptHash: digest,
+        dueCutoff: "2026-09-05T00:00:00Z",
+      },
+    });
+
+    expect(data?.resultFact.revision).toBe(maximumSafeRevision);
   });
 });
