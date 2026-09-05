@@ -53,6 +53,34 @@ ContactResult/WaitReceipt不可变行哈希按[原规范](../contracts/r1/R1-TAS
 | SPA客户端验证 | `npm run typecheck --workspace apps/workbench`；`npm run test --workspace apps/workbench`；`npm run build --workspace apps/workbench` | 三项exit 0；7 tests通过；构建14 modules；不代表浏览器业务验收 |
 | 零漂移核对 | 从Task 3 BASE `b0de36a62b4160cf23da7fdfb4f15bd2408e8dcb`比较database、OpenAPI、前端源码、依赖、ArchitectureTest及scope向量 | 这些路径无差异；`git diff --check`通过 |
 
+## 最终修复后的实测边界
+
+最终修复源提交为`2fb596a6aac91072264f91f3d42dd3391ea5ce72`（`fix(r1): reject reused connected facts and numeric schema booleans`），tree为`bc8ea0a3c32b8cacf6f4fca4852149b4a22c01a9`。该提交已包含全部代码、测试、scratch索引范围修正和上述历史记录校正；两项完整复验开始至结束均无tracked文件更改。后续文档提交仅追加本节实测证据，不将其文档SHA冒充已执行测试的源提交。
+
+使用固定`JAVA_HOME=C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/jdk-25.0.4.1+1`及其`bin`执行`./mvnw.cmd -f backend/pom.xml verify -Pit`，exit 0。日志的两个汇总分别属于Surefire和Failsafe：
+
+```text
+Tests run: 55, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 95, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+Total time:  01:31 min
+Finished at: 2026-09-05T18:31:35+08:00
+```
+
+Surefire包括OpenApiContractTest 16、ArchitectureTest 12、RuntimeRoleTest 17、CanonicalJsonTest 7、R1EventPolicyTest 1和PostgresImageLockTest 2。Failsafe包括CommandRuntimeIT 22、CapabilityRoleExecutorIT 8、R1CommandPolicyIT 47、R1ContractClosureIT 9、AuthorizationServiceIT 8和JooqGenerationIT 1；`failsafe-summary.xml`另确认completed=95、errors/failures/skipped/flakes=0。这些是测试执行次数，含继承的运行时回归，不代表95个新增案例。
+
+Python验证器已先观察到真实复制fixture中的`0`和`0.0`导致两个预期失败，再补上`additionalProperties is False`类型敏感检查；原duplicate-member拒绝保留。数值和重复成员focused GREEN为2 tests／0.089秒。既有ContactResult＋Opportunity回归先观察到“Expected java.sql.SQLException to be thrown, but nothing was thrown.”（1 IT失败，0 errors/skips），修复后与routing测试一起通过（7 unit＋2 IT，26.443秒）。以上RED均为语义失败，未将fixture设置错误记为RED。
+
+在相同源提交/tree执行准确的CI baseline单元测试目标，未使用discovery替代：
+
+```text
+docker run --rm --mount type=bind,source=C:/Users/Jacob/.cache/codex-worktrees/ontology-law-c0,target=/repo,readonly -w /repo -e PYTHONDONTWRITEBYTECODE=1 python@sha256:581429e3df12d76e6af4be5ab7d0e7fc2013eb57dc23d2de691411c8efdbb970 python -m unittest scripts.baseline.tests.test_verify_baseline -v
+Ran 188 tests in 195.072s
+OK
+```
+
+该命令exit 0，无failure/error/skip，包含新增数值Schema回归及Linux符号链接检查。它是baseline测试套件通过的证据；稀疏本地checkout仍缺历史merge对象和34张PNG，不能据此宣称本地完整`verify_baseline.py`检查或完整GitHub checkout CI通过。最终schema/frontend检查、全分支复审、发布tree比较、hosted CI和merge/head证据仍由控制者后续执行；本次未推进任何业务交付状态。
+
 工具链为冻结的JDK 25.0.4.1+1、Maven 3.9.16、Node 24.20.0、npm 11.9.0。Linux测试使用`python@sha256:581429e3df12d76e6af4be5ab7d0e7fc2013eb57dc23d2de691411c8efdbb970`和只读`/repo`挂载；Windows账户缺少symlink权限，没有跳过该测试。SQL解析器在一次性容器安装现有`requirements-dev.txt`的pglast 7.10/PyYAML 6.0.3后执行；首次裸镜像缺pglast的失败不记为通过。前端首次嵌套npm因手工PATH指向错误shim目录失败，改为固定npm CLI直接运行workspace脚本后通过，仓库未为此修改。
 
 成功日志不声明pristine：保留既有OpenAPI生成器mutualTLS error-level消息、OpenAPI 3.1/oneOf/discriminator及模型命名警告、JooqAuditAppender的JAXB annotation编译警告和Flyway already-exists警告；没有升级依赖或加入抑制。它们仍须最终审查分类，生成/测试成功不等于真实mTLS接入已完成。
