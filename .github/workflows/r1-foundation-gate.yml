@@ -1,0 +1,28 @@
+name: R1 foundation gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-jooq-foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c
+        with:
+          distribution: temurin
+          java-version: "25.0.4.1"
+          cache: maven
+      - name: Verify exact JDK build
+        run: java -version 2>&1 | grep -F 'Temurin-25.0.4.1+1'
+      - name: Real PostgreSQL integration and architecture
+        run: ./mvnw -f backend/pom.xml verify -Pit
+      - name: Regenerate jOOQ and reject drift
+        run: backend/scripts/generate-jooq.sh --check
