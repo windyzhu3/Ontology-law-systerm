@@ -208,6 +208,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/tasks/commands/reopen-due-routing-review-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reopen one exact due RESOLVE_LEAD_ROUTING_GAP Task */
+        post: operations["reopenDueRoutingReviewTasks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -987,6 +1004,13 @@ export interface components {
             waitReceiptHash: components["schemas"]["Digest32"];
             waitReceiptId: components["schemas"]["Uuid"];
         };
+        ReopenDueRoutingReviewTaskV1: {
+            dueCutoff: components["schemas"]["Instant"];
+            expectedTaskRevision: components["schemas"]["Revision"];
+            taskId: components["schemas"]["Uuid"];
+            waitReceiptHash: components["schemas"]["Digest32"];
+            waitReceiptId: components["schemas"]["Uuid"];
+        };
         ResolveDuplicateLeadCommandForm: {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -1186,7 +1210,10 @@ export interface components {
             triggeringContactResultHash: components["schemas"]["Digest32"];
             triggeringContactResultId: components["schemas"]["Uuid"];
         };
-        /** Format: int64 */
+        /**
+         * Format: int64
+         * @description JSON safe integer revision; values outside this range are rejected without coercion.
+         */
         Revision: number;
         SafeText200: string;
         SafeText500: string;
@@ -1850,6 +1877,41 @@ export interface operations {
         };
         responses: {
             /** @description The exact waiting Task is reopened or was already reopened by the same selector. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["TaskETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOccurrenceCommandReceipt"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["InternalUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            409: components["responses"]["ConflictProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    reopenDueRoutingReviewTasks: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenDueRoutingReviewTaskV1"];
+            };
+        };
+        responses: {
+            /** @description The exact waiting routing-review Task is reopened or was already reopened by the same selector. */
             200: {
                 headers: {
                     ETag: components["headers"]["TaskETagHeader"];

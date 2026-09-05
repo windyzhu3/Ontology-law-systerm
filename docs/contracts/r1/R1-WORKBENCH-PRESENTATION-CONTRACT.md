@@ -24,6 +24,8 @@ R1 只交付一份响应式 Workbench。身份管理 route mode 与 Workbench �
 
 所有对象都拒绝未声明字段。字段名、requiredness 和 null 形态固定如下；本文的 `Uuid`、`Revision`、`Instant`、`Digest32`、`Code64` 和 strong ETag 使用 HTTP 合同定义。响应不含 Tenant、Principal/Grant/组织内部 ID、SQL/Repository 名称、密文、HMAC、授权路径、原始 Task/Fact hash 或不可见主体数据。
 
+所有`Revision`响应和请求均限于JSON安全整数`0..9007199254740991`；投影不得发出旧导入的超界值或静默舍入。具名routing-review恢复完成后，刷新必须把该`RESOLVE_LEAD_ROUTING_GAP` Task以OPEN及递增revision投影为`CurrentCard`，随后只接受其冻结的`RECORD_ROUTING_DISPOSITION`流程；恢复前、错误Task类型或stale selector均不得改变卡片或等待计数。
+
 ### Top-level and card DTOs
 
 | DTO | Field | Cardinality | Exact type / constraint |
