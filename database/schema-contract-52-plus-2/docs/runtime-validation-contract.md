@@ -1,5 +1,7 @@
 # 52＋2 运行时重验合同
 
+R1 v1.1 amendment: the complete frozen R1 notification registry has 14 event types; none is an unfrozen non-completion event. Projection consumption validates the real Event/Outbox and re-reads current Owner facts under `R1_BUSINESS_TENANT_LOCK` shared then identity shared locks. `R1_PROJECTION` DELIVERED means API validation followed by fenced Worker CAS; it creates no projection table or business mutation. The lease profile is concurrency/batch 4, poll 1 second, lease 60 seconds, HTTP timeout 10 seconds, eight cumulative claims, retry delays 1s/5s/30s/2m/10m/30m/2h, and expired-claim reaping to PENDING or EXHAUSTED.
+
 ## 1. 目的与适用范围
 
 本文件是[当前MVP语义基线](../../../docs/baseline/CURRENT-MVP-BASELINE.md)与52＋2结构/物理合同的从属运行时补充，规定API、CommandRuntime、各 Fact Owner、Query Facade、Dispatcher、ProviderIngress 与 DeploymentRuntime共同执行的验证。这里的“必须”“不得”只在上位基线已定义的边界内构成运行时要求；如与上位基线冲突，验证必须失败关闭，不得据此放宽或改写上位规则。

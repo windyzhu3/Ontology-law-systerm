@@ -1,10 +1,10 @@
 # R1 Command Policy and Event Contract
 
-Contract ID: R1-COMMAND-POLICY-EVENT-V1
+Contract ID: R1-COMMAND-POLICY-EVENT-V1.1
 
 Status: FROZEN
 
-Semantic baseline: MVP-2026-09-05.2
+Semantic baseline: MVP-2026-09-05.3
 
 Shared payload Schema: contracts/events/r1-domain-notification-v1.schema.json
 
@@ -12,9 +12,12 @@ Shared payload Schema: contracts/events/r1-domain-notification-v1.schema.json
 
 ## Command policy registry
 
+The registry key is the composite `(CommandType, PrincipalKind)`. The runtime derives and persists the instance envelope from that key; replay requires the same scope, payload and envelope. SERVICE capture additionally requires the exact static `R1_TRUSTED_SERVICE_SOURCE_BINDING_V1` issuer/audience/provider/tenant/principal/appointment/source-account binding, SERVICE_ACTOR/SYSTEM, and empty on-behalf-of. Request data cannot select identity, envelope, authority, Tenant or organization.
+
 | CommandType | Envelope | PrincipalKind | AuthorityPath | AuthoritySlot | AuthorityCode | ScopeSelector | ObjectDeny | TaskType | WaitProfile |
 |---|---|---|---|---|---|---|---|---|---|
 | CAPTURE_LEAD | INTERNAL_ADMIN | HUMAN | DIRECT,DELEGATED | SOURCE_INTAKE_OWNER | LEAD_CAPTURE | sourceIntakeRootCode | existing-lead:LEAD_CAPTURE-DENY | NONE | NONE |
+| CAPTURE_LEAD | SERVICE_ACTOR | SERVICE | SYSTEM | SOURCE_INTAKE_OWNER | LEAD_CAPTURE | sourceIntakeRootCode | existing-lead:LEAD_CAPTURE-DENY | NONE | NONE |
 | SAVE_ACTION_DRAFT | INTERNAL_TASK | HUMAN | DIRECT,DELEGATED | taskTypeRegistry | taskTypeRegistry | taskOwnerOrganization | task-and-lead:taskTypeAuthority-DENY | persistedTaskType | NONE |
 | REOPEN_DUE_CONTACT_TASKS | SERVICE_ACTOR | SERVICE | SYSTEM | SYSTEM_RECOVERY | CONTACT_TASK_RECOVER | taskOwnerOrganization | task-and-lead:CONTACT_TASK_RECOVER-DENY | CONTACT_LEAD | CONTACT_RETRY_V1 |
 | REOPEN_DUE_ROUTING_REVIEW_TASKS | SERVICE_ACTOR | SERVICE | SYSTEM | SYSTEM_RECOVERY | ROUTING_REVIEW_TASK_RECOVER | taskOwnerOrganization | task-and-lead:ROUTING_REVIEW_TASK_RECOVER-DENY | RESOLVE_LEAD_ROUTING_GAP | R1_ROUTING_REVIEW_WAIT_V1 |

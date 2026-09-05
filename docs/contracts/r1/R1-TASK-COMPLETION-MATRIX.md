@@ -1,5 +1,7 @@
 # R1 Task 完成合同矩阵
 
+ADR-0008 amendment: capture policy is keyed by `(CommandType, PrincipalKind)` and admits a separately authorized SERVICE_ACTOR/SYSTEM capture path. The seven Task primary commands and their existing completion facts/codes remain unchanged. CurrentCard evidence includes committed `R1_CURRENT_WORKCARD_DISCLOSURE_V1` Audit for both 200 and 304; `R1_PROJECTION` delivery is technical acknowledgement only and never completes or reopens a Task.
+
 Contract ID: R1-TASK-COMPLETION-V1
 
 Status: FROZEN

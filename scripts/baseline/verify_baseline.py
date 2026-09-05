@@ -17,8 +17,10 @@ from urllib.parse import unquote, urlsplit
 
 try:
     from scripts.baseline.r1_command_contract import validate_r1_command_contract
+    from scripts.baseline.r1_business_closure_contract import validate as validate_r1_business_closure_contract
 except ModuleNotFoundError:  # Direct script execution places this directory on sys.path.
     from r1_command_contract import validate_r1_command_contract
+    from r1_business_closure_contract import validate as validate_r1_business_closure_contract
 
 
 ALLOWED_STATES = {"DRAFT", "FROZEN", "MERGED", "IMPLEMENTED", "RUNTIME_VERIFIED"}
@@ -44,7 +46,7 @@ TARGET_GATE_STATES = {
 VISUAL_BUNDLE_VERSION = "visual-bundle-2026-08-27"
 VISUAL_OWNER = "Product Design"
 VISUAL_CONFIRMATION_DATE = "2026-08-27"
-CANONICAL_BASELINE_ID = "MVP-2026-09-05.2"
+CANONICAL_BASELINE_ID = "MVP-2026-09-05.3"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 HISTORICAL_BANNER = "历史规格（HISTORICAL_SUPERSEDED）"
 HISTORICAL_WARNING = (
@@ -1610,8 +1612,8 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
         return
     metadata = (
         (task_text, "R1-TASK-COMPLETION-V1", "R1 task contract"),
-        (http_text, "R1-HTTP-V1", "R1 HTTP contract"),
-        (workbench_text, "R1-WORKBENCH-V1", "R1 workbench contract"),
+        (http_text, "R1-HTTP-V1.1", "R1 HTTP contract"),
+        (workbench_text, "R1-WORKBENCH-V1.1", "R1 workbench contract"),
     )
     for text, expected_id, label in metadata:
         if field_value(text, "Contract ID") != expected_id or field_value(text, "Status") != "FROZEN":
@@ -2680,6 +2682,8 @@ def _verify_repository_result_unchecked(root: Path) -> VerificationResult:
     verify_matter_endpoint(structural_findings, baseline_text)
     verify_r1_contracts(root, structural_findings)
     structural_findings.extend(validate_r1_command_contract(root))
+    if (root / "docs/adr/ADR-0008-r1-business-closure-alignment.md").is_file():
+        structural_findings.extend(validate_r1_business_closure_contract(root))
     readiness_blockers = (
         verify_delivery_ledger(root, structural_findings) or []
     )

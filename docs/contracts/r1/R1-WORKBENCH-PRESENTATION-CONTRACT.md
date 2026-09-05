@@ -1,6 +1,8 @@
 # R1 Workbench 呈现合同
 
-Contract ID: R1-WORKBENCH-V1
+Contract ID: R1-WORKBENCH-V1.1
+
+All seven nonempty CurrentCard variants are `R1_CURRENT_WORKCARD_DISCLOSURE_V1`. Both 200 BODY and 304 CACHE_REVALIDATED return only after disclosure Audit commit. Task, Lead, Owner Appointment/Principal/OrganizationUnit and every actually returned Draft/candidate/fact are separate typed disclosedSource anchors. Responses use `Cache-Control: private, no-cache` and `Vary: Authorization`; Actor-scoped ETags include authorization and every disclosed source revision/digest. The SPA uses generation/AbortController so a late older request cannot overwrite a newer envelope.
 
 Status: FROZEN
 

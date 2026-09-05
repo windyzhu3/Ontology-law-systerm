@@ -1,6 +1,8 @@
 # 当前MVP基线
 
-Baseline ID: MVP-2026-09-05.2
+Baseline ID: MVP-2026-09-05.3
+
+Previous Baseline ID `MVP-2026-09-05.2` and its merge evidence remain historical. ADR-0008 activates contract-only alignment: command-policy v1.1, HTTP v1.1, Workbench v1.1, OpenAPI 1.1.0, SERVICE capture, audited CurrentCard revalidation, due discovery and projection acknowledgement. Task/event schema/physical versions remain unchanged; no production Handler or R1 business status is advanced.
 
 状态：`FROZEN`
 

@@ -14,7 +14,7 @@ from scripts.baseline.tests.test_r1_command_contract import R1CommandContractTes
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "verify_baseline.py"
-CANONICAL_BASELINE_ID = "MVP-2026-09-05.2"
+CANONICAL_BASELINE_ID = "MVP-2026-09-05.3"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 CANONICAL_MATTER_PUBLICATION_CLAUSE = (
     "同一本地事务必须写入完整MatterRef槽：稳定`matter_id`、`matter_no`、类型、"
@@ -504,7 +504,7 @@ class VerifyBaselineTest(unittest.TestCase):
                 [
                     "# R1 HTTP error and precondition matrix",
                     "",
-                    "Contract ID: R1-HTTP-V1",
+                    "Contract ID: R1-HTTP-V1.1",
                     "",
                     "Status: FROZEN",
                     "",
@@ -559,7 +559,7 @@ class VerifyBaselineTest(unittest.TestCase):
                 [
                     "# R1 workbench presentation contract",
                     "",
-                    "Contract ID: R1-WORKBENCH-V1",
+                    "Contract ID: R1-WORKBENCH-V1.1",
                     "",
                     "Status: FROZEN",
                     "",

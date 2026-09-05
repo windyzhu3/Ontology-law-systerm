@@ -1,6 +1,10 @@
 # R1 HTTP、错误与前置条件合同
 
-Contract ID: R1-HTTP-V1
+Contract ID: R1-HTTP-V1.1
+
+R1 v1.1 freezes 15 operations: 11 public Bearer and 4 mutualTLS. `listDueR1Tasks` accepts only `recoveryType=CONTACT_TASK|ROUTING_REVIEW_TASK`, limit default 50 bounded 1..100, and optional opaque cursor; it returns `candidates` plus optional `nextCursor`. Each candidate has exactly recoveryType/taskId/expectedTaskRevision/waitReceiptId/waitReceiptHash/dueCutoff/idempotencyKey. Pagination orders by `(resume_due_at, task_id)` with an Actor-scoped cursor and stable UUIDv5 recovery key. `consumeR1Projection` accepts exactly domainEventOutboxId/domainEventId/expectedOutboxRevision/leaseOwner/fencingToken and succeeds with 204 and no body. Both DTOs reject unknown fields.
+
+`STALE_OUTBOX_CLAIM` and `PROJECTION_EVENT_INVALID` belong only to consumeR1Projection's typed internal Problem allowlist; no public operation error allowlist changes. Internal authorization failures are 403, never disguised as permanent 404.
 
 Status: FROZEN
 

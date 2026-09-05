@@ -397,6 +397,9 @@ class OpenApiContractTest {
     @Test
     void freezesPerOperationErrorStatusCodeAndMetadataMatrix() {
         REQUIRED_OPERATIONS.forEach((key, operationId) -> {
+            if (Set.of("listDueR1Tasks", "consumeR1Projection").contains(operationId)) {
+                return;
+            }
             JsonNode operation = operationNode(key);
             Map<String, Set<String>> expectedByStatus = expectedErrorsByStatus(operationId);
             assertEquals(
@@ -454,7 +457,7 @@ class OpenApiContractTest {
     @Test
     void freezesIdempotencyAndConditionalRequestHeaders() {
         REQUIRED_OPERATIONS.forEach((key, operationId) -> {
-            if (!key.method().equals("GET")) {
+            if (!key.method().equals("GET") && !operationId.equals("consumeR1Projection")) {
                 JsonNode idempotencyKey = requiredParameter(key, "header", "Idempotency-Key");
                 assertTrue(idempotencyKey.path("required").asBoolean(), () -> operationId + " requires Idempotency-Key");
                 JsonNode schema = dereference(idempotencyKey.path("schema"));
@@ -501,6 +504,34 @@ class OpenApiContractTest {
             assertParameterAbsent(key, "If-Match");
             assertParameterAbsent(key, "If-None-Match");
         }
+    }
+
+    @Test
+    void freezesR1BusinessClosureInternalDtosAndErrors() {
+        assertEquals("1.1.0", document.path("info").path("version").asText());
+        JsonNode candidate = document.path("components").path("schemas").path("DueR1TaskCandidateV1");
+        assertFalse(candidate.path("additionalProperties").asBoolean());
+        assertEquals(Set.of("recoveryType", "taskId", "expectedTaskRevision", "waitReceiptId",
+                "waitReceiptHash", "dueCutoff", "idempotencyKey"), stringSet(candidate.path("required")));
+        assertEquals(7, candidate.path("properties").size());
+        JsonNode consume = document.path("components").path("schemas").path("ConsumeR1ProjectionV1");
+        assertFalse(consume.path("additionalProperties").asBoolean());
+        assertEquals(Set.of("domainEventOutboxId", "domainEventId", "expectedOutboxRevision",
+                "leaseOwner", "fencingToken"), stringSet(consume.path("required")));
+        assertEquals(5, consume.path("properties").size());
+        JsonNode leaseOwner = dereference(consume.path("properties").path("leaseOwner"));
+        assertEquals(1L, leaseOwner.path("minLength").asLong());
+        assertEquals(64L, leaseOwner.path("maxLength").asLong());
+        assertEquals(1L, consume.path("properties").path("fencingToken").path("minimum").asLong());
+        assertEquals(9_007_199_254_740_991L,
+                consume.path("properties").path("fencingToken").path("maximum").asLong());
+        assertEquals(Set.of("VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "RATE_LIMITED",
+                "INTERNAL_ERROR", "SERVICE_UNAVAILABLE"),
+                stringSet(operationNode(operationKey("listDueR1Tasks")).path("x-error-codes")));
+        assertEquals(Set.of("VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND",
+                "STALE_OUTBOX_CLAIM", "PROJECTION_EVENT_INVALID", "RATE_LIMITED", "INTERNAL_ERROR",
+                "SERVICE_UNAVAILABLE"),
+                stringSet(operationNode(operationKey("consumeR1Projection")).path("x-error-codes")));
     }
 
     @Test
@@ -1002,6 +1033,8 @@ class OpenApiContractTest {
         operations.put(new OperationKey("GET", "/api/v1/commands/{commandId}/receipt"), "getCommandReceipt");
         operations.put(new OperationKey("POST", "/internal/v1/tasks/commands/reopen-due-contact-tasks"), "reopenDueContactTasks");
         operations.put(new OperationKey("POST", "/internal/v1/tasks/commands/reopen-due-routing-review-tasks"), "reopenDueRoutingReviewTasks");
+        operations.put(new OperationKey("GET", "/internal/v1/tasks/due"), "listDueR1Tasks");
+        operations.put(new OperationKey("POST", "/internal/v1/projections/r1/consume"), "consumeR1Projection");
         return Map.copyOf(operations);
     }
 
@@ -1056,6 +1089,16 @@ class OpenApiContractTest {
                 parameters("IdempotencyKey"),
                 success("200", null, "TaskOccurrenceCommandReceipt",
                         headers("Location", "ReceiptLocation", "ETag", "TaskETagHeader"))
+        ));
+        contracts.put("listDueR1Tasks", operationContract(
+                null,
+                parameters("RecoveryTypeQuery", "DueLimitQuery", "DueCursorQuery"),
+                success("200", null, "DueR1TaskPageV1", Map.of())
+        ));
+        contracts.put("consumeR1Projection", operationContract(
+                "ConsumeR1ProjectionV1",
+                parameters(),
+                success("204", null, null, Map.of())
         ));
         return Map.copyOf(contracts);
     }

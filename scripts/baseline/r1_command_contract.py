@@ -21,23 +21,27 @@ COMMAND_POLICY_HEADERS = (
     "WaitProfile",
 )
 COMMAND_POLICIES = {
-    "CAPTURE_LEAD": (
-        "INTERNAL_ADMIN", "HUMAN", "DIRECT,DELEGATED", "SOURCE_INTAKE_OWNER",
+    ("CAPTURE_LEAD", "HUMAN"): (
+        "INTERNAL_ADMIN", "DIRECT,DELEGATED", "SOURCE_INTAKE_OWNER",
         "LEAD_CAPTURE", "sourceIntakeRootCode", "existing-lead:LEAD_CAPTURE-DENY",
         "NONE", "NONE",
     ),
-    "SAVE_ACTION_DRAFT": (
-        "INTERNAL_TASK", "HUMAN", "DIRECT,DELEGATED", "taskTypeRegistry",
+    ("CAPTURE_LEAD", "SERVICE"): (
+        "SERVICE_ACTOR", "SYSTEM", "SOURCE_INTAKE_OWNER", "LEAD_CAPTURE",
+        "sourceIntakeRootCode", "existing-lead:LEAD_CAPTURE-DENY", "NONE", "NONE",
+    ),
+    ("SAVE_ACTION_DRAFT", "HUMAN"): (
+        "INTERNAL_TASK", "DIRECT,DELEGATED", "taskTypeRegistry",
         "taskTypeRegistry", "taskOwnerOrganization",
         "task-and-lead:taskTypeAuthority-DENY", "persistedTaskType", "NONE",
     ),
-    "REOPEN_DUE_CONTACT_TASKS": (
-        "SERVICE_ACTOR", "SERVICE", "SYSTEM", "SYSTEM_RECOVERY",
+    ("REOPEN_DUE_CONTACT_TASKS", "SERVICE"): (
+        "SERVICE_ACTOR", "SYSTEM", "SYSTEM_RECOVERY",
         "CONTACT_TASK_RECOVER", "taskOwnerOrganization",
         "task-and-lead:CONTACT_TASK_RECOVER-DENY", "CONTACT_LEAD", "CONTACT_RETRY_V1",
     ),
-    "REOPEN_DUE_ROUTING_REVIEW_TASKS": (
-        "SERVICE_ACTOR", "SERVICE", "SYSTEM", "SYSTEM_RECOVERY",
+    ("REOPEN_DUE_ROUTING_REVIEW_TASKS", "SERVICE"): (
+        "SERVICE_ACTOR", "SYSTEM", "SYSTEM_RECOVERY",
         "ROUTING_REVIEW_TASK_RECOVER", "taskOwnerOrganization",
         "task-and-lead:ROUTING_REVIEW_TASK_RECOVER-DENY", "RESOLVE_LEAD_ROUTING_GAP",
         "R1_ROUTING_REVIEW_WAIT_V1",
@@ -285,15 +289,22 @@ def _validate_registry(
     rows: list[tuple[str, ...]] | None,
     expected: dict[str, tuple[str, ...]],
     findings: list[str],
+    key_columns: tuple[int, ...] = (0,),
 ) -> dict[str, tuple[str, ...]] | None:
     if rows is None:
         return None
-    keys = [row[0] for row in rows]
+    keys = [
+        row[key_columns[0]] if len(key_columns) == 1 else tuple(row[index] for index in key_columns)
+        for row in rows
+    ]
     duplicates = sorted(key for key, count in Counter(keys).items() if count > 1)
     if duplicates:
         findings.append(f"R1 {label} duplicate key: {duplicates[0]}")
         return None
-    actual = {row[0]: row[1:] for row in rows}
+    actual = {
+        key: tuple(value for index, value in enumerate(row) if index not in key_columns)
+        for key, row in zip(keys, rows)
+    }
     missing = sorted(set(expected) - set(actual))
     extra = sorted(set(actual) - set(expected))
     if missing:
@@ -317,9 +328,9 @@ def validate_r1_command_contract(root: Path) -> list[str]:
         return findings
 
     metadata = {
-        "Contract ID": "R1-COMMAND-POLICY-EVENT-V1",
+        "Contract ID": "R1-COMMAND-POLICY-EVENT-V1.1",
         "Status": "FROZEN",
-        "Semantic baseline": "MVP-2026-09-05.2",
+        "Semantic baseline": "MVP-2026-09-05.3",
         "Shared payload Schema": SCHEMA_PATH.as_posix(),
     }
     for name, expected in metadata.items():
@@ -331,6 +342,7 @@ def validate_r1_command_contract(root: Path) -> list[str]:
         _parse_table(text, "Command policy registry", COMMAND_POLICY_HEADERS, findings),
         COMMAND_POLICIES,
         findings,
+        (0, 2),
     )
     draft_authorities = _validate_registry(
         "draft authority",
@@ -352,8 +364,8 @@ def validate_r1_command_contract(root: Path) -> list[str]:
     )
 
     if policies is not None and draft_authorities is not None:
-        draft_policy = policies["SAVE_ACTION_DRAFT"]
-        if draft_policy[3:5] != ("taskTypeRegistry", "taskTypeRegistry"):
+        draft_policy = policies[("SAVE_ACTION_DRAFT", "HUMAN")]
+        if draft_policy[2:4] != ("taskTypeRegistry", "taskTypeRegistry"):
             findings.append("R1 draft policy must resolve both authority fields from TaskType")
 
     if events is not None and branches is not None:
