@@ -82,7 +82,7 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 |---|---|---|
 | `CaptureLeadV1` | `sourceChannelCode: Code64` (1), `sourceAccountCode: string[1..128]` (1), `sourceRecordKey: string[1..256]` (1), `capturedAt: Instant` (1), `capturedName: string[1..200]` (0..1), `phone: string[2..16]` (0..1), `email: email-string[1..320]` (0..1), `cityCode: Code64` (0..1), `serviceCategoryCode: Code64` (1), `jurisdictionCode: Code64` (1), `urgencyCode: Code64` (1), `legalNeedSummary: SafeText2000` (1) | phone 若出现必须匹配 `^\+[1-9][0-9]{0,14}$`；phone/email 可同时缺失并进入 P0-02。sourceRecordKey 区分大小写且不 trim。客户端不得提交 Lead/Party/Assignment ID、摘要、密文、HMAC、捕获内容 digest 或 Tenant；服务端按 Task 合同规范化并保护自然键和敏感值 |
 | `SaveActionDraftV1` | `actionCode: Code64` (1), `schemaVersion: integer` (1), `values: object` (1) | `actionCode` 必须等于 Task 冻结 `primaryCommand`；`schemaVersion=1`；`values` 必须逐字段等于相应 command DTO 去掉 `draftId`、`expectedDraftRevision`、`draftDigest` 后的 Schema |
-| `ResolveDuplicateLeadV1` | Draft confirmation fields (各 1), `decisionCode` (1), `candidateLeadId: Uuid` (1), `candidateLeadRevision: Revision` (1), `partyId: Uuid` (1), `partyRevision: Revision` (1), `rationaleSummary: SafeText500` (1) | `decisionCode ∈ {LINK_EXISTING_PARTY,KEEP_SEPARATE}`；两个 exact selector 两分支均必填并须等于 Task 创建时按 Task 合同确定、提交时重验的候选及其同一活动 Party；LINK 才修改当前 Lead 的 Party 解析/处置，KEEP_SEPARATE 只记录分离决定 |
+| `ResolveDuplicateLeadV1` | Draft confirmation fields (各 1), `decisionCode` (1), `candidateLeadId: Uuid` (1), `candidateLeadRevision: Revision` (1), `partyId: Uuid` (1), `partyRevision: Revision` (1), `rationaleSummary: SafeText500` (1) | `decisionCode ∈ {LINK_EXISTING_PARTY,KEEP_SEPARATE}`；两个 exact selector 两分支均必填并须等于 Task 创建时按 Task 合同确定、提交时重验的候选及其同一活动 Party；两分支均要求当前Lead仍为`CAPTURED`并做`revision=old+1` CAS：LINK写入Party解析和`LINK_EXISTING_PARTY`处置，KEEP只写`disposition_code=KEEP_SEPARATE`且禁止修改Party解析、assignment、捕获/V850字段及candidate Lead/Party |
 | `CompleteLeadIngressV1` | Draft confirmation fields (各 1), `phone: string[2..16]` (0..1), `email: email-string[1..320]` (0..1), `sourceCode: Code64` (1), `sourceSummary: SafeText500` (1) | phone/email 至少一个；phone 若出现必须匹配 `^\+[1-9][0-9]{0,14}$`；`sourceCode ∈ {OWNER_CONFIRMED,CUSTOMER_PROVIDED}`；仅当原始 phone/email 和完整 ingress 槽均为空时允许；服务端生成密文、HMAC、完成时间和 digest |
 | `AssignLeadV1` | Draft confirmation fields (各 1), `ownerAppointmentId: Uuid` (1) | Appointment 必须来自当前卡允许候选，且提交前仍为同 Tenant、ACTIVE、有准确 authority 且无 DENY |
 | `RecordRoutingDispositionV1` | Draft confirmation fields (各 1), `decisionCode` (1), `rationaleSummary: SafeText500` (1) | `decisionCode ∈ {SCHEDULE_ROUTING_REVIEW,RETRY_ASSIGNMENT_NOW,REQUEST_SOURCE_INTAKE_STOP}`；恢复时间、候选选择和准确 intake Owner 均由服务器策略决定 |
@@ -181,6 +181,15 @@ digest43    = 43(ALPHA / DIGIT / "-" / "_")
 
 不得使用空 security、两个 scheme 的 OR/AND 组合、API key、`X-Tenant-Id` 或浏览器持有的内部证书。mTLS 身份只在服务端映射受限 ActorContext；它不允许请求提交 Tenant。
 
+## Authentication challenge binding
+
+| SecurityScheme | Operations | UnauthenticatedTransport |
+|---|---|---|
+| publicBearer | /api/v1/** | HTTP_401_PROBLEM_WITH_WWW_AUTHENTICATE_BEARER |
+| internalMutualTls | reopenDueContactTasks | TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE |
+
+公网Bearer operation的HTTP 401使用`application/problem+json`并带标准`WWW-Authenticate: Bearer` challenge。内部mTLS operation优先在TLS握手层拒绝无证书/无效证书；若证书已通过握手但服务端身份映射失败而产生HTTP 401，则仍返回Problem，但禁止发送Bearer challenge或任何`WWW-Authenticate` header。
+
 ## Idempotency binding
 
 | Property | FrozenValue |
@@ -214,7 +223,7 @@ capture 不对尚不存在的资源要求 `If-Match`。Draft 首次创建使用 
 | currentETag | 0..1 | `CurrentETag`；本表指定 kind 且当前资源存在并对 Actor 可见时必须出现；`NONE` 时禁止出现 |
 | receiptRef | 0..1 | `ReceiptRef`；COMMAND_PAYLOAD_CONFLICT 必须出现并指向原 Receipt；其他 code 仅当该同 key 请求已有可恢复的终态 REJECTED Receipt 时允许出现 |
 
-401 必须带标准 `WWW-Authenticate: Bearer` challenge；429 和 503 可带整数秒 `Retry-After`。这些 header 不改变 Problem shape，且不得透露 Tenant、对象存在性、授权规则或内部故障原因。
+公网Bearer operation的401必须带标准`WWW-Authenticate: Bearer` challenge；内部mTLS operation遵循上方Authentication challenge binding，绝不发送Bearer challenge。429 和 503 可带整数秒 `Retry-After`。这些 header 不改变 Problem shape，且不得透露 Tenant、对象存在性、授权规则或内部故障原因。
 
 | ErrorCode | HttpStatus | RetryPolicy | FieldErrors | CurrentETag | SafeText |
 |---|---|---|---|---|---|
