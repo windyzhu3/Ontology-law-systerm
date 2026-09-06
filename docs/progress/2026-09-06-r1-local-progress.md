@@ -18,9 +18,20 @@
 | 当前收口计划Task 2 | 本地基础授权/运行时围栏已完成并提交`3a2b63a556297e81842421f52d50950695209d64`，真实PostgreSQL回归证据保留在原Task 2报告。它不代表生产Lead业务命令已实现。 |
 | 当前收口计划Task 3 | 本地实现及独立评审已完成，代码提交`df9b985a2b371e93016890fd1fc8ffc7e50415f7`。六个生产capture/P0 Handler及必要Owner读写、真实Draft原子确认、保护/规范化、Task后继/等待已实现。四个生产P0 IT类共33个测试，覆盖各分支、准确delta、幂等、权限变更、并发与技术失败回滚。固定运行时最终回归`task-3-resume-22-final-regression.log`：67 unit/architecture +218 IT，0 failures/errors/skips，进程exit0；218包含继承的既有运行时回归，不能当作218个新增业务测试。独立评审：Spec compliant、Task quality Approved，无Critical/Important；不代表已合并、部署或全R1验收。 |
 | 当前收口计划Task 4 | 本地后端实现、验证和独立评审已完成，代码提交`03573e93e03e0a5d71d7f2b6c5c93ea7cfe07fbd`。生产SAVE_ACTION_DRAFT通过现有CommandRuntime持久化、CAS编辑、NO_CHANGE和幂等重放；保留Task3原子确认，七种冻结候选校验与Task/Draft/Lead/Owner准确来源读口已实现。专项5个unit及30个新增Draft/读口IT通过，完整回归71 unit/architecture +249 IT通过，进程均exit0。独立评审Spec compliant、Task quality Approved，无Critical/Important；未连接HTTP或前端，不代表全部R1业务验收。 |
+| 当前收口计划Task 5预检 | 用户授权继续后已完成设计/接口预检，确认QUERY读取边界存在待批准的合同冲突，详见下节；未开始生产实现，不计为完成。当前未修改权限、迁移或业务逻辑。 |
 | 当前收口计划Tasks 5–10 | 尚未完成。审计Query、contact/recovery、worker、HTTP装配、SPA与整体E2E/容量验收仍待实现或验证；准备brief不等于实施。 |
 
 以上Task编号来自[2026-09-05收口计划](../superpowers/plans/2026-09-05-r1-business-closure-plan.md)，与早期R1计划编号不可混用。Task 1/2/3原始报告和日志保留在本地忽略目录`.superpowers/sdd/2026-09-05-r1-business-closure-plan/`的`task-1-report.md`、`task-2-report.md`、`task-3-report.md`。Task3报告保留原NEEDS_CONTEXT检查点、真实RED/GREEN与失败迭代、最终接口和逐分支证据；Task4在后续授权后单独实施，报告为同目录`task-4-report.md`，不自动进入Task5。以下Python结果仍是前一轮合同修复证据，不冒充本轮重新执行。历史托管与合并证据见[2026-09-05分层验收报告](2026-09-05-r1-contract-closure-acceptance.md)。
+
+## Task 5预检：读取能力合同需要先确认
+
+本轮基于`610c16b`继续，发现上一步记录的依赖确实不能仅靠补Java接口解决：[Task矩阵](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)第114–116行要求重复候选同时比较原始及后补phone/email HMAC，[展示合同](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)第87行要求服务器提供准确候选selector；但[批准规格](../superpowers/specs/2026-09-05-r1-business-closure-alignment-design.md)第5.2节限定QUERY读取，而[V850](../../database/schema-contract-52-plus-2/generated/db/migration/V850__lead_ingress_completion_slot.sql)第135–160及243–250行明确禁止QUERY读取任何补全槽字段。
+
+只比较原始联系方式会漏掉或错排合法候选；从Draft还原会把草稿当作Fact真源；临时切换COMMAND、新增提权函数或SELECT授权都会改变冻结的权限/设计边界。因此暂停Task5生产实施，等待用户确认是否先进行最小必要的只读能力设计及合同受控修订。至少两个补全HMAC匹配字段确实必需，其他字段须按实际展示需求逐项论证；建议保留旧迁移字节、不新增表、不开放写权限、不扩Worker权限，并保留同事务授权及披露前审计。这只是待确认建议，尚未实施修订。
+
+因果Decision/ContactResult的服务端选择属于Task5原范围，可通过Owner读口完成；ACK已有`causalStop`，并非另一个需要扩大权限的阻塞。此处读取冲突与已修复的P0自动分配合同冲突、尚待处理的容量向量问题分别记录，不混为同一问题。
+
+本轮未改生产代码，固定JDK及迁移后PostgreSQL基线`task-5-preflight-baseline.log`实际通过14个unit/architecture与9个IT，0 failures/errors/skips，于2026-09-06T16:21:19+08:00退出0。测试覆盖既有能力角色和准确QUERY刷新读口，不冒充新的CurrentCard实现或冲突修复。整体仍为Task1–4完成，HTTP/前端/E2E未打通。
 
 ## Task 4后端完成复核与范围
 
