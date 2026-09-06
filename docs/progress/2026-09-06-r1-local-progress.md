@@ -1,8 +1,8 @@
 # R1本地实施进度（2026-09-06）
 
-> 当前状态补充（2026-09-06，ADR-0010）：用户已确认四列QUERY能力修订，基线后继`MVP-2026-09-06.2`与`52-plus-2-v1.2`通过V860激活于本地分支。下文“待确认/未激活/V850全槽禁读”是前序时点记录，由本具名补充覆盖当前状态。当前能力单元实现及有限本地验证已通过，独立评审待完成；旧v1.1托管RUNTIME_VERIFIED仅属于旧合同。原Task 5生产消费者尚未开始，Task 6–10、业务/SPA/E2E/容量/发布状态未提升。
+> 当前状态补充（2026-09-06，ADR-0010）：四列QUERY能力修订已完成本地实现、验证与独立规格/质量评审，提交`f0eb0ab`及评审修复`1543f49`。活动基线为`MVP-2026-09-06.2`/`52-plus-2-v1.2`。下文“待确认/未激活/V850全槽禁读”保留为前序时点记录，不代表当前状态。原Task 5读取阻塞已解除，开始恢复其实施；Task 6–10仍不进入。旧v1.1托管RUNTIME_VERIFIED仅属于旧合同，业务/SPA/E2E/容量/发布状态未提升。
 
-能力实库门禁：`IngressQueryCapabilityIT` 5例＋`CapabilityRoleExecutorIT` 8例，2026-09-06T16:57:01+08:00，Maven verify exit 0（57.279秒），另14例unit/architecture。覆盖真实新库、V850九列禁读、四列读取与五列/整行/写拒绝、无GRANT OPTION、真实Lead/补全数据升级与非QUERY ACL/登录成员保持、SQLSTATE 55000故障回滚及恢复重试、Flyway validate与no-op；现有runtime SQL在真实数据库拒绝遗漏V860、旧版本、额外列授权和GRANT OPTION。最终有限回归：完整后端71 unit＋254 IT，exit 0（4分24秒）；schema 58例与generate --check，exit 0；runtime 121例（5.585秒），exit 0；baseline 243例（186.974秒），exit 0。暂存制品真实baseline CLI exit 0，输出baseline consistency PASS及6个既有范围内R2非致命阻塞；最终提交后CLI由主控复核。详细原始日志与报告保存在本地计划工作区。
+能力实库门禁：`IngressQueryCapabilityIT` 5例＋`CapabilityRoleExecutorIT` 8例，2026-09-06T16:57:01+08:00，Maven verify exit 0（57.279秒），另14例unit/architecture。覆盖真实新库、V850九列禁读、四列读取与五列/整行/写拒绝、无GRANT OPTION、真实Lead/补全数据升级与非QUERY ACL/登录成员保持、SQLSTATE 55000故障回滚及恢复重试、Flyway validate与no-op；现有runtime SQL在真实数据库拒绝遗漏V860、旧版本、额外列授权和GRANT OPTION。完整后端71 unit＋254 IT、schema 58例与generate --check、runtime 121例、baseline 243例均exit 0。评审发现并修复旧运行证据可能满足新版门禁的问题，受影响227例复验通过（192.211秒，非新增227例）。主控对修复提交实跑baseline CLI exit 0：baseline consistency PASS、R2 BLOCKED 7，明确包含v1.2运行证据未满足项；V001–V850/OpenAPI/事件/历史证据字节保持不变。独立复审确认全部问题已处理，无新增Critical/Important。日志保留既有工具警告，不声称warning-free。详细原始日志与报告保存在本地计划工作区。
 
 当前位于本地分支`codex/r1-lead-contact-vertical-slice`。本记录区分合同修复、已有组件和真实业务交付；不代表已合并、已部署或R1已验收。
 
@@ -22,7 +22,7 @@
 | 当前收口计划Task 2 | 本地基础授权/运行时围栏已完成并提交`3a2b63a556297e81842421f52d50950695209d64`，真实PostgreSQL回归证据保留在原Task 2报告。它不代表生产Lead业务命令已实现。 |
 | 当前收口计划Task 3 | 本地实现及独立评审已完成，代码提交`df9b985a2b371e93016890fd1fc8ffc7e50415f7`。六个生产capture/P0 Handler及必要Owner读写、真实Draft原子确认、保护/规范化、Task后继/等待已实现。四个生产P0 IT类共33个测试，覆盖各分支、准确delta、幂等、权限变更、并发与技术失败回滚。固定运行时最终回归`task-3-resume-22-final-regression.log`：67 unit/architecture +218 IT，0 failures/errors/skips，进程exit0；218包含继承的既有运行时回归，不能当作218个新增业务测试。独立评审：Spec compliant、Task quality Approved，无Critical/Important；不代表已合并、部署或全R1验收。 |
 | 当前收口计划Task 4 | 本地后端实现、验证和独立评审已完成，代码提交`03573e93e03e0a5d71d7f2b6c5c93ea7cfe07fbd`。生产SAVE_ACTION_DRAFT通过现有CommandRuntime持久化、CAS编辑、NO_CHANGE和幂等重放；保留Task3原子确认，七种冻结候选校验与Task/Draft/Lead/Owner准确来源读口已实现。专项5个unit及30个新增Draft/读口IT通过，完整回归71 unit/architecture +249 IT通过，进程均exit0。独立评审Spec compliant、Task quality Approved，无Critical/Important；未连接HTTP或前端，不代表全部R1业务验收。 |
-| 当前收口计划Task 5预检 | 用户授权继续后已完成设计/接口预检，确认QUERY读取边界存在待批准的合同冲突，详见下节；未开始生产实现，不计为完成。当前未修改权限、迁移或业务逻辑。 |
+| 当前收口计划Task 5 | 四列能力前置修订及评审已完成，正在恢复工作卡读取/披露审计实施；尚未完成，不计为前后端已打通。 |
 | 当前收口计划Tasks 5–10 | 尚未完成。审计Query、contact/recovery、worker、HTTP装配、SPA与整体E2E/容量验收仍待实现或验证；准备brief不等于实施。 |
 
 以上Task编号来自[2026-09-05收口计划](../superpowers/plans/2026-09-05-r1-business-closure-plan.md)，与早期R1计划编号不可混用。Task 1/2/3原始报告和日志保留在本地忽略目录`.superpowers/sdd/2026-09-05-r1-business-closure-plan/`的`task-1-report.md`、`task-2-report.md`、`task-3-report.md`。Task3报告保留原NEEDS_CONTEXT检查点、真实RED/GREEN与失败迭代、最终接口和逐分支证据；Task4在后续授权后单独实施，报告为同目录`task-4-report.md`，不自动进入Task5。以下Python结果仍是前一轮合同修复证据，不冒充本轮重新执行。历史托管与合并证据见[2026-09-05分层验收报告](2026-09-05-r1-contract-closure-acceptance.md)。
