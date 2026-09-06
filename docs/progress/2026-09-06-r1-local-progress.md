@@ -25,6 +25,8 @@
 
 ## Task 5预检：读取能力合同需要先确认
 
+用户随后回复“继续”，同意先做最小只读能力修订。已形成[四列精确权限与迁移规格草案](../superpowers/specs/2026-09-06-r1-ingress-query-capability-design.md)，等待确认具体字段和后继版本：仅补全phone/email密文及HMAC四列SELECT，其余五列仍禁读；旧V001–V850保持字节不变，通过独立后继迁移实施。当前只新增书面设计，尚未激活合同、执行GRANT或开始Task5生产实现。
+
 本轮基于`610c16b`继续，发现上一步记录的依赖确实不能仅靠补Java接口解决：[Task矩阵](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)第114–116行要求重复候选同时比较原始及后补phone/email HMAC，[展示合同](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)第87行要求服务器提供准确候选selector；但[批准规格](../superpowers/specs/2026-09-05-r1-business-closure-alignment-design.md)第5.2节限定QUERY读取，而[V850](../../database/schema-contract-52-plus-2/generated/db/migration/V850__lead_ingress_completion_slot.sql)第135–160及243–250行明确禁止QUERY读取任何补全槽字段。
 
 只比较原始联系方式会漏掉或错排合法候选；从Draft还原会把草稿当作Fact真源；临时切换COMMAND、新增提权函数或SELECT授权都会改变冻结的权限/设计边界。因此暂停Task5生产实施，等待用户确认是否先进行最小必要的只读能力设计及合同受控修订。至少两个补全HMAC匹配字段确实必需，其他字段须按实际展示需求逐项论证；建议保留旧迁移字节、不新增表、不开放写权限、不扩Worker权限，并保留同事务授权及披露前审计。这只是待确认建议，尚未实施修订。
