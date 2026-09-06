@@ -1,6 +1,24 @@
 # R1本地实施进度（2026-09-06）
 
-> 当前结论：收口计划Task 1–5已完成本地实现、验证与独立评审。最新Task 5交付的是七类工作卡的后端读取、逐来源授权和审计提交后披露，代码`555d2f5`、评审修复`cef0431`。仍未完成生产HTTP安全装配、前端接线或R1整体验收；不能称“基础功能全部实现”。本轮不进入Task 6–10。
+> 当前结论：收口计划Task 1–5已完成本地实现、验证与独立评审。Task 6预检发现的两处边界已有用户确认的最小方案，现已形成[主管重开与证据只读修订规格](../superpowers/specs/2026-09-06-r1-contact-reopen-evidence-read-design.md)，等待书面审阅后进入详细计划；活动合同尚未激活、业务代码尚未修改，Task 6未完成。生产HTTP安全装配、前端接线和R1整体验收仍未完成，不能称“基础功能全部实现”。Task 7–10未启动。
+
+本轮用户已确认：联系总序号永久递增，第3次及以后未接通只转主管复核，主管每次明确重开一张新Task、不补充自动额度；Evidence只校验既有、同Tenant、有效且准确绑定当前Lead版本的引用。规格补充了Submission/Binding自身DENY、工作卡披露与缓存、绑定撤回的既有业务围栏要求。仅新增书面规格和更新进度，没有执行迁移、GRANT、业务实现、推送或部署；基线版本仍为MVP-2026-09-06.2/52-plus-2-v1.2。
+
+## Task 6预检记录：现已形成上述修订规格
+
+本轮基于`9892ec7`在现有隔离工作区继续原Task 6，未进入后续Worker/HTTP/SPA范围。起始回归`task-6-start-baseline.log`于2026-09-06T21:25:44+08:00实际exit0：16项unit/architecture＋9项IT，0 failures/errors/skips，49.955秒；这些是继承组件基线，不是新增首联业务完成证据。
+
+核对发现：
+
+- [Task矩阵](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)允许第三次未接通后创建主管复核，且`REOPEN_CONTACT`须新建联系Task。
+- [V080物理合同](../../database/schema-contract-52-plus-2/generated/db/migration/V080__lead_tables.sql)明确`contact_no`在Lead内从1递增且唯一，不能将第四次重新编号为1或3。
+- [现有事件校验](../../backend/src/main/java/io/github/windyzhu3/ontologylaw/execution/R1EventPolicy.java)要求所有联系结果序号不超过3，连第四次`CONNECTED_VALID`也不能提交；Task矩阵中未接通复核因果绑定又仅接受`contact_no=3`。
+
+因此“第三次未接通→主管重新联系→新任务提交结果”目前缺少一致的已批准规则。只实现新建Task会留下无法完成的责任卡；重置序号违反物理合同；擅自新增重试轮次或放宽次数会改变设计。需要先明确全局联系序号与自动重试上限的关系、主管重开后的结果及后继规则，再同步相关合同和验证器。当前没有采用任何新规则，未修改生产代码、迁移、权限或API，Task 6尚未完成。
+
+另一个需明确的既有接口边界：[HTTP矩阵](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md)要求可选`evidenceSubmissionId`必须指向同Tenant可见的准确EvidenceSubmission，但当前Java模块白名单、依赖DAG及jOOQ Owner白名单未包含Evidence Owner，也没有既有只读端口。V830已经授予对应角色SELECT，因此这不是新的数据库权限问题。不能让Lead直接查询其他Owner的表，也不能用外键存在性代替可见性授权。建议仅补既有证据引用的最小只读Owner/授权边界，不实施上传、证据管理UI或新接口；该建议尚未获批或实现。
+
+以下Task 5及更早章节保留历史证据；其中“本轮不进入Task 6”的表述仅指当时轮次，当前状态以上文为准。
 
 前置合同修订（ADR-0010）：四列QUERY能力修订已完成本地实现、验证与独立规格/质量评审，提交`f0eb0ab`及评审修复`1543f49`。活动基线为`MVP-2026-09-06.2`/`52-plus-2-v1.2`。下文历史章节中的“待确认/未激活/V850全槽禁读”不代表当前状态。原Task 5读取阻塞已解除，其消费者现已完成；旧v1.1托管RUNTIME_VERIFIED仅属于旧合同，SPA/E2E/容量/发布状态未提升。
 
