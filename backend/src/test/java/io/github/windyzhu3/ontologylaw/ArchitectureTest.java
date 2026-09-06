@@ -83,6 +83,14 @@ class ArchitectureTest {
     }
 
     @Test
+    void query_projection_is_connectionless_and_has_no_execution_or_audit_dependency() {
+        noClasses().that().resideInAPackage(ROOT + ".query..")
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "java.sql..", "javax.sql..", "org.jooq..", ROOT + ".execution..", ROOT + ".audit..")
+                .allowEmptyShould(false).check(productionClasses);
+    }
+
+    @Test
     void jooq_dependencies_are_confined_to_owner_internal_persistence_packages() {
         noClasses().that().resideOutsideOfPackages(OWNER_MODULES.stream()
                         .map(module -> ROOT + "." + module + ".internal.persistence..")

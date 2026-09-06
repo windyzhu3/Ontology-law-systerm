@@ -5,7 +5,11 @@ import java.util.*;
 
 /** Immutable evidence from one current database authorization decision. */
 public record AuthorizationSnapshot(AuthorizationService.Request request, Instant checkedAt,
-        boolean allowed, String rejectionCode, AuthorizationService.Subject authorityFact, String evidence, byte[] digest) {
+        boolean allowed, String rejectionCode, AuthorizationService.Subject authorityFact, String evidence, byte[] digest, String stableDependencies) {
+    public AuthorizationSnapshot(AuthorizationService.Request request,Instant checkedAt,boolean allowed,String rejectionCode,
+            AuthorizationService.Subject authorityFact,String evidence,byte[] digest) {
+        this(request,checkedAt,allowed,rejectionCode,authorityFact,evidence,digest,null);
+    }
     public AuthorizationSnapshot { Objects.requireNonNull(request); Objects.requireNonNull(checkedAt); digest = digest.clone(); }
     @Override public byte[] digest() { return digest.clone(); }
 }

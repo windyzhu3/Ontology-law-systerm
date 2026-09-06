@@ -21,7 +21,8 @@ public final class JooqAuthorizationService implements AuthorizationService {
         var check=new Check(DSL.using(connection,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)),request,now);
         String rejection=check.evaluate();
         String evidence="R1_AUTHORIZATION_SNAPSHOT_V1\n"+request+"\n"+now+"\n"+check.evidence+"\n"+(rejection==null?"ALLOW":rejection);
-        return new AuthorizationSnapshot(request,now,rejection==null,rejection,check.selectedFact,evidence,hash(evidence));
+        String stable="R1_AUTHORIZATION_DEPENDENCIES_V1\n"+request+"\n"+check.evidence+"\n"+(rejection==null?"ALLOW":rejection);
+        return new AuthorizationSnapshot(request,now,rejection==null,rejection,check.selectedFact,evidence,hash(evidence),stable);
     }
     public void lockForMutation(Connection connection, UUID tenantId) throws SQLException { requireTransaction(connection); lock(connection,tenantId,false); }
     public void lockForEvaluation(Connection connection, UUID tenantId) throws SQLException { requireTransaction(connection); lock(connection,tenantId,true); }

@@ -14,5 +14,7 @@ public interface CurrentTaskReader {
     Task read(Connection c,UUID tenant,UUID taskId)throws SQLException;
     List<Task> ownedTasks(Connection c,UUID tenant,UUID owner)throws SQLException;
     Decision decision(Connection c,UUID tenant,UUID decisionId)throws SQLException;
+    Decision causalStop(Connection c,UUID tenant,Task task)throws SQLException;
+    List<Task> completedContactTasks(Connection c,UUID tenant,UUID leadId)throws SQLException;
     static CurrentTaskReader databaseBacked() { return new io.github.windyzhu3.ontologylaw.responsibility.internal.persistence.JooqCurrentTaskReader(); }
 }

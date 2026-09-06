@@ -122,7 +122,10 @@ public abstract class PostgresIntegrationTest {
         public Connection migratorConnection() throws SQLException { return connect("law_schema_migrator", migratorPassword); }
         public Connection adminConnection() throws SQLException { return connect(postgres.getUsername(), postgres.getPassword()); }
         private Connection connect(String user, String password) throws SQLException {
-            return DriverManager.getConnection(postgres.getJdbcUrl(), user, password);
+            var properties=new java.util.Properties();properties.setProperty("user",user);properties.setProperty("password",password);
+            // Keep SQLSTATE and exception class, suppress protected synthetic row details on fixture failures.
+            properties.setProperty("logServerErrorDetail","false");
+            return DriverManager.getConnection(postgres.getJdbcUrl(),properties);
         }
         @Override public void close() { postgres.close(); }
     }

@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class OpenApiContractTest {
+public class OpenApiContractTest {
 
     private static final String SCHEMA_REF_PREFIX = "#/components/schemas/";
     private static final String PARAMETER_REF_PREFIX = "#/components/parameters/";
@@ -1815,6 +1815,10 @@ class OpenApiContractTest {
     private static void assertSchemaAccepts(Object instance, JsonNode schema, String context) {
         List<String> violations = schemaViolations(JsonNode.wrap(instance), schema, "$", new HashSet<>());
         assertEquals(List.of(), violations, () -> context + " must be accepted: " + violations);
+    }
+    public static void assertCurrentWorkcardWire(Object body)throws IOException {
+        if(document==null)loadCanonicalContract();
+        assertSchemaAccepts(body,document.path("components").path("schemas").path("CurrentWorkCardEnvelope"),"Actual workcard response");
     }
 
     private static void assertSchemaRejects(Object instance, JsonNode schema, String context) {

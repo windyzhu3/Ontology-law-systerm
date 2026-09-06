@@ -17,9 +17,13 @@ public final class JooqCurrentLeadReader implements CurrentLeadReader {
         this.protection=Objects.requireNonNull(protection);this.parties=Objects.requireNonNull(parties);
     }
     private static DSLContext db(Connection c) { return DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)); }
+    public Subject selector(Connection c,UUID tenant,UUID id) {
+        var l=LEAD_;Long revision=db(c).select(l.REVISION).from(l).where(l.TENANT_ID.eq(tenant)).and(l.LEAD_ID.eq(id)).fetchOne(l.REVISION);
+        return revision==null?null:new Subject("lead.lead",id,revision,null);
+    }
     public Lead read(Connection c,UUID tenant,UUID id) {
         var l=LEAD_;
-        // Explicit original columns are essential: SELECT * includes V850 columns forbidden to QUERY.
+        // Explicit original columns are essential: SELECT * still includes five forbidden V850 columns.
         var r=db(c).select(l.REVISION,l.SOURCE_CHANNEL_CODE,l.SOURCE_ACCOUNT_CODE,l.CAPTURED_AT,l.CAPTURED_NAME_CIPHERTEXT,
                 l.CAPTURED_PHONE_CIPHERTEXT,l.CAPTURED_EMAIL_CIPHERTEXT,l.LEGAL_NEED_SUMMARY_CIPHERTEXT,l.CITY_CODE,
                 l.SERVICE_CATEGORY_CODE,l.JURISDICTION_CODE,l.URGENCY_CODE,l.PARSED_PARTY_ID,l.PARTY_RESOLUTION_CODE,l.DISPOSITION_CODE,l.CURRENT_ASSIGNMENT_ID)
@@ -30,6 +34,22 @@ public final class JooqCurrentLeadReader implements CurrentLeadReader {
                 protection.decrypt(tenant,CAPTURED_EMAIL,r.get(l.CAPTURED_EMAIL_CIPHERTEXT)),protection.decrypt(tenant,LEGAL_NEED_SUMMARY,r.get(l.LEGAL_NEED_SUMMARY_CIPHERTEXT)),
                 r.get(l.CITY_CODE),r.get(l.SERVICE_CATEGORY_CODE),r.get(l.JURISDICTION_CODE),r.get(l.URGENCY_CODE),r.get(l.PARSED_PARTY_ID),
                 r.get(l.PARTY_RESOLUTION_CODE),r.get(l.DISPOSITION_CODE),r.get(l.CURRENT_ASSIGNMENT_ID));
+    }
+    public EffectiveContact effectiveContact(Connection c,UUID tenant,UUID id) {
+        var l=LEAD_;
+        var r=db(c).select(l.REVISION,l.CAPTURED_PHONE_CIPHERTEXT,l.CAPTURED_EMAIL_CIPHERTEXT,
+            l.INGRESS_COMPLETION_PHONE_CIPHERTEXT,l.INGRESS_COMPLETION_EMAIL_CIPHERTEXT)
+            .from(l).where(l.TENANT_ID.eq(tenant)).and(l.LEAD_ID.eq(id)).fetchOne();
+        if(r==null)return null;
+        String phone=protection.decrypt(tenant,CAPTURED_PHONE,r.get(l.CAPTURED_PHONE_CIPHERTEXT));
+        String email=protection.decrypt(tenant,CAPTURED_EMAIL,r.get(l.CAPTURED_EMAIL_CIPHERTEXT));
+        if(phone==null||phone.isEmpty())phone=protection.decrypt(tenant,INGRESS_PHONE,r.get(l.INGRESS_COMPLETION_PHONE_CIPHERTEXT));
+        if(email==null||email.isEmpty())email=protection.decrypt(tenant,INGRESS_EMAIL,r.get(l.INGRESS_COMPLETION_EMAIL_CIPHERTEXT));
+        return new EffectiveContact(new Subject("lead.lead",id,r.get(l.REVISION),null),phone,email);
+    }
+    public Duplicate duplicate(Connection c,UUID tenant,UUID id,java.time.Instant cutoff)throws SQLException {
+        var l=LEAD_;String disposition=db(c).select(l.DISPOSITION_CODE).from(l).where(l.TENANT_ID.eq(tenant)).and(l.LEAD_ID.eq(id)).fetchOne(l.DISPOSITION_CODE);
+        return JooqDuplicateCandidateReader.select(c,tenant,id,disposition,cutoff,parties);
     }
     public Party namedParty(Connection c,UUID tenant,UUID id)throws SQLException {
         var p=parties.named(c,tenant,id);

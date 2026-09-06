@@ -39,18 +39,10 @@ public final class JooqLeadRepository implements LeadIngressService {
           .set(l.LEGAL_NEED_SUMMARY_CIPHERTEXT,encrypt(tenant,LEGAL_NEED_SUMMARY,p,"legalNeedSummary")).set(l.CAPTURED_CONTENT_DIGEST,CanonicalJson.digest(CanonicalJson.encode(digest)))
           .set(l.PARTY_RESOLUTION_CODE,"UNRESOLVED").set(l.DISPOSITION_CODE,"CAPTURED").set(l.REVISION,0L).set(l.CREATED_AT,time(now)).execute();return read(c,tenant,id);
     }
-    private static boolean matches(byte[] a,byte[] b,byte[] x,byte[] y){return a!=null&&(Arrays.equals(a,x)||Arrays.equals(a,y))||b!=null&&(Arrays.equals(b,x)||Arrays.equals(b,y));}
     public Duplicate duplicate(Connection c,UUID tenant,Lead current,Instant cutoff)throws SQLException {
-        if(!"CAPTURED".equals(current.disposition()))return null;
-        var l=LEAD_;Duplicate best=null;int bestRank=3;Instant bestTime=null;UUID bestId=null;
-        var rows=db(c).selectFrom(l).where(l.TENANT_ID.eq(tenant)).and(l.LEAD_ID.ne(current.selector().id())).and(l.CREATED_AT.le(time(cutoff))).and(l.PARTY_RESOLUTION_CODE.eq("RESOLVED")).fetch();
-        for(var row:rows){var candidate=lead(row);boolean phone=matches(current.phone(),current.ingressPhone(),candidate.phone(),candidate.ingressPhone());boolean email=matches(current.email(),current.ingressEmail(),candidate.email(),candidate.ingressEmail());if(!phone&&!email)continue;
-            var party=parties.active(c,tenant,candidate.party());if(party==null)continue;int rank=phone&&email?0:phone?1:2;
-            if(best==null||rank<bestRank||rank==bestRank&&(candidate.capturedAt().isBefore(bestTime)||candidate.capturedAt().equals(bestTime)&&compare(candidate.selector().id(),bestId)<0)){
-                best=new Duplicate(candidate.selector(),new Subject("party.party",party.id(),party.revision(),null));bestRank=rank;bestTime=candidate.capturedAt();bestId=candidate.selector().id();}
-        }return best;
+        var result=JooqDuplicateCandidateReader.select(c,tenant,current.selector().id(),current.disposition(),cutoff,parties);
+        return result==null?null:new Duplicate(result.lead(),result.party());
     }
-    private static int compare(UUID a,UUID b){int high=Long.compareUnsigned(a.getMostSignificantBits(),b.getMostSignificantBits());return high==0?Long.compareUnsigned(a.getLeastSignificantBits(),b.getLeastSignificantBits()):high;}
     public Assignment assignment(Connection c,UUID tenant,UUID id){var a=LEAD_ASSIGNMENT;var r=db(c).selectFrom(a).where(a.TENANT_ID.eq(tenant)).and(a.LEAD_ASSIGNMENT_ID.eq(id)).fetchOne();return r==null?null:new Assignment(new Subject("lead.lead_assignment",id,r.get(a.REVISION),null),r.get(a.LEAD_ID),r.get(a.OWNER_APPOINTMENT_ID),r.get(a.ASSIGNMENT_STATUS_CODE),r.get(a.CREATED_AT).toInstant());}
     public boolean hasOpenAssignment(Connection c,UUID tenant,UUID lead){var a=LEAD_ASSIGNMENT;return db(c).fetchExists(DSL.selectOne().from(a).where(a.TENANT_ID.eq(tenant)).and(a.LEAD_ID.eq(lead)).and(a.ASSIGNMENT_STATUS_CODE.eq("OPEN")));}
     public Assignment assign(Connection c,UUID tenant,Lead lead,UUID owner,String reason,Instant now){
