@@ -1,5 +1,7 @@
 # R1本地实施进度（2026-09-06）
 
+> 最新状态（2026-09-07）：Task 6已完成本地后端实现、验证及独立评审，详见[Task 6完成回执](2026-09-07-r1-task6-progress.md)。本页以下保留此前历史状态，不代表当前Task 6仍未实施；HTTP/SPA/整体E2E及容量仍未完成。
+
 > 当前结论：收口计划Task 1–5已完成本地实现、验证与独立评审。[ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md)已将[主管重开与证据只读书面规格](../superpowers/specs/2026-09-06-r1-contact-reopen-evidence-read-design.md)激活为`MVP-2026-09-06.3`/`R1-TASK-COMPLETION-V1.2`静态合同；业务代码尚未修改，原Task 6仍未完成。生产HTTP安全装配、前端接线和R1整体验收仍未完成，不能称“基础功能全部实现”。Task 7–10未启动。
 
 最小合同计划的原子单元只交付负向测试、活动合同与版本、验证器及真实baseline CLI一致性；它不交付事件/Owner/工作卡或业务Handler。后续原Task6以本合同提交为新BASE，完成联系第4/5次、准确因果、Evidence Owner、四Subject授权与200/304披露的生产实现和独立评审。计划中的生产交接清单不是已经交付的功能，任何业务验收状态均未推进。
