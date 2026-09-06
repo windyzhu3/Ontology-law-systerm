@@ -2,11 +2,13 @@
 
 ADR-0008 amendment: capture policy is keyed by `(CommandType, PrincipalKind)` and admits a separately authorized SERVICE_ACTOR/SYSTEM capture path. The seven Task primary commands and their existing completion facts/codes remain unchanged. CurrentCard evidence includes committed `R1_CURRENT_WORKCARD_DISCLOSURE_V1` Audit for both 200 and 304; `R1_PROJECTION` delivery is technical acknowledgement only and never completes or reopens a Task.
 
-Contract ID: R1-TASK-COMPLETION-V1
+Contract ID: R1-TASK-COMPLETION-V1.1
 
 Status: FROZEN
 
-确认日期：2026-09-02
+确认日期：2026-09-06；原始V1确认于2026-09-02。
+
+[ADR-0009](../../adr/ADR-0009-p0-duplicate-automatic-assignment.md)只修订P0-01两分支的有界自动后继Assignment与单次Lead CAS合同。Decision完成事实、digest既有语义、事件集合和HTTP版本不变。
 
 本合同冻结 P0-01 至 P0-04、`CONTACT_LEAD` 三结果、来源停用请求确认和主管有效性复核。它只使用当前 52＋2 事实，不新增表，也不实现 R2/R3/Matter。
 
@@ -95,9 +97,15 @@ Receipt outcome 的封闭集合只有 `SUCCEEDED`、`NO_CHANGE`、`REJECTED`。C
 
 `CONTACT_CONNECTED_VALID`的确认草稿必须且只在该分支携带`legalNeed: SafeText2000`；服务端以其规范化UTF-8原文生成`opportunity.opportunity.legal_need_ciphertext`和SHA-256 `legal_need_digest`。`NOT_CONNECTED`与`SUSPECT_INVALID`禁止携带该字段，Lead捕获时的`legalNeedSummary`不得被静默当作本次已确认法律需求。
 
-`P0_01_LINK_EXISTING`在同一Lead锁和事务中完成两类写入，二者缺一即整体回滚：先按冻结候选规则重验候选Lead准确revision及其`parsed_party_id`所指向Party仍为准确revision的ACTIVE最终Party；再对当前Lead执行一次CAS，仅把`parsed_party_id=candidateLead.parsed_party_id`、`party_resolution_code=RESOLVED`、`disposition_code=LINK_EXISTING_PARTY`和`revision=old+1`写入数据库合同允许更新列。它不更新候选Lead或Party，不合并/删除Lead或Party，也不复制Party标识。`DecisionRecord(LEAD_DUPLICATE_RESOLUTION, LINK_EXISTING_PARTY)`的`content_digest`覆盖当前Lead旧selector、候选Lead/Party selector、上述新值和新Lead revision；它仍是Task唯一完成Fact及Receipt/Event准确结果Fact。后继选择器只消费CAS后的Lead revision。
+`P0_01_LINK_EXISTING`在同一Lead锁和事务中，先按冻结候选规则重验候选Lead准确revision及其`parsed_party_id`所指向Party仍为准确revision的ACTIVE最终Party；准备解析新值`parsed_party_id=candidateLead.parsed_party_id`、`party_resolution_code=RESOLVED`、`disposition_code=LINK_EXISTING_PARTY`。下一责任选择器根据这些已解析的预期Lead事实裁定分支，再对当前Lead执行一次最终CAS，将解析新值、下文条件允许的Assignment指针及`revision=old+1`共同写入数据库合同允许更新列。它不更新候选Lead或Party，不合并/删除Lead或Party，也不复制Party标识。`DecisionRecord(LEAD_DUPLICATE_RESOLUTION, LINK_EXISTING_PARTY)`的`content_digest`覆盖当前Lead旧selector、候选Lead/Party selector、上述三个解析新值和新Lead revision；它仍是Task唯一完成Fact及Receipt/Event准确结果Fact。
 
-`P0_01_KEEP_SEPARATE`也必须在同一Lead锁和事务中重验创建Task时冻结的候选Lead/Party准确selector；随后只对当前Lead执行一次CAS，把`disposition_code=KEEP_SEPARATE`、`revision=old+1`写入允许更新列。它不得修改当前Lead的`parsed_party_id`、`party_resolution_code`、`current_assignment_id`、捕获字段或V850 ingress槽，也不得更新候选Lead/Party、关联Party、合并或删除任何记录。`DecisionRecord(LEAD_DUPLICATE_RESOLUTION, KEEP_SEPARATE)`的`content_digest`覆盖当前Lead旧selector、候选Lead/Party selector、`KEEP_SEPARATE`和新Lead revision；它仍是唯一完成Fact。后继选择器只消费CAS后的Lead revision，并因该Lead已不再是`CAPTURED`而跳过重复候选规则。
+`P0_01_KEEP_SEPARATE`也必须在同一Lead锁和事务中重验创建Task时冻结的候选Lead/Party准确selector；以`disposition_code=KEEP_SEPARATE`的预期Lead事实裁定下一责任，然后一次最终CAS共同写入该处置、下文条件允许的Assignment指针及`revision=old+1`。它不得修改当前Lead的`parsed_party_id`、`party_resolution_code`、捕获字段或V850 ingress槽，也不得更新候选Lead/Party、关联Party、合并或删除任何记录。`DecisionRecord(LEAD_DUPLICATE_RESOLUTION, KEEP_SEPARATE)`的`content_digest`覆盖当前Lead旧selector、候选Lead/Party selector、`KEEP_SEPARATE`和新Lead revision；它仍是唯一完成Fact。
+
+两分支只有在既有`R1_LEAD_NEXT_RESPONSIBILITY_V1`选中AUTOMATIC且有有效销售候选时，才允许`current_assignment_id`从NULL变为本命令同事务新建、同Tenant、同Lead、准确Owner的唯一OPEN/revision 0 Assignment ID。锁内必须证明尚无OPEN Assignment；Owner遵循原Source Policy候选谓词、排序、组织root范围、AuthorityGrant及无DENY规则，并保持提交前最终identity锁内复验。禁止任意改指、复用Assignment、跨Lead、重新分配或调用方选择自动Owner。MANUAL、非自动或零候选分支不创建Assignment且指针不变。捕获字段、V850槽及候选Lead/Party在两分支均不可修改。
+
+旧版“选择器只消费CAS后Lead”的含义由此精确化：分支评估读取锁内已重验的解析后预期事实，持久化后继Task才冻结最终CAS后的Lead revision。无需中间提交、第二次Lead CAS或第二次业务选择；始终仅`old→old+1`，不得改为`+2`。Decision、Assignment、Draft确认、最终Lead CAS、原Task DONE、恰一个后继及Receipt/Audit/Event/Outbox同事务提交，任何失败遵循Transaction and replay invariants的准确阶段delta，不能推迟到Outbox业务补完。
+
+Decision digest的`new-values`仅指LINK三个解析值，不指整行联合更新后的所有字段；KEEP的输入仍为上述处置值。两个既有digest profile/字段含义均不新增`assignmentId`或`current_assignment_id`。条件Assignment是独立后继Fact，联合状态由同事务Lead准确指针、Assignment同Tenant/Lead/Owner/OPEN/revision绑定和后继Task最终Lead selector共同证明；Assignment不替代Decision完成原Task，不新增`LeadAssignedV1`事件。两分支仍各1 Event、1 Outbox，准确sourceFact为Decision。
 
 ## Deterministic owner and successor rules
 
@@ -125,7 +133,7 @@ Receipt outcome 的封闭集合只有 `SUCCEEDED`、`NO_CHANGE`、`REJECTED`。C
 
 ### 下一责任选择器
 
-`R1_LEAD_NEXT_RESPONSIBILITY_V1` 在同一事务、同一 Lead lock 下重验：仅当当前`disposition_code=CAPTURED`且疑似重复时才创建`RESOLVE_LEAD_DUPLICATE`；缺少联系方式且 V850 槽为空则 `COMPLETE_LEAD_INGRESS`；已有明确人工 Owner 请求则 `ASSIGN_LEAD`；可自动分配则原子创建 Assignment 和 `CONTACT_LEAD`；零候选则 `RESOLVE_LEAD_ROUTING_GAP`。必须恰建一个后继或在已有 OPEN 同类型自然唯一键命中时返回 NO_CHANGE，禁止同时建立两张责任卡。LINK与KEEP_SEPARATE都从CAS后的Lead revision进入本选择器；二者均不会重复创建刚完成的duplicate-resolution Task。
+`R1_LEAD_NEXT_RESPONSIBILITY_V1` 在同一事务、同一 Lead lock 下重验：仅当当前`disposition_code=CAPTURED`且疑似重复时才创建`RESOLVE_LEAD_DUPLICATE`；缺少联系方式且 V850 槽为空则 `COMPLETE_LEAD_INGRESS`；已有明确人工 Owner 请求则 `ASSIGN_LEAD`；可自动分配则原子创建 Assignment 和 `CONTACT_LEAD`；零候选则 `RESOLVE_LEAD_ROUTING_GAP`。必须恰建一个后继或在已有 OPEN 同类型自然唯一键命中时返回 NO_CHANGE，禁止同时建立两张责任卡。LINK与KEEP_SEPARATE按上文先以解析后的预期Lead事实评估，后继冻结单次最终CAS后的Lead revision；二者均不会重复创建刚完成的duplicate-resolution Task。
 
 `RETRY_ASSIGNMENT_NOW` 只执行一次候选选择：命中时创建一条 Assignment 和一张 `CONTACT_LEAD`；仍为空时创建一张新的 `RESOLVE_LEAD_ROUTING_GAP`，不得递归自动重试。
 
@@ -196,10 +204,18 @@ Task registry的`TaskType`、`PrimaryCommand`、`PayloadSchema`、`CompletionFac
 
 ## Duplicate resolution transition registry
 
-| BranchID | RequiredCurrentDisposition | CandidateSelectors | CurrentLeadCAS | ForbiddenCurrentLeadChanges | CandidateLeadPartyMutation | DecisionDigest | SuccessorSelector |
-|---|---|---|---|---|---|---|---|
-| P0_01_LINK_EXISTING | CAPTURED | candidateLead@revision+party@revision:revalidate | parsed_party_id=candidate.parsed_party_id;party_resolution_code=RESOLVED;disposition_code=LINK_EXISTING_PARTY;revision=old+1 | current_assignment_id,capture_fields,ingress_slot | NONE | old-current-lead-selector+candidate-lead-party-selectors+new-values+new-revision | post-CAS-lead-revision;duplicate-only-when-CAPTURED |
-| P0_01_KEEP_SEPARATE | CAPTURED | candidateLead@revision+party@revision:revalidate | disposition_code=KEEP_SEPARATE;revision=old+1 | parsed_party_id,party_resolution_code,current_assignment_id,capture_fields,ingress_slot | NONE | old-current-lead-selector+candidate-lead-party-selectors+KEEP_SEPARATE+new-revision | post-CAS-lead-revision;duplicate-only-when-CAPTURED |
+| BranchID | RequiredCurrentDisposition | CandidateSelectors | CurrentLeadCAS | ForbiddenCurrentLeadChanges | CandidateLeadPartyMutation | DecisionDigest | SuccessorSelector | ConditionalAssignment |
+|---|---|---|---|---|---|---|---|---|
+| P0_01_LINK_EXISTING | CAPTURED | candidateLead@revision+party@revision:revalidate | parsed_party_id=candidate.parsed_party_id;party_resolution_code=RESOLVED;disposition_code=LINK_EXISTING_PARTY;revision=old+1 | capture_fields,ingress_slot | NONE | old-current-lead-selector+candidate-lead-party-selectors+new-values+new-revision | post-CAS-lead-revision;duplicate-only-when-CAPTURED | R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1 |
+| P0_01_KEEP_SEPARATE | CAPTURED | candidateLead@revision+party@revision:revalidate | disposition_code=KEEP_SEPARATE;revision=old+1 | parsed_party_id,party_resolution_code,capture_fields,ingress_slot | NONE | old-current-lead-selector+candidate-lead-party-selectors+KEEP_SEPARATE+new-revision | post-CAS-lead-revision;duplicate-only-when-CAPTURED | R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1 |
+
+`CurrentLeadCAS`列保留resolution字段及唯一revision增量；`ConditionalAssignment`列只按下表在同一次最终CAS追加有界指针更新。`SuccessorSelector`表示持久后继绑定最终revision，不要求评估前先执行CAS。
+
+## Duplicate automatic assignment registry
+
+| PolicyID | Eligibility | PointerTransition | AssignmentBinding | OwnerSelection | LeadCAS | OtherOutcomes | SelectorEvaluation | CompletionProof | Atomicity |
+|---|---|---|---|---|---|---|---|---|---|
+| R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1 | R1_LEAD_NEXT_RESPONSIBILITY_V1:AUTOMATIC-valid-candidate;no-existing-OPEN-assignment | current_assignment_id:null-to-exact-new-assignment-id;no-repoint-reuse-reassign | NEW-OPEN-revision0;same-command-transaction;same-tenant;same-Lead;exact-selected-Owner | existing-source-policy-order;current-authority-and-no-DENY;final-identity-revalidation;no-caller-selected-Owner | single-final-CAS;resolution-and-conditional-pointer;revision=old+1 | manual-nonautomatic-empty-candidate:pointer-unchanged;assignment:+0 | resolved-prospective-Lead-under-existing-locks;successor-freezes-final-post-CAS-revision | Decision-only-completion-Receipt-Event;resolution-only-digest;Assignment-independent-successor-Fact;no-LeadAssigned-event | Draft-confirmation+Decision+conditional-Assignment+Lead-CAS+Task-DONE+exactly-one-successor+Receipt+Audit+Event+Outbox;rejection-frozen-deltas;technical-failure-all-0;replay-all-0 |
 
 ## CONTACT_RETRY_V1
 
@@ -227,8 +243,8 @@ Task registry的`TaskType`、`PrimaryCommand`、`PayloadSchema`、`CompletionFac
 
 | ScenarioID | BranchID | FactDelta | TaskDelta | SuccessorDelta | ReceiptEventOutboxAudit | IsolationRollback |
 |---|---|---|---|---|---|---|
-| E2E_P0_01_LINK | P0_01_LINK_EXISTING | `decision_record:+1; lead rows:+0; parsed_party_id:candidate.parsed_party_id; party_resolution_code:RESOLVED; disposition_code:LINK_EXISTING_PARTY; lead revision:+1` | `current:DONE,r+1` | `R1 selector on post-CAS Lead revision:exactly1` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `candidate Lead/Party mutation:0; other-tenant:0; replay:all-0; technical-failure:all-0` |
-| E2E_P0_01_SEPARATE | P0_01_KEEP_SEPARATE | `decision_record:+1; lead rows:+0; disposition_code:KEEP_SEPARATE; lead revision:+1` | `current:DONE,r+1` | `R1 selector on post-CAS Lead revision:exactly1` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `candidate Lead/Party mutation:0; other-tenant:0; replay:all-0; technical-failure:all-0` |
+| E2E_P0_01_LINK | P0_01_LINK_EXISTING | `decision_record:+1; lead rows:+0; parsed_party_id:candidate.parsed_party_id; party_resolution_code:RESOLVED; disposition_code:LINK_EXISTING_PARTY; lead revision:+1; conditional Assignment/pointer:R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1` | `current:DONE,r+1` | `R1 selector on post-CAS Lead revision:exactly1` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `candidate Lead/Party mutation:0; other-tenant:0; replay:all-0; technical-failure:all-0` |
+| E2E_P0_01_SEPARATE | P0_01_KEEP_SEPARATE | `decision_record:+1; lead rows:+0; disposition_code:KEEP_SEPARATE; lead revision:+1; conditional Assignment/pointer:R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1` | `current:DONE,r+1` | `R1 selector on post-CAS Lead revision:exactly1` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `candidate Lead/Party mutation:0; other-tenant:0; replay:all-0; technical-failure:all-0` |
 | E2E_P0_02 | P0_02_COMPLETE | `lead rows:+0; ingress slot:0-to-1; lead revision:+1` | `current:DONE,r+1` | `R1 selector:exactly1` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `stale:domain-0; other-tenant:0; technical-failure:all-0` |
 | E2E_P0_03 | P0_03_ASSIGN | `assignment:+1; lead revision:+1` | `current:DONE,r+1` | `CONTACT_LEAD:+1,OPEN,r0` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `other-tenant:0; duplicate-open-assignment:rejected; technical-failure:all-0` |
 | E2E_P0_04_SCHEDULE | P0_04_SCHEDULE_ROUTING_REVIEW | `decision_record:+1; wait_receipt:+1` | `current:DONE,r+1` | `routing task:+1,WAITING,r1` | `receipt:+1,event:+1,outbox:+1,audit:+1` | `other-tenant:0; technical-failure:all-0` |

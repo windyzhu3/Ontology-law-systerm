@@ -330,7 +330,7 @@ def validate_r1_command_contract(root: Path) -> list[str]:
     metadata = {
         "Contract ID": "R1-COMMAND-POLICY-EVENT-V1.1",
         "Status": "FROZEN",
-        "Semantic baseline": "MVP-2026-09-05.3",
+        "Semantic baseline": "MVP-2026-09-06.1",
         "Shared payload Schema": SCHEMA_PATH.as_posix(),
     }
     for name, expected in metadata.items():

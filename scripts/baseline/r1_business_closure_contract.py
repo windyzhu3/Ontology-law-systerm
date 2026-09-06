@@ -106,7 +106,7 @@ def validate(root: Path) -> list[str]:
         "Vary: Authorization",
     ):
         _require(adr, value, "ADR decision", findings)
-    _require(baseline, "Baseline ID: MVP-2026-09-05.3", "active baseline id", findings)
+    _require(baseline, "Baseline ID: MVP-2026-09-06.1", "active baseline id", findings)
     try:
         document = yaml.load(api, Loader=_StrictSafeLoader)
     except yaml.YAMLError as error:

@@ -46,7 +46,7 @@ TARGET_GATE_STATES = {
 VISUAL_BUNDLE_VERSION = "visual-bundle-2026-08-27"
 VISUAL_OWNER = "Product Design"
 VISUAL_CONFIRMATION_DATE = "2026-08-27"
-CANONICAL_BASELINE_ID = "MVP-2026-09-05.3"
+CANONICAL_BASELINE_ID = "MVP-2026-09-06.1"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 HISTORICAL_BANNER = "历史规格（HISTORICAL_SUPERSEDED）"
 HISTORICAL_WARNING = (
@@ -385,19 +385,21 @@ R1_DUPLICATE_TRANSITION_CONTRACTS = {
         "candidateLead@revision+party@revision:revalidate",
         "parsed_party_id=candidate.parsed_party_id;party_resolution_code=RESOLVED;"
         "disposition_code=LINK_EXISTING_PARTY;revision=old+1",
-        "current_assignment_id,capture_fields,ingress_slot",
+        "capture_fields,ingress_slot",
         "NONE",
         "old-current-lead-selector+candidate-lead-party-selectors+new-values+new-revision",
         "post-CAS-lead-revision;duplicate-only-when-CAPTURED",
+        "R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1",
     ),
     "P0_01_KEEP_SEPARATE": (
         "CAPTURED",
         "candidateLead@revision+party@revision:revalidate",
         "disposition_code=KEEP_SEPARATE;revision=old+1",
-        "parsed_party_id,party_resolution_code,current_assignment_id,capture_fields,ingress_slot",
+        "parsed_party_id,party_resolution_code,capture_fields,ingress_slot",
         "NONE",
         "old-current-lead-selector+candidate-lead-party-selectors+KEEP_SEPARATE+new-revision",
         "post-CAS-lead-revision;duplicate-only-when-CAPTURED",
+        "R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1",
     ),
 }
 R1_LEAD_DISPOSITION_ALLOWLIST = "`CAPTURED`, `LINK_EXISTING_PARTY`, `KEEP_SEPARATE`"
@@ -415,14 +417,16 @@ R1_E2E_CONTRACTS = {
     "E2E_P0_01_LINK": (
         "P0_01_LINK_EXISTING",
         "`decision_record:+1; lead rows:+0; parsed_party_id:candidate.parsed_party_id; "
-        "party_resolution_code:RESOLVED; disposition_code:LINK_EXISTING_PARTY; lead revision:+1`",
+        "party_resolution_code:RESOLVED; disposition_code:LINK_EXISTING_PARTY; lead revision:+1; "
+        "conditional Assignment/pointer:R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1`",
         "`current:DONE,r+1`", "`R1 selector on post-CAS Lead revision:exactly1`",
         "`receipt:+1,event:+1,outbox:+1,audit:+1`",
         "`candidate Lead/Party mutation:0; other-tenant:0; replay:all-0; technical-failure:all-0`",
     ),
     "E2E_P0_01_SEPARATE": (
         "P0_01_KEEP_SEPARATE",
-        "`decision_record:+1; lead rows:+0; disposition_code:KEEP_SEPARATE; lead revision:+1`",
+        "`decision_record:+1; lead rows:+0; disposition_code:KEEP_SEPARATE; lead revision:+1; "
+        "conditional Assignment/pointer:R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1`",
         "`current:DONE,r+1`", "`R1 selector on post-CAS Lead revision:exactly1`",
         "`receipt:+1,event:+1,outbox:+1,audit:+1`",
         "`candidate Lead/Party mutation:0; other-tenant:0; replay:all-0; technical-failure:all-0`",
@@ -868,7 +872,8 @@ REQUIRED_NONVISUAL_ROWS = {
     "BASE-CLOSURE-DESIGN": ("PR2", "FROZEN", HISTORICAL_BASELINE_ID, "../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md"),
     "BASE-PR2-CLOSURE-PLAN": ("PR2", "FROZEN", "2026-08-28", "../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md"),
     "BASE-CURRENT-MVP": ("MVP", "FROZEN", HISTORICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
-    "BASE-CURRENT-MVP-2026-09-05": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05": ("MVP", "FROZEN", "MVP-2026-09-05.3", "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
     "R1-COMMAND-POLICY-EVENT-CONTRACT": (
         "R1", "FROZEN", "r1-command-policy-event-v1",
         "../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md",
@@ -1630,7 +1635,7 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
         findings.append("R1 implementation plan must declare Status: FROZEN")
         return
     metadata = (
-        (task_text, "R1-TASK-COMPLETION-V1", "R1 task contract"),
+        (task_text, "R1-TASK-COMPLETION-V1.1", "R1 task contract"),
         (http_text, "R1-HTTP-V1.1", "R1 HTTP contract"),
         (workbench_text, "R1-WORKBENCH-V1.1", "R1 workbench contract"),
     )
@@ -1827,6 +1832,7 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
         "CandidateLeadPartyMutation",
         "DecisionDigest",
         "SuccessorSelector",
+        "ConditionalAssignment",
     )
     duplicate_transition_rows = parse_controlled_markdown_table(
         task_text,
@@ -1856,6 +1862,33 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
                 f"R1 duplicate transition differs from frozen contract: {branch_id}"
             )
             return
+
+    assignment_headers = (
+        "PolicyID", "Eligibility", "PointerTransition", "AssignmentBinding",
+        "OwnerSelection", "LeadCAS", "OtherOutcomes", "SelectorEvaluation",
+        "CompletionProof", "Atomicity",
+    )
+    assignment_values = (
+        "R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1",
+        "R1_LEAD_NEXT_RESPONSIBILITY_V1:AUTOMATIC-valid-candidate;no-existing-OPEN-assignment",
+        "current_assignment_id:null-to-exact-new-assignment-id;no-repoint-reuse-reassign",
+        "NEW-OPEN-revision0;same-command-transaction;same-tenant;same-Lead;exact-selected-Owner",
+        "existing-source-policy-order;current-authority-and-no-DENY;final-identity-revalidation;no-caller-selected-Owner",
+        "single-final-CAS;resolution-and-conditional-pointer;revision=old+1",
+        "manual-nonautomatic-empty-candidate:pointer-unchanged;assignment:+0",
+        "resolved-prospective-Lead-under-existing-locks;successor-freezes-final-post-CAS-revision",
+        "Decision-only-completion-Receipt-Event;resolution-only-digest;Assignment-independent-successor-Fact;no-LeadAssigned-event",
+        "Draft-confirmation+Decision+conditional-Assignment+Lead-CAS+Task-DONE+exactly-one-successor+Receipt+Audit+Event+Outbox;rejection-frozen-deltas;technical-failure-all-0;replay-all-0",
+    )
+    assignment_rows = parse_controlled_markdown_table(
+        task_text, "Duplicate automatic assignment registry", assignment_headers,
+        "R1 duplicate automatic assignment registry", findings,
+    )
+    if assignment_rows is None:
+        return
+    if assignment_rows != [dict(zip(assignment_headers, assignment_values))]:
+        findings.append("R1 duplicate automatic assignment differs from frozen bounded policy")
+        return
 
     code_allowlist_headers = ("Code domain", "Allowed values")
     code_allowlist_rows = parse_controlled_markdown_table(
@@ -2557,6 +2590,9 @@ def verify_delivery_ledger(root: Path, findings: list[str]) -> list[str] | None:
 
     if superseded_by(rows_by_id["BASE-CURRENT-MVP"]) != "BASE-CURRENT-MVP-2026-09-05":
         findings.append("Delivery ledger BASE-CURRENT-MVP must point to BASE-CURRENT-MVP-2026-09-05")
+        return
+    if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1":
+        findings.append("Delivery ledger BASE-CURRENT-MVP-2026-09-05 must point to BASE-CURRENT-MVP-2026-09-05-2026-09-06.1")
         return
 
     visual_row_ids = {row_id for row_id in rows_by_id if row_id.startswith("VIS-")}

@@ -10,6 +10,8 @@
 
 **Spec:** [批准规格](../specs/2026-09-05-r1-business-closure-alignment-design.md)，尤其第 2、4–11 节。原计划 Task 1–4 保留历史，本计划不重新实现它们。
 
+2026-09-06受控前置修订：[ADR-0009](../../adr/ADR-0009-p0-duplicate-automatic-assignment.md)和`MVP-2026-09-06.1`/`R1-TASK-COMPLETION-V1.1`承接Task 3发现的P0-01自动后继指针冲突。下文Task 1的`.3`及Task版本不变陈述保留为当时实施记录，当前仅以ADR-0009批准的单次CAS有界例外替代。Task 3生产Handler仍待完成；本修订不改变Tasks 4–10或容量向量。
+
 ## Global Constraints
 
 - 一个响应式 SPA、一份 OpenAPI、一个模块化单体 Jar。

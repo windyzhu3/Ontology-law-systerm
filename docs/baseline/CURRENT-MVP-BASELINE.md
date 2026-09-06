@@ -1,12 +1,12 @@
 # 当前MVP基线
 
-Baseline ID: MVP-2026-09-05.3
+Baseline ID: MVP-2026-09-06.1
 
-Previous Baseline ID `MVP-2026-09-05.2` and its merge evidence remain historical. ADR-0008 activates contract-only alignment: command-policy v1.1, HTTP v1.1, Workbench v1.1, OpenAPI 1.1.0, SERVICE capture, audited CurrentCard revalidation, due discovery and projection acknowledgement. Task/event schema/physical versions remain unchanged; no production Handler or R1 business status is advanced.
+Previous Baseline ID `MVP-2026-09-05.3` and older merge evidence remain historical. [ADR-0009](../adr/ADR-0009-p0-duplicate-automatic-assignment.md) activates Task contract `R1-TASK-COMPLETION-V1.1`: P0-01 permits only the bounded automatic successor Assignment pointer in one combined Lead CAS, preserving revision +1 and the resolution-only Decision digest/completion/Event source. ADR-0008's command-policy v1.1, HTTP v1.1, Workbench v1.1, OpenAPI 1.1.0, SERVICE capture, audited CurrentCard revalidation, due discovery and projection acknowledgement remain active. Event schema/physical versions and operation shapes remain unchanged; no production Handler or R1 business status is advanced.
 
 状态：`FROZEN`
 
-确认日期：2026-09-05；前版MVP-2026-09-05.1与MVP-2026-08-28.1的已合并证据保留为历史。
+确认日期：2026-09-06；前版MVP-2026-09-05.3及更早已合并证据保留为历史。
 
 R1实施合同确认日期：2026-09-02
 
@@ -17,6 +17,8 @@ R1实施合同确认日期：2026-09-02
 本文件是当前销售MVP唯一人工阅读入口和语义总纲。未在本基线明确保留的历史语义不得自动复活；任何未决事项只能通过新的ADR和新的基线版本处理。[ADR-0001](../adr/ADR-0001-pr2-runtime-gate-order.md)冻结PR #2合并与后续PostgreSQL运行时门禁的执行顺序。
 
 ## authority-order
+
+[ADR-0008](../adr/ADR-0008-r1-business-closure-alignment.md)和[ADR-0009](../adr/ADR-0009-p0-duplicate-automatic-assignment.md)与下列第5项同层，按各自显式局部supersession解释；ADR-0009仅覆盖P0-01自动后继指针及CAS评估时序，不覆盖其余冻结约束。
 
 [ADR-0006](../adr/ADR-0006-command-runtime-authorization-boundary.md)记录CommandRuntime授权裁定时点、Scope binding、静态信封和提交确认丢失语义；[ADR-0007](../adr/ADR-0007-r1-command-policy-event-closure.md)与[R1命令授权及事件合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)承接四类专属授权和完整R1成功事件集合。52＋2物理合同、迁移、工程版本与产品范围不变。
 
