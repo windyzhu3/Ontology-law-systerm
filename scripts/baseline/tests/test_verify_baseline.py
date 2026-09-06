@@ -627,7 +627,7 @@ class VerifyBaselineTest(unittest.TestCase):
             ),
         )
 
-    def create_valid_repository(self, root: Path) -> None:
+    def create_valid_repository(self, root: Path, *, runtime_version: str = "v1.2") -> None:
         self.write(
             root,
             "README.md",
@@ -752,6 +752,32 @@ class VerifyBaselineTest(unittest.TestCase):
             markdown_row("R1-E2E-GOLDEN", "R1", "Golden path", "E2E", "[runtime record](../evidence/ledger/r1-e2e-golden.md)", "Engineering", "r1", "R2 entry", "RUNTIME_VERIFIED", "[runtime record](../evidence/ledger/r1-e2e-golden.md)", "none", "—"),
             markdown_row("R1-E2E-FAILURES", "R1", "Failure paths", "E2E", "[runtime record](../evidence/ledger/r1-e2e-failures.md)", "Engineering", "r1", "R2 entry", "RUNTIME_VERIFIED", "[runtime record](../evidence/ledger/r1-e2e-failures.md)", "none", "—"),
         ]
+        previous_id = "DB-52P2-PG18-RUNTIME"
+        for version, row_id in (
+            ("v1.1", "DB-52P2-PG18-RUNTIME-V1-1"),
+            ("v1.2", "DB-52P2-PG18-RUNTIME-V1-1-V1-2"),
+        ):
+            previous_index = next(
+                index for index, row in enumerate(ledger_rows)
+                if row.startswith(f"| {previous_id} |")
+            )
+            ledger_rows[previous_index] = ledger_rows[previous_index].removesuffix("— |") + f"{row_id} |"
+            record = f"db-runtime-{version}.md"
+            self.write(
+                root, f"docs/evidence/ledger/{record}",
+                f"ID: {row_id}\nVersion: pg18-52-plus-2-{version}\n"
+                "Command: python3 runtime/verify_runtime.py verify --ci-only --runs 2 "
+                "--evidence-dir ../../.artifacts/schema-runtime\nExit code: 0\n",
+            )
+            ledger_rows.append(markdown_row(
+                row_id, "MVP", "PostgreSQL 18 runtime verification", "Runtime",
+                "[runtime verifier](../../database/schema-contract-52-plus-2/runtime/verify_runtime.py)",
+                "Database", f"pg18-52-plus-2-{version}", "R2 entry", "RUNTIME_VERIFIED",
+                f"[runtime record](../evidence/ledger/{record})", "none", "—",
+            ))
+            previous_id = row_id
+            if version == runtime_version:
+                break
         for row_id, asset in visual_assets():
             relative_asset = "../" + asset.removeprefix("docs/")
             index = "../design/sales-mvp-workcards/README.md" if "SALES" in row_id else "../design/identity-admin-mvp/README.md"
@@ -2610,6 +2636,64 @@ class VerifyBaselineTest(unittest.TestCase):
                 "Gate R2 entry unmet: missing required delivery row "
                 "DB-52P2-PG18-RUNTIME; a runtime plan is not runtime evidence",
             )
+
+    def test_r2_gate_requires_v1_2_runtime_even_when_all_other_gates_pass(self) -> None:
+        """Break caught: a terminal v1.1 hosted record makes the v1.2 baseline ready."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root, runtime_version="v1.1")
+            structural_findings = []
+            gates = verify_baseline_module.verify_delivery_ledger(root, structural_findings)
+            self.assertEqual([], structural_findings)
+            self.assertEqual([
+                "Gate R2 entry unmet: DB-52P2-PG18-RUNTIME must resolve to "
+                "DB-52P2-PG18-RUNTIME-V1-1-V1-2 at pg18-52-plus-2-v1.2; "
+                "historical runtime evidence cannot satisfy the current baseline"
+            ], gates)
+            self.assert_gate_finding(root, gates[0])
+
+    def test_r2_gate_keeps_implemented_v1_2_runtime_unmet(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_ledger_cell(root, "DB-52P2-PG18-RUNTIME-V1-1-V1-2", "State", "IMPLEMENTED")
+            self.assert_gate_finding(
+                root,
+                "Gate R2 entry unmet: DB-52P2-PG18-RUNTIME active successor "
+                "DB-52P2-PG18-RUNTIME-V1-1-V1-2 is IMPLEMENTED, requires RUNTIME_VERIFIED",
+            )
+
+    def test_r2_gate_rejects_detached_or_wrong_version_current_runtime(self) -> None:
+        for fault in ("detached", "wrong_version"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                self.create_valid_repository(root)
+                if fault == "detached":
+                    self.replace_ledger_cell(root, "DB-52P2-PG18-RUNTIME-V1-1", "Superseded by", "—")
+                else:
+                    self.replace_ledger_cell(root, "DB-52P2-PG18-RUNTIME-V1-1-V1-2", "Version", "pg18-52-plus-2-v0")
+                    record = root / "docs/evidence/ledger/db-runtime-v1.2.md"
+                    record.write_text(record.read_text(encoding="utf-8").replace(
+                        "pg18-52-plus-2-v1.2", "pg18-52-plus-2-v0"), encoding="utf-8")
+                structural_findings = []
+                gates = verify_baseline_module.verify_delivery_ledger(root, structural_findings)
+                self.assertEqual([], structural_findings)
+                self.assertEqual([
+                    "Gate R2 entry unmet: DB-52P2-PG18-RUNTIME must resolve to "
+                    "DB-52P2-PG18-RUNTIME-V1-1-V1-2 at pg18-52-plus-2-v1.2; "
+                    "historical runtime evidence cannot satisfy the current baseline"
+                ], gates)
+
+    def test_v1_2_runtime_cannot_reuse_v1_1_structured_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_ledger_cell(
+                root, "DB-52P2-PG18-RUNTIME-V1-1-V1-2", "Evidence",
+                "[old runtime record](../evidence/ledger/db-runtime-v1.1.md)",
+            )
+            self.assert_finding(root, "Delivery ledger row DB-52P2-PG18-RUNTIME-V1-1-V1-2 "
+                                "RUNTIME_VERIFIED evidence must link a structured row-bound evidence record")
 
     def test_invalid_utf8_is_structural_for_every_governed_read_path(self) -> None:
         governed_paths = (

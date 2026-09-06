@@ -21,6 +21,28 @@ def validate(root: Path) -> list[str]:
 
 
 class R1BusinessClosureContractTest(unittest.TestCase):
+    def test_valid_v1_2_capability_artifacts_do_not_substitute_for_runtime_evidence(self):
+        """Break caught: valid v1.2 static artifacts allow historical runtime evidence through R2."""
+        from scripts.baseline import r1_business_closure_contract, verify_baseline
+        from scripts.baseline.tests.test_verify_baseline import VerifyBaselineTest
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            VerifyBaselineTest().create_valid_repository(root, runtime_version="v1.1")
+            shutil.copytree(
+                ROOT / "database/schema-contract-52-plus-2/generated",
+                root / "database/schema-contract-52-plus-2/generated", dirs_exist_ok=True,
+            )
+            self.assertEqual([], r1_business_closure_contract.validate_ingress_query_capability(root))
+            structural_findings = []
+            gates = verify_baseline.verify_delivery_ledger(root, structural_findings)
+            self.assertEqual([], structural_findings)
+            self.assertEqual([
+                "Gate R2 entry unmet: DB-52P2-PG18-RUNTIME must resolve to "
+                "DB-52P2-PG18-RUNTIME-V1-1-V1-2 at pg18-52-plus-2-v1.2; "
+                "historical runtime evidence cannot satisfy the current baseline"
+            ], gates)
+
     def test_ingress_query_successor_rejects_missing_changed_or_relabelled_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

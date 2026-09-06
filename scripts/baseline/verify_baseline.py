@@ -897,6 +897,9 @@ STATE_RANK = {
     "IMPLEMENTED": 3,
     "RUNTIME_VERIFIED": 4,
 }
+CURRENT_DATABASE_RUNTIME = (
+    "DB-52P2-PG18-RUNTIME-V1-1-V1-2", "pg18-52-plus-2-v1.2"
+)
 R2_STATE_REQUIREMENTS = {
     "DB-52P2-PG18-RUNTIME": "RUNTIME_VERIFIED",
     "BASE-CLOSURE-DESIGN": "MERGED",
@@ -2697,6 +2700,16 @@ def verify_delivery_ledger(root: Path, findings: list[str]) -> list[str] | None:
             continue
         active_id = active_successor(row_id, rows_by_id)
         active_row = rows_by_id[active_id]
+        if row_id == "DB-52P2-PG18-RUNTIME" and (
+            active_id, active_row["Version"]
+        ) != CURRENT_DATABASE_RUNTIME:
+            current_id, current_version = CURRENT_DATABASE_RUNTIME
+            gate_findings.append(
+                f"Gate R2 entry unmet: {row_id} must resolve to "
+                f"{current_id} at {current_version}; "
+                "historical runtime evidence cannot satisfy the current baseline"
+            )
+            continue
         if STATE_RANK[active_row["State"]] < STATE_RANK[required_state]:
             subject = row_id if active_id == row_id else f"{row_id} active successor {active_id}"
             gate_findings.append(
