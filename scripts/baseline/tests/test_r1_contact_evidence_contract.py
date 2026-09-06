@@ -77,21 +77,33 @@ class R1ContactEvidenceContractTest(unittest.TestCase):
 
     def test_each_registry_value_is_enforced_independently(self):
         """Break caught: a profile value can drift while the registry still passes."""
-        mutations = (
-            ("contactNo>=3", "contactNo=3"),
-            ("LEAD_GLOBAL_MONOTONIC", "RESET_ON_REVIEW"),
-            ("MAX_INITIAL_CONTACT_NO_3", "THREE_PER_REVIEW_CYCLE"),
-            ("NEW_OPEN_TASK", "REOPEN_TERMINAL_TASK"),
-            ("CURRENT_LEAD_EXACT_REVISION", "SAME_LEAD_ID_ONLY"),
-            ("ACTIVE_NOT_REVOKED", "BINDING_OPTIONAL"),
-            ("TASK,LEAD,SUBMISSION,BINDING", "TASK,LEAD"),
-            ("DIRECT,DELEGATED", "DIRECT,DELEGATED,OBJECT"),
-            ("QUERY_ONLY", "COMMAND_FALLBACK"),
-            ("AUDIT_BEFORE_200_AND_304", "AUDIT_ONLY_200"),
-            ("R1_BUSINESS_TENANT_LOCK", "IDENTITY_LOCK_ONLY"),
-            ("evidence_submission,evidence_binding", "evidence.*"),
+        ordinal_finding = (
+            "R1 contact/evidence R1 contact ordinal registry registry must equal the "
+            "approved complete key/value set"
         )
-        for old, new in mutations:
+        evidence_finding = (
+            "R1 contact/evidence R1 evidence reference registry registry must equal the "
+            "approved complete key/value set"
+        )
+        owner_finding = (
+            "R1 contact/evidence R1 evidence owner registry registry must equal the "
+            "approved complete owner boundary"
+        )
+        mutations = (
+            ("contactNo>=3", "contactNo=3", ordinal_finding),
+            ("LEAD_GLOBAL_MONOTONIC", "RESET_ON_REVIEW", ordinal_finding),
+            ("MAX_INITIAL_CONTACT_NO_3", "THREE_PER_REVIEW_CYCLE", ordinal_finding),
+            ("NEW_OPEN_TASK", "REOPEN_TERMINAL_TASK", ordinal_finding),
+            ("CURRENT_LEAD_EXACT_REVISION", "SAME_LEAD_ID_ONLY", evidence_finding),
+            ("ACTIVE_NOT_REVOKED", "BINDING_OPTIONAL", evidence_finding),
+            ("TASK,LEAD,SUBMISSION,BINDING", "TASK,LEAD", evidence_finding),
+            ("DIRECT,DELEGATED", "DIRECT,DELEGATED,OBJECT", evidence_finding),
+            ("QUERY_ONLY", "COMMAND_FALLBACK", evidence_finding),
+            ("AUDIT_BEFORE_200_AND_304", "AUDIT_ONLY_200", evidence_finding),
+            ("R1_BUSINESS_TENANT_LOCK", "IDENTITY_LOCK_ONLY", evidence_finding),
+            ("evidence_submission,evidence_binding", "evidence.*", owner_finding),
+        )
+        for old, new, expected_finding in mutations:
             with self.subTest(old=old, new=new), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 self.copy_active_contract(root)
@@ -102,7 +114,9 @@ class R1ContactEvidenceContractTest(unittest.TestCase):
                 prefix, registries = text[:start], text[start:]
                 self.assertIn(old, registries)
                 path.write_text(prefix + registries.replace(old, new, 1), encoding="utf-8")
-                self.assertTrue(any("registry" in finding for finding in validate(root)))
+                self.assertEqual([expected_finding], validate(root))
+                path.write_text(prefix + registries, encoding="utf-8")
+                self.assertEqual([], validate(root), "restoring the profile must restore validity")
 
     def test_registry_parser_rejects_structural_bypasses(self):
         """Break caught: malformed, duplicate, unknown, or historical tables are accepted."""
@@ -122,6 +136,63 @@ class R1ContactEvidenceContractTest(unittest.TestCase):
         for name, old, new in cases:
             with self.subTest(case=name):
                 self.assert_mutation_fails(COMMAND, old, new, "registry")
+
+    def test_registry_parser_excludes_html_comment_hidden_suffix(self):
+        """Break caught: registries hidden in an HTML comment satisfy the active gate."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.copy_active_contract(root)
+            command = root / COMMAND
+            text = command.read_text(encoding="utf-8")
+            start = text.index("## R1 contact ordinal registry")
+            prefix, registries = text[:start], text[start:]
+            command.write_text(
+                prefix + "<!-- Historical reference only; inactive\n" + registries + "\n-->\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                any(
+                    "R1 contact ordinal registry registry must have exactly one active heading"
+                    in finding
+                    for finding in validate(root)
+                )
+            )
+
+    def test_registry_parser_respects_complete_fence_delimiters(self):
+        """Break caught: a shorter inner fence exposes registries inside a longer fence."""
+        cases = (
+            ("triple-backtick", "```markdown", "", "```"),
+            ("longer-backtick", "````markdown", "```\n", "````"),
+            ("triple-tilde", "~~~markdown", "", "~~~"),
+            ("longer-tilde", "~~~~markdown", "~~~\n", "~~~~"),
+        )
+        for name, opening, inner, closing in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.copy_active_contract(root)
+                command = root / COMMAND
+                text = command.read_text(encoding="utf-8")
+                start = text.index("## R1 contact ordinal registry")
+                prefix, registries = text[:start], text[start:]
+                command.write_text(
+                    prefix
+                    + "## Historical reference only\n\n"
+                    + opening
+                    + "\n"
+                    + inner
+                    + registries
+                    + "\n"
+                    + closing
+                    + "\n",
+                    encoding="utf-8",
+                )
+                self.assertTrue(
+                    any(
+                        "R1 contact ordinal registry registry must have exactly one active heading"
+                        in finding
+                        for finding in validate(root)
+                    )
+                )
 
     def test_required_artifacts_and_versions_are_enforced(self):
         """Break caught: missing authority or a stale active version is accepted."""
@@ -180,6 +251,42 @@ class R1ContactEvidenceContractTest(unittest.TestCase):
             self.assertTrue(
                 any("contact/evidence" in finding for finding in verify_repository(root))
             )
+
+    def test_integrated_repository_verifier_rejects_hidden_registries(self):
+        """Break caught: the total verifier accepts registries hidden from Markdown readers."""
+        from scripts.baseline.tests.test_verify_baseline import VerifyBaselineTest
+        from scripts.baseline.verify_baseline import verify_repository
+
+        wrappers = (
+            (
+                "html-comment",
+                lambda registries: "<!-- Historical reference only; inactive\n"
+                + registries
+                + "\n-->\n",
+            ),
+            (
+                "longer-fence",
+                lambda registries: "## Historical reference only\n\n````markdown\n```\n"
+                + registries
+                + "\n````\n",
+            ),
+        )
+        for name, wrap in wrappers:
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                VerifyBaselineTest().create_valid_repository(root)
+                self.assertEqual([], verify_repository(root))
+                command = root / COMMAND
+                text = command.read_text(encoding="utf-8")
+                start = text.index("## R1 contact ordinal registry")
+                command.write_text(text[:start] + wrap(text[start:]), encoding="utf-8")
+                self.assertTrue(
+                    any(
+                        "R1 contact ordinal registry registry must have exactly one active heading"
+                        in finding
+                        for finding in verify_repository(root)
+                    )
+                )
 
 
 if __name__ == "__main__":

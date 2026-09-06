@@ -59,15 +59,45 @@ def _read(root: Path, relative: str, findings: list[str]) -> str:
 
 def _without_fenced_code(text: str) -> list[str]:
     visible: list[str] = []
-    fence: str | None = None
-    for line in text.splitlines():
-        stripped = line.lstrip()
-        if fence is None and (stripped.startswith("```") or stripped.startswith("~~~")):
-            fence = stripped[:3]
+    fence_character: str | None = None
+    fence_length = 0
+    in_html_comment = False
+    for source_line in text.splitlines():
+        stripped = source_line.lstrip()
+        if fence_character is not None:
+            closing_length = len(stripped) - len(stripped.lstrip(fence_character))
+            if (
+                closing_length >= fence_length
+                and not stripped[closing_length:].strip()
+            ):
+                fence_character = None
+                fence_length = 0
             continue
-        if fence is not None:
-            if stripped.startswith(fence):
-                fence = None
+
+        fragments: list[str] = []
+        cursor = 0
+        while cursor < len(source_line):
+            if in_html_comment:
+                comment_end = source_line.find("-->", cursor)
+                if comment_end < 0:
+                    cursor = len(source_line)
+                    continue
+                in_html_comment = False
+                cursor = comment_end + 3
+                continue
+            comment_start = source_line.find("<!--", cursor)
+            if comment_start < 0:
+                fragments.append(source_line[cursor:])
+                break
+            fragments.append(source_line[cursor:comment_start])
+            in_html_comment = True
+            cursor = comment_start + 4
+
+        line = "".join(fragments)
+        stripped = line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            fence_character = stripped[0]
+            fence_length = len(stripped) - len(stripped.lstrip(fence_character))
             continue
         visible.append(line)
     return visible
