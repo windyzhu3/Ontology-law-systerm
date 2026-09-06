@@ -2,7 +2,7 @@ package io.github.windyzhu3.ontologylaw.lead;
 import io.github.windyzhu3.ontologylaw.execution.*;
 import java.time.*;import java.time.format.DateTimeFormatterBuilder;import java.util.*;
 
-/** Closed candidate schemas for the six Task3 commands; API adapters reuse these domain validations. */
+/** Closed schemas shared by saved candidates and their seven primary commands. */
 final class LeadInputs {
     private LeadInputs(){}
     static Map<String,Object> object(Object p){if(!(p instanceof Map<?,?> m))throw new CommandHandler.Rejected("VALIDATION_FAILED");var result=new TreeMap<String,Object>();m.forEach((k,v)->result.put((String)k,v));return result;}
@@ -29,7 +29,25 @@ final class LeadInputs {
             case RECORD_ROUTING_DISPOSITION -> {fields(p,Set.of("decisionCode","rationaleSummary"),Set.of());if(!Set.of("SCHEDULE_ROUTING_REVIEW","RETRY_ASSIGNMENT_NOW","REQUEST_SOURCE_INTAKE_STOP").contains(string(p,"decisionCode")))throw new IllegalArgumentException("Decision required");p.put("rationaleSummary",text(p,"rationaleSummary",500));}
             case RESOLVE_DUPLICATE_LEAD -> {fields(p,Set.of("decisionCode","candidateLeadId","candidateLeadRevision","partyId","partyRevision","rationaleSummary"),Set.of());if(!Set.of("LINK_EXISTING_PARTY","KEEP_SEPARATE").contains(string(p,"decisionCode")))throw new IllegalArgumentException("Decision required");for(String key:List.of("candidateLeadId","partyId"))p.put(key,uuid(p,key).toString());for(String key:List.of("candidateLeadRevision","partyRevision"))p.put(key,revision(p,key));p.put("rationaleSummary",text(p,"rationaleSummary",500));}
             case ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST -> {fields(p,Set.of("causalDecisionId","causalDecisionHash","rationaleSummary"),Set.of());p.put("causalDecisionId",uuid(p,"causalDecisionId").toString());hash(p,"causalDecisionHash");p.put("rationaleSummary",text(p,"rationaleSummary",500));}
-            default -> throw new IllegalArgumentException("Task3 candidate required");
+            case RECORD_CONTACT_RESULT -> {
+                fields(p,Set.of("leadAssignmentId","leadAssignmentRevision","contactChannelCode","resultCode"),Set.of("resultSummary","legalNeed","evidenceSubmissionId"));
+                p.put("leadAssignmentId",uuid(p,"leadAssignmentId").toString());
+                p.put("leadAssignmentRevision",revision(p,"leadAssignmentRevision"));
+                if(!Set.of("PHONE","EMAIL").contains(string(p,"contactChannelCode")))throw new IllegalArgumentException("Contact channel required");
+                if(!Set.of("CONNECTED_VALID","NOT_CONNECTED","SUSPECT_INVALID").contains(string(p,"resultCode")))throw new IllegalArgumentException("Contact result required");
+                if("CONNECTED_VALID".equals(p.get("resultCode")))p.put("legalNeed",text(p,"legalNeed",2000));
+                else if(p.containsKey("legalNeed"))throw new IllegalArgumentException("Legal need forbidden for this result");
+                if(p.containsKey("resultSummary"))p.put("resultSummary",text(p,"resultSummary",500));
+                if(p.containsKey("evidenceSubmissionId"))p.put("evidenceSubmissionId",uuid(p,"evidenceSubmissionId").toString());
+            }
+            case REVIEW_LEAD_VALIDITY -> {
+                fields(p,Set.of("triggeringContactResultId","triggeringContactResultHash","decisionCode","rationaleSummary"),Set.of());
+                p.put("triggeringContactResultId",uuid(p,"triggeringContactResultId").toString());
+                hash(p,"triggeringContactResultHash");
+                if(!Set.of("CONFIRM_INVALID","CLOSE_UNREACHED","REOPEN_CONTACT").contains(string(p,"decisionCode")))throw new IllegalArgumentException("Review decision required");
+                p.put("rationaleSummary",text(p,"rationaleSummary",500));
+            }
+            default -> throw new IllegalArgumentException("Primary Task candidate required");
         }return Collections.unmodifiableMap(p);
     }
 }

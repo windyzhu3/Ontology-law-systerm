@@ -28,6 +28,10 @@ public final class JooqR1EventFacts implements R1EventFacts {
         var f=LEAD_CONTACT_RESULT;
         var r=DSL.using(c,SQLDialect.POSTGRES).selectFrom(f).where(f.TENANT_ID.eq(tenant)).and(f.LEAD_CONTACT_RESULT_ID.eq(id)).fetchOne();
         if(r==null)return null;
+        return new Contact(contactSelector(tenant,id,r),r.get(f.LEAD_ID),r.get(f.LEAD_ASSIGNMENT_ID),r.get(f.CONTACT_TASK_ID),r.get(f.CONTACT_NO),r.get(f.RESULT_CODE));
+    }
+    static Subject contactSelector(UUID tenant,UUID id,org.jooq.Record r) {
+        var f=LEAD_CONTACT_RESULT;
         var fields=new TreeMap<String,Object>();
         fields.put("tenantId",tenant.toString());fields.put("lead_contact_result_id",id.toString());fields.put("lead_id",r.get(f.LEAD_ID).toString());
         fields.put("lead_assignment_id",r.get(f.LEAD_ASSIGNMENT_ID).toString());fields.put("contact_no",r.get(f.CONTACT_NO));fields.put("contact_task_id",r.get(f.CONTACT_TASK_ID).toString());
@@ -35,8 +39,7 @@ public final class JooqR1EventFacts implements R1EventFacts {
         fields.put("evidence_submission_id",r.get(f.EVIDENCE_SUBMISSION_ID)==null?null:r.get(f.EVIDENCE_SUBMISSION_ID).toString());
         var timestamp=new DateTimeFormatterBuilder().appendInstant(6).toFormatter();
         fields.put("resulted_at",timestamp.format(r.get(f.RESULTED_AT).toInstant()));fields.put("created_at",timestamp.format(r.get(f.CREATED_AT).toInstant()));
-        return new Contact(new Subject("lead.lead_contact_result",id,null,Base64.getUrlEncoder().withoutPadding().encodeToString(CanonicalJson.digest(CanonicalJson.encode(fields)))),
-                r.get(f.LEAD_ID),r.get(f.LEAD_ASSIGNMENT_ID),r.get(f.CONTACT_TASK_ID),r.get(f.CONTACT_NO),r.get(f.RESULT_CODE));
+        return new Subject("lead.lead_contact_result",id,null,Base64.getUrlEncoder().withoutPadding().encodeToString(CanonicalJson.digest(CanonicalJson.encode(fields))));
     }
     public boolean contactExistsForTask(Connection c,UUID tenant,UUID taskId) {
         var f=LEAD_CONTACT_RESULT;

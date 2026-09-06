@@ -7,6 +7,38 @@ import org.jooq.*;import org.jooq.impl.DSL;
 import static io.github.windyzhu3.ontologylaw.responsibility.internal.persistence.jooq.Tables.*;
 public final class JooqActionDraftRepository implements ActionDraftService {
     private static DSLContext db(Connection c){return DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false));}
+    public Draft read(Connection c,UUID tenant,UUID taskId) {
+        var d=ACTION_DRAFT;
+        var row=db(c).selectFrom(d).where(d.TENANT_ID.eq(tenant)).and(d.TASK_OCCURRENCE_ID.eq(taskId)).fetchOne();
+        if(row==null)return null;
+        return new Draft(new io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Subject("responsibility.action_draft",row.get(d.ACTION_DRAFT_ID),row.get(d.REVISION),null),
+                taskId,row.get(d.ACTION_CODE),row.get(d.PAYLOAD_SCHEMA_CODE),row.get(d.PAYLOAD_SCHEMA_VERSION),candidateValues(c,row.get(d.CANDIDATE_PAYLOAD)),
+                Base64.getUrlEncoder().withoutPadding().encodeToString(row.get(d.CANDIDATE_PAYLOAD_DIGEST)),row.get(d.STATE),row.get(d.CREATED_AT).toInstant(),row.get(d.LAST_EDITED_AT).toInstant());
+    }
+    public Saved save(Connection c,UUID tenant,TaskFactory.Task task,Draft expected,Map<String,Object> values,UUID actor,Instant now)throws SQLException {
+        var d=ACTION_DRAFT;
+        String canonical=CanonicalJson.encode(values);
+        byte[] digest=CanonicalJson.digest(canonical);
+        var current=read(c,tenant,task.selector().id());
+        if(!Objects.equals(current,expected))throw new CommandHandler.Rejected("STALE_DRAFT");
+        if(current!=null) {
+            if(!"DRAFT".equals(current.state())||!task.type().command.equals(current.actionCode())||!task.type().schema.equals(current.schemaCode())||current.schemaVersion()!=1)
+                throw new CommandHandler.Rejected("DRAFT_DIGEST_MISMATCH");
+            if(canonical.equals(CanonicalJson.encode(current.values()))&&Arrays.equals(digest,Base64.getUrlDecoder().decode(current.digest())))return new Saved(current,false);
+            int changed=db(c).update(d).set(d.CANDIDATE_PAYLOAD,JSONB.valueOf(canonical)).set(d.CANDIDATE_PAYLOAD_DIGEST,digest)
+                    .set(d.LAST_EDITED_AT,now.atOffset(ZoneOffset.UTC)).set(d.REVISION,CommandHandler.nextRevision(current.selector().revision()))
+                    .where(d.TENANT_ID.eq(tenant)).and(d.TASK_OCCURRENCE_ID.eq(task.selector().id())).and(d.ACTION_DRAFT_ID.eq(current.selector().id()))
+                    .and(d.STATE.eq("DRAFT")).and(d.REVISION.eq(current.selector().revision())).execute();
+            if(changed!=1)throw new CommandHandler.Rejected("STALE_DRAFT");
+        } else {
+            UUID id=db(c).select(DSL.field("uuidv7()",UUID.class)).fetchOne(0,UUID.class);
+            db(c).insertInto(d).set(d.TENANT_ID,tenant).set(d.ACTION_DRAFT_ID,id).set(d.TASK_OCCURRENCE_ID,task.selector().id())
+                    .set(d.ACTION_CODE,task.type().command).set(d.PAYLOAD_SCHEMA_CODE,task.type().schema).set(d.PAYLOAD_SCHEMA_VERSION,1)
+                    .set(d.CANDIDATE_PAYLOAD,JSONB.valueOf(canonical)).set(d.CANDIDATE_PAYLOAD_DIGEST,digest).set(d.STATE,"DRAFT")
+                    .set(d.CREATED_BY_APPOINTMENT_ID,actor).set(d.CREATED_AT,now.atOffset(ZoneOffset.UTC)).set(d.LAST_EDITED_AT,now.atOffset(ZoneOffset.UTC)).set(d.REVISION,0L).execute();
+        }
+        return new Saved(read(c,tenant,task.selector().id()),true);
+    }
     public boolean exists(Connection c,UUID tenant,UUID task,UUID draft){
         var d=ACTION_DRAFT;return db(c).fetchExists(db(c).selectOne().from(d).where(d.TENANT_ID.eq(tenant)).and(d.TASK_OCCURRENCE_ID.eq(task)).and(d.ACTION_DRAFT_ID.eq(draft)));
     }
