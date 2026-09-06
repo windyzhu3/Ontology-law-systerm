@@ -174,7 +174,7 @@ class R1BusinessClosureContractTest(unittest.TestCase):
         self.mutation(ADR, "| CapacityProfile | R1-CAPACITY-V1 |\n", "")
 
     def test_baseline_mismatch_is_rejected(self):
-        self.mutation("docs/baseline/CURRENT-MVP-BASELINE.md", "Baseline ID: MVP-2026-09-06.2", "Baseline ID: MVP-2026-09-05.3")
+        self.mutation("docs/baseline/CURRENT-MVP-BASELINE.md", "Baseline ID: MVP-2026-09-06.3", "Baseline ID: MVP-2026-09-06.2")
 
 
 if __name__ == "__main__":

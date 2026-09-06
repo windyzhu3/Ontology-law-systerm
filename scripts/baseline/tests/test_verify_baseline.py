@@ -14,8 +14,13 @@ from scripts.baseline.tests.test_r1_command_contract import R1CommandContractTes
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "verify_baseline.py"
-CANONICAL_BASELINE_ID = "MVP-2026-09-06.2"
+CANONICAL_BASELINE_ID = "MVP-2026-09-06.3"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
+R1_CONTACT_EVIDENCE_BASELINE_MARKERS = (
+    "Task contract `R1-TASK-COMPLETION-V1.2`",
+    "physical capability `52-plus-2-v1.2` remain unchanged",
+    "no production Handler, Evidence port, Workbench or R1 business status is advanced",
+)
 CANONICAL_MATTER_PUBLICATION_CLAUSE = (
     "同一本地事务必须写入完整MatterRef槽：稳定`matter_id`、`matter_no`、类型、"
     "能力包版本和可信创建时间，并发布`MatterCreated`事实通知供Post-MVP消费者使用。"
@@ -401,7 +406,7 @@ class VerifyBaselineTest(unittest.TestCase):
                 [
                     "# R1 task completion matrix",
                     "",
-                    "Contract ID: R1-TASK-COMPLETION-V1.1",
+                    "Contract ID: R1-TASK-COMPLETION-V1.2",
                     "",
                     "Status: FROZEN",
                     "",
@@ -412,6 +417,9 @@ class VerifyBaselineTest(unittest.TestCase):
                     "R1_BUSINESS_WINDOW_V1",
                     "**Pre-slot gate：**",
                     "`legalNeed: SafeText2000`",
+                    "NOT_CONNECTED且contact_no>=3",
+                    "第3次及以后不得自动创建CONTACT重试",
+                    "第1次`SUSPECT_INVALID`后重开所得第2次`NOT_CONNECTED`",
                     "",
                     "## Task registry",
                     "",
@@ -527,6 +535,10 @@ class VerifyBaselineTest(unittest.TestCase):
                     "",
                     "## Request DTO catalog",
                     "`legalNeed: SafeText2000`",
+                    "Task、Lead、Submission、Binding四个准确Subject的DENY",
+                    "返回同一既有`NOT_FOUND`",
+                    "post-slot `REJECTED Slot:+1, Receipt:+1, Audit:+1`",
+                    "Runtime现有QUERY阶段",
                     "## Successful response projections",
                     "## ETag contract",
                     "## ActionDraft confirmation lifecycle",
@@ -584,6 +596,10 @@ class VerifyBaselineTest(unittest.TestCase):
                     "`PreconditionTokens`",
                     "## Command form and Draft projection",
                     "`ActionDraftProjection`",
+                    "不得返回文件内容、文件名、对象位置或下载URL",
+                    "200 BODY和304 CACHE_REVALIDATED",
+                    "旧ETag不得绕过撤权或Binding撤回",
+                    "选择下一张合格卡或返回安全零态",
                     "",
                     "## Envelope fields",
                     "",
@@ -649,6 +665,9 @@ class VerifyBaselineTest(unittest.TestCase):
                     "# Current MVP Baseline",
                     "",
                     f"Baseline ID: {CANONICAL_BASELINE_ID}",
+                    "Task contract `R1-TASK-COMPLETION-V1.2`",
+                    "physical capability `52-plus-2-v1.2` remain unchanged",
+                    "no production Handler, Evidence port, Workbench or R1 business status is advanced",
                     "",
                     "状态：`FROZEN`",
                     "",
@@ -676,6 +695,41 @@ class VerifyBaselineTest(unittest.TestCase):
             "# R1 plan\n\nStatus: FROZEN\n",
         )
         self.write_r1_contract_fixture(root)
+        self.write(
+            root,
+            "docs/adr/ADR-0011-r1-contact-reopen-evidence-read.md",
+            "# ADR-0011\n\nStatus: Accepted\n\nSemantic baseline: MVP-2026-09-06.3\n"
+            "Task contract: R1-TASK-COMPLETION-V1.2\n"
+            "Physical capability: 52-plus-2-v1.2\n"
+            "本次只激活文档与静态验证器\n",
+        )
+        self.write(
+            root,
+            "docs/superpowers/specs/2026-09-06-r1-contact-reopen-evidence-read-design.md",
+            "# Approved amendment\n\n状态：APPROVED\n\n"
+            "## 2. 联系总序号与自动重试\n\n"
+            "## 3. Evidence引用的最小读口\n",
+        )
+        self.write(
+            root,
+            "docs/superpowers/specs/2026-09-05-r1-business-closure-alignment-design.md",
+            "# Supersession index\n\nADR-0011-r1-contact-reopen-evidence-read.md\n"
+            "原Task 6生产实现仍未完成\n",
+        )
+        self.write(
+            root,
+            "docs/superpowers/plans/2026-09-05-r1-business-closure-plan.md",
+            "# Supersession index\n\nADR-0011-r1-contact-reopen-evidence-read.md\n"
+            "历史Task 6正文/checkbox不改写且仍未完成\n",
+        )
+        self.write(
+            root,
+            "docs/progress/2026-09-06-r1-local-progress.md",
+            "原Task 6仍未完成\n本次只激活`MVP-2026-09-06.3`静态合同与验证器\n"
+            "物理能力仍为`52-plus-2-v1.2`\n",
+        )
+        self.write(root, "scripts/baseline/r1_contact_evidence_contract.py", "# validator fixture\n")
+        self.write(root, "scripts/baseline/tests/test_r1_contact_evidence_contract.py", "# validator test fixture\n")
         repository_root = Path(__file__).resolve().parents[3]
         for relative_path in (
             Path("docs/adr/ADR-0007-r1-command-policy-event-closure.md"),
@@ -740,7 +794,9 @@ class VerifyBaselineTest(unittest.TestCase):
             markdown_row("BASE-CURRENT-MVP", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", HISTORICAL_BASELINE_ID, "PR2 merge", "MERGED", "[closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05"),
             markdown_row("BASE-CURRENT-MVP-2026-09-05", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", "MVP-2026-09-05.3", "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1"),
             markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", "MVP-2026-09-06.1", "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2"),
-            markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", CANONICAL_BASELINE_ID, "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "—"),
+            markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", "MVP-2026-09-06.2", "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3"),
+            markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", CANONICAL_BASELINE_ID, "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "—"),
+            markdown_row("R1-CONTACT-EVIDENCE-CONTRACT", "R1", "Contact ordinal and Evidence reference contract", "Docs", "[ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md)", "Engineering", "r1-contact-evidence-v1", "R1 implementation", "FROZEN", "[ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md); [Task matrix](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md); [command contract](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md); [validator](../../scripts/baseline/r1_contact_evidence_contract.py); [validator tests](../../scripts/baseline/tests/test_r1_contact_evidence_contract.py)", "Contract-only delivery; original Task 6 must implement", "—"),
             markdown_row("R1-COMMAND-POLICY-EVENT-CONTRACT", "R1", "R1 command policy and event contract", "Docs", "[R1 command contract](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)", "Engineering", "r1-command-policy-event-v1", "R1 implementation", "FROZEN", "[R1 command contract](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)", "Runtime enforcement remains separate", "—"),
             markdown_row("R1-IMPLEMENTATION-PLAN", "R1", "Lead-contact plan", "Plan", "[R1 plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Engineering", "2026-08-28", "R1 implementation", "FROZEN", "[plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Production code is not yet implemented", "—"),
             markdown_row("R1-IMPLEMENTATION-CONTRACT", "R1", "R1 scaffold, HTTP, task, and workbench contract", "Docs", "[ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)", "Engineering", "r1-contract-v1", "R1 implementation", "FROZEN", "[ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md); [task matrix](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md); [HTTP matrix](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md); [workbench contract](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)", "Production scaffold is not yet implemented", "—"),
@@ -900,12 +956,15 @@ class VerifyBaselineTest(unittest.TestCase):
         )
 
     def assert_finding(self, root: Path, expected_finding: str) -> None:
+        self.assert_findings(root, [expected_finding])
+
+    def assert_findings(self, root: Path, expected_findings: list[str]) -> None:
         findings = verify_repository(root)
-        self.assertEqual(findings, [expected_finding])
+        self.assertEqual(findings, expected_findings)
 
         cli_result = self.run_cli(root)
         self.assertEqual(cli_result.returncode, 1)
-        self.assertEqual(cli_result.stdout.strip().splitlines(), [expected_finding])
+        self.assertEqual(cli_result.stdout.strip().splitlines(), expected_findings)
         self.assertEqual(cli_result.stderr, "")
 
     def assert_gate_finding(self, root: Path, expected_finding: str) -> None:
@@ -1019,6 +1078,11 @@ class VerifyBaselineTest(unittest.TestCase):
 
             expected = [
                 "Missing canonical baseline: docs/baseline/CURRENT-MVP-BASELINE.md",
+                "R1 contact/evidence artifact missing or invalid UTF-8: docs/baseline/CURRENT-MVP-BASELINE.md",
+                "R1 contact/evidence contract missing active baseline: Baseline ID: MVP-2026-09-06.3",
+                "R1 contact/evidence contract missing active Task contract: Task contract `R1-TASK-COMPLETION-V1.2`",
+                "R1 contact/evidence contract missing physical capability: physical capability `52-plus-2-v1.2` remain unchanged",
+                "R1 contact/evidence contract missing contract-only baseline: no production Handler, Evidence port, Workbench or R1 business status is advanced",
                 "Delivery ledger row BASE-CURRENT-MVP Artifact must contain safe Git-tracked in-repository regular-file links",
             ]
             self.assertEqual(verify_repository(root), expected)
@@ -1041,14 +1105,18 @@ class VerifyBaselineTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            self.assert_finding(
+            self.assert_findings(
                 root,
-                "Current baseline must declare Baseline ID: "
-                f"{CANONICAL_BASELINE_ID}",
+                [
+                    "Current baseline must declare Baseline ID: "
+                    f"{CANONICAL_BASELINE_ID}",
+                    "R1 contact/evidence contract missing active baseline: "
+                    f"Baseline ID: {CANONICAL_BASELINE_ID}",
+                ],
             )
 
     def test_runtime_baseline_version_accepts_only_the_approved_successor(self) -> None:
-        for version, valid in [("MVP-2026-09-06.2", True), ("MVP-2026-09-05.3", False), ("MVP-2026-09-06.1", False), ("MVP-2026-09-05.2", False), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.1", False), ("MVP-2026-09-05.10", False)]:
+        for version, valid in [("MVP-2026-09-06.3", True), ("MVP-2026-09-06.2", False), ("MVP-2026-09-05.3", False), ("MVP-2026-09-06.1", False), ("MVP-2026-09-05.2", False), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.1", False), ("MVP-2026-09-05.10", False)]:
             with self.subTest(version=version), tempfile.TemporaryDirectory() as temp_dir:
                 root = Path(temp_dir)
                 baseline = root / "docs/baseline/CURRENT-MVP-BASELINE.md"
@@ -1415,6 +1483,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         "",
                         "状态：`FROZEN`",
                         "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
+                        "",
                         "## task-waiting-contract",
                         "OPEN → WAITING 允许进入等待。",
                         "",
@@ -1443,6 +1513,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         f"Baseline ID: {CANONICAL_BASELINE_ID}",
                         "",
                         "状态：`FROZEN`",
+                        "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
                         "",
                         "SYSTEM_RECOVERY 这个术语在前言中被提到，但不属于等待规则。",
                         "",
@@ -1475,6 +1547,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         "",
                         "状态：`FROZEN`",
                         "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
+                        "",
                         "## waiting-glossary",
                         "SYSTEM_RECOVERY 只是术语解释，不是冻结的等待契约。",
                         "",
@@ -1503,6 +1577,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         f"Baseline ID: {CANONICAL_BASELINE_ID}",
                         "",
                         "状态：`FROZEN`",
+                        "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
                         "",
                         "## task-waiting-contract",
                         "OPEN → WAITING 只允许在 SYSTEM_RECOVERY 安全暂停时进入。",
@@ -1703,6 +1779,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         "",
                         "状态：`FROZEN`",
                         "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
+                        "",
                         "MatterCreated 与第二Matter身份在这里被顺带提到，但不属于 Matter 终点章节。",
                         "",
                         "## task-waiting-contract",
@@ -1735,6 +1813,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         "",
                         "状态：`FROZEN`",
                         "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
+                        "",
                         "## task-waiting-contract",
                         "OPEN → WAITING 只允许在 SYSTEM_RECOVERY 安全暂停时进入。",
                         "",
@@ -1764,6 +1844,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         f"Baseline ID: {CANONICAL_BASELINE_ID}",
                         "",
                         "状态：`FROZEN`",
+                        "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
                         "",
                         CANONICAL_MATTER_PUBLICATION_CLAUSE,
                         "",
@@ -1899,6 +1981,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         "",
                         "状态：`FROZEN`",
                         "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
+                        "",
                         CANONICAL_MATTER_PROHIBITION_CLAUSE,
                         "",
                         "## task-waiting-contract",
@@ -1933,6 +2017,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         f"Baseline ID: {CANONICAL_BASELINE_ID}",
                         "",
                         "状态：`FROZEN`",
+                        "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
                         "",
                         CANONICAL_MATTER_PROHIBITION_CLAUSE,
                         "",
@@ -2336,19 +2422,14 @@ class VerifyBaselineTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.create_valid_repository(root)
-            self.write(
-                root,
-                "docs/progress/MVP-DELIVERY-LEDGER.md",
-                "\n".join(
-                    [
-                        "# MVP Delivery Ledger",
-                        "",
-                        "| ID | Release | Capability | Layer | Artifact | Owner | Version | Target gate | State | Evidence | Blocker/next gate | Superseded by |",
-                        "|---|---|---|---|---|---|---|---|---|---|---|---|",
-                        "| BL-1 | MVP | Baseline | Docs | [Current baseline](../baseline/CURRENT-MVP-BASELINE.md) | Product | v1 | merge | SHIPPING | [Closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md) | next | — |",
-                        "",
-                    ]
-                ),
+            ledger = root / "docs/progress/MVP-DELIVERY-LEDGER.md"
+            ledger.write_text(
+                ledger.read_text(encoding="utf-8").rstrip()
+                + "\n| BL-1 | MVP | Baseline | Docs | "
+                "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md) | Product | "
+                "v1 | merge | SHIPPING | "
+                "[Closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md) | next | — |\n",
+                encoding="utf-8",
             )
 
             self.assert_finding(

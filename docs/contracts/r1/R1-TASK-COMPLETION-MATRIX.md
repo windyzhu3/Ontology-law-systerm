@@ -1,8 +1,8 @@
 # R1 Task 完成合同矩阵
 
-ADR-0008 amendment: capture policy is keyed by `(CommandType, PrincipalKind)` and admits a separately authorized SERVICE_ACTOR/SYSTEM capture path. The seven Task primary commands and their existing completion facts/codes remain unchanged. CurrentCard evidence includes committed `R1_CURRENT_WORKCARD_DISCLOSURE_V1` Audit for both 200 and 304; `R1_PROJECTION` delivery is technical acknowledgement only and never completes or reopens a Task.
+ADR-0008 amendment: capture policy is keyed by `(CommandType, PrincipalKind)` and admits a separately authorized SERVICE_ACTOR/SYSTEM capture path. The seven Task primary commands and their existing completion facts/codes remain unchanged. CurrentCard evidence includes committed `R1_CURRENT_WORKCARD_DISCLOSURE_V1` Audit for both 200 and 304; `R1_PROJECTION` delivery is technical acknowledgement only and never completes or reopens a Task. [ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md) activates the approved global contact ordinal and minimal Evidence reference boundary at semantic baseline `MVP-2026-09-06.3`; physical capability remains `52-plus-2-v1.2`.
 
-Contract ID: R1-TASK-COMPLETION-V1.1
+Contract ID: R1-TASK-COMPLETION-V1.2
 
 Status: FROZEN
 
@@ -40,7 +40,7 @@ Task行的自然幂等槽是Tenant＋Task subject scope＋调用方UUID `Idempot
 | RESOLVE_LEAD_ROUTING_GAP | NONE | 自动选择零销售候选且准确主管唯一 | 锁内重验Lead revision、分支所需主管/来源Owner与当前策略 | NONE |
 | ACK_SOURCE_INTAKE_STOP_REQUEST | `causalDecision@hash` | 取`decision_code=REQUEST_SOURCE_INTAKE_STOP`、其原Task completion_fact准确指回该Decision、原Task subject等于本Task Lead selector且`decided_at <= task.created_at`的最大`(decided_at, decision_record_id)`；它必须就是创建本Task的同事务Decision | 草稿提供`causalDecisionId,causalDecisionHash`；重验该不可变Decision、原Task、completion_fact、Lead selector和最大项全链 | `causalDecisionId,causalDecisionHash` |
 | CONTACT_LEAD | `leadAssignment@revision` | 取Lead `current_assignment_id`指向、属于同Lead、状态OPEN且Owner等于Task Owner的唯一Assignment | 草稿提供`leadAssignmentId,leadAssignmentRevision`；重验Lead当前指针、Assignment所属Lead/OPEN/revision/Owner及Task Owner全部相等 | `leadAssignmentId,leadAssignmentRevision` |
-| REVIEW_LEAD_VALIDITY | `triggeringContactResult@hash` | 取同Lead、其`contact_task_id` Task completion_fact准确指回该结果、结果为`SUSPECT_INVALID`或`NOT_CONNECTED且contact_no=3`、且`resulted_at <= task.created_at`的最大`(resulted_at, lead_contact_result_id)`；它必须就是创建本Task的同事务结果 | 草稿提供`triggeringContactResultId,triggeringContactResultHash`；重验不可变结果、来源CONTACT_LEAD Task、completion_fact、Lead与允许触发条件全链 | `triggeringContactResultId,triggeringContactResultHash` |
+| REVIEW_LEAD_VALIDITY | `triggeringContactResult@hash` | 取同Lead、其`contact_task_id` Task completion_fact准确指回该结果、结果为`SUSPECT_INVALID`或`NOT_CONNECTED且contact_no>=3`、且`resulted_at <= task.created_at`的最大`(resulted_at, lead_contact_result_id)`；它必须就是创建本Task的同事务结果，不能用旧第3次结果冒充第4次结果 | 草稿提供`triggeringContactResultId,triggeringContactResultHash`；重验不可变结果、来源CONTACT_LEAD Task、completion_fact、Lead与允许触发条件全链 | `triggeringContactResultId,triggeringContactResultHash` |
 
 以上“最大”比较先按`timestamptz(6)`、再按UUID的RFC 4122网络字节无符号字典序；不得按数据库未指定collation或显示文本排序。所有SecondaryBinding都进入对应Task唯一ActionDraft的candidate payload；主命令成功时该Draft以同一事务`DRAFT→CONFIRMED`，使`confirmed_payload_digest=candidate_payload_digest`。它们仍须由Fact Owner重验，不能把Draft当业务真相。任何selector缺失、不匹配或已失效都拒绝，不能降级到只按ID、最新任意行或UUID第一项。
 
@@ -86,8 +86,8 @@ SHA-256 hex：`61f1239c8e8e1d03bde88452a61321bbfa66cabbc72e32242d87de9cf58f89ca`
 | P0_04_REQUEST_SOURCE_INTAKE_STOP | RESOLVE_LEAD_ROUTING_GAP | REQUEST_SOURCE_INTAKE_STOP | SUCCEEDED | responsibility.decision_record | `LEAD_ROUTING_DISPOSITION@hash` | `SourceIntakeStopRequestedV1` | R1_PROJECTION | ACK_SOURCE_INTAKE_STOP_REQUEST | DIRECT | SOURCE_INTAKE_OWNER |
 | ACK_SOURCE_INTAKE_STOP_REQUEST | ACK_SOURCE_INTAKE_STOP_REQUEST | SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED | SUCCEEDED | responsibility.decision_record | `SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED@hash` | `SourceIntakeStopRequestAcknowledgedV1` | R1_PROJECTION | NONE | NONE | NONE |
 | CONTACT_CONNECTED_VALID | CONTACT_LEAD | CONNECTED_VALID | SUCCEEDED | lead.lead_contact_result | `contactResult@hash` | `LeadContactResultRecordedV1,OpportunityOpened` | R1_PROJECTION | NONE | OPPORTUNITY_BOUNDARY_V1 | NONE |
-| CONTACT_NOT_CONNECTED_RETRY | CONTACT_LEAD | NOT_CONNECTED | SUCCEEDED | lead.lead_contact_result | `contactResult@hash; attemptNo<3` | `LeadContactResultRecordedV1` | R1_PROJECTION | CONTACT_LEAD | CONTACT_RETRY_V1 | SAME_ASSIGNMENT_OWNER |
-| CONTACT_NOT_CONNECTED_EXHAUSTED | CONTACT_LEAD | NOT_CONNECTED | SUCCEEDED | lead.lead_contact_result | `contactResult@hash; attemptNo=3` | `LeadContactRetryExhaustedV1` | R1_PROJECTION | REVIEW_LEAD_VALIDITY | CONTACT_RETRY_V1 | ROUTING_SUPERVISOR |
+| CONTACT_NOT_CONNECTED_RETRY | CONTACT_LEAD | NOT_CONNECTED | SUCCEEDED | lead.lead_contact_result | `contactResult@hash; contactNo<3` | `LeadContactResultRecordedV1` | R1_PROJECTION | CONTACT_LEAD | CONTACT_RETRY_V1 | SAME_ASSIGNMENT_OWNER |
+| CONTACT_NOT_CONNECTED_EXHAUSTED | CONTACT_LEAD | NOT_CONNECTED | SUCCEEDED | lead.lead_contact_result | `contactResult@hash; contactNo>=3` | `LeadContactRetryExhaustedV1` | R1_PROJECTION | REVIEW_LEAD_VALIDITY | CONTACT_RETRY_V1 | ROUTING_SUPERVISOR |
 | CONTACT_SUSPECT_INVALID | CONTACT_LEAD | SUSPECT_INVALID | SUCCEEDED | lead.lead_contact_result | `contactResult@hash` | `LeadContactResultRecordedV1` | R1_PROJECTION | REVIEW_LEAD_VALIDITY | DIRECT | ROUTING_SUPERVISOR |
 | REVIEW_CONFIRM_INVALID | REVIEW_LEAD_VALIDITY | CONFIRM_INVALID | SUCCEEDED | responsibility.decision_record | `LEAD_VALIDITY_REVIEW@hash` | `LeadValidityReviewedV1` | R1_PROJECTION | NONE | NONE | NONE |
 | REVIEW_CLOSE_UNREACHED | REVIEW_LEAD_VALIDITY | CLOSE_UNREACHED | SUCCEEDED | responsibility.decision_record | `LEAD_VALIDITY_REVIEW@hash` | `LeadValidityReviewedV1` | R1_PROJECTION | NONE | NONE | NONE |
@@ -219,13 +219,15 @@ Task registry的`TaskType`、`PrimaryCommand`、`PayloadSchema`、`CompletionFac
 
 ## CONTACT_RETRY_V1
 
-- 初次 `CONTACT_LEAD` 计 attempt 1，总次数最多 3。
+- `contact_no`是同Tenant、同Lead从1开始、在既有Lead排他业务锁内按历史最大值加1分配的全局单调结果序号；主管重开、Owner或Assignment变化不得重置、覆盖或复用。无法安全递增时在任何事实写入前整体回滚。
+- 自动额度只覆盖初始全局序号1和2；第3次及以后不得自动创建CONTACT重试。主管每次可明确新建一张额外CONTACT Task，但不得补充已消耗额度或让后台模拟主管决定。
 - 时区固定为 Source Policy 的 IANA `businessTimezone`；R1 静态 `businessCalendar=CN_WEEKDAY_V1`，工作日为当地周一至周五，暂不排除法定节假日。DST 间隙向后移动到首个有效时刻，重叠取较早 offset。
-- attempt 1 的 `NOT_CONNECTED`：后继恢复时间为该日历的下一工作日当地 10:00，原始 due 为恢复后 30 分钟。
-- attempt 2 的 `NOT_CONNECTED`：后继恢复时间为该日历的下一工作日当地 15:00，原始 due 为恢复后 30 分钟。
+- `contactNo=1`的`NOT_CONNECTED`：后继恢复时间为该日历的下一工作日当地 10:00，原始 due 为恢复后 30 分钟。
+- `contactNo=2`的`NOT_CONNECTED`：后继恢复时间为该日历的下一工作日当地 15:00，原始 due 为恢复后 30 分钟。
 - 每次优先切换到另一种已经受控捕获且可用的 channel；没有另一 channel 时保持当前 channel，不得发明联系方式。
-- attempt 3 的 `NOT_CONNECTED`：不再创建联系重试，创建 `REVIEW_LEAD_VALIDITY`，reason=`CONTACT_RETRY_EXHAUSTED`。
+- `contactNo>=3`的`NOT_CONNECTED`：不再创建联系重试，创建 `REVIEW_LEAD_VALIDITY`，reason=`CONTACT_RETRY_EXHAUSTED`。
 - 重试 Task 必须先以 OPEN/revision 0 创建，再在同事务转 WAITING/revision 1 并追加一条 WaitReceipt。到期 internal command 只做 WAITING→OPEN CAS，不完成 Task、不改变 Owner 或 SLA。
+- 主管`REOPEN_CONTACT`只完成原REVIEW并创建一张绑定当前准确Lead revision和唯一有效OPEN Assignment Owner的`CONTACT_LEAD/OPEN/revision0`；旧Task保持DONE，新Task使用原30分钟SLA且无WaitReceipt。第1次`SUSPECT_INVALID`后重开所得第2次`NOT_CONNECTED`仍按15:00规则自动安排第3次；第3次或以后重开所得第4/5次结果继续使用本表，不重置序号。
 
 ## Transaction and replay invariants
 

@@ -4,11 +4,11 @@ Contract ID: R1-COMMAND-POLICY-EVENT-V1.1
 
 Status: FROZEN
 
-Semantic baseline: MVP-2026-09-06.2
+Semantic baseline: MVP-2026-09-06.3
 
 Shared payload Schema: contracts/events/r1-domain-notification-v1.schema.json
 
-确认日期：2026-09-05。Owner：Engineering。本文是 R1 命令专属授权、事件描述和成功分支通知集合的唯一静态合同；[ADR-0007](../../adr/ADR-0007-r1-command-policy-event-closure.md)记录其基线承接，[批准设计](../../superpowers/specs/2026-09-05-r1-contract-closure-design.md)提供解释背景。调用方不得提交或选择 policy、authority code、scope organization、授权路径、Grant ID、事件类型、source selector 或 QueueOwner。
+确认日期：2026-09-05。Owner：Engineering。本文是 R1 命令专属授权、事件描述和成功分支通知集合的唯一静态合同；[ADR-0007](../../adr/ADR-0007-r1-command-policy-event-closure.md)记录其基线承接，[批准设计](../../superpowers/specs/2026-09-05-r1-contract-closure-design.md)提供解释背景。[ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md)和[批准修订规格](../../superpowers/specs/2026-09-06-r1-contact-reopen-evidence-read-design.md)只具名替代联系序号/耗尽解释并补齐Evidence引用最小只读边界。调用方不得提交或选择 policy、authority code、scope organization、授权路径、Grant ID、事件类型、source selector 或 QueueOwner。
 
 ## Command policy registry
 
@@ -102,3 +102,53 @@ R1 保留历史及新增 OpportunityOpened，即使其 R1_PROJECTION Outbox 已 
 ## Delivery boundary
 
 本文冻结合同而不宣称 Handler、API、Worker、Workbench、真实身份配置或浏览器业务验收已完成。R1-BACKEND、R1-SPA、R1-E2E-GOLDEN、R1-E2E-FAILURES 的交付状态不因本文改变。
+
+## R1 contact and Evidence amendment semantics
+
+`contactNo`是同Tenant、同Lead的全局单调正序号，主管重开、Owner或Assignment变化均不重置。自动重试只允许`contactNo<3`；`contactNo>=3`未接通只能进入`CONTACT_RETRY_EXHAUSTED`主管复核，主管`REOPEN_CONTACT`创建新OPEN Task而不补充自动额度。任意合法正序号的CONNECTED_VALID/SUSPECT_INVALID仍适用原后继；不得以`contactNo<=3`限制事件合法性，成功事件成员、Event/Outbox/Receipt/Audit数量保持原表。
+
+Evidence引用仅在可选`evidenceSubmissionId`出现时读取。只接受Actor Tenant中绑定当前Task之Lead准确revision、ACTIVE且未撤回的既有Submission/Binding；缺省为零Evidence读取。授权复用`ASSIGNMENT_OWNER/SALES_CONTACT_OWNER`与真实Task Owner组织scope，HUMAN只允许DIRECT或合法一跳DELEGATED，Task、Lead、Submission、Binding分别检查DENY；无效或不可见统一安全NOT_FOUND。
+
+只读端口归Evidence Owner，只访问`evidence_submission`、`evidence_binding`并返回Submission不可变行JCS SHA-256 selector、Binding准确revision及关系，不返回文件内容或位置。唯一新增依赖边为`lead→evidence`、`api→evidence`、`evidence→identity`；读取在Runtime既有QUERY阶段完成，执行阶段只消费已验证selector，最终QUERY阶段在原业务/identity锁下复验，Owner方法不得切换角色。未来Evidence绑定写者必须进入`R1_BUSINESS_TENANT_LOCK`排他围栏；本合同不新增写者、权限码、数据库GRANT或对象操作。
+
+## R1 contact ordinal registry
+
+| Profile | Key | Value |
+|---|---|---|
+| R1_CONTACT_ORDINAL_V1 | ordinal | LEAD_GLOBAL_MONOTONIC |
+| R1_CONTACT_ORDINAL_V1 | retry | contactNo<3 |
+| R1_CONTACT_ORDINAL_V1 | exhausted | contactNo>=3 |
+| R1_CONTACT_ORDINAL_V1 | automaticBudget | MAX_INITIAL_CONTACT_NO_3 |
+| R1_CONTACT_ORDINAL_V1 | supervisorReopen | NEW_OPEN_TASK |
+| R1_CONTACT_ORDINAL_V1 | connectedValid | ANY_SAFE_POSITIVE_CONTACT_NO |
+| R1_CONTACT_ORDINAL_V1 | suspectInvalid | ANY_SAFE_POSITIVE_CONTACT_NO |
+
+## R1 evidence reference registry
+
+| Profile | Key | Value |
+|---|---|---|
+| R1_CONTACT_EVIDENCE_REF_V1 | input | OPTIONAL_SUBMISSION_ID |
+| R1_CONTACT_EVIDENCE_REF_V1 | absent | ZERO_EVIDENCE_READ |
+| R1_CONTACT_EVIDENCE_REF_V1 | tenant | ACTOR_TENANT |
+| R1_CONTACT_EVIDENCE_REF_V1 | target | CURRENT_LEAD_EXACT_REVISION |
+| R1_CONTACT_EVIDENCE_REF_V1 | binding | ACTIVE_NOT_REVOKED |
+| R1_CONTACT_EVIDENCE_REF_V1 | subjects | TASK,LEAD,SUBMISSION,BINDING |
+| R1_CONTACT_EVIDENCE_REF_V1 | authority | ASSIGNMENT_OWNER/SALES_CONTACT_OWNER |
+| R1_CONTACT_EVIDENCE_REF_V1 | paths | DIRECT,DELEGATED |
+| R1_CONTACT_EVIDENCE_REF_V1 | scope | TASK_OWNER_ORGANIZATION |
+| R1_CONTACT_EVIDENCE_REF_V1 | submissionSelector | IMMUTABLE_ROW_JCS_SHA256 |
+| R1_CONTACT_EVIDENCE_REF_V1 | bindingSelector | EXACT_REVISION |
+| R1_CONTACT_EVIDENCE_REF_V1 | capability | QUERY_ONLY |
+| R1_CONTACT_EVIDENCE_REF_V1 | disclosure | AUDIT_BEFORE_200_AND_304 |
+| R1_CONTACT_EVIDENCE_REF_V1 | cache | SELECTORS_AND_AUTH_DEPENDENCIES |
+| R1_CONTACT_EVIDENCE_REF_V1 | invalid | SAFE_NOT_FOUND |
+| R1_CONTACT_EVIDENCE_REF_V1 | hiddenCard | NEXT_ELIGIBLE_OR_ZERO |
+| R1_CONTACT_EVIDENCE_REF_V1 | bindingWriterFence | R1_BUSINESS_TENANT_LOCK |
+| R1_CONTACT_EVIDENCE_REF_V1 | writes | NONE |
+| R1_CONTACT_EVIDENCE_REF_V1 | files | NO_CONTENT_OR_LOCATOR |
+
+## R1 evidence owner registry
+
+| Owner | Tables | Dependencies | Consumers |
+|---|---|---|---|
+| evidence | evidence_submission,evidence_binding | identity | lead,api |

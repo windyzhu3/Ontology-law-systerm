@@ -18,9 +18,11 @@ from urllib.parse import unquote, urlsplit
 try:
     from scripts.baseline.r1_command_contract import validate_r1_command_contract
     from scripts.baseline.r1_business_closure_contract import validate as validate_r1_business_closure_contract
+    from scripts.baseline.r1_contact_evidence_contract import validate as validate_r1_contact_evidence_contract
 except ModuleNotFoundError:  # Direct script execution places this directory on sys.path.
     from r1_command_contract import validate_r1_command_contract
     from r1_business_closure_contract import validate as validate_r1_business_closure_contract
+    from r1_contact_evidence_contract import validate as validate_r1_contact_evidence_contract
 
 
 ALLOWED_STATES = {"DRAFT", "FROZEN", "MERGED", "IMPLEMENTED", "RUNTIME_VERIFIED"}
@@ -46,7 +48,7 @@ TARGET_GATE_STATES = {
 VISUAL_BUNDLE_VERSION = "visual-bundle-2026-08-27"
 VISUAL_OWNER = "Product Design"
 VISUAL_CONFIRMATION_DATE = "2026-08-27"
-CANONICAL_BASELINE_ID = "MVP-2026-09-06.2"
+CANONICAL_BASELINE_ID = "MVP-2026-09-06.3"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 HISTORICAL_BANNER = "历史规格（HISTORICAL_SUPERSEDED）"
 HISTORICAL_WARNING = (
@@ -334,11 +336,11 @@ R1_BRANCH_DETAIL_CONTRACTS = {
         "`LeadContactResultRecordedV1,OpportunityOpened`", "R1_PROJECTION",
     ),
     "CONTACT_NOT_CONNECTED_RETRY": (
-        "SUCCEEDED", "`contactResult@hash; attemptNo<3`",
+        "SUCCEEDED", "`contactResult@hash; contactNo<3`",
         "`LeadContactResultRecordedV1`", "R1_PROJECTION",
     ),
     "CONTACT_NOT_CONNECTED_EXHAUSTED": (
-        "SUCCEEDED", "`contactResult@hash; attemptNo=3`",
+        "SUCCEEDED", "`contactResult@hash; contactNo>=3`",
         "`LeadContactRetryExhaustedV1`", "R1_PROJECTION",
     ),
     "CONTACT_SUSPECT_INVALID": (
@@ -874,7 +876,8 @@ REQUIRED_NONVISUAL_ROWS = {
     "BASE-CURRENT-MVP": ("MVP", "FROZEN", HISTORICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
     "BASE-CURRENT-MVP-2026-09-05": ("MVP", "FROZEN", "MVP-2026-09-05.3", "../baseline/CURRENT-MVP-BASELINE.md"),
     "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1": ("MVP", "FROZEN", "MVP-2026-09-06.1", "../baseline/CURRENT-MVP-BASELINE.md"),
-    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2": ("MVP", "FROZEN", "MVP-2026-09-06.2", "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
     "R1-COMMAND-POLICY-EVENT-CONTRACT": (
         "R1", "FROZEN", "r1-command-policy-event-v1",
         "../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md",
@@ -1639,7 +1642,7 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
         findings.append("R1 implementation plan must declare Status: FROZEN")
         return
     metadata = (
-        (task_text, "R1-TASK-COMPLETION-V1.1", "R1 task contract"),
+        (task_text, "R1-TASK-COMPLETION-V1.2", "R1 task contract"),
         (http_text, "R1-HTTP-V1.1", "R1 HTTP contract"),
         (workbench_text, "R1-WORKBENCH-V1.1", "R1 workbench contract"),
     )
@@ -2602,6 +2605,9 @@ def verify_delivery_ledger(root: Path, findings: list[str]) -> list[str] | None:
     if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2":
         findings.append("Delivery ledger previous baseline must point to BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2")
         return
+    if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3":
+        findings.append("Delivery ledger previous baseline must point to BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3")
+        return
 
     visual_row_ids = {row_id for row_id in rows_by_id if row_id.startswith("VIS-")}
     unexpected_visual_ids = sorted(visual_row_ids - set(EXPECTED_VISUAL_ROWS))
@@ -2757,6 +2763,7 @@ def _verify_repository_result_unchecked(root: Path) -> VerificationResult:
     structural_findings.extend(validate_r1_command_contract(root))
     if (root / "docs/adr/ADR-0008-r1-business-closure-alignment.md").is_file():
         structural_findings.extend(validate_r1_business_closure_contract(root))
+    structural_findings.extend(validate_r1_contact_evidence_contract(root))
     readiness_blockers = (
         verify_delivery_ledger(root, structural_findings) or []
     )

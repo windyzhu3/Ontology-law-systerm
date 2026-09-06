@@ -6,6 +6,8 @@ R1 v1.1 freezes 15 operations: 11 public Bearer and 4 mutualTLS. `listDueR1Tasks
 
 `STALE_OUTBOX_CLAIM` and `PROJECTION_EVENT_INVALID` belong only to consumeR1Projection's typed internal Problem allowlist; no public operation error allowlist changes. Internal authorization failures are 403, never disguised as permanent 404.
 
+[ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md) activates semantic baseline `MVP-2026-09-06.3` without changing this contract ID, the 11 public＋4 internal operation set, DTO shape or physical capability `52-plus-2-v1.2`. It narrows the existing optional `evidenceSubmissionId` to an exact, authorized Evidence reference and keeps all production implementation gates separate.
+
 Status: FROZEN
 
 确认日期：2026-09-02
@@ -99,7 +101,7 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 | `AssignLeadV1` | Draft confirmation fields (各 1), `ownerAppointmentId: Uuid` (1) | Appointment 必须来自当前卡允许候选，且提交前仍为同 Tenant、ACTIVE、有准确 authority 且无 DENY |
 | `RecordRoutingDispositionV1` | Draft confirmation fields (各 1), `decisionCode` (1), `rationaleSummary: SafeText500` (1) | `decisionCode ∈ {SCHEDULE_ROUTING_REVIEW,RETRY_ASSIGNMENT_NOW,REQUEST_SOURCE_INTAKE_STOP}`；恢复时间、候选选择和准确 intake Owner 均由服务器策略决定 |
 | `AcknowledgeSourceIntakeStopRequestV1` | Draft confirmation fields (各 1), `causalDecisionId: Uuid` (1), `causalDecisionHash: Digest32` (1), `rationaleSummary: SafeText500` (1) | causal selector 必须等于 Task 创建时按 Task 合同确定、提交时重验的 routing Decision selector；唯一 outcome 隐含为 `SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED`，不接受自由 decisionCode |
-| `RecordContactResultV1` | Draft confirmation fields (各 1), `leadAssignmentId: Uuid` (1), `leadAssignmentRevision: Revision` (1), `contactChannelCode: Code64` (1), `resultCode: Code64` (1), `resultSummary: SafeText500` (0..1), `legalNeed: SafeText2000` (0..1), `evidenceSubmissionId: Uuid` (0..1) | `contactChannelCode ∈ {PHONE,EMAIL}`；`resultCode ∈ {CONNECTED_VALID,NOT_CONNECTED,SUSPECT_INVALID}`；`legalNeed`在CONNECTED_VALID时必填并作为新Opportunity的受保护原始描述，在其他结果时禁止；Assignment selector 必须等于Task创建时按Task合同确定、提交时重验的绑定；Evidence若出现必须为同Tenant可见的准确Submission |
+| `RecordContactResultV1` | Draft confirmation fields (各 1), `leadAssignmentId: Uuid` (1), `leadAssignmentRevision: Revision` (1), `contactChannelCode: Code64` (1), `resultCode: Code64` (1), `resultSummary: SafeText500` (0..1), `legalNeed: SafeText2000` (0..1), `evidenceSubmissionId: Uuid` (0..1) | `contactChannelCode ∈ {PHONE,EMAIL}`；`resultCode ∈ {CONNECTED_VALID,NOT_CONNECTED,SUSPECT_INVALID}`；`legalNeed`在CONNECTED_VALID时必填并作为新Opportunity的受保护原始描述，在其他结果时禁止；Assignment selector 必须等于Task创建时按Task合同确定、提交时重验的绑定；Evidence缺省时零读取，出现时必须为Actor Tenant中绑定当前Task准确Lead revision、ACTIVE且未撤回并通过四Subject授权的既有Submission |
 | `ReviewLeadValidityV1` | Draft confirmation fields (各 1), `triggeringContactResultId: Uuid` (1), `triggeringContactResultHash: Digest32` (1), `decisionCode` (1), `rationaleSummary: SafeText500` (1) | `decisionCode ∈ {CONFIRM_INVALID,CLOSE_UNREACHED,REOPEN_CONTACT}`；ContactResult selector 必须等于 Task 创建时按 Task 合同确定、提交时重验的触发结果 |
 | `ReopenDueContactTaskV1` | `taskId: Uuid` (1), `expectedTaskRevision: Revision` (1), `waitReceiptId: Uuid` (1), `waitReceiptHash: Digest32` (1), `dueCutoff: Instant` (1) | Task 必须为 WAITING `CONTACT_LEAD`；最新 WaitReceipt 必须绑定 expected revision 且 `resumeDueAt <= dueCutoff <=` 服务端事务可信当前时间；恰做一次 WAITING→OPEN CAS。若同一 selector 已使 Task 成为 OPEN/revision=`expectedTaskRevision+1`，返回 NO_CHANGE；不允许空批成功 |
 | `ReopenDueRoutingReviewTaskV1` | `taskId: Uuid` (1), `expectedTaskRevision: Revision` (1), `waitReceiptId: Uuid` (1), `waitReceiptHash: Digest32` (1), `dueCutoff: Instant` (1) | Task 必须为 WAITING `RESOLVE_LEAD_ROUTING_GAP`且最新WaitReceipt为`R1_ROUTING_REVIEW_WAIT_V1`；其余due、CAS和NO_CHANGE语义与contact恢复相同 |
@@ -277,3 +279,11 @@ capture 不对尚不存在的资源要求 `If-Match`。Draft 首次创建使用 
 错误响应使用 RFC 9457 Problem Details，并只允许 `type`、`title`、`status`、`code`、`detail`、`instance`、`fieldErrors`、`currentETag`、`receiptRef`、`retryPolicy`。`detail` 和 `SafeText` 不得泄露 SQL、堆栈、Tenant、主体可见性、内部 ID 或授权规则。`fieldErrors` 只在表中标为 REQUIRED 时出现；`currentETag` 只返回表中指定的资源种类，首次创建 Draft 且资源尚不存在时可以不返回具体值。
 
 零分配候选是 P0-04 正常业务分支：完成当前责任并创建 `RESOLVE_LEAD_ROUTING_GAP`，不是 HTTP 错误。技术异常整体回滚；业务拒绝若已占用 command slot，则只留下不可变 REJECTED Receipt 和 REJECTED Audit。
+
+## R1 Evidence reference HTTP boundary
+
+`evidenceSubmissionId`只能出现在冻结的`RecordContactResultV1`候选shape中，不能增加Tenant、Grant、Binding ID、revision/hash、对象地址、文件内容或下载字段。服务端先完成Task/Lead/Owner准确授权，再由Evidence Owner查询`evidence_submission`及唯一`evidence_binding`；target必须为当前Task绑定的准确`lead.lead@revision`且绑定ACTIVE未撤回。Task、Lead、Submission、Binding四个准确Subject的DENY都适用`SALES_CONTACT_OWNER`，HUMAN只接受DIRECT或合法一跳DELEGATED，OBJECT-only、提交人身份或外键存在不能替代。
+
+缺失、跨Tenant、其他Lead或revision、其他target、无Binding、已撤回或不可见都返回同一既有`NOT_FOUND`，不得指明失败来源。发现于占slot前时Slot/Receipt/Audit/业务写均为0；只有已通过pre-slot而在最终复验失效时才允许既有post-slot `REJECTED Slot:+1, Receipt:+1, Audit:+1`，其他事实/Event/Outbox仍为0。技术故障整体回滚。
+
+读取只发生在Runtime现有QUERY阶段，执行阶段消费已验证Submission hash/Binding revision selector，最终QUERY阶段在同连接和既有业务/identity锁下复验；不得在Evidence Owner内部切换角色。该引用不产生Evidence写入，不改变Operation、状态码或Problem shape。

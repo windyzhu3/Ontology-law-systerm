@@ -1,8 +1,8 @@
 # 当前MVP基线
 
-Baseline ID: MVP-2026-09-06.2
+Baseline ID: MVP-2026-09-06.3
 
-Previous Baseline IDs `MVP-2026-09-06.1`, `MVP-2026-09-05.3` and older merge evidence remain historical. [ADR-0009](../adr/ADR-0009-p0-duplicate-automatic-assignment.md) activates Task contract `R1-TASK-COMPLETION-V1.1`: P0-01 permits only the bounded automatic successor Assignment pointer in one combined Lead CAS, preserving revision +1 and the resolution-only Decision digest/completion/Event source. ADR-0008's command-policy v1.1, HTTP v1.1, Workbench v1.1, OpenAPI 1.1.0, SERVICE capture, audited CurrentCard revalidation, due discovery and projection acknowledgement remain active. Event schema and operation shapes remain unchanged; [ADR-0010](../adr/ADR-0010-lead-ingress-query-read-capability.md) separately activates only the four-column QUERY SELECT successor `52-plus-2-v1.2`; no production Handler or R1 business status is advanced.
+Previous Baseline IDs `MVP-2026-09-06.2`, `MVP-2026-09-06.1`, `MVP-2026-09-05.3` and older merge evidence remain historical. [ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md) activates Task contract `R1-TASK-COMPLETION-V1.2`: ContactResult uses a Lead-global monotonic `contactNo`, only values `<3` receive automatic retry, values `>=3` enter supervisor review, and every `REOPEN_CONTACT` creates one new OPEN Task without replenishing the automatic budget. The same ADR adds the Evidence Owner `QUERY_ONLY` boundary for the existing optional Submission reference, including exact current-Lead-revision binding, four-subject DENY, safe NOT_FOUND and audited 200/304 disclosure. ADR-0008 through ADR-0010 otherwise remain active. Event schema, event counts, operation/DTO shapes and physical capability `52-plus-2-v1.2` remain unchanged; no production Handler, Evidence port, Workbench or R1 business status is advanced.
 
 状态：`FROZEN`
 
@@ -18,6 +18,8 @@ R1实施合同确认日期：2026-09-02
 
 ## authority-order
 
+[ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md)与第5项同层；只替代联系次数解释并补齐既有Evidence引用的最小只读Owner/授权/披露边界。它不改变字段、事件数量、operation、数据库GRANT、迁移或物理能力版本；生产实现仍由原Task 6验收。
+
 [ADR-0010](../adr/ADR-0010-lead-ingress-query-read-capability.md)与第5项同层；仅对QUERY读取补全phone/email各自HMAC及密文四列、v1.2能力版本作具名supersession。其余五列、整表SELECT和写权限仍禁止，业务披露审计不因数据库授权而豁免。
 
 [ADR-0008](../adr/ADR-0008-r1-business-closure-alignment.md)和[ADR-0009](../adr/ADR-0009-p0-duplicate-automatic-assignment.md)与下列第5项同层，按各自显式局部supersession解释；ADR-0009仅覆盖P0-01自动后继指针及CAS评估时序，不覆盖其余冻结约束。
@@ -30,7 +32,7 @@ R1实施合同确认日期：2026-09-02
 2. `database/schema-contract-52-plus-2/contract/`：当前MVP数据结构唯一人工维护源。
 3. 由合同机械生成的manifest、字段合同和Flyway DDL。
 4. `database/schema-contract-52-plus-2/docs/runtime-validation-contract.md`：DDL无法证明的运行时规则。
-5. [ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)、[ADR-0005](../adr/ADR-0005-r1-foundation-readiness.md)、[ADR-0006](../adr/ADR-0006-command-runtime-authorization-boundary.md)、[ADR-0007](../adr/ADR-0007-r1-command-policy-event-closure.md)、[R1命令授权及事件合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)、[R1 Task完成矩阵](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)、[R1 HTTP矩阵](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md)和[R1 Workbench合同](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)：决定R1工程、授权、事件、HTTP、责任完成与呈现语义；涉及持久化形态、唯一键或Receipt基数时必须服从第2至4项。
+5. [ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)、[ADR-0005](../adr/ADR-0005-r1-foundation-readiness.md)、[ADR-0006](../adr/ADR-0006-command-runtime-authorization-boundary.md)、[ADR-0007](../adr/ADR-0007-r1-command-policy-event-closure.md)、[ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md)、[R1命令授权及事件合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)、[R1 Task完成矩阵](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)、[R1 HTTP矩阵](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md)和[R1 Workbench合同](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)：决定R1工程、授权、事件、HTTP、责任完成与呈现语义；涉及持久化形态、唯一键或Receipt基数时必须服从第2至4项。
 6. [冻结R1计划](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)：只决定上述合同的实施顺序，不能覆盖合同或数据库权威。
 7. `docs/progress/MVP-DELIVERY-LEDGER.md`：仅记录交付状态，不改变产品或数据库语义。
 8. `docs/design/`：视觉验收证据，不产生领域规则。

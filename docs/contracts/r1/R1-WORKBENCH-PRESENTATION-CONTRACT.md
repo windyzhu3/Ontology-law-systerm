@@ -4,6 +4,8 @@ Contract ID: R1-WORKBENCH-V1.1
 
 All seven nonempty CurrentCard variants are `R1_CURRENT_WORKCARD_DISCLOSURE_V1`. Both 200 BODY and 304 CACHE_REVALIDATED return only after disclosure Audit commit. Task, Lead, Owner Appointment/Principal/OrganizationUnit and every actually returned Draft/candidate/fact are separate typed disclosedSource anchors. Responses use `Cache-Control: private, no-cache` and `Vary: Authorization`; Actor-scoped ETags include authorization and every disclosed source revision/digest. The SPA uses generation/AbortController so a late older request cannot overwrite a newer envelope.
 
+[ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md) activates semantic baseline `MVP-2026-09-06.3` while this contract ID and wire DTOs remain unchanged. Its Evidence rule only secures the existing optional Contact Draft candidate; it creates no browser, upload, download or management feature.
+
 Status: FROZEN
 
 确认日期：2026-09-02
@@ -123,3 +125,11 @@ Workbench 普通路径不显示全局菜单或左侧栏；操作流围绕当前�
 ## R1 boundary
 
 R1 只实现 `/workbench` 及其 P0-01 至 P0-04、联系和有效性复核卡。`/admin/identity/*` 的 route mode、导航隔离和权限边界在脚手架中保留，但身份管理生产页面、CRUD 和独立验收属于后续交付，不能计入 R1 完成证据。
+
+## R1 Evidence selector disclosure
+
+CONTACT Draft中的`evidenceSubmissionId`只是候选值。保存Draft不证明Evidence资格；CurrentCard恢复该候选时，必须按主命令相同规则重验当前Task绑定的准确Lead revision、ACTIVE未撤回的Binding，以及Task、Lead、Submission、Binding四个准确来源的授权和DENY。只有全部通过才可在既有`commandForm.values`或`ActionDraftProjection.values`中回显原ID。
+
+若Evidence缺失、跨Tenant、绑定其他Lead/revision、撤回或不可见，该完整卡不合格；按既有排序选择下一张合格卡或返回安全零态，不得静默删去ID而改变Draft digest，也不得显示失败来源。Workbench不得返回文件内容、文件名、对象位置或下载URL；Submission不可变行hash和Binding revision只作为内部披露来源selector。
+
+准确Submission/Binding selector和其Task/Lead/Owner/授权依赖加入Actor-scoped Workbench ETag与`R1_CURRENT_WORKCARD_DISCLOSURE_V1` Audit来源集合。200 BODY和304 CACHE_REVALIDATED均必须重新验证引用与DENY，并在披露Audit提交后返回；旧ETag不得绕过撤权或Binding撤回。该静态合同不声称CurrentCard或SPA生产实现已完成。

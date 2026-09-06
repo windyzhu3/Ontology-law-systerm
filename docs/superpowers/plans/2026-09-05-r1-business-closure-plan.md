@@ -1,5 +1,7 @@
 # R1 Business Closure Implementation Plan
 
+> 2026-09-06原Task 6具名前置：[ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md)与[批准修订规格](../specs/2026-09-06-r1-contact-reopen-evidence-read-design.md)已将全局联系序号、`contactNo<3`自动额度、`contactNo>=3`复核及Evidence引用最小只读边界激活为静态合同。历史Task 6正文/checkbox不改写且仍未完成；后续实施以本合同提交为新BASE，一次性完成Java/jOOQ/实库/CurrentCard验收，不重复派发合同任务。
+
 > 2026-09-06具名supersession：[ADR-0010](../../adr/ADR-0010-lead-ingress-query-read-capability.md)与[有限能力计划](2026-09-06-r1-ingress-query-capability-plan.md)是原Task 5之前的独立门禁，仅允许V860四列QUERY SELECT及v1.2活动合同同步。历史步骤不重写；物理合同禁止修改条款只对此具名例外豁免。原Task 5消费者须在门禁评审后继续，原Task 8生产readiness组装仍待实施。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
