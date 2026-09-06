@@ -25,14 +25,23 @@ public final class R1CommandPolicy {
         var request=context.authorization();
         boolean dedicated=dedicated(e.type());
         // The shared lock precedes the clock and ALL current Owner/organization reads, not only Grant evaluation.
-        if(finalCheck && dedicated)authorization.lockForEvaluation(c,e.actor().tenantId());
+        if(finalCheck)authorization.lockForEvaluation(c,e.actor().tenantId());
         var first=authorization.evaluate(c,request,finalCheck);
         var checks=new ArrayList<AuthorizationSnapshot>();checks.add(first);
         String failure=null;String ownerEvidence="";
         if(!context.scope().tenantId().equals(e.actor().tenantId()) || context.scope().type()!=e.type() || !request.actor().equals(e.actor()))failure="NOT_AUTHORIZED";
         else if(!dedicated) {
             String expected=primaryPolicy(e.type());
-            if(expected==null || request.requirement().path()==Path.SYSTEM || !expected.equals(request.requirement().slot()+":"+request.requirement().authorityCode()))failure="NOT_AUTHORIZED";
+            if(expected==null || (request.requirement().path()!=Path.DIRECT&&request.requirement().path()!=Path.DELEGATED) || !expected.equals(request.requirement().slot()+":"+request.requirement().authorityCode()) || facts==null || context.scope().taskId()==null)failure="NOT_AUTHORIZED";
+            else {
+                var task=facts.task(c,e.actor().tenantId(),context.scope().taskId(),first.checkedAt());
+                UUID represented=request.requirement().path()==Path.DELEGATED?e.actor().onBehalfAppointmentId():e.actor().appointmentId();
+                ownerEvidence="primaryTask="+task;
+                if(task==null||task.owner()==null||!task.owner().active()||!task.ownerAppointmentId().equals(represented)
+                        ||!task.lead().equals(request.subject())||!request.scopeOrganizationId().equals(task.owner().organizationId())
+                        ||!e.type().name().equals(task.primaryCommand())||!DRAFTS.containsKey(task.taskType())||DRAFTS.get(task.taskType()).command()!=e.type())failure="NOT_AUTHORIZED";
+                else {add(c,checks,request,task.selector());add(c,checks,request,task.lead());add(c,checks,request,task.currentLead());}
+            }
         } else if(facts==null || context.binding()==null)failure="NOT_AUTHORIZED";
         else {
             try {

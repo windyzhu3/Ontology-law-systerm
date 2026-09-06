@@ -339,9 +339,10 @@ class R1CommandPolicyIT extends CommandRuntimeIT {
     @Test void capture_final_revocation_after_slot_rolls_back_to_rejected_receipt_and_audit()throws Exception {
         var h=captureHandler();var context=capture(h,"FIXTURE",captureGrant(h));
         var handler=new NoChangeHandler(h,context,h.seed.request().subject()) {
-            @Override public void validateBeforeCommit(Connection c,CommandEnvelope e,Context context,Result result) {
+            @Override public Result execute(Connection c,CommandEnvelope e,Context context) {
                 try {mutate(h,"update identity.authority_grant set state='REVOKED',revoked_at=clock_timestamp(),revocation_reason_code='TEST',revision=revision+1 where tenant_id=? and authority_grant_id=?",h.seed.tenant(),h.seed.grant());}
                 catch(Exception failure){throw new AssertionError(failure);}
+                return Result.noChange(h.seed.request().subject());
             }
         };
         var result=run(new CommandRuntime(List.of(handler),auth,"POLICY_IT",readers),envelope(h,CommandEnvelope.Type.CAPTURE_LEAD,h.seed.request().actor(),Map.of("sourceAccountCode","FIXTURE")));

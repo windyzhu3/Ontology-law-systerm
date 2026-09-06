@@ -5,7 +5,10 @@ import io.github.windyzhu3.ontologylaw.identity.AuthorizationService.PrincipalKi
 import java.util.*;
 
 /** Created by a trusted adapter after authentication and input schema validation. */
-public record CommandEnvelope(Type type, UUID commandId, UUID correlationId, Actor actor, Object payload) {
+public record CommandEnvelope(Type type, UUID commandId, UUID correlationId, Actor actor, Object payload, TaskPrecondition taskPrecondition) {
+    /** Trusted path/header carrier, deliberately outside the canonical request-body digest. */
+    public record TaskPrecondition(UUID taskId,String ifMatch) {public TaskPrecondition {Objects.requireNonNull(taskId);}}
+    public CommandEnvelope(Type type,UUID commandId,UUID correlationId,Actor actor,Object payload) {this(type,commandId,correlationId,actor,payload,null);}
     public enum Envelope { INTERNAL_TASK, INTERNAL_ADMIN, CUSTOMER_GRANT, SERVICE_ACTOR }
     public enum Type {
         RESOLVE_DUPLICATE_LEAD, COMPLETE_LEAD_INGRESS, ASSIGN_LEAD, RECORD_ROUTING_DISPOSITION,

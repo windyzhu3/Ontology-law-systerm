@@ -57,7 +57,8 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
         }
     }
     static String scalar(Connection c,String query)throws SQLException {try(var s=c.createStatement();var r=s.executeQuery(query)){assertTrue(r.next());return r.getString(1);}}
-    CommandRuntime runtime(Handler h){return new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("POSTGRES_IT"),null,io.github.windyzhu3.ontologylaw.lead.R1EventReaders.databaseBacked());}
+    static R1AuthorizationFacts ownerFacts(){return io.github.windyzhu3.ontologylaw.lead.R1AuthorizationReaders.databaseBacked(new io.github.windyzhu3.ontologylaw.lead.R1SourcePolicyRegistry(Map.of()));}
+    CommandRuntime runtime(Handler h){return new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("POSTGRES_IT"),ownerFacts(),io.github.windyzhu3.ontologylaw.lead.R1EventReaders.databaseBacked());}
     CommandResult runResult(CommandRuntime runtime,CommandEnvelope e)throws Exception {try(var c=database.apiConnection()){return runtime.execute(c,e);}}
     CommandOutcome run(CommandRuntime runtime,CommandEnvelope e)throws Exception {return assertInstanceOf(CommandOutcome.class,runResult(runtime,e));}
     List<Long> counts(Handler h)throws Exception {
@@ -100,16 +101,16 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
     }
     @Test void audit_failure_after_real_append_rolls_back_every_effect()throws Exception {
         Handler h=new Handler();
-        var runtime=new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),(c,e)->{io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("POSTGRES_IT").append(c,e);throw new SQLException("Injected audit failure","08006");},null,io.github.windyzhu3.ontologylaw.lead.R1EventReaders.databaseBacked());
+        var runtime=new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),(c,e)->{io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("POSTGRES_IT").append(c,e);throw new SQLException("Injected audit failure","08006");},ownerFacts(),io.github.windyzhu3.ontologylaw.lead.R1EventReaders.databaseBacked());
         assertThrows(SQLException.class,()->run(runtime,h.envelope(UUID.randomUUID(),Map.of())));assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));
     }
     @Test void committed_revocation_after_fact_write_causes_only_terminal_rejection()throws Exception {
-        Handler h=new Handler(){@Override public void validateBeforeCommit(Connection c,CommandEnvelope e,Context context,Result result)throws SQLException {
-            super.validateBeforeCommit(c,e,context,result);
+        Handler h=new Handler(){@Override public Result execute(Connection c,CommandEnvelope e,Context context)throws SQLException {
+            var result=super.execute(c,e,context);
             try(var writer=database.apiConnection()){inTransaction(writer,Capability.COMMAND,w->{
                 AuthorizationService.databaseBacked().lockForMutation(w,seed.tenant());
                 sql(w,"update identity.authority_grant set state='REVOKED',revoked_at=clock_timestamp(),revocation_reason_code='TEST',revision=revision+1 where tenant_id=? and authority_grant_id=?",seed.tenant(),seed.grant());return null;
-            });}
+            });}return result;
         }};
         var result=run(runtime(h),h.envelope(UUID.randomUUID(),Map.of()));assertEquals(CommandOutcome.Status.REJECTED,result.status());assertEquals("NOT_AUTHORIZED",result.rejectionCode());assertEquals(List.of(1L,1L,1L,0L,0L,0L),counts(h));
     }
@@ -285,7 +286,7 @@ class CommandRuntimeIT extends PostgresIntegrationTest {
         assertEquals(1,inserts.get());assertEquals(List.of(0L,0L,0L,0L,0L,0L),counts(h));
     }
     @Test void audit_uses_the_explicit_trusted_deployment_node()throws Exception {
-        Handler h=new Handler();var runtime=new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("NODE_A"),null,io.github.windyzhu3.ontologylaw.lead.R1EventReaders.databaseBacked());
+        Handler h=new Handler();var runtime=new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("NODE_A"),ownerFacts(),io.github.windyzhu3.ontologylaw.lead.R1EventReaders.databaseBacked());
         run(runtime,h.envelope(UUID.randomUUID(),Map.of()));
         try(var observer=database.migratorConnection()){assertEquals("NODE_A",scalar(observer,"select execution_node_code from audit.audit_entry where tenant_id='"+h.seed.tenant()+"'"));}
     }

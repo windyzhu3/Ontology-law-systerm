@@ -63,7 +63,12 @@ public final class CommandRuntime {
                 var eventPolicy=new R1EventPolicy(eventFacts);eventPolicy.beforeWork(c,envelope,context);
                 setLocalRole(c,Capability.COMMAND);handler.validateBeforeWork(c,envelope,context);result=handler.execute(c,envelope,context);
                 if(result.status()==CommandOutcome.Status.NO_CHANGE)c.rollback(business);
-                setLocalRole(c,Capability.QUERY);handler.validateBeforeCommit(c,envelope,context,result);
+                setLocalRole(c,Capability.QUERY);
+                // Capture denials on newly written exact selectors before rollback restores old
+                // revisions. The shared identity lock also precedes all final Owner reads.
+                terminal=policy.authorize(c,envelope,context,true);
+                if(!terminal.allowed())throw new CommandHandler.Rejected(terminal.rejectionCode());
+                handler.validateBeforeCommit(c,envelope,context,result);
                 eventPolicy.validate(c,envelope,context,result);
                 terminal=policy.authorize(c,envelope,context,true);
                 if(!terminal.allowed())throw new CommandHandler.Rejected(terminal.rejectionCode());
