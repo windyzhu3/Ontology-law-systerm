@@ -13,12 +13,13 @@ final class ReadConnectionProbe implements InvocationHandler {
     final AtomicInteger inserts=new AtomicInteger();
     final CountDownLatch auditReached=new CountDownLatch(1),auditContinue=new CountDownLatch(1),commitReached=new CountDownLatch(1),commitContinue=new CountDownLatch(1);
     int pauseAuditAt=0;boolean pauseCommit=false,loseCommitAck=false;
+    String commitAckSqlState="08006";
     ReadConnectionProbe(Connection delegate){this.delegate=delegate;}
     Connection connection(){return (Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},this);}
     public Object invoke(Object proxy,Method method,Object[] args)throws Throwable {
         if(method.getName().equals("commit")) {
             commitReached.countDown();if(pauseCommit)await(commitContinue);
-            Object result=call(delegate,method,args);if(loseCommitAck)throw new SQLException("Synthetic commit acknowledgement unavailable","08006");return result;
+            Object result=call(delegate,method,args);if(loseCommitAck)throw new SQLException("Synthetic commit acknowledgement unavailable",commitAckSqlState);return result;
         }
         Object result=call(delegate,method,args);
         if(result instanceof Statement statement) {

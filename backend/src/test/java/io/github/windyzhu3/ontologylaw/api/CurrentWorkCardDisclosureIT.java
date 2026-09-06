@@ -12,8 +12,56 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import com.sun.net.httpserver.HttpServer;
 import io.github.windyzhu3.ontologylaw.execution.CanonicalJson;
+import io.github.windyzhu3.ontologylaw.execution.SensitiveReadRuntime;
+import io.github.windyzhu3.ontologylaw.audit.AuditAppender;
+import io.github.windyzhu3.ontologylaw.identity.AuthorizationService;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import static io.github.windyzhu3.ontologylaw.execution.internal.persistence.CapabilityRoleExecutor.*;
 
 class CurrentWorkCardDisclosureIT extends WorkcardTestFixture {
+    // Catches exception-wrapper-dependent retry semantics at the real JDBC read boundary.
+    @ParameterizedTest
+    @CsvSource({"42P01,false,500", "42P01,true,500", "22012,false,500", "22012,true,500",
+        "25001,false,500", "25001,true,500", "08003,false,503", "08003,true,503",
+        "55P03,false,503", "55P03,true,503"})
+    void read_sql_failure_classification_is_independent_of_checked_or_wrapped_form(String state,boolean wrapped,int expectedStatus)throws Exception {
+        setupCard(TaskFactory.Type.COMPLETE_LEAD_INGRESS);
+        var runtime=new SensitiveReadRuntime(AuthorizationService.databaseBacked(),AuditAppender.databaseBacked("SQL_CLASSIFICATION_IT"));
+        var observedState=new AtomicReference<String>();
+        try(var c=database.apiConnection();var blocker=database.adminConnection()) {
+            try(var statement=blocker.createStatement()){statement.execute("select pg_advisory_lock(814735192)");}
+            var failure=assertThrows(SensitiveReadRuntime.Failure.class,()->runtime.read(c,seed.request().actor(),UUID.randomUUID(),null,(connection,now)->{
+                try {
+                    if(state.equals("25001"))return inTransaction(connection,Capability.QUERY,ignored->{throw new AssertionError("Nested read must be rejected before callback");});
+                    if(state.equals("08003"))connection.close();
+                    try(var statement=connection.createStatement()) {
+                        if(state.equals("55P03"))statement.execute("set local lock_timeout='10ms'");
+                        statement.execute(state.equals("42P01")?"select * from pg_catalog.task5_missing_relation":state.equals("55P03")?"select pg_advisory_xact_lock(814735192)":"select 1/0");
+                    }
+                    throw new AssertionError("Real JDBC read must fail");
+                } catch(SQLException sql) {
+                    observedState.set(sql.getSQLState());
+                    if(wrapped)throw new IllegalStateException("Synthetic read wrapper",sql);
+                    throw sql;
+                }
+            }));
+            assertEquals(state,observedState.get());
+            assertEquals(expectedStatus,failure.status());
+            assertEquals(expectedStatus==500?"INTERNAL_ERROR":"SERVICE_UNAVAILABLE",failure.code());
+            assertNull(failure.getCause());assertEquals(0,auditCount());
+        }
+    }
+    @Test void nested_transaction_initialization_is_safe_500_and_does_not_enter_disclosure()throws Exception {
+        setupCard(TaskFactory.Type.COMPLETE_LEAD_INGRESS);
+        try(var c=database.apiConnection()) {
+            c.setAutoCommit(false);
+            var response=new CurrentWorkCardDisclosureService(protection,policies,"NESTED_READ_IT").read(c,seed.request().actor(),UUID.randomUUID(),null);
+            assertEquals(500,response.status());assertEquals("INTERNAL_ERROR",response.errorCode());
+            assertNull(response.body());assertNull(response.etag());assertEquals(0,auditCount());
+            assertFalse(c.getAutoCommit());c.rollback();
+        }
+    }
     @Test void repeat_body_and_revalidation_commit_a_fresh_exact_audit_set_with_stable_etag()throws Exception {
         setupCard(TaskFactory.Type.COMPLETE_LEAD_INGRESS);
         var service=new CurrentWorkCardDisclosureService(protection,policies,"DISCLOSURE_IT");
@@ -70,13 +118,15 @@ class CurrentWorkCardDisclosureIT extends WorkcardTestFixture {
         }
     }
     @Test void commit_succeeded_but_ack_lost_returns_safe_503_and_retry_adds_a_new_audit_set()throws Exception {
+        for(String state:List.of("08006","XX000","42P01")) {
         setupCard(TaskFactory.Type.COMPLETE_LEAD_INGRESS);
         try(var c=database.apiConnection()) {
-            var probe=new ReadConnectionProbe(c);probe.loseCommitAck=true;
+            var probe=new ReadConnectionProbe(c);probe.loseCommitAck=true;probe.commitAckSqlState=state;
             var response=new CurrentWorkCardDisclosureService(protection,policies,"ACK_TEST").read(probe.connection(),seed.request().actor(),UUID.randomUUID(),null);
             assertEquals(503,response.status());assertEquals("SERVICE_UNAVAILABLE",response.errorCode());assertNull(response.body());assertNull(response.etag());assertEquals(5,auditCount());
         }
         assertEquals(200,readCard(null).status());assertEquals(10,auditCount());
+        }
     }
     @Test void audit_subjects_and_bound_authorization_summaries_are_exact_and_read_has_no_command_side_effects()throws Exception {
         setupCard(TaskFactory.Type.ASSIGN_LEAD);UUID correlation=UUID.randomUUID();

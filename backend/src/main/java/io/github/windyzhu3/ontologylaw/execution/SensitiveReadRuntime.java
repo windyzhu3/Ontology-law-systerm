@@ -29,6 +29,7 @@ public final class SensitiveReadRuntime {
         if(actor==null)throw new Failure(401,"UNAUTHENTICATED");
         if(actor.principalKind()!=PrincipalKind.HUMAN)throw new Failure(403,"NOT_AUTHORIZED");
         Objects.requireNonNull(correlation);
+        boolean[] awaitingCommitAcknowledgement={false};
         try {
             return inTransaction(connection,Capability.QUERY,c->{
                 fence.shared(c,actor.tenantId());
@@ -47,14 +48,27 @@ public final class SensitiveReadRuntime {
                             source.disclosedSource(),source.authorizationAnchor(),source.authorization(),matched?AuditAppender.ResponseMode.CACHE_REVALIDATED:AuditAppender.ResponseMode.BODY));
                     } catch(SQLException|RuntimeException failure) {throw new Failure(503,"SERVICE_UNAVAILABLE");}
                 }
-                return new Committed(matched?304:200,matched?null:prepared.envelope(),etag);
+                var result=new Committed(matched?304:200,matched?null:prepared.envelope(),etag);
+                // Anything after this callback returns belongs to commit/connection restoration,
+                // whose outcome cannot safely authorize releasing the prepared response.
+                awaitingCommitAcknowledgement[0]=true;
+                return result;
             });
         } catch(Failure safe) {throw safe;}
-        catch(SQLException failure) {throw new Failure(503,"SERVICE_UNAVAILABLE");}
-        catch(RuntimeException failure) {
-            for(Throwable cause=failure;cause!=null;cause=cause.getCause())if(cause instanceof SQLException sql&&(sql.getSQLState()!=null&&(sql.getSQLState().startsWith("08")||Set.of("55P03","57014","40P01","40001").contains(sql.getSQLState()))))throw new Failure(503,"SERVICE_UNAVAILABLE");
-            throw new Failure(500,"INTERNAL_ERROR");
+        catch(SQLException|RuntimeException failure) {
+            if(awaitingCommitAcknowledgement[0])throw new Failure(503,"SERVICE_UNAVAILABLE");
+            throw classifyReadFailure(failure);
         }
+    }
+    private static Failure classifyReadFailure(Throwable failure) {
+        for(Throwable cause=failure;cause!=null;cause=cause.getCause()) {
+            if(cause instanceof SQLException sql) {
+                String state=sql.getSQLState();
+                if(state!=null&&(state.startsWith("08")||Set.of("55P03","57014","40P01","40001").contains(state)))
+                    return new Failure(503,"SERVICE_UNAVAILABLE");
+            }
+        }
+        return new Failure(500,"INTERNAL_ERROR");
     }
     private static String etag(Actor actor,Prepared prepared) {
         var scope=new TreeMap<String,Object>();scope.put("tenant",actor.tenantId().toString());scope.put("principal",actor.principalId().toString());scope.put("appointment",actor.appointmentId().toString());
