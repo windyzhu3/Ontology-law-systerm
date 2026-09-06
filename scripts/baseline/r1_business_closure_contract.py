@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import hashlib
+import json
 from collections import Counter
 from pathlib import Path
 
@@ -69,6 +71,27 @@ def _markdown_rows(text: str, heading: str, findings: list[str]) -> list[list[st
     return rows
 
 
+def validate_ingress_query_capability(root: Path) -> list[str]:
+    """Bind the named permission exception to its complete reviewed generated inventory."""
+    generated = root / "database/schema-contract-52-plus-2/generated"
+    expected_hash = "a4beeb91ed93be455736eafa3abb829f6a94fed3a263be5996832e458b7c4b39"
+    try:
+        manifest = json.loads((generated / "schema-contract-manifest.json").read_text(encoding="utf-8"))
+        canonical = json.dumps({k: v for k, v in manifest.items() if k != "contractSha256"}, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        if manifest.get("contractVersion") != "52-plus-2-v1.2" or manifest.get("contractSha256") != expected_hash or hashlib.sha256(canonical).hexdigest() != expected_hash:
+            raise ValueError("wrong successor manifest")
+        inventory = manifest["generatedArtifactSha256"]
+        actual_paths = {"db/migration/" + path.name for path in (generated / "db/migration").glob("*.sql")}
+        if actual_paths != set(inventory) or len(inventory) != 21:
+            raise ValueError("wrong migration inventory")
+        for relative, digest in inventory.items():
+            if hashlib.sha256((generated / relative).read_bytes()).hexdigest() != digest:
+                raise ValueError("changed migration bytes")
+    except (OSError, UnicodeError, ValueError, TypeError, KeyError, AttributeError):
+        return ["R1 ingress QUERY capability requires the exact 52-plus-2-v1.2 manifest and V001-V860 inventory"]
+    return []
+
+
 def validate(root: Path) -> list[str]:
     findings: list[str] = []
     command = _read(root, "docs/contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md", findings)
@@ -106,7 +129,8 @@ def validate(root: Path) -> list[str]:
         "Vary: Authorization",
     ):
         _require(adr, value, "ADR decision", findings)
-    _require(baseline, "Baseline ID: MVP-2026-09-06.1", "active baseline id", findings)
+    _require(baseline, "Baseline ID: MVP-2026-09-06.2", "active baseline id", findings)
+    findings.extend(validate_ingress_query_capability(root))
     try:
         document = yaml.load(api, Loader=_StrictSafeLoader)
     except yaml.YAMLError as error:

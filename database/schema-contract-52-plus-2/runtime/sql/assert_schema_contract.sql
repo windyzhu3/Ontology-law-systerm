@@ -62,8 +62,8 @@ BEGIN
     WHERE success
       AND version IS NOT NULL
       AND type = 'SQL';
-    IF actual_count <> 20 THEN
-        RAISE EXCEPTION 'assertion=20 successful migrations expected=20 actual=%', actual_count;
+    IF actual_count <> 21 THEN
+        RAISE EXCEPTION 'assertion=21 successful migrations expected=21 actual=%', actual_count;
     END IF;
     IF EXISTS (SELECT 1 FROM platform_meta.flyway_schema_history WHERE NOT success) THEN
         SELECT count(*) INTO actual_count
@@ -72,14 +72,14 @@ BEGIN
     END IF;
     SELECT max(version::integer)::text INTO actual_text
     FROM platform_meta.flyway_schema_history WHERE success;
-    IF actual_text IS DISTINCT FROM '850' THEN
-        RAISE EXCEPTION 'assertion=maximum migration version expected=850 actual=%', coalesce(actual_text, 'NULL');
+    IF actual_text IS DISTINCT FROM '860' THEN
+        RAISE EXCEPTION 'assertion=maximum migration version expected=860 actual=%', coalesce(actual_text, 'NULL');
     END IF;
     IF NOT EXISTS (
         SELECT 1 FROM platform_meta.flyway_schema_history
-        WHERE version::integer = 850 AND success
+        WHERE version::integer = 860 AND success
     ) THEN
-        RAISE EXCEPTION 'assertion=V850 successful expected=true actual=false';
+        RAISE EXCEPTION 'assertion=V860 successful expected=true actual=false';
     END IF;
 
     SELECT count(*) INTO actual_count
@@ -294,9 +294,14 @@ BEGIN
         'lead.lead',
         completion_column.column_name,
         'SELECT'
-    ) IS TRUE;
+    ) IS DISTINCT FROM (completion_column.column_name IN (
+        'ingress_completion_phone_hmac', 'ingress_completion_email_hmac',
+        'ingress_completion_phone_ciphertext', 'ingress_completion_email_ciphertext'
+    )) OR pg_catalog.has_column_privilege(
+        'law_app_query', 'lead.lead', completion_column.column_name, 'SELECT WITH GRANT OPTION'
+    );
     IF actual_count <> 0 THEN
-        RAISE EXCEPTION 'assertion=V850 query role completion SELECT expected=0 columns actual=%', actual_count;
+        RAISE EXCEPTION 'assertion=V860 query role completion SELECT expected=0 mismatches actual=%', actual_count;
     END IF;
     SELECT count(*) INTO actual_count
     FROM pg_catalog.pg_roles role_record
@@ -322,14 +327,14 @@ BEGIN
     FROM platform_meta.deployment_state
     WHERE deployment_state_key = 'PRIMARY'
       AND operating_mode = 'BLOCKED'
-      AND schema_contract_version = '52-plus-2-v1.1'
-      AND revision = 1
+      AND schema_contract_version = '52-plus-2-v1.2'
+      AND revision = 2
       AND active_release_digest = pg_catalog.decode(pg_catalog.repeat('00', 32), 'hex')
       AND active_manifest_hash = pg_catalog.decode(pg_catalog.repeat('00', 32), 'hex')
       AND pg_catalog.octet_length(active_release_digest) = 32
       AND pg_catalog.octet_length(active_manifest_hash) = 32;
     IF actual_count <> 1 THEN
-        RAISE EXCEPTION 'assertion=deployment_state PRIMARY/BLOCKED/52-plus-2-v1.1/revision=1 with 32 zero bytes expected=1 actual=%', actual_count;
+        RAISE EXCEPTION 'assertion=deployment_state PRIMARY/BLOCKED/52-plus-2-v1.2/revision=2 with 32 zero bytes expected=1 actual=%', actual_count;
     END IF;
 END;
 $schema_contract$;

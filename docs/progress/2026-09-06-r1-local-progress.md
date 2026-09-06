@@ -1,5 +1,9 @@
 # R1本地实施进度（2026-09-06）
 
+> 当前状态补充（2026-09-06，ADR-0010）：用户已确认四列QUERY能力修订，基线后继`MVP-2026-09-06.2`与`52-plus-2-v1.2`通过V860激活于本地分支。下文“待确认/未激活/V850全槽禁读”是前序时点记录，由本具名补充覆盖当前状态。当前能力单元实现及有限本地验证已通过，独立评审待完成；旧v1.1托管RUNTIME_VERIFIED仅属于旧合同。原Task 5生产消费者尚未开始，Task 6–10、业务/SPA/E2E/容量/发布状态未提升。
+
+能力实库门禁：`IngressQueryCapabilityIT` 5例＋`CapabilityRoleExecutorIT` 8例，2026-09-06T16:57:01+08:00，Maven verify exit 0（57.279秒），另14例unit/architecture。覆盖真实新库、V850九列禁读、四列读取与五列/整行/写拒绝、无GRANT OPTION、真实Lead/补全数据升级与非QUERY ACL/登录成员保持、SQLSTATE 55000故障回滚及恢复重试、Flyway validate与no-op；现有runtime SQL在真实数据库拒绝遗漏V860、旧版本、额外列授权和GRANT OPTION。最终有限回归：完整后端71 unit＋254 IT，exit 0（4分24秒）；schema 58例与generate --check，exit 0；runtime 121例（5.585秒），exit 0；baseline 243例（186.974秒），exit 0。暂存制品真实baseline CLI exit 0，输出baseline consistency PASS及6个既有范围内R2非致命阻塞；最终提交后CLI由主控复核。详细原始日志与报告保存在本地计划工作区。
+
 当前位于本地分支`codex/r1-lead-contact-vertical-slice`。本记录区分合同修复、已有组件和真实业务交付；不代表已合并、已部署或R1已验收。
 
 当前已经进入**R1 MVP业务的后端实施**，不是仍只在搭建通用基础设施，也不是前后端已打通。基础授权/事务组件及Task1–4已完成本地实现、验证和独立评审；完整基础使用闭环仍缺审计读取、HTTP安全装配、前端及E2E，完整R1业务还缺首联/复核/恢复与Worker。Task编号不代表工作量百分比。

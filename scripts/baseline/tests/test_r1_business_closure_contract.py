@@ -21,13 +21,32 @@ def validate(root: Path) -> list[str]:
 
 
 class R1BusinessClosureContractTest(unittest.TestCase):
+    def test_ingress_query_successor_rejects_missing_changed_or_relabelled_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for folder in ("docs/adr", "docs/contracts/r1", "docs/baseline", "contracts/openapi", "contracts/events", "database/schema-contract-52-plus-2/generated"):
+                shutil.copytree(ROOT / folder, root / folder)
+            manifest = root / "database/schema-contract-52-plus-2/generated/schema-contract-manifest.json"
+            migration = root / "database/schema-contract-52-plus-2/generated/db/migration/V860__lead_ingress_query_read_capability.sql"
+            original_manifest, original_sql = manifest.read_text(encoding="utf-8"), migration.read_text(encoding="utf-8")
+            # Every mutation must be caught by the capability validator, independently of other contracts.
+            for fault in ("old_version", "wrong_hash", "missing_migration", "unauthorized_grant"):
+                with self.subTest(fault=fault):
+                    manifest.write_text(original_manifest, encoding="utf-8")
+                    migration.write_text(original_sql, encoding="utf-8")
+                    if fault == "old_version": manifest.write_text(original_manifest.replace('52-plus-2-v1.2', '52-plus-2-v1.1'), encoding="utf-8")
+                    if fault == "wrong_hash": manifest.write_text(original_manifest.replace('a4beeb91ed93be455736eafa3abb829f6a94fed3a263be5996832e458b7c4b39', '0' * 64), encoding="utf-8")
+                    if fault == "missing_migration": migration.unlink()
+                    if fault == "unauthorized_grant": migration.write_text(original_sql + '\nGRANT SELECT ON lead.lead TO law_app_query;\n', encoding="utf-8")
+                    self.assertTrue(any('ingress QUERY capability' in finding for finding in validate(root)), fault)
+
     def test_current_contract_is_consistent(self):
         self.assertEqual([], validate(ROOT))
 
     def mutation(self, file, old, new):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for folder in ("docs/adr", "docs/contracts/r1", "docs/baseline", "contracts/openapi", "contracts/events"):
+            for folder in ("docs/adr", "docs/contracts/r1", "docs/baseline", "contracts/openapi", "contracts/events", "database/schema-contract-52-plus-2/generated"):
                 shutil.copytree(ROOT / folder, root / folder)
             path = root / file
             self.assertTrue(path.is_file(), f"missing active artifact: {file}")
@@ -133,7 +152,7 @@ class R1BusinessClosureContractTest(unittest.TestCase):
         self.mutation(ADR, "| CapacityProfile | R1-CAPACITY-V1 |\n", "")
 
     def test_baseline_mismatch_is_rejected(self):
-        self.mutation("docs/baseline/CURRENT-MVP-BASELINE.md", "Baseline ID: MVP-2026-09-06.1", "Baseline ID: MVP-2026-09-05.3")
+        self.mutation("docs/baseline/CURRENT-MVP-BASELINE.md", "Baseline ID: MVP-2026-09-06.2", "Baseline ID: MVP-2026-09-05.3")
 
 
 if __name__ == "__main__":

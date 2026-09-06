@@ -56,17 +56,19 @@ python3 scripts/verify_generated_sql.py
 
 `python3 generate.py` 只应在修改 `contract/` 后执行。评审应同时检查合同源和全部生成差异；已执行的迁移不得被重写，后续兼容变更必须新增向前迁移，并先通过新的架构决策解除当前冻结边界。
 
-## PostgreSQL 18 v1.1 运行时门禁
+## PostgreSQL 18能力后继与历史运行时门禁
 
-当前 `52-plus-2-v1.1` 已在 PR #5 的 Docker-capable 托管执行器中，以 PostgreSQL 18.6 与 Flyway 13.4.0 完成两次隔离空库运行、run A no-op 和五个失败关闭探针。闭合记录为 [机器摘要](../../docs/evidence/schema-runtime/2026-08-28-postgresql-18-v1.1-summary.json) 与 [审阅报告](../../docs/evidence/schema-runtime/2026-08-28-postgresql-18-v1.1-report.md)：workflow run `33590363980`、artifact `9831569892`，覆盖 V001–V850、20 个迁移、54 张受管表、13 个 Schema、207 个物理外键和53个 mutation guard。
+当前`52-plus-2-v1.2`由[ADR-0010](../../docs/adr/ADR-0010-lead-ingress-query-read-capability.md)限定为四列QUERY SELECT，无GRANT OPTION；其余五列、SELECT *及写入仍拒绝。共21迁移、最大860、部署revision 2，字段模型不变。本地验证见[进度](../../docs/progress/2026-09-06-r1-local-progress.md)；尚无v1.2托管运行时或发布验收。
 
-本地执行器没有 Docker/Compose，本地结果仍为 `BLOCKED/docker_compose_unavailable`，没有本地 PASS。v1.1 是独立的闭合证据；它不复用或扩大 ADR-0003 所治理的 v1 晋级证明。以下命令只重验 ADR-0003 的历史 `52-plus-2-v1` 持久证据对，不能作为 v1.1 report 的验证命令：
+历史 `52-plus-2-v1.1` 已在 PR #5 的 Docker-capable 托管执行器中，以 PostgreSQL 18.6 与 Flyway 13.4.0 完成两次隔离空库运行、run A no-op 和五个失败关闭探针。闭合记录为 [机器摘要](../../docs/evidence/schema-runtime/2026-08-28-postgresql-18-v1.1-summary.json) 与 [审阅报告](../../docs/evidence/schema-runtime/2026-08-28-postgresql-18-v1.1-report.md)：workflow run `33590363980`、artifact `9831569892`，覆盖 V001–V850、20 个迁移、54 张受管表、13 个 Schema、207 个物理外键和53个 mutation guard。
+
+原证据收集时本地执行器没有 Docker/Compose，记录为 `BLOCKED/docker_compose_unavailable`；后续本地环境和测试结果单独记录。v1.1 是独立的闭合证据；它不复用或扩大 ADR-0003 所治理的 v1 晋级证明。以下命令只重验 ADR-0003 的历史 `52-plus-2-v1` 持久证据对，不能作为 v1.1 report 的验证命令：
 
 ```bash
 python3 runtime/verify_runtime.py validate-promoted-evidence
 ```
 
-历史 `52-plus-2-v1` 证据仍保留在 [v1 机器摘要](../../docs/evidence/schema-runtime/2026-09-01-postgresql-18-v1-summary.json)、[v1 审阅报告](../../docs/evidence/schema-runtime/2026-09-01-postgresql-18-v1-report.md) 与 [ADR-0003](../../docs/adr/ADR-0003-hosted-runtime-evidence-promotion.md) 中。当前 v1.1 结论只覆盖数据库 V001–V850 合同与运行时门禁；不覆盖 R1 业务生产实现。
+历史 `52-plus-2-v1` 证据仍保留在 [v1 机器摘要](../../docs/evidence/schema-runtime/2026-09-01-postgresql-18-v1-summary.json)、[v1 审阅报告](../../docs/evidence/schema-runtime/2026-09-01-postgresql-18-v1-report.md) 与 [ADR-0003](../../docs/adr/ADR-0003-hosted-runtime-evidence-promotion.md) 中。历史 v1.1 结论只覆盖数据库 V001–V850 合同与运行时门禁；不覆盖 R1 业务生产实现。
 
 ## Flyway 迁移顺序
 
@@ -92,8 +94,9 @@ python3 runtime/verify_runtime.py validate-promoted-evidence
 18. `V830__application_privileges.sql`
 19. `V840__schema_contract_validation.sql`
 20. `V850__lead_ingress_completion_slot.sql`
+21. `V860__lead_ingress_query_read_capability.sql`
 
-`V840` 会在安装事务内拒绝错误表数、缺失中文注释、非白名单物理外键、越权列更新、应用角色Owner/DDL/Delete/Truncate能力和缺失 mutation guard；`V850` 仅以前向方式追加并封存 Lead ingress completion 槽。两者验证的是物理结构，不替代运行时授权或业务有效性验证。
+`V840` 会在安装事务内拒绝错误表数、缺失中文注释、非白名单物理外键、越权列更新、应用角色Owner/DDL/Delete/Truncate能力和缺失 mutation guard；`V850` 仅以前向方式追加并封存 Lead ingress completion 槽。`V860`仅增加已批准四列QUERY SELECT并原子推进合同版本。它们不替代运行时授权、披露审计或业务有效性验证。
 
 ### 角色占位符
 
@@ -128,7 +131,7 @@ flyway -configFiles=flyway.conf info
 
 1. 锁定唯一 `PRIMARY` 行并校验期望 `revision`；
 2. 写入准确应用发布摘要和部署清单摘要；
-3. 确认 `schema_contract_version = '52-plus-2-v1.1'`；
+3. 确认 `schema_contract_version = '52-plus-2-v1.2'`；
 4. 将 `revision` 精确加一并写入可信 `changed_at`；
 5. 最后把运行模式切换为 `ACTIVE`。
 

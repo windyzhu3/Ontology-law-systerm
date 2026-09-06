@@ -4,7 +4,7 @@ Contract ID: R1-COMMAND-POLICY-EVENT-V1.1
 
 Status: FROZEN
 
-Semantic baseline: MVP-2026-09-06.1
+Semantic baseline: MVP-2026-09-06.2
 
 Shared payload Schema: contracts/events/r1-domain-notification-v1.schema.json
 

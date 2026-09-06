@@ -46,7 +46,7 @@ TARGET_GATE_STATES = {
 VISUAL_BUNDLE_VERSION = "visual-bundle-2026-08-27"
 VISUAL_OWNER = "Product Design"
 VISUAL_CONFIRMATION_DATE = "2026-08-27"
-CANONICAL_BASELINE_ID = "MVP-2026-09-06.1"
+CANONICAL_BASELINE_ID = "MVP-2026-09-06.2"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 HISTORICAL_BANNER = "历史规格（HISTORICAL_SUPERSEDED）"
 HISTORICAL_WARNING = (
@@ -873,7 +873,8 @@ REQUIRED_NONVISUAL_ROWS = {
     "BASE-PR2-CLOSURE-PLAN": ("PR2", "FROZEN", "2026-08-28", "../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md"),
     "BASE-CURRENT-MVP": ("MVP", "FROZEN", HISTORICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
     "BASE-CURRENT-MVP-2026-09-05": ("MVP", "FROZEN", "MVP-2026-09-05.3", "../baseline/CURRENT-MVP-BASELINE.md"),
-    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1": ("MVP", "FROZEN", "MVP-2026-09-06.1", "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
     "R1-COMMAND-POLICY-EVENT-CONTRACT": (
         "R1", "FROZEN", "r1-command-policy-event-v1",
         "../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md",
@@ -2593,6 +2594,10 @@ def verify_delivery_ledger(root: Path, findings: list[str]) -> list[str] | None:
         return
     if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1":
         findings.append("Delivery ledger BASE-CURRENT-MVP-2026-09-05 must point to BASE-CURRENT-MVP-2026-09-05-2026-09-06.1")
+        return
+
+    if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2":
+        findings.append("Delivery ledger previous baseline must point to BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2")
         return
 
     visual_row_ids = {row_id for row_id in rows_by_id if row_id.startswith("VIS-")}

@@ -1,5 +1,7 @@
 # R1 Business Closure Implementation Plan
 
+> 2026-09-06具名supersession：[ADR-0010](../../adr/ADR-0010-lead-ingress-query-read-capability.md)与[有限能力计划](2026-09-06-r1-ingress-query-capability-plan.md)是原Task 5之前的独立门禁，仅允许V860四列QUERY SELECT及v1.2活动合同同步。历史步骤不重写；物理合同禁止修改条款只对此具名例外豁免。原Task 5消费者须在门禁评审后继续，原Task 8生产readiness组装仍待实施。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 实现并验证 R1 接入、七类责任卡、首联、等待恢复、Worker 与单 SPA 闭环，逐项满足已批准规格。

@@ -98,6 +98,7 @@ Run from schema directory: `python generate.py`, then `python generate.py --chec
 Locked Python image: `python@sha256:581429e3df12d76e6af4be5ab7d0e7fc2013eb57dc23d2de691411c8efdbb970`; mount this worktree at `/work`, install `scripts/baseline/requirements.txt` (PyYAML 6.0.3), run:
 
 ```sh
+export PYTHONPATH=/work/database/schema-contract-52-plus-2
 python -m unittest discover -s database/schema-contract-52-plus-2/tests -v
 python -m unittest discover -s database/schema-contract-52-plus-2/runtime/tests -v
 python -m unittest discover -s scripts/baseline/tests -v
@@ -105,7 +106,7 @@ python database/schema-contract-52-plus-2/generate.py --check
 python scripts/baseline/verify_baseline.py
 ```
 
-For real verifier only, mount the actual common Git directory read-only and pass Linux GIT_DIR/GIT_COMMON_DIR/GIT_WORK_TREE overrides. Do not pass these variables to unit suites that create temporary repositories. Use current PowerShell 7; do not launch a legacy powershell.exe script that misdecodes the Chinese common Git path. PostgreSQL image comes from repository `runtime/toolchain.lock.json`.
+For real verifier only, mount the actual common Git directory read-only and pass Linux GIT_DIR/GIT_COMMON_DIR/GIT_WORK_TREE overrides. Do not pass these variables to unit suites that create temporary repositories. Hosted-evidence fixture suites also read source Git history: resolve the exact source gitfile through read-only container mount routing or a container-owned source clone, without changing host gitfiles; hydrate a specifically missing partial-clone object using host Git when necessary. Use current PowerShell 7; do not launch a legacy powershell.exe script that misdecodes the Chinese common Git path. PostgreSQL image comes from repository `runtime/toolchain.lock.json`.
 
 - [ ] **Step 7: Self-review and commit the complete unit.** Compare historical migration/OpenAPI/event hashes; confirm no business production files changed. Commit all approved source/generated/contracts/tests together with `feat: add bounded ingress query read capability`. Write report with RED/GREEN, current-vs-historical evidence, remaining Task 5 obligations and exact changed file list. Independent reviewer receives the full original BASE..HEAD diff and approves both spec and quality before original Task 5 resumes.
 

@@ -63,6 +63,10 @@ public abstract class PostgresIntegrationTest {
         private Database(PostgreSQLContainer postgres) { this.postgres = postgres; }
 
         public static Database start() throws Exception {
+            return start(null);
+        }
+
+        public static Database start(String target) throws Exception {
             var container = new PostgreSQLContainer(DockerImageName.parse(lockedPostgresImage())
                     .asCompatibleSubstituteFor("postgres"))
                     .withDatabaseName("law_contract_runtime").withUsername("postgres")
@@ -70,7 +74,7 @@ public abstract class PostgresIntegrationTest {
             var database = new Database(container);
             try {
                 container.start();
-                database.initialize();
+                database.initialize(target);
                 return database;
             } catch (Exception | Error failure) {
                 container.close();
@@ -78,7 +82,7 @@ public abstract class PostgresIntegrationTest {
             }
         }
 
-        private void initialize() throws Exception {
+        private void initialize(String target) throws Exception {
             try (var connection = adminConnection(); var sql = connection.createStatement()) {
                 sql.execute("CREATE ROLE law_schema_migrator LOGIN NOINHERIT PASSWORD '" + migratorPassword + "'");
                 sql.execute("ALTER DATABASE law_contract_runtime OWNER TO law_schema_migrator");
@@ -86,24 +90,31 @@ public abstract class PostgresIntegrationTest {
                     sql.execute("CREATE ROLE " + role + " NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE");
                 }
             }
-            var flyway = Flyway.configure().dataSource(postgres.getJdbcUrl(), "law_schema_migrator", migratorPassword)
+            var flyway = migrations(target);
+            flyway.migrate();
+            flyway.validate();
+            long migrations = java.util.Arrays.stream(flyway.info().applied())
+                    .filter(migration -> migration.getVersion() != null).count();
+            long expected = target == null ? 21 : 20;
+            if (migrations != expected) throw new IllegalStateException("Expected " + expected + " migrations, got " + migrations);
+            try (var connection = adminConnection(); var sql = connection.createStatement()) {
+                sql.execute(Files.readString(repositoryRoot().resolve("backend/src/test/resources/db/bootstrap-runtime-logins.sql")));
+                sql.execute("ALTER ROLE law_api_login PASSWORD '" + apiPassword + "'");
+                sql.execute("ALTER ROLE law_worker_login PASSWORD '" + workerPassword + "'");
+            }
+        }
+
+        public Flyway migrations(String target) {
+            var configuration = Flyway.configure().dataSource(postgres.getJdbcUrl(), "law_schema_migrator", migratorPassword)
                     .defaultSchema("platform_meta")
                     .schemas("identity", "audit", "responsibility", "execution", "external_action", "evidence", "party",
                             "lead", "opportunity", "conflict", "contract", "transfer", "platform_meta")
                     .locations("filesystem:" + repositoryRoot().resolve("database/schema-contract-52-plus-2/generated/db/migration"))
                     .placeholders(Map.of("app_command_role", "law_app_command", "app_query_role", "law_app_query",
                             "audit_append_role", "law_audit_append", "app_worker_role", "law_app_worker"))
-                    .cleanDisabled(true).baselineOnMigrate(false).validateMigrationNaming(true).load();
-            flyway.migrate();
-            flyway.validate();
-            long migrations = java.util.Arrays.stream(flyway.info().applied())
-                    .filter(migration -> migration.getVersion() != null).count();
-            if (migrations != 20) throw new IllegalStateException("Expected 20 migrations, got " + migrations);
-            try (var connection = adminConnection(); var sql = connection.createStatement()) {
-                sql.execute(Files.readString(repositoryRoot().resolve("backend/src/test/resources/db/bootstrap-runtime-logins.sql")));
-                sql.execute("ALTER ROLE law_api_login PASSWORD '" + apiPassword + "'");
-                sql.execute("ALTER ROLE law_worker_login PASSWORD '" + workerPassword + "'");
-            }
+                    .cleanDisabled(true).baselineOnMigrate(false).validateMigrationNaming(true);
+            if (target != null) configuration.target(target);
+            return configuration.load();
         }
 
         public Connection apiConnection() throws SQLException { return connect("law_api_login", apiPassword); }

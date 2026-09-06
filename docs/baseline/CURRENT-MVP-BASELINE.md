@@ -1,8 +1,8 @@
 # 当前MVP基线
 
-Baseline ID: MVP-2026-09-06.1
+Baseline ID: MVP-2026-09-06.2
 
-Previous Baseline ID `MVP-2026-09-05.3` and older merge evidence remain historical. [ADR-0009](../adr/ADR-0009-p0-duplicate-automatic-assignment.md) activates Task contract `R1-TASK-COMPLETION-V1.1`: P0-01 permits only the bounded automatic successor Assignment pointer in one combined Lead CAS, preserving revision +1 and the resolution-only Decision digest/completion/Event source. ADR-0008's command-policy v1.1, HTTP v1.1, Workbench v1.1, OpenAPI 1.1.0, SERVICE capture, audited CurrentCard revalidation, due discovery and projection acknowledgement remain active. Event schema/physical versions and operation shapes remain unchanged; no production Handler or R1 business status is advanced.
+Previous Baseline IDs `MVP-2026-09-06.1`, `MVP-2026-09-05.3` and older merge evidence remain historical. [ADR-0009](../adr/ADR-0009-p0-duplicate-automatic-assignment.md) activates Task contract `R1-TASK-COMPLETION-V1.1`: P0-01 permits only the bounded automatic successor Assignment pointer in one combined Lead CAS, preserving revision +1 and the resolution-only Decision digest/completion/Event source. ADR-0008's command-policy v1.1, HTTP v1.1, Workbench v1.1, OpenAPI 1.1.0, SERVICE capture, audited CurrentCard revalidation, due discovery and projection acknowledgement remain active. Event schema and operation shapes remain unchanged; [ADR-0010](../adr/ADR-0010-lead-ingress-query-read-capability.md) separately activates only the four-column QUERY SELECT successor `52-plus-2-v1.2`; no production Handler or R1 business status is advanced.
 
 状态：`FROZEN`
 
@@ -10,13 +10,15 @@ Previous Baseline ID `MVP-2026-09-05.3` and older merge evidence remain historic
 
 R1实施合同确认日期：2026-09-02
 
-当前数据库合同版本：`52-plus-2-v1.1`（静态合同与真实PostgreSQL 18 v1.1运行证据均已保持独立可定位）
-当前52＋2合同摘要：`0c04d48ddae6891b53fdacabdba34d1124e757b070a4c9018597e4e0a4674301`
+当前数据库合同版本：`52-plus-2-v1.2`（追加V860四列QUERY读取；21迁移、最大860、部署revision 2；本地门禁见进度记录，旧v1.1托管证据仅证明旧合同）
+当前52＋2合同摘要：`a4beeb91ed93be455736eafa3abb829f6a94fed3a263be5996832e458b7c4b39`
 字段合同摘要：`f4c17c4c0a8697820b30adb61b8cdb209666a4672393d4f8fc9d73a5f169addf`
 
 本文件是当前销售MVP唯一人工阅读入口和语义总纲。未在本基线明确保留的历史语义不得自动复活；任何未决事项只能通过新的ADR和新的基线版本处理。[ADR-0001](../adr/ADR-0001-pr2-runtime-gate-order.md)冻结PR #2合并与后续PostgreSQL运行时门禁的执行顺序。
 
 ## authority-order
+
+[ADR-0010](../adr/ADR-0010-lead-ingress-query-read-capability.md)与第5项同层；仅对QUERY读取补全phone/email各自HMAC及密文四列、v1.2能力版本作具名supersession。其余五列、整表SELECT和写权限仍禁止，业务披露审计不因数据库授权而豁免。
 
 [ADR-0008](../adr/ADR-0008-r1-business-closure-alignment.md)和[ADR-0009](../adr/ADR-0009-p0-duplicate-automatic-assignment.md)与下列第5项同层，按各自显式局部supersession解释；ADR-0009仅覆盖P0-01自动后继指针及CAS评估时序，不覆盖其余冻结约束。
 

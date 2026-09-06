@@ -308,6 +308,7 @@ _LEGACY_V1_CONTRACT_SHA256 = "a9c53d0126b7997e0aac511d3a4baf1da02a5f10d829ca5113
 _LEGACY_V1_FIELD_CONTRACT_SHA256 = "be79d991fa9e13e3f0af1c682333b6a063201387b78f7c9ec32a03bad51096ed"
 _CURRENT_V1_1_CONTRACT_SHA256 = "0c04d48ddae6891b53fdacabdba34d1124e757b070a4c9018597e4e0a4674301"
 _CURRENT_V1_1_FIELD_CONTRACT_SHA256 = "f4c17c4c0a8697820b30adb61b8cdb209666a4672393d4f8fc9d73a5f169addf"
+_CURRENT_V1_2_CONTRACT_SHA256 = "a4beeb91ed93be455736eafa3abb829f6a94fed3a263be5996832e458b7c4b39"
 _RUNTIME_CONTRACT_PROFILES = {
     "52-plus-2-v1": {
         "contractRevision": 0,
@@ -319,8 +320,13 @@ _RUNTIME_CONTRACT_PROFILES = {
         "maximumMigrationVersion": 850,
         "migrationCount": 20,
     },
+    "52-plus-2-v1.2": {
+        "contractRevision": 2,
+        "maximumMigrationVersion": 860,
+        "migrationCount": 21,
+    },
 }
-_CI_SCHEMA_VERSION = "postgresql-runtime-ci-artifact-v1.1"
+_CI_SCHEMA_VERSION = "postgresql-runtime-ci-artifact-v1.2"
 _CI_CONTRACT_PROFILES = {
     "postgresql-runtime-ci-artifact-v1": {
         "migrationCount": 19,
@@ -331,13 +337,22 @@ _CI_CONTRACT_PROFILES = {
         "contractSha256": _LEGACY_V1_CONTRACT_SHA256,
         "fieldContractSha256": _LEGACY_V1_FIELD_CONTRACT_SHA256,
     },
-    _CI_SCHEMA_VERSION: {
+    "postgresql-runtime-ci-artifact-v1.1": {
         "migrationCount": 20,
         "managedTableCount": 54,
         "managedSchemaCount": 13,
         "physicalForeignKeyCount": 207,
         "mutationGuardCount": 53,
         "contractSha256": _CURRENT_V1_1_CONTRACT_SHA256,
+        "fieldContractSha256": _CURRENT_V1_1_FIELD_CONTRACT_SHA256,
+    },
+    _CI_SCHEMA_VERSION: {
+        "migrationCount": 21,
+        "managedTableCount": 54,
+        "managedSchemaCount": 13,
+        "physicalForeignKeyCount": 207,
+        "mutationGuardCount": 53,
+        "contractSha256": _CURRENT_V1_2_CONTRACT_SHA256,
         "fieldContractSha256": _CURRENT_V1_1_FIELD_CONTRACT_SHA256,
     },
 }
@@ -508,10 +523,10 @@ _VERIFIER_ASSERTION_DIAGNOSTICS = {
     "52 application tables": ("schema", "verifier_schema_application_table_count"),
     "2 platform_meta tables": ("schema", "verifier_schema_platform_meta_table_set"),
     "public schema table count": ("schema", "verifier_schema_public_table_count"),
-    "20 successful migrations": ("schema", "verifier_schema_migration_count"),
+    "21 successful migrations": ("schema", "verifier_schema_migration_count"),
     "all migrations successful": ("schema", "verifier_schema_migration_success"),
     "maximum migration version": ("schema", "verifier_schema_max_migration_version"),
-    "V850 successful": ("schema", "verifier_schema_v850_success"),
+    "V860 successful": ("schema", "verifier_schema_v860_success"),
     "207 composite foreign keys": ("schema", "verifier_schema_foreign_key_count"),
     "application foreign keys NO ACTION": ("schema", "verifier_schema_foreign_key_actions"),
     "validated MATCH SIMPLE foreign keys": ("schema", "verifier_schema_foreign_key_validation"),
@@ -536,9 +551,9 @@ _VERIFIER_ASSERTION_DIAGNOSTICS = {
         "schema",
         "verifier_schema_v850_guard_capability_execute",
     ),
-    "V850 query role completion SELECT": (
+    "V860 query role completion SELECT": (
         "schema",
-        "verifier_schema_v850_query_completion_select",
+        "verifier_schema_v860_query_completion_select",
     ),
     "53 mutation guards": ("schema", "verifier_schema_mutation_guard_count"),
     "four distinct capability roles": ("schema", "verifier_schema_capability_role_count"),
@@ -548,7 +563,7 @@ _VERIFIER_ASSERTION_DIAGNOSTICS = {
         "schema",
         "verifier_schema_capability_migrator_isolation",
     ),
-    "deployment_state PRIMARY/BLOCKED/52-plus-2-v1.1/revision=1 with 32 zero bytes": (
+    "deployment_state PRIMARY/BLOCKED/52-plus-2-v1.2/revision=2 with 32 zero bytes": (
         "schema",
         "verifier_schema_deployment_state_seed",
     ),
@@ -561,6 +576,13 @@ _VERIFIER_ASSERTION_DIAGNOSTICS = {
         "capability",
         "verifier_capability_deployment_revision_guard",
     ),
+    "query ingress source code": ("capability", "verifier_capability_query_ingress_source_code"),
+    "query ingress source summary": ("capability", "verifier_capability_query_ingress_source_summary"),
+    "query ingress appointment": ("capability", "verifier_capability_query_ingress_appointment"),
+    "query ingress completion time": ("capability", "verifier_capability_query_ingress_time"),
+    "query ingress digest": ("capability", "verifier_capability_query_ingress_digest"),
+    "query whole Lead read": ("capability", "verifier_capability_query_whole_lead"),
+    "query role TRUNCATE": ("capability", "verifier_capability_query_truncate"),
     "query role INSERT": ("capability", "verifier_capability_query_insert"),
     "query role UPDATE": ("capability", "verifier_capability_query_update"),
     "query role DELETE": ("capability", "verifier_capability_query_delete"),
@@ -679,6 +701,9 @@ _VERIFIER_ASSERTION_MESSAGE_PATTERN = re.compile(
 )
 _VERIFIER_DIAGNOSTIC_CODES = frozenset(
     {
+        # Historical v1.1 failure artifacts retain their original closed diagnostic IDs.
+        "verifier_schema_v850_success",
+        "verifier_schema_v850_query_completion_select",
         *(code for _, code in _VERIFIER_ASSERTION_DIAGNOSTICS.values()),
         *(code for _, code in _VERIFIER_PHASE_DIAGNOSTICS.values()),
         *_VERIFIER_FINGERPRINT_SQLSTATE_DIAGNOSTICS.values(),
@@ -2409,11 +2434,18 @@ def _ci_unverified_contract_summary() -> dict[str, object]:
 
 
 def _ci_verified_contract_summary(manifest: Mapping[str, object]) -> dict[str, object]:
+    # Bind the entire manifest, including the ordered migration inventory, to the
+    # reviewed current contract; an old/missing/changed migration cannot be relabelled.
+    content = {key: value for key, value in manifest.items() if key != "contractSha256"}
+    canonical = json.dumps(content, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    if (manifest.get("contractSha256") != _CURRENT_V1_2_CONTRACT_SHA256
+            or hashlib.sha256(canonical).hexdigest() != _CURRENT_V1_2_CONTRACT_SHA256):
+        raise ValueError("CI current manifest hash or migration inventory differs from the approved contract")
     schemas = manifest.get("schemas")
     foreign_keys = manifest.get("physicalForeignKeyWhitelist")
     candidate = {
         "verified": True,
-        "migrationCount": 20,
+        "migrationCount": 21,
         "managedTableCount": manifest.get("physicalTableCountAfterFlywayBootstrap"),
         "managedSchemaCount": len(schemas) if isinstance(schemas, list) else None,
         "physicalForeignKeyCount": len(foreign_keys) if isinstance(foreign_keys, list) else None,
@@ -2422,10 +2454,10 @@ def _ci_verified_contract_summary(manifest: Mapping[str, object]) -> dict[str, o
         "fieldContractSha256": manifest.get("fieldContractSha256"),
     }
     if (
-        manifest.get("contractVersion") != "52-plus-2-v1.1"
+        manifest.get("contractVersion") != "52-plus-2-v1.2"
         or manifest.get("applicationTableCount") != 52
     ):
-        raise ValueError("CI contract manifest is outside the current 52-plus-2-v1.1 boundary")
+        raise ValueError("CI contract manifest is outside the current 52-plus-2-v1.2 boundary")
     return candidate
 
 
@@ -2555,7 +2587,7 @@ def _validate_ci_controller_verifier(
         raise ValueError(f"{context} summary did not pass")
     _validate_runtime_contract_facts(
         summary,
-        expected_contract_version="52-plus-2-v1.1",
+        expected_contract_version="52-plus-2-v1.2",
     )
     return summary
 
@@ -5255,13 +5287,13 @@ def main(
                 manifest_path,
                 "read_contract_manifest",
             )
-            if manifest.get("contractVersion") == "52-plus-2-v1.1":
+            if manifest.get("contractVersion") == "52-plus-2-v1.2":
                 current_summary = validate_ci_runtime_artifact(ci_output_directory)
                 if (
                     current_summary["workflowOutcome"] != "PASSED"
                     or current_summary["gitCommit"] != before_snapshot.head
                 ):
-                    raise ValueError("current v1.1 CI artifact does not bind the successful checkout")
+                    raise ValueError("current v1.2 CI artifact does not bind the successful checkout")
                 targets = (
                     ci_output_directory / _CI_SUMMARY_NAME,
                     ci_output_directory / _CI_MARKDOWN_NAME,

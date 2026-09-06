@@ -49,6 +49,9 @@ class R1CommandContractTest(unittest.TestCase):
         with temporary:
             self.assertEqual(self.validator()(root), [])
 
+    def test_stale_semantic_baseline_cannot_relabel_current_command_contract(self) -> None:
+        self.assert_contract_mutation_fails("Semantic baseline: MVP-2026-09-06.2", "Semantic baseline: MVP-2026-09-06.1")
+
     def test_capture_policy_cannot_be_removed(self) -> None:
         self.assert_contract_mutation_fails(
             "| CAPTURE_LEAD | INTERNAL_ADMIN | HUMAN | DIRECT,DELEGATED | "

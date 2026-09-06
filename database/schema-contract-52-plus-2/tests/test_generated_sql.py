@@ -1,11 +1,46 @@
 import re
+import hashlib
 import json
 import tempfile
 import unittest
 from pathlib import Path
 
+# Independent pre-amendment byte fixture, captured at b019cff59c83be739d676a41591877ecaa1708df.
+HISTORICAL_MIGRATION_SHA256 = {
+    "db/migration/V001__bootstrap_schemas.sql": "5f0b866c7f9f4adcfc1e658053859b068b88cca6f476f376deec50f283c816e7",
+    "db/migration/V002__deployment_state.sql": "66fee9505dc4f5a0e9d4d180d0979867e00321af57c37c76376fbe49df635833",
+    "db/migration/V010__identity_tables.sql": "7d8de2e97a8cb20ce7242262989b4648d03baddb49cf5d5c21b91ddf5a3bd222",
+    "db/migration/V020__audit_tables.sql": "921cb77c29279ebe21be27db29f3843858bb3b980b345010efec18e5c4619d27",
+    "db/migration/V030__responsibility_tables.sql": "81656311fabaa2cd591ea25365bda5e7f95af30d0d08776ff66004ef6b7f3cb7",
+    "db/migration/V040__execution_tables.sql": "408f0c066aabec3e9b8c45765c1723464db894dee1e290708bd3732638abe67d",
+    "db/migration/V050__external_action_tables.sql": "bf9b80bfa3825856eb738a4c8b78491bccdc825436a4769b41e6c2d590ff0f23",
+    "db/migration/V060__evidence_tables.sql": "a42a5cc0f09274e3ab7e34192324de94ee0344bdbd7906d1efbfefc5792e31fa",
+    "db/migration/V070__party_tables.sql": "56716e2b519629f2d7311c8dd58609462b9dce444adbf998146851553a15e75f",
+    "db/migration/V080__lead_tables.sql": "5e096ecbb6a72f0a25fe380edbb80ce3fb7024c93d0d360c7841eac84e1198b8",
+    "db/migration/V090__opportunity_tables.sql": "b33f5a6abaebc387249b534acb10f8569da808adaa673543a409ae23bf51bc9a",
+    "db/migration/V100__conflict_tables.sql": "91810fee670d380e31582400441e4985f3ec0056441d546dec4a35389741d22e",
+    "db/migration/V110__contract_tables.sql": "8badb97821333736aea2dfff16a7fc95de9d5df9136d4f0064052bc4626c23b4",
+    "db/migration/V120__transfer_tables.sql": "9ee22813c4e71312f94a0762084989a5e0aea9a78ae47168a677e762bd325128",
+    "db/migration/V800__cross_domain_foreign_keys.sql": "6e4d2b23c33179e03b801cf17a5b83be3709be55d0047cde9e8c48cad4a14cde",
+    "db/migration/V810__update_guards.sql": "bc95f1b0a80924848162388f9e9162d8a628091e93c5112579bd33f7ebeab0b7",
+    "db/migration/V820__indexes.sql": "1c6968f012d5085fae5fcb0dbcee17cd9225034b9c81e8ef9de717d96e5f820f",
+    "db/migration/V830__application_privileges.sql": "4292e7294b40211b3d141cf7b0b1d5c1e09582056bf27b9c3bde39bacb34e821",
+    "db/migration/V840__schema_contract_validation.sql": "0919a6047fdb94879aa2fce18ce3df8d22eaf2de5d27f9cbb26f04c27dd2b2ad",
+    "db/migration/V850__lead_ingress_completion_slot.sql": "6f784b95ae823bf5d97ef742d5494396911828c9ddc88ff07d35a6bc816e488b"
+}
+
 
 class GeneratedSqlTest(unittest.TestCase):
+    def test_successor_appends_v860_without_rewriting_any_historical_migration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.render(root)
+            actual = {str(p.relative_to(root)).replace('\\', '/'): hashlib.sha256(p.read_bytes()).hexdigest()
+                      for p in (root / 'db/migration').glob('*.sql')}
+            self.assertEqual(set(HISTORICAL_MIGRATION_SHA256) | {'db/migration/V860__lead_ingress_query_read_capability.sql'}, set(actual))
+            for name, digest in HISTORICAL_MIGRATION_SHA256.items():
+                self.assertEqual(digest, actual[name], name)
+
     def render(self, root: Path):
         from contract.render import generate_all
         generate_all(root)
@@ -359,8 +394,8 @@ class GeneratedSqlTest(unittest.TestCase):
             self.render(root)
             manifest = json.loads((root / "schema-contract-manifest.json").read_text(encoding="utf-8"))
             self.assertRegex(manifest["contractSha256"], r"^[0-9a-f]{64}$")
-            self.assertEqual("52-plus-2-v1.1", manifest["contractVersion"])
-            self.assertEqual(20, len(manifest["generatedArtifactSha256"]))
+            self.assertEqual("52-plus-2-v1.2", manifest["contractVersion"])
+            self.assertEqual(21, len(manifest["generatedArtifactSha256"]))
             for digest in manifest["generatedArtifactSha256"].values():
                 self.assertRegex(digest, r"^[0-9a-f]{64}$")
             self.assertEqual(52, manifest["applicationTableCount"])
@@ -408,6 +443,7 @@ class GeneratedSqlTest(unittest.TestCase):
                 "V830__application_privileges.sql",
                 "V840__schema_contract_validation.sql",
                 "V850__lead_ingress_completion_slot.sql",
+                "V860__lead_ingress_query_read_capability.sql",
             ], names)
 
 

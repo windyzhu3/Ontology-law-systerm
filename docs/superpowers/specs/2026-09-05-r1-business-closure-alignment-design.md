@@ -1,5 +1,7 @@
 # R1 基础功能闭环与原始设计对齐规格
 
+> 2026-09-06具名supersession：[ADR-0010](../../adr/ADR-0010-lead-ingress-query-read-capability.md)和[批准能力规格](2026-09-06-r1-ingress-query-capability-design.md)仅豁免四列补全phone/email密文及HMAC的QUERY SELECT与`52-plus-2-v1.2`/V860后继；其余物理合同限制不变。先完成能力修订接受项1–3及独立评审，再继续原Task 5的匹配、解密和七卡审计披露；Task 6–10不因本修订获得授权。
+
 日期：2026-09-05。状态：APPROVED（用户已明确确认本书面规格，授权进入详细计划及实施）。
 
 基准提交：`3250636d98fe8abab24e83d9c66ec6d1dd42bc73`。

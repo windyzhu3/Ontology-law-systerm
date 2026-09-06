@@ -435,8 +435,8 @@ class RuntimeHarnessTests(unittest.TestCase):
                 self.assertEqual(diagnostic_map[label][0], expected_phase)
 
         sql_labels = set().union(*labels_by_script.values())
-        self.assertEqual(expect_call_count, 23)
-        self.assertEqual(len(sql_labels), 53)
+        self.assertEqual(expect_call_count, 30)
+        self.assertEqual(len(sql_labels), 60)
         self.assertEqual(set(diagnostic_map), sql_labels)
 
     def _successful_runtime_stage(
@@ -463,11 +463,11 @@ class RuntimeHarnessTests(unittest.TestCase):
         elif "logs" in command and command[-1] == "verifier":
             stdout = json.dumps(
                 {
-                    "contractRevision": 1,
-                    "contractVersion": "52-plus-2-v1.1",
+                    "contractRevision": 2,
+                    "contractVersion": "52-plus-2-v1.2",
                     "fingerprint": "0123456789abcdef0123456789abcdef",
-                    "maximumMigrationVersion": 850,
-                    "migrationCount": 20,
+                    "maximumMigrationVersion": 860,
+                    "migrationCount": 21,
                     "postgresVersion": (
                         "PostgreSQL 18.0 (Debian 18.0-1.pgdg13+3) on x86_64-pc-linux-gnu, "
                         "compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit"
@@ -583,10 +583,10 @@ class RuntimeHarnessTests(unittest.TestCase):
             ("assert_schema_contract.sql", "52 application tables", "verifier_schema_application_table_count"),
             ("assert_schema_contract.sql", "2 platform_meta tables", "verifier_schema_platform_meta_table_set"),
             ("assert_schema_contract.sql", "public schema table count", "verifier_schema_public_table_count"),
-            ("assert_schema_contract.sql", "20 successful migrations", "verifier_schema_migration_count"),
+            ("assert_schema_contract.sql", "21 successful migrations", "verifier_schema_migration_count"),
             ("assert_schema_contract.sql", "all migrations successful", "verifier_schema_migration_success"),
             ("assert_schema_contract.sql", "maximum migration version", "verifier_schema_max_migration_version"),
-            ("assert_schema_contract.sql", "V850 successful", "verifier_schema_v850_success"),
+            ("assert_schema_contract.sql", "V860 successful", "verifier_schema_v860_success"),
             ("assert_schema_contract.sql", "207 composite foreign keys", "verifier_schema_foreign_key_count"),
             ("assert_schema_contract.sql", "application foreign keys NO ACTION", "verifier_schema_foreign_key_actions"),
             ("assert_schema_contract.sql", "validated MATCH SIMPLE foreign keys", "verifier_schema_foreign_key_validation"),
@@ -596,16 +596,23 @@ class RuntimeHarnessTests(unittest.TestCase):
             ("assert_schema_contract.sql", "V850 ingress completion slot trigger", "verifier_schema_v850_slot_trigger"),
             ("assert_schema_contract.sql", "V850 ingress completion guard PUBLIC EXECUTE", "verifier_schema_v850_guard_public_execute"),
             ("assert_schema_contract.sql", "V850 ingress completion guard capability EXECUTE", "verifier_schema_v850_guard_capability_execute"),
-            ("assert_schema_contract.sql", "V850 query role completion SELECT", "verifier_schema_v850_query_completion_select"),
+            ("assert_schema_contract.sql", "V860 query role completion SELECT", "verifier_schema_v860_query_completion_select"),
             ("assert_schema_contract.sql", "53 mutation guards", "verifier_schema_mutation_guard_count"),
             ("assert_schema_contract.sql", "four distinct capability roles", "verifier_schema_capability_role_count"),
             ("assert_schema_contract.sql", "capability roles NOLOGIN", "verifier_schema_capability_roles_nologin"),
             ("assert_schema_contract.sql", "capability parent role memberships", "verifier_schema_capability_parent_membership"),
             ("assert_schema_contract.sql", "capability roles cannot obtain migration owner", "verifier_schema_capability_migrator_isolation"),
-            ("assert_schema_contract.sql", "deployment_state PRIMARY/BLOCKED/52-plus-2-v1.1/revision=1 with 32 zero bytes", "verifier_schema_deployment_state_seed"),
+            ("assert_schema_contract.sql", "deployment_state PRIMARY/BLOCKED/52-plus-2-v1.2/revision=2 with 32 zero bytes", "verifier_schema_deployment_state_seed"),
             ("assert_capabilities.sql", "cross-tenant organization parent", "verifier_capability_cross_tenant_parent"),
             ("assert_capabilities.sql", "deployment no-op update", "verifier_capability_deployment_noop_guard"),
             ("assert_capabilities.sql", "deployment revision must increment exactly once", "verifier_capability_deployment_revision_guard"),
+            ("assert_capabilities.sql", "query ingress source code", "verifier_capability_query_ingress_source_code"),
+            ("assert_capabilities.sql", "query ingress source summary", "verifier_capability_query_ingress_source_summary"),
+            ("assert_capabilities.sql", "query ingress appointment", "verifier_capability_query_ingress_appointment"),
+            ("assert_capabilities.sql", "query ingress completion time", "verifier_capability_query_ingress_time"),
+            ("assert_capabilities.sql", "query ingress digest", "verifier_capability_query_ingress_digest"),
+            ("assert_capabilities.sql", "query whole Lead read", "verifier_capability_query_whole_lead"),
+            ("assert_capabilities.sql", "query role TRUNCATE", "verifier_capability_query_truncate"),
             ("assert_capabilities.sql", "query role INSERT", "verifier_capability_query_insert"),
             ("assert_capabilities.sql", "query role UPDATE", "verifier_capability_query_update"),
             ("assert_capabilities.sql", "query role DELETE", "verifier_capability_query_delete"),
@@ -955,6 +962,8 @@ class RuntimeHarnessTests(unittest.TestCase):
             *FINGERPRINT_SQLSTATE_DIAGNOSTICS.values(),
             FINGERPRINT_SQLSTATE_UNMAPPED_DIAGNOSTIC,
             *PARSER_STATE_DIAGNOSTIC_CODES,
+            "verifier_schema_v850_success",
+            "verifier_schema_v850_query_completion_select",
             "verifier_diagnostic_unknown",
             "verifier_logs_unavailable",
         ]
@@ -1973,7 +1982,7 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
             "52 application tables",
             "2 platform_meta tables",
             "public schema table count",
-            "20 successful migrations",
+            "21 successful migrations",
             "maximum migration version",
             "207 composite foreign keys",
             "53 mutation guards",
@@ -1985,14 +1994,14 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
             "parent role memberships",
             "PRIMARY",
             "BLOCKED",
-            "52-plus-2-v1.1",
-            "revision=1",
+            "52-plus-2-v1.2",
+            "revision=2",
             "32 zero bytes",
         ):
             with self.subTest(literal=literal):
                 self.assertIn(literal, schema_contract)
         self.assertIn("platform_meta.flyway_schema_history", schema_contract)
-        self.assertIn("version::integer = 850", schema_contract)
+        self.assertIn("version::integer = 860", schema_contract)
         self.assertIn("RAISE EXCEPTION", schema_contract)
         self.assertIn("expected=", schema_contract)
         self.assertIn("actual=", schema_contract)
@@ -2017,8 +2026,8 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
         ):
             self.assertIn(f"'{runtime_fact}'", fingerprint)
 
-    def test_successful_migration_count_includes_only_twenty_versioned_sql_migrations(self) -> None:
-        """Break caught: Flyway SCHEMA or BASELINE markers inflate the 20-migration count."""
+    def test_successful_migration_count_includes_only_twenty_one_versioned_sql_migrations(self) -> None:
+        """Break caught: Flyway SCHEMA or BASELINE markers inflate the 21-migration count."""
         schema_contract = (PROJECT_ROOT / "runtime" / "sql" / "assert_schema_contract.sql").read_text(
             encoding="utf-8"
         )
@@ -2031,7 +2040,7 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
         self.assertIsNotNone(count_query, "the runtime contract must count Flyway history rows")
         predicate = count_query.group("predicate")
 
-        rows = [(f"{version:03d}", "SQL", 1) for version in range(1, 21)]
+        rows = [(f"{version:03d}", "SQL", 1) for version in range(1, 22)]
         rows.extend(
             [
                 (None, "SCHEMA", 1),
@@ -2053,7 +2062,7 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
                 f"SELECT count(*) FROM platform_meta.flyway_schema_history WHERE {predicate}"
             ).fetchone()[0]
 
-        self.assertEqual(actual_count, 20)
+        self.assertEqual(actual_count, 21)
 
     def test_function_privilege_probe_binds_the_name_and_oid_overload(self) -> None:
         """Break caught: a text role name leaves has_function_privilege unresolved on PostgreSQL 18."""
@@ -2080,8 +2089,8 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
         self.assertNotIn("${", schema_contract)
         self.assertIn("'law_app_query'", schema_contract)
 
-    def test_v1_1_manifest_cannot_overwrite_fixed_v1_publication(self) -> None:
-        """Break caught: a v1.1 runtime result is published to the durable fixed v1 evidence pair."""
+    def test_v1_2_manifest_cannot_overwrite_fixed_v1_publication(self) -> None:
+        """Break caught: a v1.2 runtime result is published to the durable fixed v1 evidence pair."""
         from runtime import verify_runtime
 
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -2100,7 +2109,7 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
                 encoding="utf-8"
             )
         )
-        self.assertEqual(manifest["contractVersion"], "52-plus-2-v1.1")
+        self.assertEqual(manifest["contractVersion"], "52-plus-2-v1.2")
 
         with self.assertRaisesRegex(ValueError, "v1|legacy|publication"):
             verify_runtime.normalize_runtime_result_for_publication(

@@ -74,6 +74,16 @@ SELECT pg_temp.expect_sqlstate(
 
 SET LOCAL ROLE law_app_query;
 SELECT 1 FROM lead.lead LIMIT 0;
+SELECT ingress_completion_phone_hmac, ingress_completion_email_hmac,
+       ingress_completion_phone_ciphertext, ingress_completion_email_ciphertext
+FROM lead.lead WHERE false;
+SELECT pg_temp.expect_sqlstate('42501', 'SELECT ingress_completion_source_code FROM lead.lead WHERE false', 'query ingress source code');
+SELECT pg_temp.expect_sqlstate('42501', 'SELECT ingress_completion_source_summary_ciphertext FROM lead.lead WHERE false', 'query ingress source summary');
+SELECT pg_temp.expect_sqlstate('42501', 'SELECT ingress_completed_by_appointment_id FROM lead.lead WHERE false', 'query ingress appointment');
+SELECT pg_temp.expect_sqlstate('42501', 'SELECT ingress_completed_at FROM lead.lead WHERE false', 'query ingress completion time');
+SELECT pg_temp.expect_sqlstate('42501', 'SELECT ingress_completion_digest FROM lead.lead WHERE false', 'query ingress digest');
+SELECT pg_temp.expect_sqlstate('42501', 'SELECT * FROM lead.lead WHERE false', 'query whole Lead read');
+SELECT pg_temp.expect_sqlstate('42501', 'TRUNCATE lead.lead', 'query role TRUNCATE');
 SELECT pg_temp.expect_sqlstate('42501', 'INSERT INTO lead.lead (tenant_id) SELECT NULL::uuid WHERE false', 'query role INSERT');
 SELECT pg_temp.expect_sqlstate('42501', 'UPDATE lead.lead SET revision = revision + 1 WHERE false', 'query role UPDATE');
 SELECT pg_temp.expect_sqlstate('42501', 'DELETE FROM lead.lead WHERE false', 'query role DELETE');

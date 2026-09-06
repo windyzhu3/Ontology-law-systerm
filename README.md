@@ -2,7 +2,7 @@
 
 > 以准确业务事实驱动责任：**一张卡、一个 Owner、一个主命令、一个明确结果**。当一张卡无法维持这一约束时，拆分责任或后置能力，不增加通用流程结构。
 
-本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。[当前最新基线](docs/baseline/CURRENT-MVP-BASELINE.md)已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同、V850 前向迁移及 PostgreSQL 18 v1.1 运行时证据。R1 的 A/B（脚手架、OpenAPI）、C0 合同修正及 C 数据库基础设施已合并；D 的 CommandRuntime、实时授权与审计基础设施及实库测试已通过 PR #12 合并（`ae88e63257699715dc3ee0c139563f5bfafdb2b7`）。MVP-2026-09-05.2 的合同收口与可复用运行时机制随后通过[功能 PR #14](https://github.com/windyzhu3/Ontology-law-systerm/pull/14)合并，最终功能合并提交为`037b3f9f547493153c2edaffabdd53904c752e64`；准确 head/tree、PR test-merge 及 exact-head 托管 CI 绑定见[分层验收记录](docs/progress/2026-09-05-r1-contract-closure-acceptance.md)。
+本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。[当前最新基线](docs/baseline/CURRENT-MVP-BASELINE.md)已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同、V860 四列QUERY读取能力后继及独立保留的 PostgreSQL 18 v1.1 历史运行时证据。R1 的 A/B（脚手架、OpenAPI）、C0 合同修正及 C 数据库基础设施已合并；D 的 CommandRuntime、实时授权与审计基础设施及实库测试已通过 PR #12 合并（`ae88e63257699715dc3ee0c139563f5bfafdb2b7`）。MVP-2026-09-05.2 的合同收口与可复用运行时机制随后通过[功能 PR #14](https://github.com/windyzhu3/Ontology-law-systerm/pull/14)合并，最终功能合并提交为`037b3f9f547493153c2edaffabdd53904c752e64`；准确 head/tree、PR test-merge 及 exact-head 托管 CI 绑定见[分层验收记录](docs/progress/2026-09-05-r1-contract-closure-acceptance.md)。
 
 该功能合并冻结了capture、draft、两类recovery的命令专属授权和完整R1成功事件集合，补齐`OpportunityOpened`的Schema/Owner Outbox映射，把`CONNECTED_VALID`校正为2 Event/2 Outbox，并将可复用授权与精确事件校验接入真实Owner facts及CommandRuntime。它仍不包含生产业务Handler/Controller，不交付业务SPA或浏览器E2E；ADM-01～07仍只是视觉设计和身份数据原语、尚不可操作，R2/R3也未交付。下一业务工作仍是原计划Task 5；完整R1后端、SPA和浏览器E2E业务门禁仍未满足。
 
@@ -19,7 +19,7 @@
 - [52＋2 Schema 合同说明](database/schema-contract-52-plus-2/README.md)
 - [完整字段合同](database/schema-contract-52-plus-2/generated/field-contract.md)
 - [机器可读合同清单](database/schema-contract-52-plus-2/generated/schema-contract-manifest.json)
-- [20 个 Flyway 迁移（以V850为链尾）](database/schema-contract-52-plus-2/generated/db/migration/V850__lead_ingress_completion_slot.sql)
+- [21 个 Flyway 迁移（以V860为链尾）](database/schema-contract-52-plus-2/generated/db/migration/V860__lead_ingress_query_read_capability.sql)
 - [运行时提交前重验合同](database/schema-contract-52-plus-2/docs/runtime-validation-contract.md)
 - [验证记录](database/schema-contract-52-plus-2/VERIFICATION.md)
 - [身份与组织管理MVP高保真基线](docs/design/identity-admin-mvp/README.md)
@@ -164,9 +164,9 @@ python3 -m unittest discover -s tests -v
 python3 scripts/verify_generated_sql.py
 ```
 
-当前数据库运行时证据口径为 `52-plus-2-v1.1`：20 个迁移、54 张受管表、13 个 Schema、207 个物理外键和53个 mutation guard，来自 PR #5 的 PostgreSQL 18 两次隔离空库运行。静态合同与生成物摘要、以及 v1 历史验证记录均保留在[验证报告](database/schema-contract-52-plus-2/VERIFICATION.md)中。
+当前能力合同为`52-plus-2-v1.2`（21迁移、最大860、部署revision 2）；本地验证与独立评审见[进度记录](docs/progress/2026-09-06-r1-local-progress.md)。历史托管数据库运行时证据口径为 `52-plus-2-v1.1`：20 个迁移、54 张受管表、13 个 Schema、207 个物理外键和53个 mutation guard，来自 PR #5 的 PostgreSQL 18 两次隔离空库运行。静态合同与生成物摘要、以及 v1 历史验证记录均保留在[验证报告](database/schema-contract-52-plus-2/VERIFICATION.md)中。
 
-当前开发环境可提供Docker；已冻结的v1.1正式证据仍来自PR #5 PostgreSQL 18执行器，后续本地实库检查不能替代受控发布门禁证据。受控发布仍须在专用 PostgreSQL 18 数据库以固定 Flyway 版本执行 `migrate` → strict `validate` → `info`，并确认应用制品摘要与 `52-plus-2-v1.1` manifest 匹配后，才可将`deployment_state`从`BLOCKED` CAS 切换为`ACTIVE`。
+当前开发环境可提供Docker；已冻结的v1.1正式证据仍来自PR #5 PostgreSQL 18执行器，后续本地实库检查不能替代受控发布门禁证据。受控发布仍须在专用 PostgreSQL 18 数据库以固定 Flyway 版本执行 `migrate` → strict `validate` → `info`，并确认应用制品摘要与当前 `52-plus-2-v1.2` 完整manifest匹配后，才可将`deployment_state`从`BLOCKED` CAS 切换为`ACTIVE`。
 
 ## 8. 历史规格阅读顺序
 
