@@ -194,6 +194,66 @@ class R1ContactEvidenceContractTest(unittest.TestCase):
                     )
                 )
 
+    def test_registry_parser_enforces_fence_indentation(self):
+        """Break caught: an over-indented fence opener or closer is treated as Markdown syntax."""
+        indentations = (
+            ("zero", "", True),
+            ("one", " ", True),
+            ("two", "  ", True),
+            ("three", "   ", True),
+            ("four", "    ", False),
+            ("tab", "\t", False),
+        )
+        for name, indentation, is_fence in indentations:
+            with (
+                self.subTest(position="opening", indentation=name),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                root = Path(directory)
+                self.copy_active_contract(root)
+                command = root / COMMAND
+                text = command.read_text(encoding="utf-8")
+                start = text.index("## R1 contact ordinal registry")
+                prefix, registries = text[:start], text[start:]
+                command.write_text(
+                    prefix + indentation + "````markdown\n" + registries + "\n````\n",
+                    encoding="utf-8",
+                )
+                findings = validate(root)
+                if is_fence:
+                    self.assertTrue(
+                        any("must have exactly one active heading" in finding for finding in findings)
+                    )
+                else:
+                    self.assertEqual([], findings)
+
+            with (
+                self.subTest(position="closing", indentation=name),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                root = Path(directory)
+                self.copy_active_contract(root)
+                command = root / COMMAND
+                text = command.read_text(encoding="utf-8")
+                start = text.index("## R1 contact ordinal registry")
+                prefix, registries = text[:start], text[start:]
+                command.write_text(
+                    prefix
+                    + "````markdown\n"
+                    + indentation
+                    + "````\n"
+                    + registries
+                    + ("" if is_fence else "\n````\n"),
+                    encoding="utf-8",
+                )
+                findings = validate(root)
+                if is_fence:
+                    self.assertEqual([], findings)
+                else:
+                    self.assertTrue(
+                        any("must have exactly one active heading" in finding for finding in findings)
+                    )
+
     def test_required_artifacts_and_versions_are_enforced(self):
         """Break caught: missing authority or a stale active version is accepted."""
         cases = (
@@ -280,6 +340,36 @@ class R1ContactEvidenceContractTest(unittest.TestCase):
                 text = command.read_text(encoding="utf-8")
                 start = text.index("## R1 contact ordinal registry")
                 command.write_text(text[:start] + wrap(text[start:]), encoding="utf-8")
+                self.assertTrue(
+                    any(
+                        "R1 contact ordinal registry registry must have exactly one active heading"
+                        in finding
+                        for finding in verify_repository(root)
+                    )
+                )
+
+    def test_integrated_repository_verifier_rejects_overindented_false_closers(self):
+        """Break caught: total verification accepts a registry exposed by a false fence close."""
+        from scripts.baseline.tests.test_verify_baseline import VerifyBaselineTest
+        from scripts.baseline.verify_baseline import verify_repository
+
+        for name, indentation in (("four-spaces", "    "), ("tab", "\t")):
+            with self.subTest(indentation=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                VerifyBaselineTest().create_valid_repository(root)
+                self.assertEqual([], verify_repository(root))
+                command = root / COMMAND
+                text = command.read_text(encoding="utf-8")
+                start = text.index("## R1 contact ordinal registry")
+                command.write_text(
+                    text[:start]
+                    + "````markdown\n"
+                    + indentation
+                    + "````\n"
+                    + text[start:]
+                    + "\n````\n",
+                    encoding="utf-8",
+                )
                 self.assertTrue(
                     any(
                         "R1 contact ordinal registry registry must have exactly one active heading"

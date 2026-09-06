@@ -63,11 +63,13 @@ def _without_fenced_code(text: str) -> list[str]:
     fence_length = 0
     in_html_comment = False
     for source_line in text.splitlines():
-        stripped = source_line.lstrip()
+        indentation = len(source_line) - len(source_line.lstrip(" "))
+        stripped = source_line[indentation:]
         if fence_character is not None:
             closing_length = len(stripped) - len(stripped.lstrip(fence_character))
             if (
-                closing_length >= fence_length
+                indentation <= 3
+                and closing_length >= fence_length
                 and not stripped[closing_length:].strip()
             ):
                 fence_character = None
@@ -94,8 +96,11 @@ def _without_fenced_code(text: str) -> list[str]:
             cursor = comment_start + 4
 
         line = "".join(fragments)
-        stripped = line.lstrip()
-        if stripped.startswith("```") or stripped.startswith("~~~"):
+        indentation = len(line) - len(line.lstrip(" "))
+        stripped = line[indentation:]
+        if indentation <= 3 and (
+            stripped.startswith("```") or stripped.startswith("~~~")
+        ):
             fence_character = stripped[0]
             fence_length = len(stripped) - len(stripped.lstrip(fence_character))
             continue
