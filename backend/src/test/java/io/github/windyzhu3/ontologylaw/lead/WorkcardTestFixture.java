@@ -20,9 +20,12 @@ public abstract class WorkcardTestFixture extends PostgresIntegrationTest {
     protected R1SourcePolicyRegistry policies=new R1SourcePolicyRegistry(Map.of("FIXTURE",new R1SourcePolicyRegistry.SourcePolicy(
         R1SourcePolicyRegistry.AssignmentMode.MANUAL,List.of("ROOT"),"ROOT","ROOT","Asia/Shanghai")));
     protected void setupCard(TaskFactory.Type type)throws Exception {
+        setupCard(type,null);
+    }
+    protected void setupCard(TaskFactory.Type type,Instant createdAt)throws Exception {
         seed=AuthorizationServiceIT.seed(database,"HUMAN",type.authority);
         try(var c=database.apiConnection()){inTransaction(c,Capability.COMMAND,x->{
-            var leads=LeadIngressService.databaseBacked(protection);var tasks=TaskFactory.databaseBacked();var now=leads.now(x);
+            var leads=LeadIngressService.databaseBacked(protection);var tasks=TaskFactory.databaseBacked();var now=createdAt==null?leads.now(x):createdAt;
             var lead=leads.capture(x,seed.tenant(),input(type!=TaskFactory.Type.COMPLETE_LEAD_INGRESS),CanonicalJson.digest(UUID.randomUUID().toString()),now);
             if(type==TaskFactory.Type.RESOLVE_LEAD_DUPLICATE) {
                 var candidate=leads.capture(x,seed.tenant(),input(true),CanonicalJson.digest(UUID.randomUUID().toString()),now.minusSeconds(1));

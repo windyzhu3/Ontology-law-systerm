@@ -21,11 +21,11 @@ import org.springframework.modulith.core.ApplicationModules;
 class ArchitectureTest {
     private static final String ROOT = "io.github.windyzhu3.ontologylaw";
     private static final Set<String> DOMAIN_MODULES = Set.of(
-            "audit", "execution", "identity", "lead", "opportunity", "party", "query", "responsibility");
+            "audit", "evidence", "execution", "identity", "lead", "opportunity", "party", "query", "responsibility");
     private static final Set<String> OWNER_MODULES = Set.of(
-            "audit", "execution", "identity", "lead", "opportunity", "party", "responsibility");
+            "audit", "evidence", "execution", "identity", "lead", "opportunity", "party", "responsibility");
     private static final Set<String> ALLOWED_TOP_LEVEL_PACKAGES = Set.of(
-            "api", "audit", "bootstrap", "execution", "identity",
+            "api", "audit", "bootstrap", "evidence", "execution", "identity",
             "lead", "opportunity", "party", "query", "responsibility", "worker");
     private static final Map<String, Set<String>> ALLOWED_MODULE_DEPENDENCIES = Map.ofEntries(
             Map.entry("root", Set.of("bootstrap")),
@@ -33,12 +33,13 @@ class ArchitectureTest {
             Map.entry("identity", Set.of()),
             Map.entry("party", Set.of()),
             Map.entry("audit", Set.of("identity")),
+            Map.entry("evidence", Set.of("identity")),
             Map.entry("opportunity", Set.of("identity", "audit")),
             Map.entry("execution", Set.of("identity", "audit")),
             Map.entry("responsibility", Set.of("identity", "audit", "execution")),
-            Map.entry("lead", Set.of("identity", "audit", "execution", "responsibility", "opportunity", "party")),
+            Map.entry("lead", Set.of("identity", "audit", "execution", "responsibility", "opportunity", "party", "evidence")),
             Map.entry("query", Set.of("identity", "responsibility", "lead", "opportunity")),
-            Map.entry("api", Set.of("identity", "audit", "execution", "responsibility", "lead", "opportunity", "party", "query")),
+            Map.entry("api", Set.of("identity", "audit", "execution", "responsibility", "lead", "opportunity", "party", "query", "evidence")),
             Map.entry("worker", Set.of("execution")));
 
     private final JavaClasses productionClasses = new ClassFileImporter()

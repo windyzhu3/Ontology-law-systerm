@@ -107,7 +107,7 @@ public final class R1EventPolicy {
             }
             case RECORD_CONTACT_RESULT -> {
                 completed(task,beforeTask,e,receipt);var contact=facts.contact(c,tenant,receipt.id());
-                require(contact!=null && receipt.equals(contact.selector()) && contact.taskId().equals(task.selector().id()) && contact.leadId().equals(task.lead().id()) && contact.contactNo()>=1 && contact.contactNo()<=3);
+                require(contact!=null && receipt.equals(contact.selector()) && contact.taskId().equals(task.selector().id()) && contact.leadId().equals(task.lead().id()) && contact.contactNo()>=1 && contact.contactNo()<=9007199254740991L);
                 var assignment=facts.assignment(c,tenant,contact.assignmentId());
                 require(assignment!=null && assignment.leadId().equals(contact.leadId()) && assignment.owner().equals(task.owner()));
                 require(context.scope().canonical().equals(CommandScope.task(tenant,e.type(),task.selector().id(),task.lead(),Map.of("leadAssignmentId",assignment.selector().id(),"leadAssignmentRevision",assignment.selector().revision())).canonical()));
@@ -122,7 +122,7 @@ public final class R1EventPolicy {
                     expectedSources.put(OpportunityOpened,opportunity.selector());
                 } else {
                     require(opportunity==null);
-                    if("NOT_CONNECTED".equals(outcome))outcome=contact.contactNo()==3?"NOT_CONNECTED_EXHAUSTED":"NOT_CONNECTED_RETRY";
+                    if("NOT_CONNECTED".equals(outcome))outcome=contact.contactNo()>=3?"NOT_CONNECTED_EXHAUSTED":"NOT_CONNECTED_RETRY";
                 }
             }
             default -> {
@@ -136,6 +136,11 @@ public final class R1EventPolicy {
                     default -> throw violation();
                 };
                 require(contract.equals(decision.contract()));outcome=decision.code();
+                if(e.type()==CommandEnvelope.Type.REVIEW_LEAD_VALIDITY){
+                    var trigger=facts.reviewTrigger(c,tenant,task.selector().id());
+                    require(trigger!=null&&e.payload() instanceof Map<?,?>);
+                    var payload=(Map<?,?>)e.payload();require(trigger.id().toString().equals(payload.get("triggeringContactResultId"))&&trigger.hash().equals(payload.get("triggeringContactResultHash")));
+                }
             }
         }
         String branchOutcome=outcome;

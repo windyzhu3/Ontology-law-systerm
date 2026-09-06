@@ -21,7 +21,7 @@ public interface AuditAppender {
             Objects.requireNonNull(authorizationAnchor);Objects.requireNonNull(authorization);Objects.requireNonNull(responseMode);
             if(!authorization.allowed()||!authorizationAnchor.equals(authorization.request().subject()))throw new IllegalArgumentException("Authorized anchor required");
             Set<String> anchors=switch(disclosedSource.type()) {
-                case "lead.lead","party.party","lead.lead_assignment","responsibility.task_occurrence","responsibility.decision_record" -> Set.of(disclosedSource.type());
+                case "lead.lead","party.party","lead.lead_assignment","responsibility.task_occurrence","responsibility.decision_record","evidence.evidence_submission","evidence.evidence_binding" -> Set.of(disclosedSource.type());
                 case "responsibility.action_draft" -> Set.of("responsibility.task_occurrence");
                 case "lead.lead_contact_result" -> Set.of("lead.lead");
                 case "identity.appointment","identity.principal","identity.organization_unit" -> Set.of("responsibility.task_occurrence","lead.lead");

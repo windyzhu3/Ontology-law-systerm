@@ -30,6 +30,14 @@ public final class JooqR1EventFacts implements R1EventFacts {
         if(r==null)return null;
         return new Contact(contactSelector(tenant,id,r),r.get(f.LEAD_ID),r.get(f.LEAD_ASSIGNMENT_ID),r.get(f.CONTACT_TASK_ID),r.get(f.CONTACT_NO),r.get(f.RESULT_CODE));
     }
+    public Subject reviewTrigger(Connection c,UUID tenant,UUID reviewTaskId)throws SQLException{
+        var task=io.github.windyzhu3.ontologylaw.responsibility.CurrentTaskReader.databaseBacked().read(c,tenant,reviewTaskId);
+        if(task==null||task.type()!=io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.REVIEW_LEAD_VALIDITY)return null;
+        var result=io.github.windyzhu3.ontologylaw.lead.ContactCausality.trigger(c,tenant,task.lead().id(),task.createdAt(),(connection,t,id)->{
+            var f=LEAD_CONTACT_RESULT;var r=DSL.using(connection,SQLDialect.POSTGRES).selectFrom(f).where(f.TENANT_ID.eq(t)).and(f.LEAD_CONTACT_RESULT_ID.eq(id)).fetchOne();
+            return r==null?null:new io.github.windyzhu3.ontologylaw.lead.CurrentLeadReader.ContactResult(contactSelector(t,id,r),r.get(f.LEAD_ID),r.get(f.LEAD_ASSIGNMENT_ID),r.get(f.CONTACT_TASK_ID),r.get(f.CONTACT_NO),r.get(f.CONTACT_CHANNEL_CODE),r.get(f.RESULT_CODE),r.get(f.RESULT_SUMMARY),r.get(f.EVIDENCE_SUBMISSION_ID),r.get(f.RESULTED_AT).toInstant());
+        });return result==null?null:result.selector();
+    }
     static Subject contactSelector(UUID tenant,UUID id,org.jooq.Record r) {
         var f=LEAD_CONTACT_RESULT;
         var fields=new TreeMap<String,Object>();

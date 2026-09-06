@@ -19,13 +19,28 @@ public final class JooqTaskRepository implements TaskFactory {
             r.get(t.COMPLETION_FACT_TYPE)==null?null:new Subject(r.get(t.COMPLETION_FACT_TYPE),r.get(t.COMPLETION_FACT_ID),r.get(t.COMPLETION_FACT_REVISION),base64(r.get(t.COMPLETION_FACT_HASH))));
     }
     public void lock(Connection c,UUID tenant,UUID id){var t=TASK_OCCURRENCE;db(c).select(t.TASK_OCCURRENCE_ID).from(t).where(t.TENANT_ID.eq(tenant)).and(t.TASK_OCCURRENCE_ID.eq(id)).forUpdate().fetch();}
+    public Instant now(Connection c){return db(c).select(DSL.field("clock_timestamp()",OffsetDateTime.class)).fetchOne(0,OffsetDateTime.class).toInstant();}
+    public Task reopen(Connection c,UUID tenant,Task task)throws SQLException{
+        var t=TASK_OCCURRENCE;long revision=CommandHandler.nextRevision(task.selector().revision());
+        int changed=db(c).update(t).set(t.STATE,"OPEN").set(t.REVISION,revision)
+            .where(t.TENANT_ID.eq(tenant)).and(t.TASK_OCCURRENCE_ID.eq(task.selector().id())).and(t.REVISION.eq(task.selector().revision())).and(t.STATE.eq("WAITING")).execute();
+        if(changed!=1)throw new CommandHandler.Rejected("VALIDATION_FAILED");
+        return read(c,tenant,task.selector().id());
+    }
     public List<Task> activeForLead(Connection c,UUID tenant,Subject lead){var t=TASK_OCCURRENCE;return db(c).select(t.TASK_OCCURRENCE_ID).from(t).where(t.TENANT_ID.eq(tenant)).and(t.SUBJECT_TYPE.eq(lead.type())).and(t.SUBJECT_ID.eq(lead.id())).and(t.SUBJECT_REVISION.eq(lead.revision())).and(t.STATE.in("OPEN","WAITING")).fetch(t.TASK_OCCURRENCE_ID).stream().map(id->read(c,tenant,id)).toList();}
     public Task create(Connection c,UUID tenant,Type type,UUID owner,Subject lead,ZoneId zone,Instant now){
+        return create(c,tenant,type,owner,lead,zone,now,now);
+    }
+    public Task createContactRetry(Connection c,UUID tenant,UUID owner,Subject lead,ZoneId zone,Instant now,Instant resume){
+        if(!resume.isAfter(now))throw new IllegalArgumentException("Future retry required");
+        return create(c,tenant,Type.CONTACT_LEAD,owner,lead,zone,now,resume);
+    }
+    private Task create(Connection c,UUID tenant,Type type,UUID owner,Subject lead,ZoneId zone,Instant now,Instant slaOrigin){
         if(!"lead.lead".equals(lead.type())||lead.revision()==null)throw new IllegalArgumentException("Exact Lead required");
         var t=TASK_OCCURRENCE;UUID id=id(c);
         db(c).insertInto(t).set(t.TENANT_ID,tenant).set(t.TASK_OCCURRENCE_ID,id).set(t.OWNER_APPOINTMENT_ID,owner)
             .set(t.BUSINESS_PURPOSE_CODE,type.name()).set(t.PRIMARY_COMMAND_CODE,type.command).set(t.EXPECTED_COMPLETION_FACT_TYPE,type.completionType)
-            .set(t.ORIGINAL_SLA_CODE,type.slaCode()).set(t.ORIGINAL_SLA_SECONDS,type.slaSeconds()).set(t.ORIGINAL_SLA_DUE_AT,time(R1BusinessTime.due(now,type.slaSeconds(),zone)))
+            .set(t.ORIGINAL_SLA_CODE,type.slaCode()).set(t.ORIGINAL_SLA_SECONDS,type.slaSeconds()).set(t.ORIGINAL_SLA_DUE_AT,time(R1BusinessTime.due(slaOrigin,type.slaSeconds(),zone)))
             .set(t.STATE,"OPEN").set(t.CREATED_AT,time(now)).set(t.REVISION,0L).set(t.SUBJECT_TYPE,lead.type()).set(t.SUBJECT_ID,lead.id()).set(t.SUBJECT_REVISION,lead.revision()).execute();
         return read(c,tenant,id);
     }
@@ -52,11 +67,13 @@ public final class JooqTaskRepository implements TaskFactory {
             case RESOLVE_LEAD_DUPLICATE -> "LEAD_DUPLICATE_RESOLUTION";
             case RESOLVE_LEAD_ROUTING_GAP -> "LEAD_ROUTING_DISPOSITION";
             case ACK_SOURCE_INTAKE_STOP_REQUEST -> "SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED";
+            case REVIEW_LEAD_VALIDITY -> "LEAD_VALIDITY_REVIEW";
             default -> throw new IllegalArgumentException("Task has no Task3 Decision contract");
         };
         Set<String> codes=switch(task.type()) {
             case RESOLVE_LEAD_DUPLICATE -> Set.of("LINK_EXISTING_PARTY","KEEP_SEPARATE");
             case RESOLVE_LEAD_ROUTING_GAP -> Set.of("SCHEDULE_ROUTING_REVIEW","RETRY_ASSIGNMENT_NOW","REQUEST_SOURCE_INTAKE_STOP");
+            case REVIEW_LEAD_VALIDITY -> Set.of("CONFIRM_INVALID","CLOSE_UNREACHED","REOPEN_CONTACT");
             default -> Set.of(expectedContract);
         };
         if(!expectedContract.equals(contract)||!codes.contains(code)||rationale==null||rationale.isBlank())throw new IllegalArgumentException("Unregistered Decision");
@@ -79,10 +96,14 @@ public final class JooqTaskRepository implements TaskFactory {
             var causal=new Subject("responsibility.decision_record",UUID.fromString((String)values.get("causalDecisionId")),null,(String)values.get("causalDecisionHash"));
             expected.put("causalDecisionId",causal.id().toString());expected.put("causalDecisionHash",causal.hash());
         }
+        if(task.type()==Type.REVIEW_LEAD_VALIDITY){
+            var causal=new Subject("lead.lead_contact_result",UUID.fromString((String)values.get("triggeringContactResultId")),null,(String)values.get("triggeringContactResultHash"));
+            expected.put("triggeringContactResultId",causal.id().toString());expected.put("triggeringContactResultHash",causal.hash());
+        }
         if(!expected.equals(values))throw new IllegalArgumentException("Wrong Decision digest coverage");
     }
     public Subject waitUntil(Connection c,UUID tenant,Task task,UUID actor,Instant due,Instant now)throws SQLException{
-        if(task.type()!=Type.RESOLVE_LEAD_ROUTING_GAP||!due.isAfter(now))throw new IllegalArgumentException("Routing wait required");
+        if(task.type()!=Type.RESOLVE_LEAD_ROUTING_GAP&&task.type()!=Type.CONTACT_LEAD||!due.isAfter(now))throw new IllegalArgumentException("R1 timed wait required");
         var t=TASK_OCCURRENCE;long revision=CommandHandler.nextRevision(task.selector().revision());
         int changed=db(c).update(t).set(t.STATE,"WAITING").set(t.REVISION,revision).where(t.TENANT_ID.eq(tenant)).and(t.TASK_OCCURRENCE_ID.eq(task.selector().id()))
             .and(t.STATE.eq("OPEN")).and(t.REVISION.eq(task.selector().revision())).execute();
@@ -90,7 +111,7 @@ public final class JooqTaskRepository implements TaskFactory {
         var w=WAIT_RECEIPT;
         int sequence=db(c).select(DSL.coalesce(DSL.max(w.WAIT_SEQUENCE),0)).from(w).where(w.TENANT_ID.eq(tenant)).and(w.TASK_OCCURRENCE_ID.eq(task.selector().id())).fetchOne(0,Integer.class)+1;
         db(c).insertInto(w).set(w.TENANT_ID,tenant).set(w.WAIT_RECEIPT_ID,id(c)).set(w.TASK_OCCURRENCE_ID,task.selector().id()).set(w.TASK_REVISION,revision).set(w.WAIT_SEQUENCE,sequence)
-            .set(w.WAIT_REASON_CODE,"ROUTING_REVIEW_WINDOW").set(w.WAIT_CONTRACT_CODE,"R1_ROUTING_REVIEW_WAIT_V1").set(w.WAIT_CONTRACT_VERSION,1)
+            .set(w.WAIT_REASON_CODE,task.type()==Type.CONTACT_LEAD?"CONTACT_RETRY":"ROUTING_REVIEW_WINDOW").set(w.WAIT_CONTRACT_CODE,task.type()==Type.CONTACT_LEAD?"CONTACT_RETRY_V1":"R1_ROUTING_REVIEW_WAIT_V1").set(w.WAIT_CONTRACT_VERSION,1)
             .set(w.ENTERED_WAITING_AT,time(now)).set(w.RESUME_DUE_AT,time(due)).set(w.RECORDED_BY_APPOINTMENT_ID,actor).execute();
         return new JooqEventResponsibilityReader().latestWait(c,tenant,task.selector().id()).selector();
     }

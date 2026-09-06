@@ -5,6 +5,7 @@ import io.github.windyzhu3.ontologylaw.identity.AuthorizationService.*;
 import io.github.windyzhu3.ontologylaw.lead.*;
 import io.github.windyzhu3.ontologylaw.responsibility.*;
 import io.github.windyzhu3.ontologylaw.execution.*;
+import io.github.windyzhu3.ontologylaw.evidence.EvidenceReferenceReader;
 import io.github.windyzhu3.ontologylaw.query.CurrentWorkCardQuery;
 import java.sql.*;
 import java.time.Instant;
@@ -62,6 +63,7 @@ final class CurrentWorkCardSources {
             var entry=chosenBindings.get(source);if(entry==null)entry=bindings.get(source);
             if(entry==null)throw new IllegalArgumentException("Missing actual source authorization");entries.add(entry);
         }
+        for(var entry:chosenBindings.values())if(entry.disclosedSource().type().startsWith("evidence."))entries.add(entry);
         return new SensitiveReadRuntime.Prepared(projection.envelope().values(),new DisclosurePlan(entries,dependencies));
     }
     private CurrentWorkCardQuery.CardData card(Connection c,Actor actor,CurrentTaskReader.Task task,WorkcardOwnerReader.Owner owner,
@@ -108,13 +110,7 @@ final class CurrentWorkCardSources {
                 if(contact==null||!contact.selector().equals(lead.selector())||contact.phone()==null&&contact.email()==null)return null;
             }
             case REVIEW_LEAD_VALIDITY -> {
-                for(var sourceTask:tasks.completedContactTasks(c,tenant,lead.selector().id())) {
-                    var candidate=leads.contactResult(c,tenant,sourceTask.completion().id());
-                    if(candidate==null||!candidate.selector().equals(sourceTask.completion())||!candidate.taskId().equals(sourceTask.selector().id())
-                        ||!candidate.leadId().equals(lead.selector().id())||candidate.resultedAt().isAfter(task.createdAt())
-                        ||!("SUSPECT_INVALID".equals(candidate.resultCode())||"NOT_CONNECTED".equals(candidate.resultCode())&&candidate.contactNo()==3))continue;
-                    if(result==null||candidate.resultedAt().isAfter(result.resultedAt())||candidate.resultedAt().equals(result.resultedAt())&&CurrentWorkCardQuery.compareUuid(candidate.selector().id(),result.selector().id())>0)result=candidate;
-                }
+                result=ContactCausality.trigger(c,tenant,lead.selector().id(),task.createdAt(),leads);
                 if(result==null||!bind(c,actor,result.selector(),lead.selector(),scope,task.type(),entries))return null;
             }
             case COMPLETE_LEAD_INGRESS,RESOLVE_LEAD_ROUTING_GAP -> { }
@@ -128,6 +124,16 @@ final class CurrentWorkCardSources {
             if(!bind(c,actor,draft.selector(),task.selector(),scope,task.type(),entries))return null;
             // An old Draft may contain a now-hidden selector; it is ineligible until refreshed through the authorized write path.
             var v=draft.values();
+            if(task.type()==TaskFactory.Type.CONTACT_LEAD&&v.containsKey("evidenceSubmissionId")){
+                if(!selector.equals(task.lead()))return null;
+                var path=entries.get(task.selector()).authorization().request();
+                var qualified=EvidenceReferenceReader.databaseBacked().qualify(c,path,task.selector(),task.lead(),UUID.fromString((String)v.get("evidenceSubmissionId")));
+                if(qualified==null)return null;
+                dependencies.addAll(qualified.authorization());
+                for(var snapshot:qualified.authorization().subList(2,4)){
+                    var subject=snapshot.request().subject();entries.put(subject,new DisclosurePlan.Entry(subject,subject,snapshot));
+                }
+            }
             if(duplicate!=null&&(!duplicate.lead().id().toString().equals(v.get("candidateLeadId"))||!duplicate.lead().revision().equals(v.get("candidateLeadRevision"))
                 ||!duplicate.party().id().toString().equals(v.get("partyId"))||!duplicate.party().revision().equals(v.get("partyRevision"))))return null;
             if(assignment!=null&&(!assignment.selector().id().toString().equals(v.get("leadAssignmentId"))||!assignment.selector().revision().equals(v.get("leadAssignmentRevision"))))return null;

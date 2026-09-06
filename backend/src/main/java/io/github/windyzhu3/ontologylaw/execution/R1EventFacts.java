@@ -19,6 +19,7 @@ public interface R1EventFacts {
     Subject capturedLead(Connection c, UUID tenant, String account, String digest) throws SQLException;
     Task task(Connection c, UUID tenant, UUID id) throws SQLException;
     Contact contact(Connection c, UUID tenant, UUID id) throws SQLException;
+    Subject reviewTrigger(Connection c,UUID tenant,UUID reviewTaskId)throws SQLException;
     boolean contactExistsForTask(Connection c, UUID tenant, UUID taskId) throws SQLException;
     Assignment assignment(Connection c, UUID tenant, UUID id) throws SQLException;
     Opportunity opportunityForContact(Connection c, UUID tenant, UUID contactId) throws SQLException;

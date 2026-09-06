@@ -10,7 +10,7 @@ import io.github.windyzhu3.ontologylaw.execution.CanonicalJson;
 
 public interface LeadProtection {
     enum Purpose { LEAD_PHONE_EXACT, LEAD_EMAIL_EXACT, SOURCE_RECORD_KEY }
-    enum Field { CAPTURED_NAME, CAPTURED_PHONE, CAPTURED_EMAIL, LEGAL_NEED_SUMMARY, INGRESS_PHONE, INGRESS_EMAIL, INGRESS_SOURCE_SUMMARY }
+    enum Field { CAPTURED_NAME, CAPTURED_PHONE, CAPTURED_EMAIL, LEGAL_NEED_SUMMARY, INGRESS_PHONE, INGRESS_EMAIL, INGRESS_SOURCE_SUMMARY, OPPORTUNITY_LEGAL_NEED }
     interface Keys {SecretKey encryption(UUID tenant);SecretKey hmac(UUID tenant,Purpose purpose);}
     byte[] encrypt(UUID tenant,Field field,String value);
     String decrypt(UUID tenant,Field field,byte[] value);

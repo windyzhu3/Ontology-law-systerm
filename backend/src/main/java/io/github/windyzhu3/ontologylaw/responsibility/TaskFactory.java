@@ -23,7 +23,10 @@ public interface TaskFactory {
     Task read(Connection c,UUID tenant,UUID id) throws SQLException;
     List<Task> activeForLead(Connection c,UUID tenant,Subject lead) throws SQLException;
     void lock(Connection c,UUID tenant,UUID id) throws SQLException;
+    Instant now(Connection c) throws SQLException;
+    Task reopen(Connection c,UUID tenant,Task task) throws SQLException;
     Task create(Connection c,UUID tenant,Type type,UUID owner,Subject lead,ZoneId zone,Instant now) throws SQLException;
+    Task createContactRetry(Connection c,UUID tenant,UUID owner,Subject lead,ZoneId zone,Instant now,Instant resume) throws SQLException;
     void complete(Connection c,UUID tenant,Task task,Subject fact,Instant now) throws SQLException;
     Subject decision(Connection c,UUID tenant,Task task,UUID actor,String contract,String decision,String rationale,Map<String,Object> digestValues,Instant now) throws SQLException;
     Subject waitUntil(Connection c,UUID tenant,Task task,UUID actor,Instant due,Instant now) throws SQLException;
