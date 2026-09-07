@@ -208,6 +208,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/projections/r1/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check current R1 organization coverage for one immediate Worker claim
+         * @description Read-only R1_PROJECTION_READINESS_V1 preflight from the unique trusted mTLS Tenant/SERVICE/Appointment binding. No caller selectors. API QUERY Owner facts and trusted source policies define coverage, including retained lineages. Final locked READ COMMITTED evaluation uses fresh database time; locks last through successful read-transaction completion before success. One active response enables one immediate bounded claim only. Changes and natural expiry after evaluation, including response transport, can race the claim. Every consume must reauthorize; no reusable proof or business writes.
+         */
+        get: operations["checkR1ProjectionReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/tasks/commands/reopen-due-contact-tasks": {
         parameters: {
             query?: never;
@@ -2045,6 +2065,85 @@ export interface operations {
             429: components["responses"]["InternalRateLimitedProblem"];
             500: components["responses"]["InternalServerProblem"];
             503: components["responses"]["InternalUnavailableProblem"];
+        };
+    };
+    checkR1ProjectionReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current organization coverage passed final locked evaluation; no response body. */
+            204: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid readiness request. */
+            400: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["InternalProblem"];
+                };
+            };
+            /** @description No valid trusted mTLS identity; no WWW-Authenticate header. */
+            401: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["InternalProblem"];
+                };
+            };
+            /** @description Missing Grant, incomplete coverage, or inactive or expired SERVICE, Appointment or organization. */
+            403: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["InternalProblem"];
+                };
+            };
+            /** @description Readiness evaluation is rate limited. */
+            429: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["InternalProblem"];
+                };
+            };
+            /** @description Safe technical evaluation failure; never success. */
+            500: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["InternalProblem"];
+                };
+            };
+            /** @description Readiness evaluation is unavailable. */
+            503: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["InternalProblem"];
+                };
+            };
         };
     };
     reopenDueContactTasks: {

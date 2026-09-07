@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: Ontology Law System R1 API
-  version: 1.1.0
+  version: 1.2.0
   description: >-
     The single executable R1 HTTP contract for Lead intake, task completion,
     ActionDraft persistence, Current Work Card projection, receipt recovery,
@@ -834,6 +834,86 @@ paths:
         '503':
           $ref: '#/components/responses/UnavailableProblem'
 
+  /internal/v1/projections/r1/readiness:
+    get:
+      tags: [InternalTaskCommands]
+      operationId: checkR1ProjectionReadiness
+      summary: Check current R1 organization coverage for one immediate Worker claim
+      description: >-
+        Read-only R1_PROJECTION_READINESS_V1 preflight from the unique trusted mTLS
+        Tenant/SERVICE/Appointment binding. No caller selectors. API QUERY Owner
+        facts and trusted source policies define coverage, including retained
+        lineages. Final locked READ COMMITTED evaluation uses fresh database time;
+        locks last through successful read-transaction completion before success.
+        One active response enables one immediate bounded claim only. Changes and
+        natural expiry after evaluation, including response transport, can race the
+        claim. Every consume must reauthorize; no reusable proof or business writes.
+      security:
+        - internalMutualTls: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: CURRENT_R1_OWNER_ORGANIZATION_COVERAGE
+      x-error-codes: [VALIDATION_FAILED, UNAUTHENTICATED, NOT_AUTHORIZED, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE]
+      responses:
+        '204':
+          description: Current organization coverage passed final locked evaluation; no response body.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+        '400':
+          description: Invalid readiness request.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/InternalProblem'}
+        '401':
+          description: No valid trusted mTLS identity; no WWW-Authenticate header.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/InternalProblem'}
+        '403':
+          description: Missing Grant, incomplete coverage, or inactive or expired SERVICE, Appointment or organization.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/InternalProblem'}
+        '429':
+          description: Readiness evaluation is rate limited.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/InternalProblem'}
+        '500':
+          description: Safe technical evaluation failure; never success.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/InternalProblem'}
+        '503':
+          description: Readiness evaluation is unavailable.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/InternalProblem'}
   /internal/v1/tasks/due:
     get:
       tags: [InternalTaskCommands]

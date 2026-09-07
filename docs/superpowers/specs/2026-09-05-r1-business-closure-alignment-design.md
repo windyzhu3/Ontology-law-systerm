@@ -1,5 +1,7 @@
 # R1 基础功能闭环与原始设计对齐规格
 
+> 2026-09-07具名supersession：[ADR-0012](../../adr/ADR-0012-r1-projection-readiness-protocol.md)与[批准readiness修订](2026-09-07-r1-projection-readiness-design.md)仅替代ADR-0008 operation数量及本规格§6.3部署readiness/失效时点措辞。活动后继为`MVP-2026-09-07.1`、OpenAPI`1.2.0`、11公共＋5内部＝16；API最终加锁数据库时间评估的一次成功只允许紧随的一次claim，评估后变更/自然到期允许在途竞态，每次consume仍当前重授权。历史正文与证据保留；原Task7/8须实现具名修订，静态合同不代表生产完成。
+
 > 2026-09-06联系/Evidence具名supersession：[ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md)与[批准修订规格](2026-09-06-r1-contact-reopen-evidence-read-design.md)只替代原Task 6的联系次数解释并补齐既有Evidence引用的最小只读Owner/授权/披露边界。活动语义为`MVP-2026-09-06.3`/`R1-TASK-COMPLETION-V1.2`，物理`52-plus-2-v1.2`、事件数、operation/DTO及其他历史正文保持；原Task 6生产实现仍未完成。
 
 > 2026-09-06具名supersession：[ADR-0010](../../adr/ADR-0010-lead-ingress-query-read-capability.md)和[批准能力规格](2026-09-06-r1-ingress-query-capability-design.md)仅豁免四列补全phone/email密文及HMAC的QUERY SELECT与`52-plus-2-v1.2`/V860后继；其余物理合同限制不变。先完成能力修订接受项1–3及独立评审，再继续原Task 5的匹配、解密和七卡审计披露；Task 6–10不因本修订获得授权。

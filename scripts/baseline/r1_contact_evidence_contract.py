@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 
 ORDINAL_PROFILE = "R1_CONTACT_ORDINAL_V1"
@@ -237,6 +238,17 @@ def validate(root: Path) -> list[str]:
     }
     documents = {name: _read(root, path, findings) for name, path in paths.items()}
 
+    # Every active English physical-capability declaration must agree. A correct
+    # later paragraph cannot mask a conflicting successor introduction; older
+    # Chinese prerequisite/evidence paragraphs retain their historical versions.
+    physical_versions = re.findall(
+        r"physical capability(?: stays)? `(52-plus-2-v[^`]+)`",
+        "\n".join(_without_fenced_code(documents["baseline"])),
+        flags=re.IGNORECASE,
+    )
+    if not physical_versions or set(physical_versions) != {"52-plus-2-v1.2"}:
+        findings.append("R1 contact/evidence active physical capability declarations must all equal 52-plus-2-v1.2")
+
     command = documents["command"]
     _profile_registry(
         command,
@@ -256,7 +268,7 @@ def validate(root: Path) -> list[str]:
 
     requirements = {
         "command": (
-            ("Semantic baseline: MVP-2026-09-06.3", "command semantic baseline"),
+            ("Semantic baseline: MVP-2026-09-07.1", "command semantic baseline"),
             ("`lead→evidence`、`api→evidence`、`evidence→identity`；读取", "dependency DAG"),
             ("不得以`contactNo<=3`限制事件合法性", "event ordinal"),
             ("最终QUERY阶段", "final QUERY revalidation"),
@@ -283,7 +295,7 @@ def validate(root: Path) -> list[str]:
             ("选择下一张合格卡或返回安全零态", "hidden card fallback"),
         ),
         "baseline": (
-            ("Baseline ID: MVP-2026-09-06.3", "active baseline"),
+            ("Baseline ID: MVP-2026-09-07.1", "active baseline"),
             ("Task contract `R1-TASK-COMPLETION-V1.2`", "active Task contract"),
             ("physical capability `52-plus-2-v1.2` remain unchanged", "physical capability"),
             ("no production Handler, Evidence port, Workbench or R1 business status is advanced", "contract-only baseline"),

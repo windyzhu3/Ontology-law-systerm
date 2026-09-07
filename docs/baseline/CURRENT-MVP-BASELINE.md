@@ -1,6 +1,8 @@
 # 当前MVP基线
 
-Baseline ID: MVP-2026-09-06.3
+Baseline ID: MVP-2026-09-07.1
+
+[ADR-0012](../adr/ADR-0012-r1-projection-readiness-protocol.md) activates the named `R1_PROJECTION_READINESS_V1` successor: OpenAPI `1.2.0`, HTTP `R1-HTTP-V1.2`, exactly 16 operations (11 public Bearer + 5 internal mTLS). It supersedes only ADR-0008's operation inventory and original closure §6.3 readiness/invalidation semantics. One successful final locked API evaluation enables one immediate bounded Worker claim; post-evaluation changes and natural expiry can race transport/claim, and every consume still reauthorizes. All responses are no-store; no proof, new authority, persistence or business delta exists. Physical capability stays `52-plus-2-v1.2`, Worker stays execution-only, and original Tasks7/8 retain production implementation/acceptance ownership. This static contract amendment does not promote backend, SPA, E2E, capacity or release readiness.
 
 Previous Baseline IDs `MVP-2026-09-06.2`, `MVP-2026-09-06.1`, `MVP-2026-09-05.3` and older merge evidence remain historical. [ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md) activates Task contract `R1-TASK-COMPLETION-V1.2`: ContactResult uses a Lead-global monotonic `contactNo`, only values `<3` receive automatic retry, values `>=3` enter supervisor review, and every `REOPEN_CONTACT` creates one new OPEN Task without replenishing the automatic budget. The same ADR adds the Evidence Owner `QUERY_ONLY` boundary for the existing optional Submission reference, including exact current-Lead-revision binding, four-subject DENY, safe NOT_FOUND and audited 200/304 disclosure. ADR-0008 through ADR-0010 otherwise remain active. Event schema, event counts, operation/DTO shapes and physical capability `52-plus-2-v1.2` remain unchanged; no production Handler, Evidence port, Workbench or R1 business status is advanced.
 

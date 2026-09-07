@@ -1,14 +1,22 @@
 # R1 HTTP、错误与前置条件合同
 
-Contract ID: R1-HTTP-V1.1
+Contract ID: R1-HTTP-V1.2
 
-R1 v1.1 freezes 15 operations: 11 public Bearer and 4 mutualTLS. `listDueR1Tasks` accepts only `recoveryType=CONTACT_TASK|ROUTING_REVIEW_TASK`, limit default 50 bounded 1..100, and optional opaque cursor; it returns `candidates` plus optional `nextCursor`. Each candidate has exactly recoveryType/taskId/expectedTaskRevision/waitReceiptId/waitReceiptHash/dueCutoff/idempotencyKey. Pagination orders by `(resume_due_at, task_id)` with an Actor-scoped cursor and stable UUIDv5 recovery key. `consumeR1Projection` accepts exactly domainEventOutboxId/domainEventId/expectedOutboxRevision/leaseOwner/fencingToken and succeeds with 204 and no body. Both DTOs reject unknown fields.
+R1 v1.2 freezes 16 operations: 11 public Bearer and 5 mutualTLS. `listDueR1Tasks` accepts only `recoveryType=CONTACT_TASK|ROUTING_REVIEW_TASK`, limit default 50 bounded 1..100, and optional opaque cursor; it returns `candidates` plus optional `nextCursor`. Each candidate has exactly recoveryType/taskId/expectedTaskRevision/waitReceiptId/waitReceiptHash/dueCutoff/idempotencyKey. Pagination orders by `(resume_due_at, task_id)` with an Actor-scoped cursor and stable UUIDv5 recovery key. `consumeR1Projection` accepts exactly domainEventOutboxId/domainEventId/expectedOutboxRevision/leaseOwner/fencingToken and succeeds with 204 and no body. Both DTOs reject unknown fields.
 
 `STALE_OUTBOX_CLAIM` and `PROJECTION_EVENT_INVALID` belong only to consumeR1Projection's typed internal Problem allowlist; no public operation error allowlist changes. Internal authorization failures are 403, never disguised as permanent 404.
 
-[ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md) activates semantic baseline `MVP-2026-09-06.3` without changing this contract ID, the 11 public＋4 internal operation set, DTO shape or physical capability `52-plus-2-v1.2`. It narrows the existing optional `evidenceSubmissionId` to an exact, authorized Evidence reference and keeps all production implementation gates separate.
+[ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md) previously activated semantic baseline `MVP-2026-09-06.3` with unchanged DTO shape and physical capability `52-plus-2-v1.2`. It narrows the existing optional `evidenceSubmissionId` to an exact, authorized Evidence reference and keeps all production implementation gates separate.
 
 Status: FROZEN
+
+[ADR-0012](../../adr/ADR-0012-r1-projection-readiness-protocol.md) is the active named successor at `MVP-2026-09-07.1`. `checkR1ProjectionReadiness` is read-only authorization preflight, not a command or event consumer. It takes no body/parameters/Tenant selector and uses only the unique trusted certificate Tenant/SERVICE/Appointment binding. All responses carry `Cache-Control: no-store`; success is 204/no body, with no ETag/304 or reusable attestation. Existing safe six-code errors below apply; missing Grant, incomplete coverage and inactive/expired SERVICE/Appointment/organization yield 403. Malformed configuration or technical evaluation never yields success. Slot/Receipt/Audit/Event/Outbox/business deltas are zero; responses/logs expose no organization/Grant identifiers, source selectors, business fields, raw exceptions or credentials.
+
+Coverage is the deduplicated union of current trusted R1 source-policy intake organizations and real R1 Task/Assignment Owner organizations needed by all fourteen frozen event routes, including retained DONE/CANCELLED Tasks and Assignment/Decision/Contact/Opportunity lineages for late notifications. Narrow API QUERY Owner ports resolve facts and policy; SQL/generated types stay in Owner internal.persistence and Worker receives only HTTP outcome. SERVICE organization, selected Grant roots, all Tenant organizations indiscriminately and first queue page are not coverage universes. Unresolved required anchors fail closed. Every organization requires one independently complete effective direct Grant of the exact SERVICE Appointment for `SYSTEM_PROJECTION/R1_PROJECTION_CONSUME/SYSTEM`; complete grants may separately cover organizations, but incomplete fields cannot be stitched. HUMAN/onBehalf/delegation/OBJECT ALLOW/recovery/LEAD_CAPTURE cannot substitute. Empty coverage still requires valid SERVICE/Appointment and effective projection Grant.
+
+API checks trusted Actor, takes shared Tenant `R1_BUSINESS_TENANT_LOCK`, then shared identity lock, and re-reads current facts/authority with fresh `clock_timestamp()` under READ COMMITTED. Locks remain held through successful read-transaction completion before HTTP success. The decision point is the final locked database-time evaluation. Committed earlier identity/policy/Owner changes must be seen; later locked writers wait for transaction completion. Changes and natural expiry afterward, including response transport before claim, are an accepted in-flight race: there is no atomic check-and-claim or instantaneous cross-process invalidation. Event-specific DENY, causal binding, source/hash integrity and lease validity are separately mandatory on every consume.
+
+Worker acquires available permits first; no permits means no check or claim. Each Tenant binding serializes check-to-claim; only the active request's success enables its one immediate bounded claim (up to permits, maximum four). Discard success after that call even for zero rows and on retry/binding change/error/restart; no proof/cache/token/TTL/persistence or local pre-authorized queue. Each later batch needs a new check. Existing ten-second timeout applies and late/cancelled responses are discarded. Failed preflight performs no claim and no attempt increment; 401/403 freezes binding, other failures withhold claims with bounded existing backoff, and no batch substitutes as a probe. Consume 401/403 freezes further claims without ack or failure-CAS. The generation/freeze guard rejects earlier success after a newer authorization failure; only a newly initiated successful check against the repaired binding resumes work. Existing claims keep attempts and reap below eight to PENDING with frozen retry delay, at eight to EXHAUSTED; no automatic EXHAUSTED redrive or waived authorization-failure attempt. Original Tasks7/8 own runtime implementation and assembly.
 
 确认日期：2026-09-02
 
@@ -18,6 +26,7 @@ Status: FROZEN
 
 | OperationId | Method | Path | TenantSource | IdempotencyKey | Preconditions | SubjectBinding | SuccessStatus | ErrorCodes |
 |---|---|---|---|---|---|---|---|---|
+| checkR1ProjectionReadiness | GET | /internal/v1/projections/r1/readiness | ACTOR_CONTEXT | NONE | NONE | CURRENT_R1_OWNER_ORGANIZATION_COVERAGE | 204 | VALIDATION_FAILED,UNAUTHENTICATED,NOT_AUTHORIZED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 | captureLead | POST | /api/v1/leads | ACTOR_CONTEXT | REQUIRED | NONE | SOURCE_NATURAL_KEY | 201 | VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,COMMAND_PAYLOAD_CONFLICT,SUPERVISOR_UNRESOLVED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 | getCurrentWorkCard | GET | /api/v1/workcards/current | ACTOR_CONTEXT | NONE | OPTIONAL_WORKBENCH_ETAG | ACTOR_SCOPE | 200/304 | UNAUTHENTICATED,NOT_AUTHORIZED,NOT_FOUND,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 | saveActionDraft | PUT | /api/v1/tasks/{taskId}/draft | ACTOR_CONTEXT | REQUIRED | IF_NONE_MATCH_STAR_OR_DRAFT_ETAG | TASK_AND_DRAFT | 200/201 | VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,DRAFT_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
@@ -70,6 +79,7 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 | reopenDueContactTasks | none | mutual-TLS client identity; `Idempotency-Key: Uuid` | `ReopenDueContactTaskV1` |
 | reopenDueRoutingReviewTasks | none | mutual-TLS client identity; `Idempotency-Key: Uuid` | `ReopenDueRoutingReviewTaskV1` |
 | listDueR1Tasks | none | mutual-TLS client identity; query `recoveryType`, optional `limit`, optional opaque `cursor` | none |
+| checkR1ProjectionReadiness | none | mutual-TLS client identity only; no parameters | none |
 | consumeR1Projection | none | mutual-TLS client identity | `ConsumeR1ProjectionV1` |
 
 “same command headers”恰指表中三项，不允许额外的 Tenant、subject revision、Draft ETag 或自由 command/action header。`If-Match`、`If-None-Match` 都只接受一个标签，不接受逗号列表、弱标签或 `If-Match: *`。`reopenDueContactTasks` 保留冻结的 operationId/path，但一次请求准确恢复一张 Task，不是批处理。
@@ -199,7 +209,7 @@ digest43    = 43(ALPHA / DIGIT / "-" / "_")
 | Scheme name | OpenAPI shape | Exact operation binding |
 |---|---|---|
 | `publicBearer` | `type: http`, `scheme: bearer` | 所有 `/api/v1/**` 十一个 operation 各自且只使用 `[{publicBearer: []}]` |
-| `internalMutualTls` | `type: mutualTLS` | listDueR1Tasks,consumeR1Projection,reopenDueContactTasks,reopenDueRoutingReviewTasks 各自且只使用 `[{internalMutualTls: []}]` |
+| `internalMutualTls` | `type: mutualTLS` | checkR1ProjectionReadiness,listDueR1Tasks,consumeR1Projection,reopenDueContactTasks,reopenDueRoutingReviewTasks 各自且只使用 `[{internalMutualTls: []}]` |
 
 不得使用空 security、两个 scheme 的 OR/AND 组合、API key、`X-Tenant-Id` 或浏览器持有的内部证书。mTLS 身份只在服务端映射受限 ActorContext；它不允许请求提交 Tenant。
 
@@ -208,7 +218,7 @@ digest43    = 43(ALPHA / DIGIT / "-" / "_")
 | SecurityScheme | Operations | UnauthenticatedTransport |
 |---|---|---|
 | publicBearer | /api/v1/** | HTTP_401_PROBLEM_WITH_WWW_AUTHENTICATE_BEARER |
-| internalMutualTls | listDueR1Tasks,consumeR1Projection,reopenDueContactTasks,reopenDueRoutingReviewTasks | TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE |
+| internalMutualTls | checkR1ProjectionReadiness,listDueR1Tasks,consumeR1Projection,reopenDueContactTasks,reopenDueRoutingReviewTasks | TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE |
 
 公网Bearer operation的HTTP 401使用`application/problem+json`并带标准`WWW-Authenticate: Bearer` challenge。内部mTLS operation优先在TLS握手层拒绝无证书/无效证书；若证书已通过握手但服务端身份映射失败而产生HTTP 401，则仍返回Problem，但禁止发送Bearer challenge或任何`WWW-Authenticate` header。
 
