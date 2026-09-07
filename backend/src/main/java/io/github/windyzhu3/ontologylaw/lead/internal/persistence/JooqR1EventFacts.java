@@ -12,6 +12,22 @@ import org.jooq.impl.DSL;
 import static io.github.windyzhu3.ontologylaw.lead.internal.persistence.jooq.Tables.*;
 
 public final class JooqR1EventFacts implements R1EventFacts {
+    public LeadAnchor leadAnchor(Connection c,UUID tenant,UUID id){
+        var l=LEAD_;var r=DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)).select(l.REVISION,l.SOURCE_ACCOUNT_CODE,l.CURRENT_ASSIGNMENT_ID).from(l).where(l.TENANT_ID.eq(tenant)).and(l.LEAD_ID.eq(id)).fetchOne();
+        return r==null?null:new LeadAnchor(new Subject("lead.lead",id,r.value1(),null),r.value2(),r.value3());
+    }
+    public ContactAnchor contactAnchor(Connection c,UUID tenant,UUID id){
+        var f=LEAD_CONTACT_RESULT;var r=DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)).select(f.LEAD_ID,f.LEAD_ASSIGNMENT_ID,f.CONTACT_TASK_ID).from(f).where(f.TENANT_ID.eq(tenant)).and(f.LEAD_CONTACT_RESULT_ID.eq(id)).fetchOne();
+        return r==null?null:new ContactAnchor(r.value1(),r.value2(),r.value3());
+    }
+    public Opportunity opportunity(Connection c,UUID tenant,UUID id)throws SQLException{
+        var o=opportunities.byId(c,tenant,id);return o==null?null:new Opportunity(o.selector(),o.leadId(),o.assignmentId(),o.contactId(),o.owner());
+    }
+    public Set<UUID> retainedAssignmentOwners(Connection c,UUID tenant) {
+        var a=LEAD_ASSIGNMENT;
+        return new HashSet<>(DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false))
+            .selectDistinct(a.OWNER_APPOINTMENT_ID).from(a).where(a.TENANT_ID.eq(tenant)).fetch(a.OWNER_APPOINTMENT_ID));
+    }
     private final EventResponsibilityReader responsibility;
     private final EventOpportunityReader opportunities;
     public JooqR1EventFacts(EventResponsibilityReader responsibility,EventOpportunityReader opportunities){this.responsibility=responsibility;this.opportunities=opportunities;}
@@ -26,7 +42,7 @@ public final class JooqR1EventFacts implements R1EventFacts {
     }
     public Contact contact(Connection c,UUID tenant,UUID id) {
         var f=LEAD_CONTACT_RESULT;
-        var r=DSL.using(c,SQLDialect.POSTGRES).selectFrom(f).where(f.TENANT_ID.eq(tenant)).and(f.LEAD_CONTACT_RESULT_ID.eq(id)).fetchOne();
+        var r=DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)).selectFrom(f).where(f.TENANT_ID.eq(tenant)).and(f.LEAD_CONTACT_RESULT_ID.eq(id)).fetchOne();
         if(r==null)return null;
         return new Contact(contactSelector(tenant,id,r),r.get(f.LEAD_ID),r.get(f.LEAD_ASSIGNMENT_ID),r.get(f.CONTACT_TASK_ID),r.get(f.CONTACT_NO),r.get(f.RESULT_CODE));
     }

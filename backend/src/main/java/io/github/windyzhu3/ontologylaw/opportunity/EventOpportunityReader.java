@@ -8,5 +8,6 @@ import java.util.UUID;
 public interface EventOpportunityReader {
     record Opportunity(Subject selector, UUID leadId, UUID assignmentId, UUID contactId, UUID owner) {}
     Opportunity forContact(Connection c, UUID tenant, UUID contactId) throws SQLException;
+    Opportunity byId(Connection c,UUID tenant,UUID id)throws SQLException;
     static EventOpportunityReader databaseBacked(){return new io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.JooqEventOpportunityReader();}
 }
