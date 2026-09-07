@@ -24,9 +24,18 @@ class R1WorkerTransportIT extends ContactFlowFixture {
     static final class MutableClock extends java.time.Clock {final java.time.Instant began=java.time.Instant.now();final java.util.concurrent.atomic.AtomicLong seconds=new java.util.concurrent.atomic.AtomicLong();public java.time.Instant instant(){return began.plusSeconds(seconds.get());}public java.time.ZoneId getZone(){return java.time.ZoneOffset.UTC;}public java.time.Clock withZone(java.time.ZoneId zone){return this;}void advance(long amount){seconds.addAndGet(amount);}}
     @TempDir Path directory;
     final char[] password="only-test-fixture".toCharArray();
+    static Path keytool(Path javaHome){
+        for(String executable:List.of("keytool","keytool.exe")){var candidate=javaHome.resolve("bin").resolve(executable);if(Files.isRegularFile(candidate)&&Files.isExecutable(candidate))return candidate;}
+        throw new IllegalStateException("TEST_JDK_KEYTOOL_UNAVAILABLE");
+    }
+    @Test void keytool_lookup_accepts_unix_and_windows_jdk_layouts()throws Exception{
+        var unix=directory.resolve("unix jdk");var windows=directory.resolve("windows jdk");Files.createDirectories(unix.resolve("bin"));Files.createDirectories(windows.resolve("bin"));
+        var unixTool=Files.createFile(unix.resolve("bin/keytool"));var windowsTool=Files.createFile(windows.resolve("bin/keytool.exe"));assertTrue(unixTool.toFile().setExecutable(true));assertTrue(windowsTool.toFile().setExecutable(true));
+        assertAll(()->assertEquals(unixTool,keytool(unix)),()->assertEquals(windowsTool,keytool(windows)));
+    }
     KeyStore key(String alias)throws Exception{
         var path=directory.resolve(alias+"-"+UUID.randomUUID()+".p12");
-        var process=new ProcessBuilder(Path.of(System.getProperty("java.home"),"bin","keytool.exe").toString(),"-genkeypair","-alias",alias,"-keystore",path.toString(),"-storepass",new String(password),"-keypass",new String(password),"-dname","CN="+alias,"-keyalg","RSA","-keysize","2048","-validity","2","-ext","SAN=dns:localhost,ip:127.0.0.1","-noprompt").redirectErrorStream(true).start();
+        var process=new ProcessBuilder(keytool(Path.of(System.getProperty("java.home"))).toString(),"-genkeypair","-alias",alias,"-keystore",path.toString(),"-storepass",new String(password),"-keypass",new String(password),"-dname","CN="+alias,"-keyalg","RSA","-keysize","2048","-validity","2","-ext","SAN=dns:localhost,ip:127.0.0.1","-noprompt").redirectErrorStream(true).start();
         try(var output=process.getInputStream()){output.transferTo(java.io.OutputStream.nullOutputStream());}assertEquals(0,process.waitFor());
         var store=KeyStore.getInstance("PKCS12");try(var in=Files.newInputStream(path)){store.load(in,password);}return store;
     }
@@ -81,7 +90,7 @@ class R1WorkerTransportIT extends ContactFlowFixture {
     @Test void crash_before_ack_and_local_expired_claim_do_not_send_or_ack_and_restart_recomputes()throws Exception{
         setupFlow(io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.CONTACT_LEAD);emit(1);
         try(var h=new Harness()){
-            h.consumeEntered=new CountDownLatch(1);h.consumeRelease=new CountDownLatch(1);var dispatcher=new R1ProjectionDispatcher(h.registry,h.client,h.outbox,"CRASH_IT",java.time.Clock.systemUTC());assertEquals(1,dispatcher.poll(h.binding));assertTrue(h.consumeEntered.await(5,TimeUnit.SECONDS));dispatcher.close();h.consumeRelease.countDown();awaitIdle(dispatcher);assertEquals(1,h.outbox.counts(seed.tenant(),100).claimed());pastOutbox("lease_until");assertEquals(1,h.outbox.reap(seed.tenant(),100));pastOutbox("available_at");h.consumeEntered=null;
+            h.consumeEntered=new CountDownLatch(1);h.consumeRelease=new CountDownLatch(1);var dispatcher=new R1ProjectionDispatcher(h.registry,h.client,h.outbox,"CRASH_IT",java.time.Clock.systemUTC());assertEquals(1,dispatcher.poll(h.binding));assertTrue(h.consumeEntered.await(5,TimeUnit.SECONDS));dispatcher.close();h.consumeRelease.countDown();awaitIdle(dispatcher);assertEquals(1,h.outbox.counts(seed.tenant(),100).claimed());pastOutbox("lease_until");assertEquals(new R1ProjectionOutboxPort.ReapResult(1,0),h.outbox.reap(seed.tenant(),100));pastOutbox("available_at");h.consumeEntered=null;
             var clock=new MutableClock();clock.advance(120);try(var expired=new R1ProjectionDispatcher(h.registry,h.client,h.outbox,"LOCAL_EXPIRED_IT",clock)){assertEquals(1,expired.poll(h.binding));awaitIdle(expired);assertEquals(1,h.consumeCalls.get());assertEquals(1,h.outbox.counts(seed.tenant(),100).claimed());}
             pastOutbox("lease_until");h.outbox.reap(seed.tenant(),100);pastOutbox("available_at");try(var restarted=new R1ProjectionDispatcher(h.registry,h.client,h.outbox,"AFTER_CRASH_IT",java.time.Clock.systemUTC())){assertEquals(1,restarted.poll(h.binding));awaitIdle(restarted);assertEquals(1,h.outbox.counts(seed.tenant(),100).delivered());}
         }
@@ -101,14 +110,31 @@ class R1WorkerTransportIT extends ContactFlowFixture {
         }
     }
     @Test void seventh_and_eighth_auth_failures_reap_normally_and_restart_never_redrives_exhausted()throws Exception{
+        var logs=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();logs.start();var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(R1ProjectionDispatcher.class);logger.addAppender(logs);
+        try{
         for(int target:List.of(7,8)){
+            logs.list.clear();
             setupFlow(io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.CONTACT_LEAD);emit(1);
             try(var h=new Harness()){
                 for(int n=1;n<target;n++){var claim=h.outbox.claim(seed.tenant(),"PRIOR_WORKER",1).getFirst();assertTrue(h.outbox.retry(claim,"NETWORK_ERROR"));pastOutbox("available_at");}
-                try(var dispatcher=new R1ProjectionDispatcher(h.registry,h.client,h.outbox,"AUTH_IT",java.time.Clock.systemUTC())){h.consumeStatus.set(403);assertEquals(1,dispatcher.poll(h.binding));awaitIdle(dispatcher);assertTrue(dispatcher.frozen(h.binding));assertEquals(Integer.toString(target),scalar("select attempt_count::text from execution.domain_event_outbox where tenant_id=?",seed.tenant()));assertEquals(Integer.toString(target*2-1),scalar("select revision::text from execution.domain_event_outbox where tenant_id=?",seed.tenant()));revokeProjection(h);pastOutbox("lease_until");assertEquals(0,dispatcher.poll(h.binding));assertEquals(target==8?1:0,h.outbox.counts(seed.tenant(),100).exhausted());}
-                try(var restarted=new R1ProjectionDispatcher(h.registry,h.client,h.outbox,"RESTART_IT",java.time.Clock.systemUTC())){assertEquals(0,restarted.poll(h.binding));mutate("insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values (?,?,?,?,?,'R1_PROJECTION_CONSUME',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",seed.tenant(),UUID.randomUUID(),h.actor.appointmentId(),seed.appointment(),seed.org());h.consumeStatus.set(204);pastOutbox("available_at");assertEquals(target==8?0:1,restarted.poll(h.binding));awaitIdle(restarted);assertEquals(target==8?0:1,h.outbox.counts(seed.tenant(),100).delivered());assertEquals(target==8?1:0,h.outbox.counts(seed.tenant(),100).exhausted());}
+                try(var dispatcher=new R1ProjectionDispatcher(h.registry,h.client,h.outbox,"AUTH_IT",java.time.Clock.systemUTC())){h.consumeStatus.set(403);assertEquals(1,dispatcher.poll(h.binding));awaitIdle(dispatcher);assertTrue(dispatcher.frozen(h.binding));assertEquals(Integer.toString(target),scalar("select attempt_count::text from execution.domain_event_outbox where tenant_id=?",seed.tenant()));assertEquals(Integer.toString(target*2-1),scalar("select revision::text from execution.domain_event_outbox where tenant_id=?",seed.tenant()));revokeProjection(h);pastOutbox("lease_until");assertEquals(0,dispatcher.poll(h.binding));assertEquals(target==8?1:0,h.outbox.counts(seed.tenant(),100).exhausted());assertEquals(target==8?1L:0L,dispatcher.reapedExhausted(h.binding));assertEquals(0,dispatcher.poll(h.binding));assertEquals(target==8?1L:0L,dispatcher.reapedExhausted(h.binding));}
+                assertEquals(target==8?1L:0L,logs.list.stream().filter(e->e.getFormattedMessage().equals("R1_PROJECTION_EXHAUSTED")).count());
+                try(var restarted=new R1ProjectionDispatcher(h.registry,h.client,h.outbox,"RESTART_IT",java.time.Clock.systemUTC())){assertEquals(0,restarted.poll(h.binding));mutate("insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values (?,?,?,?,?,'R1_PROJECTION_CONSUME',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",seed.tenant(),UUID.randomUUID(),h.actor.appointmentId(),seed.appointment(),seed.org());h.consumeStatus.set(204);pastOutbox("available_at");assertEquals(target==8?0:1,restarted.poll(h.binding));awaitIdle(restarted);assertEquals(target==8?0:1,h.outbox.counts(seed.tenant(),100).delivered());assertEquals(target==8?1:0,h.outbox.counts(seed.tenant(),100).exhausted());assertEquals(0L,restarted.reapedExhausted(h.binding));}
+                assertEquals(target==8?1L:0L,logs.list.stream().filter(e->e.getFormattedMessage().equals("R1_PROJECTION_EXHAUSTED")).count());
             }
         }
+        }finally{logger.detachAppender(logs);logs.stop();}
+    }
+    @Test void failed_reaper_commit_never_publishes_exhaustion_log_or_process_metric()throws Exception{
+        setupFlow(io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.CONTACT_LEAD);emit(1);
+        var logs=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();logs.start();var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(R1ProjectionDispatcher.class);logger.addAppender(logs);
+        try(var h=new Harness()){
+            for(int attempt=1;attempt<8;attempt++){assertTrue(h.outbox.retry(h.outbox.claim(seed.tenant(),"PRIOR_WORKER",1).getFirst(),"NETWORK_ERROR"));pastOutbox("available_at");}
+            assertEquals(8,h.outbox.claim(seed.tenant(),"LAST_WORKER",1).getFirst().attempt());pastOutbox("lease_until");
+            var failing=R1ProjectionOutboxPort.databaseBacked(()->{var raw=database.workerConnection();return (java.sql.Connection)java.lang.reflect.Proxy.newProxyInstance(java.sql.Connection.class.getClassLoader(),new Class<?>[]{java.sql.Connection.class},(proxy,method,args)->{if(method.getName().equals("commit"))throw new java.sql.SQLException("REAPER_COMMIT_ACK_FAILURE");try{return method.invoke(raw,args);}catch(java.lang.reflect.InvocationTargetException failure){throw failure.getCause();}});});
+            try(var dispatcher=new R1ProjectionDispatcher(h.registry,h.client,failing,"FAILED_REAPER",java.time.Clock.systemUTC())){assertEquals(0,dispatcher.poll(h.binding));assertEquals(0L,dispatcher.reapedExhausted(h.binding));assertEquals(1,h.outbox.counts(seed.tenant(),100).claimed());assertTrue(logs.list.stream().noneMatch(e->e.getFormattedMessage().equals("R1_PROJECTION_EXHAUSTED")));assertEquals(0,h.readinessCalls.get());}
+            try(var dispatcher=new R1ProjectionDispatcher(h.registry,h.client,h.outbox,"HEALTHY_REAPER",java.time.Clock.systemUTC())){assertEquals(0,dispatcher.poll(h.binding));assertEquals(1L,dispatcher.reapedExhausted(h.binding));assertEquals(0,dispatcher.poll(h.binding));assertEquals(1L,dispatcher.reapedExhausted(h.binding));assertEquals(1,h.outbox.counts(seed.tenant(),100).exhausted());assertEquals(1L,logs.list.stream().filter(e->e.getFormattedMessage().equals("R1_PROJECTION_EXHAUSTED")).count());}
+        }finally{logger.detachAppender(logs);logs.stop();}
     }
     @Test void real_timeout_discards_late_readiness_without_claim_and_response_loss_retries_readonly_consume()throws Exception{
         setupFlow(io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.CONTACT_LEAD);emit(1);var clock=new MutableClock();

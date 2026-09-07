@@ -5,7 +5,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantLock;
 public final class R1ProjectionDispatcher implements AutoCloseable {
-    private static final class State {final ReentrantLock check=new ReentrantLock();long generation;boolean frozen;int failures;java.time.Instant retryAt=java.time.Instant.MIN;}
+    private static final class State {final ReentrantLock check=new ReentrantLock();long generation;long reapedExhausted;boolean frozen;int failures;java.time.Instant retryAt=java.time.Instant.MIN;}
     private final Map<R1WorkerTenantBindings.Binding,State> states;private final InternalApiClient api;private final R1ProjectionOutboxPort outbox;private final String workerId;private final Clock clock;
     private final Semaphore permits=new Semaphore(4);private final ExecutorService requests=Executors.newVirtualThreadPerTaskExecutor();private ScheduledExecutorService scheduler;private volatile boolean closed;
     public R1ProjectionDispatcher(R1WorkerTenantBindings registry,InternalApiClient api,R1ProjectionOutboxPort outbox,String workerId,Clock clock){
@@ -17,7 +17,11 @@ public final class R1ProjectionDispatcher implements AutoCloseable {
         var state=state(binding);if(closed||!state.check.tryLock())return 0;int reserved=0;
         try{
             // A frozen binding still reaps leases using the same immutable attempt budget.
-            outbox.reap(binding.tenantId(),100);
+            var reaped=outbox.reap(binding.tenantId(),100);
+            if(reaped.exhausted()>0){
+                synchronized(state){state.reapedExhausted=Math.min(state.reapedExhausted,Long.MAX_VALUE-reaped.exhausted())+reaped.exhausted();}
+                warn("R1_PROJECTION_EXHAUSTED");
+            }
             if(clock.instant().isBefore(state.retryAt))return 0;
             while(reserved<4&&permits.tryAcquire())reserved++;if(reserved==0)return 0;
             long generation;synchronized(state){generation=state.generation;}
@@ -57,6 +61,8 @@ public final class R1ProjectionDispatcher implements AutoCloseable {
     private State state(R1WorkerTenantBindings.Binding binding){var state=states.get(binding);if(state==null)throw new IllegalArgumentException("R1_WORKER_BINDING_INVALID");return state;}
     public boolean frozen(R1WorkerTenantBindings.Binding binding){var state=state(binding);synchronized(state){return state.frozen;}}
     public int availablePermits(){return permits.availablePermits();}
+    /** Process-local committed lease-exhaustion metric, not backlog, durable state, or authorization. */
+    public long reapedExhausted(R1WorkerTenantBindings.Binding binding){var state=state(binding);synchronized(state){return state.reapedExhausted;}}
     public synchronized void start(){if(closed||scheduler!=null)throw new IllegalStateException("R1_WORKER_ALREADY_STARTED");scheduler=Executors.newScheduledThreadPool(states.size(),Thread.ofPlatform().daemon(true).factory());for(var binding:states.keySet())scheduler.scheduleWithFixedDelay(()->poll(binding),0,1,TimeUnit.SECONDS);}
     private static void warn(String code){org.slf4j.LoggerFactory.getLogger(R1ProjectionDispatcher.class).warn(code);}
     public synchronized void close(){closed=true;if(scheduler!=null)scheduler.shutdownNow();requests.shutdownNow();}

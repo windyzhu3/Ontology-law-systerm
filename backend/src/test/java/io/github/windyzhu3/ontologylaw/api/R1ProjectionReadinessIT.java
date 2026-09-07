@@ -15,6 +15,20 @@ import java.sql.Connection;
 import java.lang.reflect.*;
 
 class R1ProjectionReadinessIT extends ContactFlowFixture {
+    @Test void readiness_never_logs_owner_queries_or_results_with_jooq_debug_enabled()throws Exception{
+        setupContact();var actor=service("R1_PROJECTION_CONSUME");var logs=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();logs.start();
+        var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger("org.jooq.tools.LoggerListener");var level=logger.getLevel();boolean additive=logger.isAdditive();logger.setAdditive(false);logger.setLevel(ch.qos.logback.classic.Level.DEBUG);logger.addAppender(logs);
+        try{
+            logger.debug("READINESS_LOG_CAPTURE_CONTROL");assertEquals(1,logs.list.size());logs.list.clear();
+            assertEquals(204,check(actor,policies).status());
+            var missing=new R1SourcePolicyRegistry(Map.of("MISSING",new R1SourcePolicyRegistry.SourcePolicy(R1SourcePolicyRegistry.AssignmentMode.MANUAL,List.of("ROOT"),"ROOT","MISSING","Asia/Shanghai")));assertEquals(403,check(actor,missing).status());
+            try(var raw=database.apiConnection()){
+                var failing=(Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(proxy,method,args)->{if(method.getName().equals("prepareStatement")&&args[0] instanceof String query&&query.contains("organization_unit"))throw new java.sql.SQLException("READINESS_QUERY_FAILURE");try{return method.invoke(raw,args);}catch(InvocationTargetException failure){throw failure.getCause();}});
+                assertEquals(503,new R1ProjectionReadinessService(policies).check(failing,actor).status());
+            }
+            assertTrue(logs.list.isEmpty(),"Readiness must not emit SQL or fetched identity rows");
+        }finally{logger.detachAppender(logs);logger.setLevel(level);logger.setAdditive(additive);logs.stop();}
+    }
     @Test void retained_assignment_without_task_adds_real_owner_scope_and_active_child_cannot_hide_closed_ancestor()throws Exception{
         setupContact();cancelCurrent();var actor=service("R1_PROJECTION_CONSUME");UUID parent=UUID.randomUUID(),child=UUID.randomUUID(),principal=UUID.randomUUID(),appointment=UUID.randomUUID();
         mutate("insert into identity.organization_unit (tenant_id,organization_unit_id,unit_code,display_name,state,created_at) values (?,?,'OUTSIDE','fixture','ACTIVE',clock_timestamp())",seed.tenant(),parent);

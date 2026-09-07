@@ -62,12 +62,12 @@ public final class JooqR1ProjectionOutboxPort implements R1ProjectionOutboxPort 
         if(!exhausted)update.set(o.AVAILABLE_AT,DSL.field("clock_timestamp() + {0} * interval '1 second'",OffsetDateTime.class,DSL.val(DELAYS[attempt-1])));
         return update.where(exact(claim,expired)).execute()==1;
     }
-    public int reap(UUID tenant,int limit)throws SQLException{
+    public ReapResult reap(UUID tenant,int limit)throws SQLException{
         Objects.requireNonNull(tenant);bound(limit,100);
-        return transaction(c->{var d=db(c);var o=DOMAIN_EVENT_OUTBOX;int changed=0;
+        return transaction(c->{var d=db(c);var o=DOMAIN_EVENT_OUTBOX;int changed=0,exhausted=0;
             var rows=d.selectFrom(o).where(o.TENANT_ID.eq(tenant)).and(o.QUEUE_OWNER.eq("R1_PROJECTION")).and(o.STATUS.eq("CLAIMED"))
                 .and(o.LEASE_UNTIL.le(now())).orderBy(o.LEASE_UNTIL,o.DOMAIN_EVENT_OUTBOX_ID).limit(limit).forUpdate().skipLocked().fetch();
-            for(var row:rows)if(finish(d,claim(row),"LEASE_EXPIRED",false,true))changed++;return changed;
+            for(var row:rows)if(finish(d,claim(row),"LEASE_EXPIRED",false,true)){changed++;if(row.get(o.ATTEMPT_COUNT)==8)exhausted++;}return new ReapResult(changed,exhausted);
         });
     }
     public Counts counts(UUID tenant,int limit)throws SQLException{

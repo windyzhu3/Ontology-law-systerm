@@ -12,6 +12,13 @@ import java.util.concurrent.*;
 import org.junit.jupiter.api.Test;
 
 class R1ProjectionOutboxIT extends PostgresIntegrationTest {
+    @Test void reaper_commit_failure_returns_no_result_and_rolls_back_exhaustion()throws Exception{
+        var s=AuthorizationServiceIT.seed(database);var id=seed(s.tenant(),"R1_PROJECTION",Instant.now().minusSeconds(30));
+        for(int attempt=1;attempt<8;attempt++){assertTrue(port().retry(port().claim(s.tenant(),"PRIOR_WORKER",1).getFirst(),"NETWORK_ERROR"));past(id,"available_at");}
+        var claim=port().claim(s.tenant(),"LAST_WORKER",1).getFirst();assertEquals(8,claim.attempt());past(id,"lease_until");var before=row(id);
+        var failing=R1ProjectionOutboxPort.databaseBacked(()->{var raw=database.workerConnection();return (Connection)java.lang.reflect.Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(proxy,method,args)->{if(method.getName().equals("commit"))throw new SQLException("REAPER_COMMIT_ACK_FAILURE");try{return method.invoke(raw,args);}catch(java.lang.reflect.InvocationTargetException failure){throw failure.getCause();}});});
+        assertThrows(SQLException.class,()->failing.reap(s.tenant(),4));assertEquals(before,row(id));assertEquals(new R1ProjectionOutboxPort.ReapResult(1,1),port().reap(s.tenant(),4));assertEquals(new R1ProjectionOutboxPort.ReapResult(0,0),port().reap(s.tenant(),4));
+    }
     @Test void locked_first_row_is_skipped_and_counter_overflow_rolls_back_whole_batch()throws Exception{
         var s=AuthorizationServiceIT.seed(database);var first=seed(s.tenant(),"R1_PROJECTION",Instant.now().minusSeconds(90));var second=seed(s.tenant(),"R1_PROJECTION",Instant.now().minusSeconds(80));
         var locked=new CountDownLatch(1);var release=new CountDownLatch(1);
@@ -26,7 +33,7 @@ class R1ProjectionOutboxIT extends PostgresIntegrationTest {
     @Test void every_stale_tuple_is_inert_and_eighth_expired_attempt_exhausts_without_redrive()throws Exception{
         var s=AuthorizationServiceIT.seed(database);var id=seed(s.tenant(),"R1_PROJECTION",Instant.now().minusSeconds(30));var claim=port().claim(s.tenant(),"WORKER_A",1).getFirst();
         for(var stale:List.of(new R1ProjectionOutboxPort.Claim(claim.tenantId(),id,claim.eventId(),claim.revision()+1,claim.leaseOwner(),claim.fencingToken(),1,claim.leaseUntil()),new R1ProjectionOutboxPort.Claim(claim.tenantId(),id,claim.eventId(),claim.revision(),claim.leaseOwner(),claim.fencingToken()+1,1,claim.leaseUntil()),new R1ProjectionOutboxPort.Claim(claim.tenantId(),id,UUID.randomUUID(),claim.revision(),claim.leaseOwner(),claim.fencingToken(),1,claim.leaseUntil()))){var before=row(id);assertFalse(port().ack(stale));assertFalse(port().retry(stale,"NETWORK_ERROR"));assertFalse(port().exhaust(stale,"PROJECTION_EVENT_INVALID"));assertEquals(before,row(id));}
-        for(int attempt=1;attempt<=8;attempt++){assertEquals(attempt,claim.attempt());past(id,"lease_until");assertEquals(1,port().reap(s.tenant(),4));assertFalse(port().ack(claim));assertEquals(attempt==8?"EXHAUSTED":"PENDING",row(id).get("status"));if(attempt<8){past(id,"available_at");claim=port().claim(s.tenant(),"WORKER_RESTART",1).getFirst();}}
+        for(int attempt=1;attempt<=8;attempt++){assertEquals(attempt,claim.attempt());past(id,"lease_until");var reaped=port().reap(s.tenant(),4);assertEquals(new R1ProjectionOutboxPort.ReapResult(1,attempt==8?1:0),reaped);assertEquals(new R1ProjectionOutboxPort.ReapResult(0,0),port().reap(s.tenant(),4));assertFalse(port().ack(claim));assertEquals(attempt==8?"EXHAUSTED":"PENDING",row(id).get("status"));if(attempt<8){past(id,"available_at");claim=port().claim(s.tenant(),"WORKER_RESTART",1).getFirst();}}
         assertTrue(port().claim(s.tenant(),"WORKER_RESTART_2",4).isEmpty());assertEquals(8,row(id).get("attempt_count"));assertEquals(16L,row(id).get("revision"));
     }
     R1ProjectionOutboxPort port(){return R1ProjectionOutboxPort.databaseBacked(database::workerConnection);}
@@ -75,9 +82,9 @@ class R1ProjectionOutboxIT extends PostgresIntegrationTest {
     @Test void expired_claim_is_only_reaped_then_old_result_is_inert()throws Exception {
         var s=AuthorizationServiceIT.seed(database);var id=seed(s.tenant(),"R1_PROJECTION",Instant.now().minusSeconds(30));
         var first=port().claim(s.tenant(),"WORKER_A",1);assertEquals(1,first.size());var claim=first.getFirst();
-        assertEquals(0,port().reap(s.tenant(),4));past(id,"lease_until");
+        assertEquals(new R1ProjectionOutboxPort.ReapResult(0,0),port().reap(s.tenant(),4));past(id,"lease_until");
         assertFalse(port().ack(claim));assertFalse(port().retry(claim,"NETWORK_ERROR"));assertFalse(port().exhaust(claim,"PROJECTION_EVENT_INVALID"));
-        assertEquals(1,port().reap(s.tenant(),4));assertEquals("PENDING",row(id).get("status"));assertEquals(2L,row(id).get("revision"));
+        assertEquals(new R1ProjectionOutboxPort.ReapResult(1,0),port().reap(s.tenant(),4));assertEquals("PENDING",row(id).get("status"));assertEquals(2L,row(id).get("revision"));
         assertFalse(port().ack(claim));past(id,"available_at");var next=port().claim(s.tenant(),"WORKER_B",1).getFirst();
         assertEquals(2,next.attempt());assertEquals(2,next.fencingToken());assertEquals(3,next.revision());assertTrue(port().ack(next));
     }
