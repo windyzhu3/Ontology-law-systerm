@@ -219,7 +219,7 @@ class TopologyVerifierTest(unittest.TestCase):
             "version": "0.1.0",
             "scripts": {
                 "typecheck": "tsc --noEmit",
-                "test": "vitest run --passWithNoTests",
+                "test": "vitest run",
                 "build": "tsc --noEmit && vite build",
             },
             "dependencies": {"react": "19.2.8", "react-dom": "19.2.8"},
@@ -258,6 +258,14 @@ class TopologyVerifierTest(unittest.TestCase):
 
     def test_valid_single_artifact_layout_passes(self) -> None:
         self.assertEqual([], self._verify())
+
+    def test_real_workbench_tests_cannot_pass_with_no_tests(self) -> None:
+        self.assertEqual([], self._verify(), 'real test script is the accepted control')
+        path = self.root / 'apps/workbench/package.json'
+        package = json.loads(path.read_text(encoding='utf-8'))
+        package['scripts']['test'] = 'vitest run --passWithNoTests'
+        path.write_text(json.dumps(package), encoding='utf-8')
+        self.assertTrue(any('workbench script' in finding for finding in self._verify()))
 
     def test_task9_external_identity_lock_rejects_floating_and_shared_storage(self) -> None:
         verifier = self._load_verifier()

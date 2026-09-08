@@ -58,7 +58,7 @@ EXACT_SCRIPTS = {
     },
     "workbench": {
         "typecheck": "tsc --noEmit",
-        "test": "vitest run --passWithNoTests",
+        "test": "vitest run",
         "build": "tsc --noEmit && vite build",
     },
 }
