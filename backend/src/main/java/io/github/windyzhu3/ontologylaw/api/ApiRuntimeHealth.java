@@ -10,9 +10,11 @@ import org.springframework.boot.availability.*;
 /** Typed role health; no public HTTP endpoint or business authorization cache. */
 public final class ApiRuntimeHealth implements SmartLifecycle {
     private final RuntimeDatabase database;private final ApplicationContext context;
+    private final java.util.function.BooleanSupplier identity;
     private volatile boolean running;private Boolean published;private ScheduledExecutorService scheduler;
-    public ApiRuntimeHealth(RuntimeDatabase database,ApplicationContext context){this.database=database;this.context=context;}
-    public boolean healthy(){return running&&database.healthy();}
+    public ApiRuntimeHealth(RuntimeDatabase database,ApplicationContext context){this(database,context,()->true);}
+    public ApiRuntimeHealth(RuntimeDatabase database,ApplicationContext context,java.util.function.BooleanSupplier identity){this.database=database;this.context=context;this.identity=identity;}
+    public boolean healthy(){return running&&database.healthy()&&identity.getAsBoolean();}
     public synchronized void start(){if(running)return;isolation();if(!database.healthy())throw new IllegalStateException("R1_API_GATE_UNAVAILABLE");running=true;scheduler=Executors.newSingleThreadScheduledExecutor(Thread.ofPlatform().daemon(true).name("r1-api-health").factory());scheduler.scheduleWithFixedDelay(this::refresh,0,1,TimeUnit.SECONDS);}
     private void isolation(){
         if(!context.getClass().getName().contains("WebServerApplicationContext"))throw new IllegalStateException("R1_API_ASSEMBLY_INVALID");

@@ -7,6 +7,27 @@ import java.util.*;
 
 /** Append-only owner port. Writes on the caller's active AUDIT capability connection. */
 public interface AuditAppender {
+    record BootstrapEntry(UUID id,UUID commandId,UUID correlationId,String manifestDigest,String operatorAssertion,
+            io.github.windyzhu3.ontologylaw.identity.IdentityBootstrapService.Facts facts) {
+        public BootstrapEntry{Objects.requireNonNull(id);Objects.requireNonNull(commandId);Objects.requireNonNull(correlationId);Objects.requireNonNull(facts);if(manifestDigest==null||!manifestDigest.matches("[0-9a-f]{64}")||operatorAssertion==null||operatorAssertion.isBlank())throw new IllegalArgumentException("Invalid bootstrap audit");}
+        public String summary(){return io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.encode(Map.of("profile","R1_IDENTITY_BOOTSTRAP_V1","version",1,"manifestDigest",manifestDigest,"operatorAssertion",operatorAssertion,"founderPrincipalId",facts.principal().toString(),"rootOrganizationId",facts.root().toString(),"appointmentId",facts.appointment().toString(),"grantIds",facts.grants().stream().map(UUID::toString).toList()));}
+        public byte[] digest(){return io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.digest(summary());}
+    }
+    default void append(Connection c,BootstrapEntry entry)throws SQLException{throw new SQLException("Bootstrap audit unsupported","0A000");}
+    default BootstrapEntry bootstrapOriginal(Connection c,UUID tenant,UUID command)throws SQLException{throw new SQLException("Bootstrap audit unsupported","0A000");}
+    record SelfDisclosureEntry(UUID id,UUID correlationId,UUID tenantId,Subject principal,UUID ownAppointment,
+            java.time.Instant checkedAt,List<Subject> sources) {
+        public SelfDisclosureEntry {
+            Objects.requireNonNull(id);Objects.requireNonNull(correlationId);Objects.requireNonNull(tenantId);Objects.requireNonNull(checkedAt);
+            sources=List.copyOf(sources);
+            if(!"identity.principal".equals(principal.type())||sources.isEmpty()||sources.size()>101||!sources.contains(principal)
+                    ||sources.stream().anyMatch(s->s.revision()==null||!s.equals(principal)&&!"identity.appointment".equals(s.type()))
+                    ||new HashSet<>(sources).size()!=sources.size())throw new IllegalArgumentException("Invalid self disclosure");
+        }
+        public String summary(){return io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.encode(Map.of("profile","R1_IDENTITY_SELF_DISCLOSURE_V1","version",1,"operationId","getSessionContext","responseMode","BODY","resultCount",sources.size(),"disclosedSources",sources.stream().map(s->Map.of("type",s.type(),"id",s.id().toString(),"revision",s.revision())).toList()));}
+        public byte[] digest(){return io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.digest(summary());}
+    }
+    default void append(Connection c,SelfDisclosureEntry entry)throws SQLException{throw new SQLException("Self disclosure unsupported","0A000");}
     record Entry(UUID id,UUID commandId,String commandType,UUID correlationId,String result,
             AuthorizationSnapshot authorization,String summary,byte[] summaryDigest,int schemaVersion) {
         public Entry(UUID id,UUID commandId,String commandType,UUID correlationId,String result,

@@ -21,7 +21,7 @@ public class R1RequestBoundary implements WebMvcConfigurer {
     });}
     private void check(HttpServletRequest request)throws Exception {
         String path=request.getRequestURI();var op=R1HttpOperations.find(request.getMethod(),path);if(op==null)return;
-        if(path.equals("/internal/v1/projections/r1/readiness")){
+        if(path.equals("/internal/v1/projections/r1/readiness")||path.equals("/api/v1/session/context")){
             if(request.getQueryString()!=null&&!request.getQueryString().isEmpty())throw R1HttpFailure.validation("/query","NOT_ALLOWED");
             if(request.getContentLengthLong()>0||request.getHeader("Transfer-Encoding")!=null&&request.getInputStream().read()!=-1)throw R1HttpFailure.validation("/body","NOT_ALLOWED");
         }

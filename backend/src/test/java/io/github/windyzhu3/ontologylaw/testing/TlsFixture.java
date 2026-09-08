@@ -13,8 +13,12 @@ public final class TlsFixture {
     public record Key(String alias,Path path,KeyStore store) {}
     public TlsFixture(Path directory){this.directory=directory;}
     public Key key(String alias)throws Exception {
+        return key(alias,"SAN=dns:localhost,ip:127.0.0.1");
+    }
+    public Key key(String alias,String alternativeNames)throws Exception {
         var path=directory.resolve(alias+".p12");var bin=Path.of(System.getProperty("java.home"),"bin");var keytool=Files.exists(bin.resolve("keytool.exe"))?bin.resolve("keytool.exe"):bin.resolve("keytool");
-        var process=new ProcessBuilder(keytool.toString(),"-genkeypair","-alias",alias,"-keystore",path.toString(),"-storepass",new String(password),"-keypass",new String(password),"-dname","CN="+alias,"-keyalg","RSA","-keysize","2048","-validity","2","-ext","SAN=dns:localhost,ip:127.0.0.1","-noprompt").redirectErrorStream(true).start();
+        var builder=new ProcessBuilder(keytool.toString(),"-genkeypair","-alias",alias,"-keystore",path.toString(),"-storepass:env","TASK92_TEST_KEYSTORE_PASSWORD","-keypass:env","TASK92_TEST_KEYSTORE_PASSWORD","-dname","CN="+alias,"-keyalg","RSA","-keysize","2048","-validity","2","-ext",alternativeNames,"-noprompt").redirectErrorStream(true);
+        builder.environment().put("TASK92_TEST_KEYSTORE_PASSWORD",new String(password));var process=builder.start();
         try(var output=process.getInputStream()){output.transferTo(java.io.OutputStream.nullOutputStream());}if(process.waitFor()!=0)throw new IllegalStateException("TEST_KEYTOOL_FAILED");
         var store=KeyStore.getInstance("PKCS12");try(var input=Files.newInputStream(path)){store.load(input,password);}return new Key(alias,path,store);
     }

@@ -10,9 +10,10 @@ final class R1HttpOperations {
     private static final String COMMON="UNAUTHENTICATED NOT_AUTHORIZED RATE_LIMITED INTERNAL_ERROR SERVICE_UNAVAILABLE";
     private static final String WRITE="VALIDATION_FAILED IDEMPOTENCY_KEY_REQUIRED IDEMPOTENCY_KEY_INVALID COMMAND_PAYLOAD_CONFLICT";
     private static final String TASK="APPOINTMENT_INACTIVE NOT_FOUND TASK_NOT_OPEN TASK_ALREADY_COMPLETED DRAFT_DIGEST_MISMATCH STALE_TASK STALE_DRAFT STALE_SUBJECT TASK_PRECONDITION_REQUIRED";
-    private static final Set<String> READ=codes(COMMON,"NOT_FOUND");
+    private static final Set<String> READ=codes(COMMON,"NOT_FOUND VALIDATION_FAILED");
     private R1HttpOperations(){}
     static Operation find(String method,String path){
+        if(method.equals("GET")&&path.equals("/api/v1/session/context"))return new Operation(null,codes(COMMON,"VALIDATION_FAILED"));
         if(method.equals("GET")&&(path.equals("/api/v1/workcards/current")||path.matches("/api/v1/commands/[^/]+/receipt")))return new Operation(null,READ);
         if(method.equals("GET")&&(path.equals("/internal/v1/projections/r1/readiness")||path.equals("/internal/v1/tasks/due")))return new Operation(null,codes(COMMON,"VALIDATION_FAILED"));
         if(method.equals("POST")&&path.equals("/internal/v1/projections/r1/consume"))return new Operation(null,codes(COMMON,"VALIDATION_FAILED NOT_FOUND STALE_OUTBOX_CLAIM PROJECTION_EVENT_INVALID"));

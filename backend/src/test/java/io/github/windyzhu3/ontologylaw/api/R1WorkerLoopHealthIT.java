@@ -17,7 +17,7 @@ class R1WorkerLoopHealthIT extends R1HttpFixture {
         setupContact();var actor=service("R1_PROJECTION_CONSUME");
         for(String authority:List.of("CONTACT_TASK_RECOVER","ROUTING_REVIEW_TASK_RECOVER"))grant(actor.appointmentId(),authority);
         try(var http=new HttpHarness(actor,new TlsFixture(directory));var client=http.workerClient()) {
-            var registry=new R1WorkerTenantBindings("MVP-2026-09-08.1",List.of(http.workerBinding));var clock=new R1WorkerTransportIT.MutableClock();
+            var registry=new R1WorkerTenantBindings("MVP-2026-09-08.3",List.of(http.workerBinding));var clock=new R1WorkerTransportIT.MutableClock();
             try(var projection=new R1ProjectionDispatcher(registry,client,R1ProjectionOutboxPort.databaseBacked(database::workerConnection),"HEALTH_IT",clock);var due=new DueTaskScheduler(registry,client,clock)) {
                 var binding=http.workerBinding;assertFalse(projection.healthy(binding));for(var type:InternalApiClient.RecoveryType.values())assertFalse(due.healthy(binding,type));
                 projection.poll(binding);for(var type:InternalApiClient.RecoveryType.values())due.poll(binding,type);

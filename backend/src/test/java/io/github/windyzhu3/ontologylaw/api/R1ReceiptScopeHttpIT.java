@@ -45,6 +45,8 @@ class R1ReceiptScopeHttpIT extends R1HttpFixture {
         String subject="verified SERVICE subject";var actor=credentialActor(PrincipalKind.SERVICE,subject,"LEAD_CAPTURE");
         var binding=new R1ServiceSourceBinding.Entry(ISSUER,AUDIENCE,"FIXTURE",actor.tenantId(),actor.principalId(),actor.appointmentId(),Set.of("FIXTURE"));UUID key=UUID.randomUUID();var payload=capture("service-exact-source");
         try(var http=new HttpHarness(actor,subject,List.of(binding))) {
+            var selectorBefore=counts();var delegatedHeaders=Map.of("Idempotency-Key",UUID.randomUUID().toString(),"X-Appointment-Id",actor.appointmentId().toString(),"X-On-Behalf-Appointment-Id",seed.appointment().toString());
+            assertEquals(403,http.request("POST","/api/v1/leads",payload,delegatedHeaders).statusCode(),"A valid SERVICE cannot opt into HUMAN delegation");assertEquals(selectorBefore,counts());
             var before=counts();var other=new TreeMap<>(capture("service-other-account"));other.put("sourceAccountCode","OTHER");var denied=http.request("POST","/api/v1/leads",other,Map.of("Idempotency-Key",UUID.randomUUID().toString()));assertEquals(403,denied.statusCode(),denied.body());assertEquals(before,counts());
             var accepted=http.request("POST","/api/v1/leads",payload,Map.of("Idempotency-Key",key.toString()));assertEquals(201,accepted.statusCode(),accepted.body());
             before=counts();var receipt=http.request("GET","/api/v1/commands/"+key+"/receipt",null,Map.of());assertEquals(200,receipt.statusCode(),receipt.body());assertEquals(http.body(accepted),http.body(receipt));delta(before,0,0,0,0,0,0,0,0,1,0,0);

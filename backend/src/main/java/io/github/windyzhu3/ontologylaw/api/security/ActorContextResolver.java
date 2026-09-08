@@ -29,11 +29,49 @@ public final class ActorContextResolver {
     private final java.time.Clock clock;
     private final List<VerifiedTrust> trusts;private final List<Registration> registrations;
     private final Map<String,CertificateRegistration> certificates;
+    private HumanCredentialVerifier humans;
+    public ActorContextResolver(Connections connections,ExternalSubjectProtection subjects,HumanCredentialVerifier humans) {
+        this.connections=Objects.requireNonNull(connections);this.subjects=Objects.requireNonNull(subjects);this.humans=Objects.requireNonNull(humans);
+        this.clock=java.time.Clock.systemUTC();this.trusts=List.of();this.registrations=List.of();this.certificates=Map.of();
+    }
+    public HumanIdentityReader.VerifiedHumanIdentity human(String token) {
+        if(humans==null)throw invalid();
+        try {var credential=humans.verify(token);try(var c=connections.open()){return new CredentialIdentityRuntime().human(c,credential.tenantId(),credential.provider(),subjects.digest(credential.tenantId(),credential.subject()));}}
+        catch(SQLException unavailable){throw new org.springframework.security.authentication.AuthenticationServiceException("SERVICE_UNAVAILABLE");}
+        catch(HumanIdentityReader.Failure failure){throw humanFailure(failure);}
+    }
+    public Object authenticate(String token,UUID selector,boolean self) {
+        return authenticate(token,selector,null,self,false);
+    }
+    public Object authenticate(String token,UUID selector,UUID behalf,boolean self,boolean administration) {
+        return selectAuthenticated(authenticatePrincipal(token),selector,behalf,self,administration);
+    }
+    public Object authenticatePrincipal(String token) {
+        return humans!=null&&(trusts.isEmpty()||humans.acceptsIssuer(token))?human(token):bearer(token);
+    }
+    public Object selectAuthenticated(Object principal,UUID selector,UUID behalf,boolean self,boolean administration) {
+        if(principal instanceof HumanIdentityReader.VerifiedHumanIdentity identity) {
+            if(administration&&behalf!=null)throw ActorSelectionFailure.denied();if(self)return identity;
+            try(var c=connections.open()){return new CredentialIdentityRuntime().selectHuman(c,identity,selector,behalf);}
+            catch(SQLException unavailable){throw new org.springframework.security.authentication.AuthenticationServiceException("SERVICE_UNAVAILABLE");}
+            catch(HumanIdentityReader.Failure failure){throw humanFailure(failure);}
+        }
+        if(!(principal instanceof Actor actor))throw invalid();
+        if(behalf!=null||selector!=null&&!selector.equals(actor.appointmentId()))throw ActorSelectionFailure.denied();return actor;
+    }
+    private static org.springframework.security.core.AuthenticationException humanFailure(HumanIdentityReader.Failure failure) {
+        return switch(failure.code()){case "SERVICE_UNAVAILABLE"->new org.springframework.security.authentication.AuthenticationServiceException("SERVICE_UNAVAILABLE");case "NOT_AUTHORIZED"->ActorSelectionFailure.denied();default->invalid();};
+    }
     public ActorContextResolver(Connections connections,ExternalSubjectProtection subjects,List<Trust> trusts,List<Registration> registrations) {
         this(connections,subjects,trusts,registrations,List.of());
     }
     public ActorContextResolver(Connections connections,ExternalSubjectProtection subjects,List<Trust> trusts,List<Registration> registrations,List<CertificateRegistration> certificates) {
         this(connections,subjects,trusts,registrations,certificates,java.time.Clock.systemUTC());
+    }
+    /** Production composite: only SERVICE may use the exact static registry. */
+    public ActorContextResolver(Connections connections,ExternalSubjectProtection subjects,HumanCredentialVerifier humans,List<Trust> serviceTrusts,List<Registration> services,List<CertificateRegistration> certificates) {
+        this(connections,subjects,serviceTrusts,services,certificates,java.time.Clock.systemUTC());this.humans=Objects.requireNonNull(humans);
+        if(services.stream().anyMatch(r->r.actor().principalKind()!=PrincipalKind.SERVICE||r.actor().onBehalfPrincipalId()!=null)||serviceTrusts.stream().anyMatch(t->humans.trustsIssuer(t.issuer())))throw new IllegalArgumentException("Ambiguous HUMAN/SERVICE trust");
     }
     ActorContextResolver(Connections connections,ExternalSubjectProtection subjects,List<Trust> trusts,List<Registration> registrations,List<CertificateRegistration> certificates,java.time.Clock clock) {
         this.connections=Objects.requireNonNull(connections);this.subjects=Objects.requireNonNull(subjects);this.clock=Objects.requireNonNull(clock);
@@ -62,6 +100,7 @@ public final class ActorContextResolver {
         catch(RuntimeException failed){throw classify(failed);}
     }
     public Actor bearer(String token) {
+        if(humans!=null&&(trusts.isEmpty()||humans.acceptsIssuer(token)))return (Actor)authenticate(token,null,false);
         if(token==null||token.isEmpty())throw invalid();
         try {
             var candidates=new ArrayList<CredentialIdentityRuntime.Candidate>();

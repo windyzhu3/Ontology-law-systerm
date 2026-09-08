@@ -68,17 +68,22 @@ public class ProblemDetailsAdvice {
         authenticationProblem(response,publicBearer,"UNAUTHENTICATED");
     }
     public static void authenticationFailure(HttpServletResponse response,boolean publicBearer,org.springframework.security.core.AuthenticationException failure)throws IOException {
+        if(failure instanceof io.github.windyzhu3.ontologylaw.api.security.ActorSelectionFailure selection){authenticationProblem(response,publicBearer,selection.getMessage(),selection.pointer());return;}
         authenticationProblem(response,publicBearer,failure instanceof org.springframework.security.authentication.AuthenticationServiceException?"SERVICE_UNAVAILABLE":"UNAUTHENTICATED");
     }
     private static void authenticationProblem(HttpServletResponse response,boolean publicBearer,String code)throws IOException {
+        authenticationProblem(response,publicBearer,code,null);
+    }
+    private static void authenticationProblem(HttpServletResponse response,boolean publicBearer,String code,String pointer)throws IOException {
         var policy=CODES.get(code);response.setStatus(policy.status());
         response.setCharacterEncoding(java.nio.charset.StandardCharsets.UTF_8);
         response.setContentType("application/problem+json");
         response.setHeader("Cache-Control", "no-store");
         if (publicBearer&&policy.status()==401) response.setHeader("WWW-Authenticate", "Bearer");
-        var body = Map.of("type", "urn:ontology-law:problem:"+code,
+        var body = new TreeMap<String,Object>(Map.of("type", "urn:ontology-law:problem:"+code,
                 "title",policy.text(),"status",policy.status(),"code",code,
-                "detail",policy.text(),"instance","/problems/"+UUID.randomUUID(),"retryPolicy",policy.retry());
+                "detail",policy.text(),"instance","/problems/"+UUID.randomUUID(),"retryPolicy",policy.retry()));
+        if(code.equals("VALIDATION_FAILED"))body.put("fieldErrors",R1HttpFailure.validation(pointer,"INVALID_FORMAT").fields());
         response.getWriter().write(JsonMapper.builder().build().writeValueAsString(body));
     }
 }

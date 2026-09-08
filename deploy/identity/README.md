@@ -2,6 +2,8 @@
 
 状态：Task9.1 供应链与配置合同。本文和锁文件不表示 Keycloak 已部署、真实登录已接通或任一实际账号/权限已建立。部署与协议实测由 Task9.2 完成，浏览器依赖在 Task9.4/9.6 按精确版本进入唯一根 package-lock，不在本步安装或创建第二个前端包。
 
+Task9.2 增补：已提供生产配置装配、离线入口和隔离真实 IdP/数据库协议测试；具体通过记录以 Task9.2 报告为准。这不是实际生产部署、浏览器/UAT、密码策略容量或灾备验收。下面保留 Task9.1 的历史核对记录；它的“尚未完成”列描述该阶段，不代替 Task9.2 结果。
+
 ## 锁定制品与验证边界
 
 以 [identity-toolchain.lock.json](identity-toolchain.lock.json) 为唯一新增依赖清单。2026-09-08 核对官方发布、npm 注册表元数据和远程 OCI manifest：
@@ -48,3 +50,42 @@ access/refresh token 仅内存，退出先清屏再执行 RP-initiated logout；
 在创建任何实际环境前核对已冻结后继合同、精确镜像/依赖摘要、受信域名/realm/Tenant、密钥提供方式和隔离资源；缺少配置即停止启动，不带默认超级管理员或演示账号。准备 bootstrap dry-run，明确展示目标 Tenant/根组织/管理员及四项管理授权，但不打印秘密；真实离线执行仍为单独受控操作。
 
 若需改变已批准的单业务制品、应用表数、身份管理子集或安全授权边界，停止并提交具名修订；不得以“部署需要”为理由擅自扩展。
+
+## Task9.2 配置装配与受控运维
+
+`compose.yaml` 固定 linux/amd64 镜像字节，身份库使用独立内部网络、账号和持久卷，不发布数据库端口。只发布明确 loopback HTTPS 端口；生产入口由受控的 HTTPS 网络层提供。`IDENTITY_HTTPS_ORIGIN` 必须是准确 HTTPS Origin，不含 realm 路径。数据库证书 SAN 必须覆盖容器网络名 `identity-db`，Keycloak 通过 `sslmode=verify-full` 与指定 CA 校验它。私钥必须按 PostgreSQL/Keycloak 运行 UID 设置可读且不对其他用户开放；Docker Compose 本地 file-secret 不会可靠替操作者修复主机权限。缺证书、权限或秘密文件时停止，不能改为明文/跳过 TLS。
+
+先由运维准备证书、受控秘密文件及容量/备份，再离线受控地配置 realm。模板不含实际用户、秘密或演示管理员，Compose 也不自动建立管理员或导入未经填充的模板。`realm-template.json` 的每个占位符必须由部署选择固定值：准确 realm、SPA client/回跳/Origin、API audience、目录 client。不要给回跳或 Origin 使用通配符。API introspection 的 confidential client ID **必须等于 `${API_AUDIENCE}`**，这是固定版本的 recipient/audience 校验要求；不能开启 without-audience-check。目录 client 使用不同 ID、不同 secret，只授予本 realm 的 `query-users`、`view-users` 两个角色，核对没有继承 `realm-admin`、manage-users 或其他组合管理角色。模板不创建 service-account 用户及角色授予，需受控运维完成并复核。
+
+模板关闭注册、隐式流、密码授权与 offline scope，保留 Code+PKCE S256。不配置 LDAP、SAML client、动态客户端注册入口、外部 broker 或 impersonation；不得把“未配置”说成已证明上游所有功能没有漏洞。真实用户初次密码必须通过 Keycloak 临时凭据 (`temporary=true`) 交付，要求 `UPDATE_PASSWORD`；模板没有用户，因此不能替运维为每个实际账号完成该操作。测试账号仅在隔离 fixture 中使用已完成初次改密的合成凭据，不是生产账号初始化的替代品。
+
+API/Worker 均使用 `MVP-2026-09-08.3`，物理 schema/release/manifest 校验保持原值。API 的 `ols.api.human-trusts` 每项固定 `issuer`、`audience`、`identity-provider-code`、`tenant-id`、`introspection-client-id` 和受控绝对 `introspection-secret-path`；缺项、重复 issuer/映射、错误 recipient、TLS 错证书/错主机名都失败关闭。`identity-trust-store-path` 与 `identity-trust-store-password-path` 必须成对提供（应用私有 PKCS12），或同时省略使用 JDK 正常受信 CA；不修改系统 truststore。API 上线前业务 Tenant 必须已初始化且 ACTIVE。
+
+原 `registrations` 仅保留 SERVICE 的精确主体/任职/来源账号绑定；生产装配拒绝 HUMAN registration 及静态 on-behalf。动态 HUMAN 不列逐人配置，固定 issuer/provider/Tenant 下按 subject-HMAC 唯一映射。每个 Tenant 追加独立、持久的 32-byte Base64 `actor-scope-hmac`，不得复用其他用途密钥或 cursor key，也不得每次启动随机产生。它绑定完整 actual/on-behalf Actor；替代合法授权证据、重新登录与进程重启不能改变 key。轮换会影响旧 Actor 回执恢复域，必须受控处理，不默默轮换。
+
+## 独立离线 bootstrap 入口
+
+`io.github.windyzhu3.ontologylaw.api.IdentityBootstrapCommand` 是同一 Java 制品内的独立 main，不启动 Spring、HTTP 或 Worker。通过发布包的 runtime classpath 启动该 main；不将它注册成 API Bean，不开 bootstrap HTTP 路由。参数只接受模式和受控文件绝对路径：
+
+已打包 Jar 的入口（接下列参数；命令行不放凭据值）：
+
+```text
+java -Dloader.main=io.github.windyzhu3.ontologylaw.api.IdentityBootstrapCommand -cp ontology-law-system-0.1.0-SNAPSHOT.jar org.springframework.boot.loader.launch.PropertiesLauncher <mode> <config-file> <input-file> [--confirm-bootstrap]
+```
+
+```text
+candidate <operator-config.json> <exact-account-identifier-file>
+dry-run   <operator-config.json> <original-manifest.json>
+execute   <operator-config.json> <original-manifest.json> --confirm-bootstrap
+verify    <operator-config.json> <original-manifest.json>
+```
+
+封闭 operator JSON 字段：`semanticBaseline`, `tenantId`, `tenantCode`, `identityProviderCode`, `issuer`, `apiAudience`, `directoryClientId`, `directorySecretPath`, `operatorAssertion`, `node`, `activeBootstrapKeyId`, `bootstrapKeyPaths`（key ID→绝对文件路径）, `subjectHmacPath`, `identityTrustStorePath`, `identityTrustStorePasswordPath`, `database`。database 仅含 `url`, `username`, `passwordPath`, `schemaVersion`, `releaseDigest`, `manifestHash`。所有 key 文件是规范 Base64 编码的非零 32-byte 独立密钥；candidate AES-GCM key 与 subject-HMAC 不能共用。operator/tenant/provider/issuer 是固定运维绑定，不接受 HTTP 或 token 来决定。
+
+`candidate` 通过受限目录客户端精确匹配一个 enabled HUMAN 账号，输出保密的短期 `providerUserSelector`；将 stdout 直接保存在受控文件，禁止写入构建日志/聊天/截图。它不是原始 subject，不是身份授予，不写业务库。候选有效期最多 5 分钟，绑定操作者、Tenant code、provider、issuer 和经过验证的 subject。目录账号缺失、禁用、非唯一、服务账号或依赖不可用均不产生候选。
+
+manifest 只允许批准合同的 12 字段：`profile=R1_IDENTITY_BOOTSTRAP_V1`, `commandId`, `tenantCode`, `tenantDisplayName`, `rootCode`, `rootDisplayName`, `identityProviderCode`, `issuer`, `providerUserSelector`, `principalDisplayName`, `effectiveFrom`, `operatorAssertion`。不允许自行指定 Principal/Appointment/Grant ID 或权限集。操作者核对 manifest 中的名称、固定配置目标及 dry-run 输出的创建集合后，才允许显式确认 execute。dry-run 与执行都验证候选、目录及现有事实，dry-run 不写数据库。
+
+一次事务原子创建 Tenant、根组织、创始 HUMAN、根 IDENTITY_ADMIN 任职、四项固定 ROOT DIRECT 管理授权和 Slot/Receipt/Audit；不创建 Task、Draft、领域事件或 Outbox。结果不确定或进程失败时退出码 2，只提示保留原 manifest/command，不据此推断回滚。成功模式退出 0；`verify` 从不首次创建。
+
+保留 **原 commandId、完整原 manifest（含原候选密文）、原 candidate key 与 subject-HMAC key**。原键已完整提交时，完整 Slot/Receipt/Audit/初始事实验证优先于候选过期或目录网络复查，可在 IdP 暂时不可用时确认原结果。部分存在、原事实被修改、不同 manifest/新 command 冲突均不补建、不修复。未完整提交且候选过期时不能首次初始化；排除原键不确定结果后，才由运维按受控流程重新准备候选。任何实际生产执行仍须单独批准。

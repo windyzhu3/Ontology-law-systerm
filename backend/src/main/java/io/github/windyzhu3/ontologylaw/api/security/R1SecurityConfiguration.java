@@ -32,12 +32,20 @@ public class R1SecurityConfiguration {
                         .bearerTokenResolver(request->request.getRequestURI().startsWith("/api/v1/")?tokens.resolve(request):null)
                         .authenticationManagerResolver(request->authentication->{
                             var resolver=resolvers.getIfAvailable();if(resolver==null||!(authentication instanceof BearerTokenAuthenticationToken bearer))throw new BadCredentialsException("UNAUTHENTICATED");
-                            return UsernamePasswordAuthenticationToken.authenticated(resolver.bearer(bearer.getToken()),null,List.of());
+                            var principal=resolver.authenticatePrincipal(bearer.getToken());
+                            var own=selector(request,"X-Appointment-Id");var behalf=selector(request,"X-On-Behalf-Appointment-Id");
+                            if(behalf!=null&&own==null)throw ActorSelectionFailure.malformed("X-On-Behalf-Appointment-Id");
+                            return UsernamePasswordAuthenticationToken.authenticated(resolver.selectAuthenticated(principal,own,behalf,request.getRequestURI().equals("/api/v1/session/context"),request.getRequestURI().startsWith("/api/v1/admin/identity/")),null,List.of());
                         })
                         .authenticationEntryPoint((request,response,failure)->ProblemDetailsAdvice.authenticationFailure(response,request.getRequestURI().startsWith("/api/v1/"),failure))
                         .withObjectPostProcessor(new org.springframework.security.config.ObjectPostProcessor<org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter>(){
                             public <O extends org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter> O postProcess(O filter){filter.setAuthenticationFailureHandler((request,response,failure)->ProblemDetailsAdvice.authenticationFailure(response,true,failure));return filter;}
                         }))
                 .build();
+    }
+    private static java.util.UUID selector(jakarta.servlet.http.HttpServletRequest request,String name) {
+        var values=java.util.Collections.list(request.getHeaders(name));if(values.isEmpty())return null;
+        if(values.size()!=1||!values.getFirst().matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"))throw ActorSelectionFailure.malformed(name);
+        return java.util.UUID.fromString(values.getFirst());
     }
 }

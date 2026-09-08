@@ -11,6 +11,7 @@ class R1ApiConfiguration {
     @Bean R1ApiDeployment r1ApiDeployment(Environment environment){return R1ApiDeployment.from(environment);}
     @Bean ActorContextResolver actorContextResolver(R1ApiDeployment deployment){return deployment.actors;}
     @Bean R1ApiServices r1ApiServices(R1ApiDeployment deployment){return deployment.services;}
-    @Bean ApiRuntimeHealth apiRuntimeHealth(R1ApiDeployment deployment,org.springframework.context.ApplicationContext context){return new ApiRuntimeHealth(deployment.database,context);}
+    @Bean SessionContextController.Services sessionContextServices(R1ApiDeployment deployment){return deployment.session;}
+    @Bean ApiRuntimeHealth apiRuntimeHealth(R1ApiDeployment deployment,org.springframework.context.ApplicationContext context){return new ApiRuntimeHealth(deployment.database,context,deployment.humans::healthy);}
     @Bean ApiAvailability applicationAvailability(ApiRuntimeHealth health){return new ApiAvailability(health);}
 }

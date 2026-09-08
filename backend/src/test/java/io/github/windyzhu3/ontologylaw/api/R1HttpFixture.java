@@ -31,6 +31,8 @@ abstract class R1HttpFixture extends ContactFlowFixture {
     final JsonMapper mapper=JsonMapper.builder().build();
     java.util.function.UnaryOperator<java.sql.Connection> disclosureConnection=java.util.function.UnaryOperator.identity();
     java.util.function.UnaryOperator<java.sql.Connection> credentialConnection=java.util.function.UnaryOperator.identity();
+    ActorContextResolver realHumanResolver;
+    String realHumanToken;
     @org.junit.jupiter.api.BeforeEach void resetDisclosureFault(){disclosureConnection=java.util.function.UnaryOperator.identity();credentialConnection=java.util.function.UnaryOperator.identity();}
     static KeyPair signing(){try{var g=KeyPairGenerator.getInstance("RSA");g.initialize(2048);return g.generateKeyPair();}catch(Exception e){throw new AssertionError(e);}}
     protected AuthorizationServiceIT.Seed seedFor(TaskFactory.Type type)throws Exception{return AuthorizationServiceIT.seed(database,"HUMAN",type.authority,this::credentialHmac);}
@@ -51,7 +53,7 @@ abstract class R1HttpFixture extends ContactFlowFixture {
         }
         HttpHarness(Actor publicActor,String subject,List<R1ServiceSourceBinding.Entry> entries)throws Exception {this(null,null,publicActor,subject,entries);}
         HttpHarness(Actor serviceActor,io.github.windyzhu3.ontologylaw.testing.TlsFixture tls,Actor publicActor,String subject,List<R1ServiceSourceBinding.Entry> entries)throws Exception {
-            this.bearer=bearer(subject);var authenticated=publicActor==null?seed.request().actor():publicActor;
+            this.bearer=realHumanToken==null?bearer(subject):realHumanToken;var authenticated=publicActor==null?seed.request().actor():publicActor;
             byte[] release=HexFormat.of().parseHex("11".repeat(32)),manifest=HexFormat.of().parseHex("22".repeat(32));
             try(var c=database.migratorConnection()){sql(c,"update platform_meta.deployment_state set operating_mode='ACTIVE',active_release_digest=?,active_manifest_hash=?,revision=revision+1,changed_at=clock_timestamp() where deployment_state_key='PRIMARY' and (operating_mode,active_release_digest,active_manifest_hash) is distinct from ('ACTIVE',?,?)",release,manifest,release,manifest);}
             var runtimeDatabase=RuntimeDatabase.databaseBacked(database::apiConnection,RuntimeDatabase.Role.API,new RuntimeDatabase.Expected("52-plus-2-v1.2",release,manifest));
@@ -61,7 +63,7 @@ abstract class R1HttpFixture extends ContactFlowFixture {
                 workerCredentials=new io.github.windyzhu3.ontologylaw.worker.InternalApiClient.Credentials(worker.store(),tls.password,clientTrust.store());
                 properties.addAll(List.of("server.ssl.key-store="+server.path(),"server.ssl.key-store-password="+new String(tls.password),"server.ssl.key-store-type=PKCS12","server.ssl.trust-store="+serverTrust.path(),"server.ssl.trust-store-password="+new String(tls.password),"server.ssl.trust-store-type=PKCS12","server.ssl.client-auth=want"));
             }else client=HttpClient.newHttpClient();
-            var resolver=new ActorContextResolver(()->credentialConnection.apply(runtimeDatabase.open()),new ExternalSubjectProtection(credentialKeys::get),List.of(new ActorContextResolver.Trust(ISSUER,AUDIENCE,(RSAPublicKey)signing.getPublic())),List.of(new ActorContextResolver.Registration(ISSUER,AUDIENCE,"FIXTURE",authenticated)),certificateBindings);
+            var resolver=realHumanResolver!=null?realHumanResolver:new ActorContextResolver(()->credentialConnection.apply(runtimeDatabase.open()),new ExternalSubjectProtection(credentialKeys::get),List.of(new ActorContextResolver.Trust(ISSUER,AUDIENCE,(RSAPublicKey)signing.getPublic())),List.of(new ActorContextResolver.Registration(ISSUER,AUDIENCE,"FIXTURE",authenticated)),certificateBindings);
             var sourceBindings=entries.isEmpty()?null:new R1AssemblyValidationRuntime().validate(runtimeDatabase,c->R1ServiceSourceBinding.validate(c,entries,policies));
             var disclosureDatabase=new RuntimeDatabase(){public java.sql.Connection open()throws java.sql.SQLException{return disclosureConnection.apply(runtimeDatabase.open());}public boolean healthy(){return runtimeDatabase.healthy();}};
             var services=new R1ApiServices(disclosureDatabase,policies,protection,sourceBindings,"HTTP_IT",new byte[32]);
@@ -77,7 +79,7 @@ abstract class R1HttpFixture extends ContactFlowFixture {
         }
         Map<String,Object> body(HttpResponse<String> response){return mapper.readValue(response.body(),new tools.jackson.core.type.TypeReference<Map<String,Object>>(){});}
         io.github.windyzhu3.ontologylaw.worker.InternalApiClient workerClient(){return workerClient(()->true);}
-        io.github.windyzhu3.ontologylaw.worker.InternalApiClient workerClient(java.util.function.BooleanSupplier gate){return new io.github.windyzhu3.ontologylaw.worker.InternalApiClient(origin,new io.github.windyzhu3.ontologylaw.worker.R1WorkerTenantBindings("MVP-2026-09-08.1",List.of(workerBinding)),Map.of(workerBinding.credentialAlias(),workerCredentials),gate);}
+        io.github.windyzhu3.ontologylaw.worker.InternalApiClient workerClient(java.util.function.BooleanSupplier gate){return new io.github.windyzhu3.ontologylaw.worker.InternalApiClient(origin,new io.github.windyzhu3.ontologylaw.worker.R1WorkerTenantBindings("MVP-2026-09-08.3",List.of(workerBinding)),Map.of(workerBinding.credentialAlias(),workerCredentials),gate);}
         public void close(){client.close();context.close();}
     }
     Actor credentialActor(AuthorizationService.PrincipalKind kind,String subject,String authority)throws Exception {

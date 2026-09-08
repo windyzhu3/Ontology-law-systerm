@@ -1,0 +1,51 @@
+name: ontology-law-identity
+services:
+  identity-db:
+    image: postgres@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+    environment:
+      POSTGRES_DB: identity_only
+      POSTGRES_USER: identity_only
+      POSTGRES_PASSWORD_FILE: /run/secrets/identity_db_password
+    command: ["postgres", "-c", "ssl=on", "-c", "ssl_cert_file=/run/secrets/identity_db_cert", "-c", "ssl_key_file=/run/secrets/identity_db_key"]
+    secrets: [identity_db_password, identity_db_cert, identity_db_key]
+    volumes: [identity_db_data:/var/lib/postgresql]
+    networks: [identity]
+  keycloak:
+    image: quay.io/keycloak/keycloak@sha256:88943b6ad06d6293a239f0dfca5acec64218c9b3ab327bf9c936acf408a6ae3b
+    depends_on: [identity-db]
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - |
+        export KC_DB_PASSWORD="$$(</run/secrets/identity_db_password)"
+        exec /opt/keycloak/bin/kc.sh start
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://identity-db:5432/identity_only?sslmode=verify-full&sslrootcert=/run/secrets/identity_db_ca
+      KC_DB_USERNAME: identity_only
+      KC_HOSTNAME: ${IDENTITY_HTTPS_ORIGIN:?Set the exact trusted HTTPS origin}
+      KC_HOSTNAME_STRICT: "true"
+      KC_HTTP_ENABLED: "false"
+      KC_HTTPS_CERTIFICATE_FILE: /run/secrets/identity_https_cert
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /run/secrets/identity_https_key
+      KC_FEATURES_DISABLED: impersonation,dynamic-scopes
+    ports: ["127.0.0.1:${IDENTITY_HTTPS_PORT:?Set the explicit HTTPS port}:8443"]
+    secrets: [identity_db_password, identity_db_ca, identity_https_cert, identity_https_key]
+    networks: [identity]
+networks:
+  identity:
+    internal: true
+volumes:
+  identity_db_data:
+secrets:
+  identity_db_password:
+    file: ${IDENTITY_DB_PASSWORD_FILE:?Provide a protected secret file}
+  identity_db_cert:
+    file: ${IDENTITY_DB_CERT_FILE:?Provide the identity database certificate}
+  identity_db_key:
+    file: ${IDENTITY_DB_KEY_FILE:?Provide the protected database private key}
+  identity_db_ca:
+    file: ${IDENTITY_DB_CA_FILE:?Provide the identity database CA}
+  identity_https_cert:
+    file: ${IDENTITY_HTTPS_CERT_FILE:?Provide the Keycloak HTTPS certificate}
+  identity_https_key:
+    file: ${IDENTITY_HTTPS_KEY_FILE:?Provide the protected Keycloak private key}
