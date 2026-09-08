@@ -56,7 +56,7 @@ TARGET_GATE_STATES = {
 VISUAL_BUNDLE_VERSION = "visual-bundle-2026-08-27"
 VISUAL_OWNER = "Product Design"
 VISUAL_CONFIRMATION_DATE = "2026-08-27"
-CANONICAL_BASELINE_ID = "MVP-2026-09-08.2"
+CANONICAL_BASELINE_ID = "MVP-2026-09-08.3"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 HISTORICAL_BANNER = "历史规格（HISTORICAL_SUPERSEDED）"
 HISTORICAL_WARNING = (
@@ -697,7 +697,7 @@ R1_OPERATION_ERRORS = {
         "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
     },
     "getCurrentWorkCard": {
-        "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND", "RATE_LIMITED",
+        "VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND", "RATE_LIMITED",
         "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
     },
     "saveActionDraft": {
@@ -886,8 +886,10 @@ def expected_visual_rows() -> dict[str, str]:
 EXPECTED_VISUAL_ROWS = expected_visual_rows()
 REQUIRED_NONVISUAL_ROWS = {
     "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1": ("MVP", "FROZEN", "MVP-2026-09-08.1", "../baseline/CURRENT-MVP-BASELINE.md"),
-    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2": ("MVP", "FROZEN", "MVP-2026-09-08.2", "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2-2026-09-08.3": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
     "R1-IDENTITY-ACCESS-CONTRACT": ("R1", "FROZEN", "R1-IDENTITY-ACCESS-V1.0", "../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md"),
+    "R1-IDENTITY-ACCESS-CONTRACT-V1-1": ("R1", "FROZEN", "R1-IDENTITY-ACCESS-V1.1", "../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md"),
     "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1": ("MVP", "FROZEN", "MVP-2026-09-07.1", "../baseline/CURRENT-MVP-BASELINE.md"),
     "DB-52P2-CONTRACT": ("MVP", "MERGED", "52-plus-2-v1", "../../database/schema-contract-52-plus-2/contract/schema_contract.py"),
     "DB-52P2-MIGRATIONS": ("MVP", "MERGED", "52-plus-2-v1", "../../database/schema-contract-52-plus-2/generated/db/migration/V840__schema_contract_validation.sql"),
@@ -1663,8 +1665,8 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
         return
     metadata = (
         (task_text, "R1-TASK-COMPLETION-V1.2", "R1 task contract"),
-        (http_text, "R1-HTTP-V1.4", "R1 HTTP contract"),
-        (workbench_text, "R1-WORKBENCH-V1.2", "R1 workbench contract"),
+        (http_text, "R1-HTTP-V1.5", "R1 HTTP contract"),
+        (workbench_text, "R1-WORKBENCH-V1.3", "R1 workbench contract"),
     )
     for text, expected_id, label in metadata:
         if field_value(text, "Contract ID") != expected_id or field_value(text, "Status") != "FROZEN":
@@ -2642,6 +2644,12 @@ def verify_delivery_ledger(root: Path, findings: list[str]) -> list[str] | None:
         return
     if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2":
         findings.append("Delivery ledger previous baseline must point to the exact ADR-0014 successor")
+        return
+    if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2-2026-09-08.3":
+        findings.append("Delivery ledger previous baseline must point to the exact ADR-0015 successor")
+        return
+    if superseded_by(rows_by_id["R1-IDENTITY-ACCESS-CONTRACT"]) != "R1-IDENTITY-ACCESS-CONTRACT-V1-1":
+        findings.append("Delivery ledger Identity V1.0 must point to the exact ADR-0015 successor")
         return
     unexpected_visual_ids = sorted(visual_row_ids - set(EXPECTED_VISUAL_ROWS))
     if unexpected_visual_ids:

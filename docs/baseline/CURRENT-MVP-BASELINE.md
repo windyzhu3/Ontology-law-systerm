@@ -1,10 +1,12 @@
 # 当前MVP基线
 
-Baseline ID: MVP-2026-09-08.2
+Baseline ID: MVP-2026-09-08.3
+
+Delegated-context authority: [ADR-0015](../adr/ADR-0015-task9-delegated-context.md). This named static successor preserves legal one-hop delegated entry under [Identity V1.1](../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md): optional paired X-On-Behalf-Appointment-Id, two required context fields, SELF max101 and pending recovery-marker retention until explicit identity choice. HTTP V1.5 / Workbench V1.3 / OpenAPI1.4.0 activate; Command V1.3 business policies, nine request bodies, fourteen events,37/32/5 and physical52-plus-2-v1.2 remain unchanged. Identity management stays HUMAN/own Appointment/DIRECT. Task9.2a static verification cannot establish T9-D02–08 runtime PASS.
 
 Task9 identity authority: [ADR-0014](../adr/ADR-0014-task9-real-user-access.md); profile: R1_IDENTITY_ACCESS_V1
 
-2026-09-08 named successor activates [Identity V1.0](../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md), baseline MVP-2026-09-08.2, HTTP V1.4, Command V1.3, Workbench V1.2 and OpenAPI1.3.0: exactly37 operations (32 public Bearer +5 internal mTLS),14 static Identity commands and the principal-only self context. Prior activation paragraphs/counts below are historical. ADM-01–04 HUMAN production work and real login are now in Task9 scope; Task9.1 is static FROZEN only. Existing nine business request DTOs, seven Task types and fourteen events are unchanged. Keycloak independently owns external identity storage outside the business13 schemas/52+2 tables at52-plus-2-v1.2; one SPA/OpenAPI/Jar and exclusive APP_ROLE=api|worker remain. No Task9 runtime, human UAT, Task10/capacity or R1 release status is advanced.
+2026-09-08 named successor activates [Identity V1.1](../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md), baseline MVP-2026-09-08.3, HTTP V1.5, Command V1.3, Workbench V1.3 and OpenAPI1.4.0: exactly37 operations (32 public Bearer +5 internal mTLS),14 static Identity commands and authenticated-self context with explicit delegated selection. Prior activation paragraphs/counts below are historical. ADM-01–04 HUMAN production work and real login are now in Task9 scope; Task9.2a is static FROZEN only. Existing nine business request DTOs, seven Task types and fourteen events are unchanged. Keycloak independently owns external identity storage outside the business13 schemas/52+2 tables at52-plus-2-v1.2; one SPA/OpenAPI/Jar and exclusive APP_ROLE=api|worker remain. No Task9 runtime, human UAT, Task10/capacity or R1 release status is advanced.
 
 
 Receipt recovery authority: [ADR-0013](../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_RECOVERY_ACTIVATION_V1

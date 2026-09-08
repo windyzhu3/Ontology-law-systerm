@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: Ontology Law System R1 API
-  version: 1.3.0
+  version: 1.4.0
   description: >-
     The single executable R1 HTTP contract for Lead intake, task completion,
     ActionDraft persistence, Current Work Card projection, receipt recovery,
@@ -29,6 +29,7 @@ paths:
           "publicBearer": []
         }
       ],
+      "x-on-behalf-selection": "ACCEPT_VALID_HUMAN",
       "x-tenant-source": "AUTHENTICATED_IDENTITY",
       "x-subject-binding": "OWN_PRINCIPAL",
       "x-authentication-profile": "R1_AUTHENTICATED_IDENTITY_V1",
@@ -45,6 +46,9 @@ paths:
       "parameters": [
         {
           "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
         }
       ],
       "responses": {
@@ -117,6 +121,9 @@ paths:
           "$ref": "#/components/parameters/AppointmentSelection"
         },
         {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
+        },
+        {
           "$ref": "#/components/parameters/IdentityLimit"
         },
         {
@@ -165,6 +172,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT"
     }
   }
@@ -196,6 +204,9 @@ paths:
       "parameters": [
         {
           "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
         },
         {
           "$ref": "#/components/parameters/IdentityLimit"
@@ -249,6 +260,7 @@ paths:
         }
       },
       "x-authority-code": "PAGE_SPECIFIC_MANAGEMENT_AUTHORITY",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT"
     }
   }
@@ -280,6 +292,9 @@ paths:
       "parameters": [
         {
           "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
         },
         {
           "$ref": "#/components/parameters/IdentityLimit"
@@ -327,6 +342,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT"
     },
     "post": {
@@ -365,6 +381,9 @@ paths:
       "parameters": [
         {
           "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
         },
         {
           "$ref": "#/components/parameters/IdempotencyKey"
@@ -418,6 +437,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "CREATE_IDENTITY_PRINCIPAL",
       "x-envelope": "INTERNAL_ADMIN",
@@ -474,6 +494,9 @@ paths:
           "$ref": "#/components/parameters/AppointmentSelection"
         },
         {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
+        },
+        {
           "$ref": "#/components/parameters/IdempotencyKey"
         },
         {
@@ -537,6 +560,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "RENAME_IDENTITY_PRINCIPAL",
       "x-envelope": "INTERNAL_ADMIN",
@@ -593,6 +617,9 @@ paths:
           "$ref": "#/components/parameters/AppointmentSelection"
         },
         {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
+        },
+        {
           "$ref": "#/components/parameters/IdempotencyKey"
         },
         {
@@ -656,6 +683,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "SUSPEND_IDENTITY_PRINCIPAL",
       "x-envelope": "INTERNAL_ADMIN",
@@ -712,6 +740,9 @@ paths:
           "$ref": "#/components/parameters/AppointmentSelection"
         },
         {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
+        },
+        {
           "$ref": "#/components/parameters/IdempotencyKey"
         },
         {
@@ -775,6 +806,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "RESUME_IDENTITY_PRINCIPAL",
       "x-envelope": "INTERNAL_ADMIN",
@@ -831,6 +863,9 @@ paths:
           "$ref": "#/components/parameters/AppointmentSelection"
         },
         {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
+        },
+        {
           "$ref": "#/components/parameters/IdempotencyKey"
         },
         {
@@ -894,6 +929,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "DISABLE_IDENTITY_PRINCIPAL",
       "x-envelope": "INTERNAL_ADMIN",
@@ -937,6 +973,9 @@ paths:
       "parameters": [
         {
           "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
         },
         {
           "$ref": "#/components/parameters/IdentityLimit"
@@ -984,6 +1023,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_ORGANIZATION_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT"
     },
     "post": {
@@ -1022,6 +1062,9 @@ paths:
       "parameters": [
         {
           "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
         },
         {
           "$ref": "#/components/parameters/IdempotencyKey"
@@ -1075,6 +1118,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_ORGANIZATION_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "CREATE_ORGANIZATION_UNIT",
       "x-envelope": "INTERNAL_ADMIN",
@@ -1131,6 +1175,9 @@ paths:
           "$ref": "#/components/parameters/AppointmentSelection"
         },
         {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
+        },
+        {
           "$ref": "#/components/parameters/IdempotencyKey"
         },
         {
@@ -1194,6 +1241,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_ORGANIZATION_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "RENAME_ORGANIZATION_UNIT",
       "x-envelope": "INTERNAL_ADMIN",
@@ -1250,6 +1298,9 @@ paths:
           "$ref": "#/components/parameters/AppointmentSelection"
         },
         {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
+        },
+        {
           "$ref": "#/components/parameters/IdempotencyKey"
         },
         {
@@ -1313,6 +1364,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_ORGANIZATION_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "CLOSE_ORGANIZATION_UNIT",
       "x-envelope": "INTERNAL_ADMIN",
@@ -1356,6 +1408,9 @@ paths:
       "parameters": [
         {
           "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
         },
         {
           "$ref": "#/components/parameters/IdentityLimit"
@@ -1403,6 +1458,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_APPOINTMENT_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT"
     },
     "post": {
@@ -1441,6 +1497,9 @@ paths:
       "parameters": [
         {
           "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
         },
         {
           "$ref": "#/components/parameters/IdempotencyKey"
@@ -1494,6 +1553,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_APPOINTMENT_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "CREATE_APPOINTMENT",
       "x-envelope": "INTERNAL_ADMIN",
@@ -1550,6 +1610,9 @@ paths:
           "$ref": "#/components/parameters/AppointmentSelection"
         },
         {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
+        },
+        {
           "$ref": "#/components/parameters/IdempotencyKey"
         },
         {
@@ -1613,6 +1676,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_APPOINTMENT_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "SUSPEND_APPOINTMENT",
       "x-envelope": "INTERNAL_ADMIN",
@@ -1669,6 +1733,9 @@ paths:
           "$ref": "#/components/parameters/AppointmentSelection"
         },
         {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
+        },
+        {
           "$ref": "#/components/parameters/IdempotencyKey"
         },
         {
@@ -1732,6 +1799,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_APPOINTMENT_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "RESUME_APPOINTMENT",
       "x-envelope": "INTERNAL_ADMIN",
@@ -1788,6 +1856,9 @@ paths:
           "$ref": "#/components/parameters/AppointmentSelection"
         },
         {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
+        },
+        {
           "$ref": "#/components/parameters/IdempotencyKey"
         },
         {
@@ -1851,6 +1922,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_APPOINTMENT_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "END_APPOINTMENT",
       "x-envelope": "INTERNAL_ADMIN",
@@ -1894,6 +1966,9 @@ paths:
       "parameters": [
         {
           "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
         },
         {
           "$ref": "#/components/parameters/IdentityLimit"
@@ -1941,6 +2016,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_AUTHORITY_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT"
     },
     "post": {
@@ -1979,6 +2055,9 @@ paths:
       "parameters": [
         {
           "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
         },
         {
           "$ref": "#/components/parameters/IdempotencyKey"
@@ -2032,6 +2111,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_AUTHORITY_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "CREATE_AUTHORITY_GRANT",
       "x-envelope": "INTERNAL_ADMIN",
@@ -2086,6 +2166,9 @@ paths:
       "parameters": [
         {
           "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/OnBehalfAppointmentSelection"
         },
         {
           "$ref": "#/components/parameters/IdempotencyKey"
@@ -2151,6 +2234,7 @@ paths:
         }
       },
       "x-authority-code": "IDENTITY_AUTHORITY_MANAGE",
+      "x-on-behalf-selection": "REJECT",
       "x-authority-path": "DIRECT",
       "x-command-type": "REVOKE_AUTHORITY_GRANT",
       "x-envelope": "INTERNAL_ADMIN",
@@ -2173,6 +2257,7 @@ paths:
       summary: Capture one Lead from a source account
       security:
         - publicBearer: []
+      x-on-behalf-selection: ACCEPT_VALID_HUMAN
       x-tenant-source: ACTOR_CONTEXT
       x-subject-binding: SOURCE_NATURAL_KEY
       x-error-codes:
@@ -2190,6 +2275,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/AppointmentSelection'
+        - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
       requestBody:
         required: true
         content:
@@ -2233,9 +2319,11 @@ paths:
       summary: Read the current Actor-scoped Workbench envelope
       security:
         - publicBearer: []
+      x-on-behalf-selection: ACCEPT_VALID_HUMAN
       x-tenant-source: ACTOR_CONTEXT
       x-subject-binding: ACTOR_SCOPE
       x-error-codes:
+        - VALIDATION_FAILED
         - UNAUTHENTICATED
         - NOT_AUTHORIZED
         - NOT_FOUND
@@ -2245,6 +2333,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/WorkbenchIfNoneMatch'
         - $ref: '#/components/parameters/AppointmentSelection'
+        - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
       responses:
         '200':
           description: Current Workbench envelope.
@@ -2263,6 +2352,8 @@ paths:
           headers:
             ETag:
               $ref: '#/components/headers/WorkbenchETagHeader'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
         '401':
           $ref: '#/components/responses/PublicUnauthorizedProblem'
         '403':
@@ -2283,6 +2374,7 @@ paths:
       summary: Create or update the current Task ActionDraft
       security:
         - publicBearer: []
+      x-on-behalf-selection: ACCEPT_VALID_HUMAN
       x-tenant-source: ACTOR_CONTEXT
       x-subject-binding: TASK_AND_DRAFT
       x-precondition-mode: exactly-one-of-if-none-match-star-or-if-match-draft-etag
@@ -2310,6 +2402,7 @@ paths:
         - $ref: '#/components/parameters/DraftIfMatch'
         - $ref: '#/components/parameters/DraftCreateIfNoneMatch'
         - $ref: '#/components/parameters/AppointmentSelection'
+        - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
       requestBody:
         required: true
         content:
@@ -2370,6 +2463,7 @@ paths:
       summary: Resolve the frozen duplicate Lead candidate
       security:
         - publicBearer: []
+      x-on-behalf-selection: ACCEPT_VALID_HUMAN
       x-tenant-source: ACTOR_CONTEXT
       x-subject-binding: TASK_AND_LEAD_REVISION
       x-error-codes:
@@ -2397,6 +2491,7 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
         - $ref: '#/components/parameters/AppointmentSelection'
+        - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
       requestBody:
         required: true
         content:
@@ -2439,6 +2534,7 @@ paths:
       summary: Fill the one-time Lead ingress completion slot
       security:
         - publicBearer: []
+      x-on-behalf-selection: ACCEPT_VALID_HUMAN
       x-tenant-source: ACTOR_CONTEXT
       x-subject-binding: TASK_AND_LEAD_REVISION
       x-error-codes:
@@ -2467,6 +2563,7 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
         - $ref: '#/components/parameters/AppointmentSelection'
+        - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
       requestBody:
         required: true
         content:
@@ -2509,6 +2606,7 @@ paths:
       summary: Assign the Lead to one eligible Appointment
       security:
         - publicBearer: []
+      x-on-behalf-selection: ACCEPT_VALID_HUMAN
       x-tenant-source: ACTOR_CONTEXT
       x-subject-binding: TASK_LEAD_AND_ASSIGNMENT
       x-error-codes:
@@ -2535,6 +2633,7 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
         - $ref: '#/components/parameters/AppointmentSelection'
+        - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
       requestBody:
         required: true
         content:
@@ -2575,6 +2674,7 @@ paths:
       summary: Record the controlled routing-gap disposition
       security:
         - publicBearer: []
+      x-on-behalf-selection: ACCEPT_VALID_HUMAN
       x-tenant-source: ACTOR_CONTEXT
       x-subject-binding: TASK_AND_LEAD_REVISION
       x-error-codes:
@@ -2602,6 +2702,7 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
         - $ref: '#/components/parameters/AppointmentSelection'
+        - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
       requestBody:
         required: true
         content:
@@ -2644,6 +2745,7 @@ paths:
       summary: Acknowledge the exact source-intake stop request
       security:
         - publicBearer: []
+      x-on-behalf-selection: ACCEPT_VALID_HUMAN
       x-tenant-source: ACTOR_CONTEXT
       x-subject-binding: TASK_AND_CAUSAL_DECISION
       x-error-codes:
@@ -2670,6 +2772,7 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
         - $ref: '#/components/parameters/AppointmentSelection'
+        - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
       requestBody:
         required: true
         content:
@@ -2710,6 +2813,7 @@ paths:
       summary: Record one real Lead contact result
       security:
         - publicBearer: []
+      x-on-behalf-selection: ACCEPT_VALID_HUMAN
       x-tenant-source: ACTOR_CONTEXT
       x-subject-binding: TASK_LEAD_AND_ASSIGNMENT
       x-error-codes:
@@ -2737,6 +2841,7 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
         - $ref: '#/components/parameters/AppointmentSelection'
+        - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
       requestBody:
         required: true
         content:
@@ -2779,6 +2884,7 @@ paths:
       summary: Review Lead validity from the exact causal contact result
       security:
         - publicBearer: []
+      x-on-behalf-selection: ACCEPT_VALID_HUMAN
       x-tenant-source: ACTOR_CONTEXT
       x-subject-binding: TASK_AND_CAUSAL_RESULT
       x-error-codes:
@@ -2805,6 +2911,7 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
         - $ref: '#/components/parameters/AppointmentSelection'
+        - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
       requestBody:
         required: true
         content:
@@ -2851,6 +2958,7 @@ paths:
         Legacy recovery requires the complete original request and original Idempotency-Key at its original endpoint, with zero replay delta; never automatically use a new key.
       security:
         - publicBearer: []
+      x-on-behalf-selection: ACCEPT_VALID_HUMAN
       x-tenant-source: ACTOR_CONTEXT
       x-subject-binding: COMMAND_ID_AND_ACTOR_SCOPE
       x-error-codes:
@@ -2863,6 +2971,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/CommandIdPath'
         - $ref: '#/components/parameters/AppointmentSelection'
+        - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
       responses:
         '200':
           description: 'Original terminal receipt projection, disclosed only after READ_COMMAND_RECEIPT Audit commit acknowledgement; Cache-Control: no-store.'
@@ -3147,6 +3256,24 @@ components:
         "$ref": "#/components/schemas/Uuid"
       }
     }
+    OnBehalfAppointmentSelection:
+      name: X-On-Behalf-Appointment-Id
+      in: header
+      required: false
+      schema:
+        $ref: '#/components/schemas/Uuid'
+      x-requires-header: X-Appointment-Id
+      description: >-
+        Optional single UUID of an existing eligible on-behalf Appointment; requires
+        explicit paired X-Appointment-Id. Missing means own identity, never automatic
+        delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400
+        VALIDATION_FAILED before slot admission; safe field names only, never values.
+        Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403
+        NOT_AUTHORIZED without existence disclosure or own-identity fallback.
+        Only original11 business operations and getSessionContext accept valid HUMAN
+        delegation; all20 Identity management operations and SERVICE reject this
+        selector. Internal mTLS does not consume it or alter its static Actor.
+        Invalid credentials remain401; unavailable IdP/database remains503.
     AppointmentSelection: {
       "name": "X-Appointment-Id",
       "in": "header",
@@ -3710,6 +3837,7 @@ components:
       ]
     }
     SessionContextV1: {
+      "description": "Nine required fields. Selected IDs must match exactly one corresponding candidate; choices are UUID sorted and deduplicated. Cross-array membership, current qualification, bounded query overflow and fresh entry permission checks are explicit runtime obligations under Identity V1.1; generated types do not guarantee them.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -3719,9 +3847,20 @@ components:
         "selectedAppointmentId",
         "actorScopeKey",
         "canEnterWorkbench",
-        "canEnterIdentityAdmin"
+        "canEnterIdentityAdmin",
+        "delegatedAppointmentChoices",
+        "selectedOnBehalfAppointmentId"
       ],
       "properties": {
+        "delegatedAppointmentChoices": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {"$ref": "#/components/schemas/IdentityChoiceV1"}
+        },
+        "selectedOnBehalfAppointmentId": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
         "displayName": {
           "$ref": "#/components/schemas/SafeText200"
         },
@@ -3779,6 +3918,8 @@ components:
               "appointmentChoices": {
                 "maxItems": 0
               },
+              "delegatedAppointmentChoices": {"maxItems": 0},
+              "selectedOnBehalfAppointmentId": {"type": "null"},
               "selectedAppointmentId": {
                 "type": "null"
               },
@@ -3810,6 +3951,8 @@ components:
               "appointmentChoices": {
                 "minItems": 2
               },
+              "delegatedAppointmentChoices": {"maxItems": 0},
+              "selectedOnBehalfAppointmentId": {"type": "null"},
               "selectedAppointmentId": {
                 "type": "null"
               },
@@ -3847,6 +3990,19 @@ components:
               "actorScopeKey": {
                 "type": "string"
               }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"selectedOnBehalfAppointmentId": {"type": "string"}},
+            "required": ["selectedOnBehalfAppointmentId"]
+          },
+          "then": {
+            "properties": {
+              "state": {"const": "READY"},
+              "delegatedAppointmentChoices": {"minItems": 1},
+              "canEnterIdentityAdmin": {"const": false}
             }
           }
         }

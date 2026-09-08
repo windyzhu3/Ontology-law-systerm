@@ -15,7 +15,7 @@ from scripts.baseline.tests.test_r1_receipt_recovery_contract import R1ReceiptRe
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "verify_baseline.py"
-CANONICAL_BASELINE_ID = "MVP-2026-09-08.2"
+CANONICAL_BASELINE_ID = "MVP-2026-09-08.3"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 R1_CONTACT_EVIDENCE_BASELINE_MARKERS = (
     "Receipt recovery authority: [ADR-0013](../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_RECOVERY_ACTIVATION_V1",
@@ -538,7 +538,7 @@ class VerifyBaselineTest(unittest.TestCase):
                 [
                     "# R1 HTTP error and precondition matrix",
                     "",
-                    "Contract ID: R1-HTTP-V1.4",
+                    "Contract ID: R1-HTTP-V1.5",
                     "",
                     "Status: FROZEN",
                     "",
@@ -597,7 +597,7 @@ class VerifyBaselineTest(unittest.TestCase):
                 [
                     "# R1 workbench presentation contract",
                     "",
-                    "Contract ID: R1-WORKBENCH-V1.2",
+                    "Contract ID: R1-WORKBENCH-V1.3",
                     "",
                     "Status: FROZEN",
                     "",
@@ -879,6 +879,8 @@ class VerifyBaselineTest(unittest.TestCase):
             "scripts/baseline/r1_receipt_recovery_contract.py",
             "scripts/baseline/task9_identity_contract.py",
             "docs/adr/ADR-0014-task9-real-user-access.md",
+            "docs/adr/ADR-0015-task9-delegated-context.md",
+            "docs/superpowers/specs/2026-09-08-task9-delegated-context-amendment-design.md",
             "docs/contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md",
             "deploy/identity/README.md",
             "deploy/identity/identity-toolchain.lock.json",
@@ -898,12 +900,21 @@ class VerifyBaselineTest(unittest.TestCase):
                              if line.startswith("Receipt recovery authority: "))
             target = root / relative
             target.write_text(authority + "\n\n" + target.read_text(encoding="utf-8"), encoding="utf-8")
+        for relative in (
+            "docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md",
+            "docs/contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md",
+        ):
+            source = (repository_root / relative).read_text(encoding="utf-8")
+            delegated_rules = source.split("Delegated-context authority: ", 1)[1].split("Task9 identity authority: ", 1)[0]
+            target = root / relative
+            target.write_text(target.read_text(encoding="utf-8") + "\nDelegated-context authority: " + delegated_rules, encoding="utf-8")
         ledger_path = root / "docs/progress/MVP-DELIVERY-LEDGER.md"
         successor_rows = [line for line in (repository_root / "docs/progress/MVP-DELIVERY-LEDGER.md").read_text(encoding="utf-8").splitlines()
-                          if line.startswith(("| BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1 |", "| BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2 |", "| R1-RECEIPT-RECOVERY-CONTRACT |", "| R1-IDENTITY-ACCESS-CONTRACT |"))]
+                          if line.startswith(("| BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1 |", "| BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2 |", "| BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2-2026-09-08.3 |", "| R1-RECEIPT-RECOVERY-CONTRACT |", "| R1-IDENTITY-ACCESS-CONTRACT |", "| R1-IDENTITY-ACCESS-CONTRACT-V1-1 |"))]
         successor_rows = [line.replace("Canonical MVP baseline", "Canonical baseline").replace(" | FROZEN | ", " | MERGED | ").replace(
             " | Static contract only;", "; `merge-commit=abcdef0` | Static contract only;").replace(
-            " | Static authority only;", "; `merge-commit=abcdef0` | Static authority only;")
+            " | Static authority only;", "; `merge-commit=abcdef0` | Static authority only;").replace(
+            " | Static delegated-context authority only;", "; `merge-commit=abcdef0` | Static delegated-context authority only;")
             if line.startswith("| BASE-CURRENT-MVP-") else line for line in successor_rows]
         ledger_path.write_text(ledger_path.read_text(encoding="utf-8") + "\n".join(successor_rows) + "\n", encoding="utf-8")
 
@@ -1133,15 +1144,15 @@ class VerifyBaselineTest(unittest.TestCase):
                 "Missing canonical baseline: docs/baseline/CURRENT-MVP-BASELINE.md",
                 "R1 contact/evidence artifact missing or invalid UTF-8: docs/baseline/CURRENT-MVP-BASELINE.md",
                 "R1 contact/evidence active physical capability declarations must all equal 52-plus-2-v1.2",
-                "R1 contact/evidence contract missing active baseline: Baseline ID: MVP-2026-09-08.2",
+                "R1 contact/evidence contract missing active baseline: Baseline ID: MVP-2026-09-08.3",
                 "R1 contact/evidence contract missing active Task contract: Task contract `R1-TASK-COMPLETION-V1.2`",
                 "R1 contact/evidence contract missing physical capability: physical capability `52-plus-2-v1.2` remain unchanged",
                 "R1 contact/evidence contract missing contract-only baseline: no production Handler, Evidence port, Workbench or R1 business status is advanced",
                 "R1 readiness artifact missing or invalid UTF-8: docs/baseline/CURRENT-MVP-BASELINE.md",
-                "R1 readiness active baseline must be exactly MVP-2026-09-08.2",
+                "R1 readiness active baseline must be exactly MVP-2026-09-08.3",
                 "R1 readiness active baseline must name ADR-0012 supersession",
                 "R1 receipt recovery artifact missing or invalid UTF-8: docs/baseline/CURRENT-MVP-BASELINE.md",
-                "R1 receipt recovery active metadata must declare exactly Baseline ID: MVP-2026-09-08.2 in docs/baseline/CURRENT-MVP-BASELINE.md",
+                "R1 receipt recovery active metadata must declare exactly Baseline ID: MVP-2026-09-08.3 in docs/baseline/CURRENT-MVP-BASELINE.md",
                 "R1 receipt recovery requires exact resolved ADR-0013 authority and profile in docs/baseline/CURRENT-MVP-BASELINE.md",
                 "Task9 required contract artifact invalid or missing",
                 "Delivery ledger row BASE-CURRENT-MVP Artifact must contain safe Git-tracked in-repository regular-file links",
@@ -1173,14 +1184,14 @@ class VerifyBaselineTest(unittest.TestCase):
                     f"{CANONICAL_BASELINE_ID}",
                     "R1 contact/evidence contract missing active baseline: "
                     f"Baseline ID: {CANONICAL_BASELINE_ID}",
-                    "R1 readiness active baseline must be exactly MVP-2026-09-08.2",
-                    "R1 receipt recovery active metadata must declare exactly Baseline ID: MVP-2026-09-08.2 in docs/baseline/CURRENT-MVP-BASELINE.md",
+                    "R1 readiness active baseline must be exactly MVP-2026-09-08.3",
+                    "R1 receipt recovery active metadata must declare exactly Baseline ID: MVP-2026-09-08.3 in docs/baseline/CURRENT-MVP-BASELINE.md",
                     "Task9 baseline must replace prior identity exclusion",
                 ],
             )
 
     def test_runtime_baseline_version_accepts_only_the_approved_successor(self) -> None:
-        for version, valid in [("MVP-2026-09-08.2", True), ("MVP-2026-09-06.3", False), ("MVP-2026-09-06.2", False), ("MVP-2026-09-05.3", False), ("MVP-2026-09-06.1", False), ("MVP-2026-09-05.2", False), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.1", False), ("MVP-2026-09-05.10", False)]:
+        for version, valid in [("MVP-2026-09-08.3", True), ("MVP-2026-09-06.3", False), ("MVP-2026-09-06.2", False), ("MVP-2026-09-05.3", False), ("MVP-2026-09-06.1", False), ("MVP-2026-09-05.2", False), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.1", False), ("MVP-2026-09-05.10", False)]:
             with self.subTest(version=version), tempfile.TemporaryDirectory() as temp_dir:
                 root = Path(temp_dir)
                 baseline = root / "docs/baseline/CURRENT-MVP-BASELINE.md"

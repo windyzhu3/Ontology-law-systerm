@@ -147,12 +147,12 @@ def validate(root: Path) -> list[str]:
     if "Status: Accepted" not in _without_fenced_code(adr):
         findings.append("R1 readiness ADR-0012 must be active and Accepted")
     visible_baseline = _without_fenced_code(baseline)
-    if [line for line in visible_baseline if line.startswith("Baseline ID:")] != ["Baseline ID: MVP-2026-09-08.2"]:
-        findings.append("R1 readiness active baseline must be exactly MVP-2026-09-08.2")
+    if [line for line in visible_baseline if line.startswith("Baseline ID:")] != ["Baseline ID: MVP-2026-09-08.3"]:
+        findings.append("R1 readiness active baseline must be exactly MVP-2026-09-08.3")
     if not any("ADR-0012-r1-projection-readiness-protocol.md" in line for line in visible_baseline):
         findings.append("R1 readiness active baseline must name ADR-0012 supersession")
-    if "Contract ID: R1-HTTP-V1.4" not in _without_fenced_code(http):
-        findings.append("R1 readiness HTTP contract must activate R1-HTTP-V1.4")
+    if "Contract ID: R1-HTTP-V1.5" not in _without_fenced_code(http):
+        findings.append("R1 readiness HTTP contract must activate R1-HTTP-V1.5")
     http_rows = _rows(http, "Operations", ("OperationId", "Method", "Path", "TenantSource", "IdempotencyKey", "Preconditions", "SubjectBinding", "SuccessStatus", "ErrorCodes"), findings)
     expected_row = ("checkR1ProjectionReadiness", "GET", READINESS_PATH, "ACTOR_CONTEXT", "NONE", "NONE", "CURRENT_R1_OWNER_ORGANIZATION_COVERAGE", "204", ",".join(ERROR_CODES))
     if len(http_rows) != 37 or [row for row in http_rows if row[0] == "checkR1ProjectionReadiness"] != [expected_row]:
@@ -163,8 +163,8 @@ def validate(root: Path) -> list[str]:
         findings.append(f"R1 readiness OpenAPI must be strict YAML: {error}")
         return findings
     document = _mapping(document)
-    if _mapping(document.get("info")).get("version") != "1.3.0":
-        findings.append("R1 readiness OpenAPI version must be exactly 1.3.0")
+    if _mapping(document.get("info")).get("version") != "1.4.0":
+        findings.append("R1 readiness OpenAPI version must be exactly 1.4.0")
     if document.get("security") not in (None, []):
         findings.append("R1 readiness does not allow a global security fallback")
     paths = _mapping(document.get("paths"))

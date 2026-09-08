@@ -130,9 +130,9 @@ REGISTRY = {
 ACTIVE_METADATA = {
     ADR: ('Status: Accepted', 'Semantic baseline: MVP-2026-09-08.1',
           'HTTP contract: R1-HTTP-V1.3', 'Command contract: R1-COMMAND-POLICY-EVENT-V1.2', 'OpenAPI version: 1.2.0'),
-    BASELINE: ('Baseline ID: MVP-2026-09-08.2',),
-    HTTP: ('Contract ID: R1-HTTP-V1.4',),
-    COMMAND: ('Contract ID: R1-COMMAND-POLICY-EVENT-V1.3', 'Semantic baseline: MVP-2026-09-08.2'),
+    BASELINE: ('Baseline ID: MVP-2026-09-08.3',),
+    HTTP: ('Contract ID: R1-HTTP-V1.5',),
+    COMMAND: ('Contract ID: R1-COMMAND-POLICY-EVENT-V1.3', 'Semantic baseline: MVP-2026-09-08.3'),
 }
 POINTERS = (BASELINE, HTTP, COMMAND, WORKBENCH, RUNTIME, DESIGN, PLAN)
 # Each consumer declares which exact ADR protocol it consumes, separate from a
@@ -146,8 +146,8 @@ CONSUMER_PROFILES = {
     DESIGN: 'R1_RECEIPT_RECOVERY_ACTIVATION_V1',
     PLAN: 'R1_RECEIPT_RECOVERY_ACTIVATION_V1',
 }
-# ADR-0014 exact transport successor; ADR-0013's registry itself remains historical and immutable.
-OPENAPI_FROZEN_HASH = '65e813750eba9628c26d703b7515672c4c49e098bd33f16984cd8782c34f7d6a'
+# ADR-0015 exact transport successor; ADR-0013's registry itself remains historical and immutable.
+OPENAPI_FROZEN_HASH = '5e912176a32b49aaa68f182be7832f8355fa2060082812351c9847624fb42717'
 OPENAPI_DESCRIPTION = (
     'ADR-0013 / R1-HTTP-V1.3: only the identical original trusted Actor and on-behalf pair may recover a public command receipt. '
     'R1_RECEIPT_RECOVERY_METADATA_LOOKUP_V1 obtains bounded metadata inside Audit Owner; current Owner authorization is recomputed without rerunning terminal command eligibility. '

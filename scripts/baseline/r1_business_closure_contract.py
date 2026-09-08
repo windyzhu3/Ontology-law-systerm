@@ -129,15 +129,15 @@ def validate(root: Path) -> list[str]:
         "Vary: Authorization",
     ):
         _require(adr, value, "ADR decision", findings)
-    _require(baseline, "Baseline ID: MVP-2026-09-08.2", "active baseline id", findings)
+    _require(baseline, "Baseline ID: MVP-2026-09-08.3", "active baseline id", findings)
     findings.extend(validate_ingress_query_capability(root))
     try:
         document = yaml.load(api, Loader=_StrictSafeLoader)
     except yaml.YAMLError as error:
         findings.append(f"R1 OpenAPI is not strict YAML: {error}")
         return findings
-    if not isinstance(document, dict) or document.get("info", {}).get("version") != "1.3.0":
-        findings.append("R1 OpenAPI version must be 1.3.0")
+    if not isinstance(document, dict) or document.get("info", {}).get("version") != "1.4.0":
+        findings.append("R1 OpenAPI version must be 1.4.0")
         return findings
     paths = document.get("paths", {})
     if not isinstance(paths, dict) or any(not isinstance(item, dict) for item in paths.values()):

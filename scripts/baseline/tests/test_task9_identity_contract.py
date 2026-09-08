@@ -57,6 +57,75 @@ class Task9IdentityContractTest(unittest.TestCase):
     def test_task9_inventory(self):
         self.assert_inventory(self.api)
 
+    def test_delegated_context_successor_shape(self):
+        self.assertEqual('1.4.0', self.api['info']['version'])
+        schemas = self.api['components']['schemas']
+        context = schemas['SessionContextV1']
+        self.assertEqual(set(context['properties']), set(context['required']))
+        self.assertIn('delegatedAppointmentChoices', context['required'])
+        self.assertIn('selectedOnBehalfAppointmentId', context['required'])
+        self.assertEqual(50, context['properties']['delegatedAppointmentChoices']['maxItems'])
+        self.assertEqual([], self.validator().validate_document(self.api))
+
+    def test_delegated_context_rejects_transport_and_disclosure_expansion(self):
+        validate = self.validator().validate_document
+        self.assertIn('OnBehalfAppointmentSelection', self.api['components']['parameters'])
+        mutations = [
+            lambda d: d['components']['parameters'].pop('OnBehalfAppointmentSelection'),
+            lambda d: d['paths']['/api/v1/session/context']['get']['parameters'].remove({'$ref': '#/components/parameters/OnBehalfAppointmentSelection'}),
+            lambda d: d['components']['parameters']['OnBehalfAppointmentSelection'].update({'required': True}),
+            lambda d: d['components']['parameters']['OnBehalfAppointmentSelection'].update({'schema': {'type': 'array', 'items': {'type': 'string'}}}),
+            lambda d: d['components']['schemas']['SessionContextV1']['required'].remove('delegatedAppointmentChoices'),
+            lambda d: d['components']['schemas']['SessionContextV1']['required'].remove('selectedOnBehalfAppointmentId'),
+            lambda d: d['components']['schemas']['SessionContextV1']['properties']['selectedOnBehalfAppointmentId'].update({'type': 'string'}),
+            lambda d: d['components']['schemas']['SessionContextV1']['properties']['delegatedAppointmentChoices'].update({'maxItems': 51}),
+            lambda d: d['components']['schemas']['IdentityChoiceV1']['properties'].update({'principalId': {'type': 'string'}}),
+            lambda d: d['components']['schemas']['IdentityChoiceV1']['properties'].update({'grantId': {'type': 'string'}}),
+            lambda d: d['components']['schemas']['IdentityChoiceV1']['properties'].update({'authorityCode': {'type': 'string'}}),
+            lambda d: d['paths']['/api/v1/admin/identity/principals']['get'].update({'x-on-behalf-selection': 'ACCEPT_VALID_HUMAN'}),
+            lambda d: d['paths']['/api/v1/admin/identity/principals']['post'].update({'x-authority-path': 'DELEGATED'}),
+            lambda d: d['paths']['/internal/v1/projections/r1/readiness']['get'].update({'parameters': [{'$ref': '#/components/parameters/OnBehalfAppointmentSelection'}]}),
+            lambda d: d['components']['parameters']['OnBehalfAppointmentSelection'].update({'x-requires-header': None}),
+            lambda d: d['paths']['/api/v1/workcards/current']['get']['responses'].pop('400'),
+            lambda d: d['paths']['/api/v1/workcards/current']['get']['x-error-codes'].remove('VALIDATION_FAILED'),
+            lambda d: d['components']['schemas']['SessionContextV1']['allOf'][0]['then']['properties'].pop('delegatedAppointmentChoices'),
+            lambda d: d['components']['schemas']['SessionContextV1']['allOf'][1]['then']['properties'].pop('selectedOnBehalfAppointmentId'),
+            lambda d: d['components']['schemas']['SessionContextV1']['allOf'][3]['then']['properties']['canEnterIdentityAdmin'].update({'const': True}),
+        ]
+        for mutate in mutations:
+            with self.subTest(mutation=mutate):
+                document = copy.deepcopy(self.api)
+                mutate(document)
+                self.assertTrue(validate(document))
+
+    def test_delegated_context_rules_are_enforced_by_actual_artifact_gate(self):
+        module = self.validator()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            files = [module.API, module.IDENTITY, module.ADR,
+                     'docs/baseline/CURRENT-MVP-BASELINE.md',
+                     'docs/contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md',
+                     'docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md']
+            for relative in files:
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(ROOT / relative, target)
+            for relative, rule in [
+                (module.IDENTITY, 'SELF disclosedSources has maximum101'),
+                (module.IDENTITY, 'requires explicit paired X-Appointment-Id'),
+                (files[4], 'Initial context establishment after relogin is not a confirmed identity switch.'),
+                (files[5], 'requires explicit paired X-Appointment-Id'),
+            ]:
+                with self.subTest(rule=rule):
+                    path = root / relative
+                    original = path.read_text(encoding='utf-8')
+                    self.assertIn(rule, original)
+                    path.write_text(original.replace(rule, 'REMOVED_RULE'), encoding='utf-8')
+                    try:
+                        self.assertTrue(module.validate(root))
+                    finally:
+                        path.write_text(original, encoding='utf-8')
+
     def test_inventory_rejects_removed_operation_changed_security_and_missing_not_found(self):
         self.assert_inventory(self.api)
         for mutation in ('remove-operation', 'change-security', 'remove-not-found'):
@@ -109,6 +178,9 @@ class Task9IdentityContractTest(unittest.TestCase):
             lambda d: d['components'].update({'schemas': None}),
             lambda d: d['components']['schemas'].update({'SessionContextV1': None}),
             lambda d: d['components']['schemas']['SessionContextV1'].update({'properties': None}),
+            lambda d: d['components'].update({'parameters': None}),
+            lambda d: d['paths']['/api/v1/session/context']['get'].update({'parameters': None}),
+            lambda d: d['components']['schemas']['SessionContextV1'].update({'required': [None, {}]}),
         ]
         for mutate in mutations:
             with self.subTest(mutation=mutate):
@@ -148,7 +220,7 @@ class Task9IdentityContractTest(unittest.TestCase):
                 shutil.copy2(ROOT / relative, target)
             self.assertEqual([], module.validate(root))
             for relative, original, replacement in [
-                (files[3], 'Baseline ID: MVP-2026-09-08.2', 'Baseline ID: MVP-2026-09-08.1'),
+                (files[3], 'Baseline ID: MVP-2026-09-08.3', 'Baseline ID: MVP-2026-09-08.2'),
                 (files[3], 'ADR-0014 仅纳入', '生产CRUD不计入R1。ADR-0014 仅纳入'),
                 (files[4], 'R1 只交付', '身份管理生产能力不属于 R1。R1 只交付'),
                 (files[5], '| AUTHENTICATED_IDENTITY |', '| ACTOR_CONTEXT |'),

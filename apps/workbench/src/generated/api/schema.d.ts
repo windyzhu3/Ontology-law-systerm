@@ -1839,17 +1839,21 @@ export interface components {
         } & (components["schemas"]["ResolveDuplicateLeadDraftBinding"] | components["schemas"]["CompleteLeadIngressDraftBinding"] | components["schemas"]["AssignLeadDraftBinding"] | components["schemas"]["RecordRoutingDispositionDraftBinding"] | components["schemas"]["AcknowledgeSourceIntakeStopRequestDraftBinding"] | components["schemas"]["RecordContactResultDraftBinding"] | components["schemas"]["ReviewLeadValidityDraftBinding"]);
         /** @enum {integer} */
         SchemaVersionV1: 1;
+        /** @description Nine required fields. Selected IDs must match exactly one corresponding candidate; choices are UUID sorted and deduplicated. Cross-array membership, current qualification, bounded query overflow and fresh entry permission checks are explicit runtime obligations under Identity V1.1; generated types do not guarantee them. */
         SessionContextV1: {
             actorScopeKey: string | null;
             appointmentChoices: components["schemas"]["IdentityChoiceV1"][];
             canEnterIdentityAdmin: boolean;
             canEnterWorkbench: boolean;
+            delegatedAppointmentChoices: components["schemas"]["IdentityChoiceV1"][];
             displayName: components["schemas"]["SafeText200"];
             /** Format: uuid */
             selectedAppointmentId: string | null;
+            /** Format: uuid */
+            selectedOnBehalfAppointmentId: string | null;
             /** @enum {string} */
             state: "NO_APPOINTMENT" | "APPOINTMENT_SELECTION_REQUIRED" | "READY";
-        } & (unknown & unknown & unknown);
+        } & (unknown & unknown & unknown & unknown);
         SlaSummary: {
             code: components["schemas"]["Code64"];
             dueAt: components["schemas"]["Instant"];
@@ -2291,6 +2295,8 @@ export interface components {
         IdentityLimit: number;
         IdentityOptionKind: components["schemas"]["IdentityOptionKindV1"];
         IdentitySearch: string;
+        /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+        OnBehalfAppointmentSelection: components["schemas"]["Uuid"];
         RecoveryTypeQuery: components["schemas"]["RecoveryTypeV1"];
         TaskIdPath: components["schemas"]["Uuid"];
         TaskIfMatch: components["schemas"]["TaskETag"];
@@ -2326,6 +2332,8 @@ export interface operations {
             header?: {
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -2358,6 +2366,8 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -2398,6 +2408,8 @@ export interface operations {
                 "If-Match": components["parameters"]["IdentityIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 id: components["parameters"]["IdentityIdPath"];
@@ -2442,6 +2454,8 @@ export interface operations {
                 "If-Match": components["parameters"]["IdentityIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 id: components["parameters"]["IdentityIdPath"];
@@ -2486,6 +2500,8 @@ export interface operations {
                 "If-Match": components["parameters"]["IdentityIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 id: components["parameters"]["IdentityIdPath"];
@@ -2531,6 +2547,8 @@ export interface operations {
             header?: {
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -2563,6 +2581,8 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -2603,6 +2623,8 @@ export interface operations {
                 "If-Match": components["parameters"]["IdentityIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 id: components["parameters"]["IdentityIdPath"];
@@ -2650,6 +2672,8 @@ export interface operations {
             header?: {
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -2684,6 +2708,8 @@ export interface operations {
             header?: {
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -2716,6 +2742,8 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -2756,6 +2784,8 @@ export interface operations {
                 "If-Match": components["parameters"]["IdentityIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 id: components["parameters"]["IdentityIdPath"];
@@ -2800,6 +2830,8 @@ export interface operations {
                 "If-Match": components["parameters"]["IdentityIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 id: components["parameters"]["IdentityIdPath"];
@@ -2845,6 +2877,8 @@ export interface operations {
             header?: {
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -2877,6 +2911,8 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -2917,6 +2953,8 @@ export interface operations {
                 "If-Match": components["parameters"]["IdentityIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 id: components["parameters"]["IdentityIdPath"];
@@ -2961,6 +2999,8 @@ export interface operations {
                 "If-Match": components["parameters"]["IdentityIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 id: components["parameters"]["IdentityIdPath"];
@@ -3005,6 +3045,8 @@ export interface operations {
                 "If-Match": components["parameters"]["IdentityIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 id: components["parameters"]["IdentityIdPath"];
@@ -3049,6 +3091,8 @@ export interface operations {
                 "If-Match": components["parameters"]["IdentityIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 id: components["parameters"]["IdentityIdPath"];
@@ -3095,6 +3139,8 @@ export interface operations {
             header?: {
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -3126,6 +3172,8 @@ export interface operations {
             header?: {
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 commandId: components["parameters"]["CommandIdPath"];
@@ -3158,6 +3206,8 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -3194,6 +3244,8 @@ export interface operations {
             header?: {
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -3227,6 +3279,8 @@ export interface operations {
                 "If-Match": components["parameters"]["TaskIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -3260,6 +3314,8 @@ export interface operations {
                 "If-Match": components["parameters"]["TaskIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -3293,6 +3349,8 @@ export interface operations {
                 "If-Match": components["parameters"]["TaskIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -3327,6 +3385,8 @@ export interface operations {
                 "If-Match": components["parameters"]["TaskIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -3361,6 +3421,8 @@ export interface operations {
                 "If-Match": components["parameters"]["TaskIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -3395,6 +3457,8 @@ export interface operations {
                 "If-Match": components["parameters"]["TaskIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -3429,6 +3493,8 @@ export interface operations {
                 "If-Match": components["parameters"]["TaskIfMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -3463,6 +3529,8 @@ export interface operations {
                 "If-None-Match"?: components["parameters"]["DraftCreateIfNoneMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -3516,6 +3584,8 @@ export interface operations {
                 "If-None-Match"?: components["parameters"]["WorkbenchIfNoneMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
                 "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -3540,6 +3610,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            400: components["responses"]["BadRequestProblem"];
             401: components["responses"]["PublicUnauthorizedProblem"];
             403: components["responses"]["ForbiddenProblem"];
             404: components["responses"]["NotFoundProblem"];

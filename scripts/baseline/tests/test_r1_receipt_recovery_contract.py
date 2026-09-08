@@ -141,10 +141,10 @@ class R1ReceiptRecoveryContractTest(unittest.TestCase):
             self.assert_mutation_rejected(API, lambda text: changed)
 
     def test_active_versions_and_resolved_authority_pointers_are_required(self):
-        for relative, old in ((BASELINE, 'Baseline ID: MVP-2026-09-08.2'),
-                              (HTTP, 'Contract ID: R1-HTTP-V1.4'),
+        for relative, old in ((BASELINE, 'Baseline ID: MVP-2026-09-08.3'),
+                              (HTTP, 'Contract ID: R1-HTTP-V1.5'),
                               (COMMAND, 'Contract ID: R1-COMMAND-POLICY-EVENT-V1.3')):
-            for new in ('UNKNOWN_ACTIVE_VERSION', old.replace('09-08.2', '09-07.1').replace('V1.4', 'V1.2').replace('EVENT-V1.3', 'EVENT-V1.1')):
+            for new in ('UNKNOWN_ACTIVE_VERSION', old.replace('09-08.3', '09-07.1').replace('V1.5', 'V1.2').replace('EVENT-V1.3', 'EVENT-V1.1')):
                 with self.subTest(relative=relative, new=new):
                     self.assert_mutation_rejected(relative, lambda text: text.replace(old, new))
         for relative in (BASELINE, HTTP, COMMAND, WORKBENCH, RUNTIME, DESIGN, PLAN):

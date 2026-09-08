@@ -271,7 +271,7 @@ class TopologyVerifierTest(unittest.TestCase):
         verifier = self._load_verifier()
         path = Path("deploy/identity/identity-toolchain.lock.json")
         approved = json.loads((REPOSITORY_ROOT / path).read_text(encoding="utf-8"))
-        active_api = b"openapi: 3.1.0\ninfo: {version: 1.3.0}\n"
+        active_api = b"openapi: 3.1.0\ninfo: {version: 1.4.0}\n"
         findings = []
         verifier._verify_identity_toolchain({verifier.CANONICAL_OPENAPI: active_api, path: json.dumps(approved).encode()}, "fixture", findings)
         self.assertEqual([], findings)

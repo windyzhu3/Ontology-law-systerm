@@ -112,7 +112,7 @@ class R1ProjectionReadinessContractTest(unittest.TestCase):
         """Break caught: the active HTTP row or baseline authority is disconnected."""
         for relative, old, replacement in (
             (HTTP, "| checkR1ProjectionReadiness | GET |", "| checkR1ProjectionReadiness | POST |"),
-            (HTTP, "Contract ID: R1-HTTP-V1.4", "Contract ID: R1-HTTP-V1.1"),
+            (HTTP, "Contract ID: R1-HTTP-V1.5", "Contract ID: R1-HTTP-V1.1"),
             (BASELINE, "ADR-0012-r1-projection-readiness-protocol.md", "missing-readiness.md"),
         ):
             with self.subTest(relative=relative, old=old), tempfile.TemporaryDirectory() as directory:
@@ -158,7 +158,7 @@ class R1ProjectionReadinessContractTest(unittest.TestCase):
             self.assertTrue(validate(root), "inactive registry must not satisfy the gate")
             path.write_text(original, encoding="utf-8")
             baseline = root / BASELINE
-            baseline.write_text(baseline.read_text(encoding="utf-8").replace("Baseline ID: MVP-2026-09-08.2", "Baseline ID: MVP-2026-09-06.3"), encoding="utf-8")
+            baseline.write_text(baseline.read_text(encoding="utf-8").replace("Baseline ID: MVP-2026-09-08.3", "Baseline ID: MVP-2026-09-06.3"), encoding="utf-8")
             self.assertTrue(validate(root), "old baseline is not an alternative accepted version")
 
     def test_missing_successor_artifacts_and_duplicate_yaml_are_rejected(self):

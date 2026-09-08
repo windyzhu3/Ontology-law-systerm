@@ -521,7 +521,7 @@ public class OpenApiContractTest {
 
     @Test
     void freezesR1BusinessClosureInternalDtosAndErrors() {
-        assertEquals("1.3.0", document.path("info").path("version").asText());
+        assertEquals("1.4.0", document.path("info").path("version").asText());
         JsonNode candidate = document.path("components").path("schemas").path("DueR1TaskCandidateV1");
         assertFalse(candidate.path("additionalProperties").asBoolean());
         assertEquals(Set.of("recoveryType", "taskId", "expectedTaskRevision", "waitReceiptId",
@@ -1143,7 +1143,7 @@ public class OpenApiContractTest {
         assertEquals("AUTHENTICATED_IDENTITY", self.path("x-tenant-source").asText());
         assertEquals("R1_AUTHENTICATED_IDENTITY_V1", self.path("x-authentication-profile").asText());
         assertEquals(Set.of("displayName", "state", "appointmentChoices", "selectedAppointmentId", "actorScopeKey",
-                "canEnterWorkbench", "canEnterIdentityAdmin"), fieldNames(schema("SessionContextV1").path("properties")));
+                "canEnterWorkbench", "canEnterIdentityAdmin", "delegatedAppointmentChoices", "selectedOnBehalfAppointmentId"), fieldNames(schema("SessionContextV1").path("properties")));
         assertEquals(Set.of("string", "null"), stringSet(schema("SessionContextV1").path("properties").path("selectedAppointmentId").path("type")));
         assertEquals(Set.of("LEAD_CAPTURE", "LEAD_INGRESS_RESOLVE", "LEAD_INGRESS_COMPLETE", "LEAD_ASSIGN",
                 "LEAD_ROUTING_DECIDE", "SOURCE_INTAKE_REQUEST_ACK", "SALES_CONTACT_OWNER", "LEAD_VALIDITY_REVIEW"),
@@ -1159,7 +1159,12 @@ public class OpenApiContractTest {
         noAppointment.put("actorScopeKey", null);
         noAppointment.put("canEnterWorkbench", false);
         noAppointment.put("canEnterIdentityAdmin", false);
+        noAppointment.put("delegatedAppointmentChoices", List.of());
+        noAppointment.put("selectedOnBehalfAppointmentId", null);
         assertSchemaAccepts(noAppointment, schema("SessionContextV1"), "authenticated own Principal without Appointment");
+        noAppointment.put("delegatedAppointmentChoices", List.of(Map.of("id", "01993dfe-a521-7001-8000-000000000002", "label", "Safe appointment")));
+        assertSchemaRejects(noAppointment, schema("SessionContextV1"), "unselected own identity cannot disclose delegated choices");
+        noAppointment.put("delegatedAppointmentChoices", List.of());
         noAppointment.put("selectedAppointmentId", "01993dfe-a521-7001-8000-000000000001");
         assertSchemaRejects(noAppointment, schema("SessionContextV1"), "no fabricated Appointment in NO_APPOINTMENT");
         noAppointment.put("selectedAppointmentId", null);
@@ -1246,18 +1251,18 @@ public class OpenApiContractTest {
         Map<String, OperationContract> contracts = new LinkedHashMap<>();
         contracts.put("captureLead", operationContract(
                 "CaptureLeadV1",
-                parameters("IdempotencyKey", "AppointmentSelection"),
+                parameters("IdempotencyKey", "AppointmentSelection", "OnBehalfAppointmentSelection"),
                 success("201", null, "LeadCommandReceipt", headers("Location", "ReceiptLocation"))
         ));
         contracts.put("getCurrentWorkCard", operationContract(
                 null,
-                parameters("WorkbenchIfNoneMatch", "AppointmentSelection"),
+                parameters("WorkbenchIfNoneMatch", "AppointmentSelection", "OnBehalfAppointmentSelection"),
                 success("200", null, "CurrentWorkCardEnvelope", headers("ETag", "WorkbenchETagHeader")),
                 success("304", null, null, headers("ETag", "WorkbenchETagHeader"))
         ));
         contracts.put("saveActionDraft", operationContract(
                 "SaveActionDraftV1",
-                parameters("TaskIdPath", "IdempotencyKey", "DraftIfMatch", "DraftCreateIfNoneMatch", "AppointmentSelection"),
+                parameters("TaskIdPath", "IdempotencyKey", "DraftIfMatch", "DraftCreateIfNoneMatch", "AppointmentSelection", "OnBehalfAppointmentSelection"),
                 success("200", null, "ActionDraftWriteResult",
                         headers("Location", "ReceiptLocation", "ETag", "DraftETagHeader")),
                 success("201", null, "ActionDraftWriteResult",
@@ -1279,7 +1284,7 @@ public class OpenApiContractTest {
                 "ReviewLeadValidityV1", "DecisionRecordCommandSucceeded"));
         contracts.put("getCommandReceipt", operationContract(
                 null,
-                parameters("CommandIdPath", "AppointmentSelection"),
+                parameters("CommandIdPath", "AppointmentSelection", "OnBehalfAppointmentSelection"),
                 success("200", null, "CommandReceipt", Map.of())
         ));
         contracts.put("reopenDueContactTasks", operationContract(
@@ -1307,27 +1312,27 @@ public class OpenApiContractTest {
         contracts.put("checkR1ProjectionReadiness", operationContract(
                 null, parameters(), success("204", null, null, headers("Cache-Control", "INLINE_NO_STORE"))
         ));
-        contracts.put("getSessionContext", operationContract(null, parameters("AppointmentSelection"), success("200", null, "SessionContextV1", headers("Cache-Control", "IdentityNoStore"))));
-        contracts.put("listIdentityProviderUsers", operationContract(null, parameters("AppointmentSelection", "IdentityLimit", "IdentityCursor", "IdentitySearch"), success("200", null, "ProviderUserPageV1", headers("Cache-Control", "IdentityNoStore"))));
-        contracts.put("getIdentityAdminOptions", operationContract(null, parameters("AppointmentSelection", "IdentityLimit", "IdentityCursor", "IdentityAdminPage", "IdentityOptionKind"), success("200", null, "IdentityAdminOptionsV1", headers("Cache-Control", "IdentityNoStore"))));
-        contracts.put("listIdentityPrincipals", operationContract(null, parameters("AppointmentSelection", "IdentityLimit", "IdentityCursor"), success("200", null, "IdentityPrincipalPageV1", headers("Cache-Control", "IdentityNoStore"))));
-        contracts.put("createIdentityPrincipal", operationContract("CreateIdentityPrincipalV1", parameters("AppointmentSelection", "IdempotencyKey"), success("201", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("renameIdentityPrincipal", operationContract("RenameIdentityPrincipalV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("suspendIdentityPrincipal", operationContract("SuspendIdentityPrincipalV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("resumeIdentityPrincipal", operationContract("ResumeIdentityPrincipalV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("disableIdentityPrincipal", operationContract("DisableIdentityPrincipalV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("listOrganizationUnits", operationContract(null, parameters("AppointmentSelection", "IdentityLimit", "IdentityCursor"), success("200", null, "OrganizationUnitPageV1", headers("Cache-Control", "IdentityNoStore"))));
-        contracts.put("createOrganizationUnit", operationContract("CreateOrganizationUnitV1", parameters("AppointmentSelection", "IdempotencyKey"), success("201", null, "OrganizationUnitCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("renameOrganizationUnit", operationContract("RenameOrganizationUnitV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "OrganizationUnitCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("closeOrganizationUnit", operationContract("CloseOrganizationUnitV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "OrganizationUnitCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("listAppointments", operationContract(null, parameters("AppointmentSelection", "IdentityLimit", "IdentityCursor"), success("200", null, "AppointmentPageV1", headers("Cache-Control", "IdentityNoStore"))));
-        contracts.put("createAppointment", operationContract("CreateAppointmentV1", parameters("AppointmentSelection", "IdempotencyKey"), success("201", null, "AppointmentCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("suspendAppointment", operationContract("SuspendAppointmentV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "AppointmentCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("resumeAppointment", operationContract("ResumeAppointmentV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "AppointmentCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("endAppointment", operationContract("EndAppointmentV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "AppointmentCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("listAuthorityGrants", operationContract(null, parameters("AppointmentSelection", "IdentityLimit", "IdentityCursor"), success("200", null, "AuthorityGrantPageV1", headers("Cache-Control", "IdentityNoStore"))));
-        contracts.put("createAuthorityGrant", operationContract("CreateAuthorityGrantV1", parameters("AppointmentSelection", "IdempotencyKey"), success("201", null, "AuthorityGrantCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
-        contracts.put("revokeAuthorityGrant", operationContract("RevokeAuthorityGrantV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "AuthorityGrantCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("getSessionContext", operationContract(null, parameters("AppointmentSelection", "OnBehalfAppointmentSelection"), success("200", null, "SessionContextV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("listIdentityProviderUsers", operationContract(null, parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdentityLimit", "IdentityCursor", "IdentitySearch"), success("200", null, "ProviderUserPageV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("getIdentityAdminOptions", operationContract(null, parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdentityLimit", "IdentityCursor", "IdentityAdminPage", "IdentityOptionKind"), success("200", null, "IdentityAdminOptionsV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("listIdentityPrincipals", operationContract(null, parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdentityLimit", "IdentityCursor"), success("200", null, "IdentityPrincipalPageV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("createIdentityPrincipal", operationContract("CreateIdentityPrincipalV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey"), success("201", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("renameIdentityPrincipal", operationContract("RenameIdentityPrincipalV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("suspendIdentityPrincipal", operationContract("SuspendIdentityPrincipalV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("resumeIdentityPrincipal", operationContract("ResumeIdentityPrincipalV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("disableIdentityPrincipal", operationContract("DisableIdentityPrincipalV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("listOrganizationUnits", operationContract(null, parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdentityLimit", "IdentityCursor"), success("200", null, "OrganizationUnitPageV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("createOrganizationUnit", operationContract("CreateOrganizationUnitV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey"), success("201", null, "OrganizationUnitCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("renameOrganizationUnit", operationContract("RenameOrganizationUnitV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "OrganizationUnitCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("closeOrganizationUnit", operationContract("CloseOrganizationUnitV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "OrganizationUnitCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("listAppointments", operationContract(null, parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdentityLimit", "IdentityCursor"), success("200", null, "AppointmentPageV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("createAppointment", operationContract("CreateAppointmentV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey"), success("201", null, "AppointmentCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("suspendAppointment", operationContract("SuspendAppointmentV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "AppointmentCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("resumeAppointment", operationContract("ResumeAppointmentV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "AppointmentCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("endAppointment", operationContract("EndAppointmentV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "AppointmentCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("listAuthorityGrants", operationContract(null, parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdentityLimit", "IdentityCursor"), success("200", null, "AuthorityGrantPageV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("createAuthorityGrant", operationContract("CreateAuthorityGrantV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey"), success("201", null, "AuthorityGrantCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("revokeAuthorityGrant", operationContract("RevokeAuthorityGrantV1", parameters("AppointmentSelection", "OnBehalfAppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "AuthorityGrantCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
         return Map.copyOf(contracts);
     }
 
@@ -1398,7 +1403,7 @@ public class OpenApiContractTest {
     private static OperationContract taskCommandContract(String requestSchema, String responseComponent) {
         return operationContract(
                 requestSchema,
-                parameters("TaskIdPath", "IdempotencyKey", "TaskIfMatch", "AppointmentSelection"),
+                parameters("TaskIdPath", "IdempotencyKey", "TaskIfMatch", "AppointmentSelection", "OnBehalfAppointmentSelection"),
                 success("200", responseComponent, responseSchemaForComponent(responseComponent),
                         headers("Location", "ReceiptLocation"))
         );
@@ -1460,7 +1465,7 @@ public class OpenApiContractTest {
     private static Map<String, Set<String>> requiredErrorCodes() {
         Map<String, Set<String>> errors = new LinkedHashMap<>();
         errors.put("captureLead", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,COMMAND_PAYLOAD_CONFLICT,SUPERVISOR_UNRESOLVED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
-        errors.put("getCurrentWorkCard", errors("UNAUTHENTICATED,NOT_AUTHORIZED,NOT_FOUND,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
+        errors.put("getCurrentWorkCard", errors("VALIDATION_FAILED,UNAUTHENTICATED,NOT_AUTHORIZED,NOT_FOUND,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("saveActionDraft", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,DRAFT_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("resolveDuplicateLead", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,STALE_SUBJECT,SUPERVISOR_UNRESOLVED,TASK_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("completeLeadIngress", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,INGRESS_COMPLETION_ALREADY_RECORDED,STALE_TASK,STALE_DRAFT,STALE_SUBJECT,SUPERVISOR_UNRESOLVED,TASK_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));

@@ -693,7 +693,7 @@ def _verify_identity_toolchain(snapshot: dict[Path, bytes], source: str, errors:
     lock_path = Path("deploy/identity/identity-toolchain.lock.json")
     try:
         api = yaml.safe_load(snapshot.get(CANONICAL_OPENAPI, b"{}")) or {}
-        active = api.get("info", {}).get("version") == "1.3.0"
+        active = api.get("info", {}).get("version") == "1.4.0"
         if not active and lock_path not in snapshot:
             return  # Original scaffold fixtures have no Task9 activation.
         lock = json.loads(snapshot[lock_path])
