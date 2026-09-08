@@ -152,6 +152,8 @@ selectedOnBehalfAppointmentId:
 - Modify Java: `api/security/ActorContextResolver.java`、`api/security/R1SecurityConfiguration.java`、`api/R1ApiDeployment.java`、`identity/ExternalSubjectProtection.java`、`audit/AuditAppender.java` 及其 Owner 内部实现。
 - Tests Java: `api/HumanLoginMappingIT.java`、`api/SessionContextHttpIT.java`、`identity/IdentityBootstrapIT.java`、原 `api/R1ReceiptIdentityHttpIT.java` 与角色隔离测试。
 
+版本贯通补充：ADR-0015 已激活统一 `MVP-2026-09-08.3`，本单元将 `worker/R1WorkerTenantBindings.java` 的旧 `.1` 精确校验同步为 `.3`，并覆盖拒绝旧/错版本测试。仅版本与相关夹具对齐；Worker 权限、Bean、Actor 绑定、内部接口、调度/业务行为和物理版本均保持，不构成发布晋级。
+
 Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` 为前缀，测试以 `backend/src/test/java/io/github/windyzhu3/ontologylaw/` 为前缀；SQL 只在 Owner 的 internal.persistence 中。
 
 **Consumes:** 受信 issuer/audience/provider→Tenant 配置、IdP 活动性复核、原 Subject HMAC、现有身份事实。
