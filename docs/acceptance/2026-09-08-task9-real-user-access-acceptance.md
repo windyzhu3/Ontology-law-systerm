@@ -1,12 +1,23 @@
 # Task9 扩展验收矩阵
 
-日期：2026-09-08。状态：**Task9.1/Task9.2a 静态合同验证及独立复审已通过；新增运行时/人工验收尚未完成，扩展 Task9 未完成。**
+日期：2026-09-08建立，2026-09-09更新。状态：**Task9.1/9.2a静态及Task9.2身份后端已阶段验收、独立复审通过；管理、浏览器及人工总验收尚未完成，扩展Task9未完成。**
 
 设计：[真实用户接入与状态设计](../superpowers/specs/2026-09-08-task9-real-user-access-design.md)。计划：[Task9 扩展实施计划](../superpowers/plans/2026-09-08-task9-real-user-access-plan.md)。
 
 阶段证据：[Task9.1 本地验收](../progress/2026-09-08-task9-contract-acceptance.md)。C01 合同及 C02～04 静态部分已验证；C02～04 的运行时权限、错误配置、回执披露仍随后续实现验收，不将这些混合项整体提前判为通过。
 
-代办接入补充：[具体补充设计](../superpowers/specs/2026-09-08-task9-delegated-context-amendment-design.md)已获用户书面确认，T9-D01～08 正式加入本矩阵；T9-D01静态项已通过，见[代办合同验收](../progress/2026-09-08-task9-delegated-contract-acceptance.md)，T9-D02～08运行时项尚未验收；原 C/L/I/W/U 验收不被替代，Task9.1 历史通过不覆盖这次后继修订。
+代办接入补充：[具体补充设计](../superpowers/specs/2026-09-08-task9-delegated-context-amendment-design.md)已获用户书面确认，T9-D01～08正式加入本矩阵；T9-D01静态项已通过，见[代办合同验收](../progress/2026-09-08-task9-delegated-contract-acceptance.md)。D02～07的9.2后端实现已有[运行时阶段证据](../progress/2026-09-09-task9-identity-runtime-acceptance.md)，D03浏览器、D05全部管理处理、D08会话恢复及最终同构建总验收仍待后续；不替代原C/L/I/W/U验收。
+
+### Task9.2 阶段证据定位（不是本矩阵总验收）
+
+| 验收组 | 本阶段证据 | 尚未满足的总验收部分 |
+|---|---|---|
+| L02～05、I13 | 真实OIDC／当前DB映射／本人及代办选择与故障分类，最终源码581c61e | SPA交互、通过管理API建目标用户及真实使用者链 |
+| I01、C04 | 离线候选／引导／原结果核验、HTTPS与独立身份库TLS、错误配置拒绝 | 实际部署运维；真实人员执行另须授权 |
+| D02～07后端 | 有界当前候选、真实动态业务Actor与回执、审计／锁／撤权／范围验证 | D03浏览器链、D05管理HTTP完整处理；D07单序列E2E补强 |
+| C02～03相关回归 | 原架构、角色、SERVICE/mTLS、业务与回执回归及实际CLI | 新Identity管理命令／Receipt与最终完整SPA/E2E仍随9.3～9.6 |
+
+自动证据为隔离真实Keycloak＋PostgreSQL＋HTTP及生产装配，不是模拟Token；部分状态由窄用途SQL测试夹具准备，不能替代下节规定的最终管理API建档链。所有必需ID仍须在9.6最终构建重验；非阻断测试限制详见阶段记录。
 
 ## 1. 通过条件
 

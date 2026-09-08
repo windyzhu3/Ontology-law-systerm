@@ -12,7 +12,7 @@
 
 **Status:** APPROVED。用户于 2026-09-08 确认详细设计及计划，现从 Task9.1 合同后继开始实施；后续功能与实际用户/权限变更仍按各单元门禁，不将设计批准当成完成证据。
 
-**Execution:** Task9.1 与 Task9.2a 静态合同均已验收及独立复审通过，见[代办合同证据](../../progress/2026-09-08-task9-delegated-contract-acceptance.md)。现在恢复 Task9.2 原运行时实施子代理，补齐可信登录、本人/代办 context 与离线引导；Task9.2～9.6 运行时尚未验收，Task10/R1 发布不晋级。
+**Execution:** Task9.1/9.2a静态合同及Task9.2身份接入后端均已本地阶段验收、独立复审通过，见[代办合同证据](../../progress/2026-09-08-task9-delegated-contract-acceptance.md)与[运行时证据](../../progress/2026-09-09-task9-identity-runtime-acceptance.md)。本次执行单元止于Task9.2；下一单元为Task9.3。Task9.3～9.6未完成，Task10/R1发布不晋级。
 
 ## Global Constraints
 
@@ -162,11 +162,13 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 
 **9.2a 后继输入：** 完整执行已批准代办补充设计 §2～5 与 T9-D02～07 后端部分：当前本人任职及既有一跳关系候选；双 header 显式选择；当前数据库资格与最终业务授权分开；SELF max101具名披露与原 Actor 回执恢复。用 `SessionContextHttpIT`、`R1ReceiptIdentityHttpIT` 承接；新增定向测试如需单独文件可用 `api/DelegatedSessionContextHttpIT.java`，不增加业务模块。不得只测试旧 Registration 构造器，必须证明动态 HUMAN 路径实际构造和恢复代办 Actor。现有暂停草稿先核对最后失败日志，再按原 TDD 继续，不假设已通过。
 
-- [ ] 编写 L02～L05/I01/I13 的真实 IdP＋DB 失败用例；先证明当前逐人 registration 无法接入新建用户。
-- [ ] 搭建锁定身份环境，以受限客户端验证 JWT＋在线活动性；错 issuer、audience、过期、撤销、断网都失败关闭，SERVICE 路径不放宽。
-- [ ] 实现 trusted Tenant 内 provider-subject HMAC 动态 HUMAN 映射、本人 context 的先审计后披露、多任职选择与每次请求归属复验。
-- [ ] 实现一次性 bootstrap，先 dry-run 展示无秘密的创建集合，只有明确离线执行才写；正向、同 manifest 重放、部分存在和冲突各自有准确断言。
-- [ ] 运行定向 IT、ArchitectureTest 与 Task8 安全/角色回归，检查没有 Worker 用户管理 Bean/权限，独立评审后提交。
+- [x] 编写 L02～L05/I01/I13 的真实 IdP＋DB 失败用例；先证明当前逐人 registration 无法接入新建用户。
+- [x] 搭建锁定身份环境，以受限客户端验证 JWT＋在线活动性；错 issuer、audience、过期、撤销、断网都失败关闭，SERVICE 路径不放宽。
+- [x] 实现 trusted Tenant 内 provider-subject HMAC 动态 HUMAN 映射、本人 context 的先审计后披露、多任职选择与每次请求归属复验。
+- [x] 实现一次性 bootstrap，先 dry-run 展示无秘密的创建集合，只有明确离线执行才写；正向、同 manifest 重放、部分存在和冲突各自有准确断言。
+- [x] 运行定向 IT、ArchitectureTest 与 Task8 安全/角色回归，检查没有 Worker 用户管理 Bean/权限，独立评审后提交。
+
+阶段结论：实现43fd69c、修复581c61e；113unit＋639IT完整回归及修复后52unit＋98IT受影响安全回归退出0；四项Important复审关闭。只覆盖上述ID的9.2后端部分，管理API创建目标身份、浏览器与人工证据仍在下游。非阻断建议与证据限制见阶段验收记录。
 
 ## Task 9.3: Identity 管理后端
 
@@ -232,6 +234,7 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 - [ ] 为全部 T9-C/L/I/W/D 自动项建立命名测试并先保存缺能力 RED，不使用 skip/空测试绕过；D03/D08 包含实际浏览器证据。
 - [ ] 通过真实 IdP＋管理接口创建目标身份、组织、任职、授权；从真实 capture/分配生成业务责任，逐类七卡操作并断言数据库 Fact/Receipt/Task/Wait/Event/Audit。
 - [ ] 实测 credential rotation、退出/撤销、HTTP/CAS/网络故障、恢复标记、跨 Tenant、四管理状态机和实际 Worker 等待恢复。
+- [ ] 承接9.2非阻断证据建议：用同一原回执串联重登、重建服务与更换双方合法授权证据；损坏引导记录场景按候选准确到期时间等待并显式断言，不依赖从夹具开始的固定睡眠。不得把现有分离测试或未严格断言的到期前提当作本阶段完整E2E证据。
 - [ ] 指定真实使用者执行 U01～U03；凭据由使用者自行输入，只留脱敏结果，人工未执行不能标通过。
 - [ ] 运行最终构建的前端、后端、合同、真实 E2E 与权限回归，记录工具链、镜像 digest、实际 case/exit，独立评审整个 Task9 扩展范围。
 - [ ] 全部必需 ID 通过后才宣布扩展 Task9 完成；交给原 Task10 复用同一身份/E2E fixture 继续全 BranchID/CI/容量，不开第二套身份或测试系统。
@@ -256,4 +259,4 @@ git diff --check
 
 使用仓库锁定工具链；Windows 使用 `mvnw.cmd` 或 Git Bash wrapper，不误用系统全局旧 Node/npm。每一环记录实际退出码，不把最后一个命令成功覆盖前序失败。
 
-当前执行单元：Task9.2。Task9.1 合同修改及独立验证已完成；本步仅实施 Keycloak、可信映射、self context 和离线引导，并使用隔离合成测试资源验证。本文不是任何真实账号/权限写入的执行凭据，新增画面的视觉确认、后续功能及人工 UAT 仍有各自门禁。
+本次执行单元Task9.2已完成，下一单元Task9.3。仅实施Keycloak、可信映射、self context和离线引导并使用隔离合成测试资源验证。本文不是任何真实账号／权限写入的执行凭据；Task9.3～9.6、新增画面视觉确认及人工UAT仍有各自门禁。
