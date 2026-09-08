@@ -2962,6 +2962,7 @@ paths:
       x-tenant-source: ACTOR_CONTEXT
       x-subject-binding: COMMAND_ID_AND_ACTOR_SCOPE
       x-error-codes:
+        - VALIDATION_FAILED
         - UNAUTHENTICATED
         - NOT_AUTHORIZED
         - NOT_FOUND
@@ -2982,6 +2983,8 @@ paths:
               examples:
                 receipt:
                   $ref: '#/components/examples/CommandReceiptResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestProblem'
         '401':
           $ref: '#/components/responses/PublicUnauthorizedProblem'
         '403':

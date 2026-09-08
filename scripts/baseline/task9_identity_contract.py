@@ -60,7 +60,7 @@ ADR = 'docs/adr/ADR-0015-task9-delegated-context.md'
 # Closed reviewed transport successor, including exact schemas, conditions,
 # DTO/response bindings and metadata; independent inventory checks below give
 # actionable diagnostics and count actual security declarations.
-OPENAPI_SHA256 = '915b28ca6d210470485274372f4135f6c633f7aeffd42dca2d4d0e69150a6545'
+OPENAPI_SHA256 = '2b7a1177d802886e0aaa6277b003c114ef6a0e2800795cce081304d8d71ba1e7'
 
 def canonical_hash(document):
     return hashlib.sha256(json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
@@ -155,6 +155,9 @@ def _validate_document(document):
             expected_mode = 'REJECT' if path.startswith('/api/v1/admin/identity/') else 'ACCEPT_VALID_HUMAN'
             if operation_parameters.count(selector_ref) != 1 or operation.get('x-on-behalf-selection') != expected_mode:
                 findings.append('Task9 public delegated selector binding differs: ' + operation['operationId'])
+            bad_request = 'Identity400Problem' if path.startswith('/api/v1/admin/identity/') or path == '/api/v1/session/context' else 'BadRequestProblem'
+            if 'VALIDATION_FAILED' not in operation.get('x-error-codes', []) or operation.get('responses', {}).get('400') != {'$ref': '#/components/responses/' + bad_request}:
+                findings.append('Task9 public selector requires exact validation400 binding: ' + operation['operationId'])
         elif selector_ref in operation_parameters or 'x-on-behalf-selection' in operation:
             findings.append('Task9 internal mTLS must not consume delegated selector')
     context = schemas.get('SessionContextV1', {})

@@ -3191,6 +3191,7 @@ export interface operations {
                     "application/json": components["schemas"]["CommandReceipt"];
                 };
             };
+            400: components["responses"]["BadRequestProblem"];
             401: components["responses"]["PublicUnauthorizedProblem"];
             403: components["responses"]["ForbiddenProblem"];
             404: components["responses"]["NotFoundProblem"];

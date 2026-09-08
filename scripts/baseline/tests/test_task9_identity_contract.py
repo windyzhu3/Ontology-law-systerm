@@ -67,6 +67,28 @@ class Task9IdentityContractTest(unittest.TestCase):
         self.assertEqual(50, context['properties']['delegatedAppointmentChoices']['maxItems'])
         self.assertEqual([], self.validator().validate_document(self.api))
 
+    def test_every_public_selector_operation_requires_validation_error_transport(self):
+        public = [(path, method, operation) for path, item in self.api['paths'].items()
+                  for method, operation in item.items() if method in METHODS
+                  and operation['security'] == [{'publicBearer': []}]]
+        self.assertEqual(32, len(public))
+        validate = self.validator().validate_document
+        self.assertEqual([], validate(self.api))
+        for path, method, operation in public:
+            with self.subTest(operation=operation['operationId']):
+                self.assertIn('VALIDATION_FAILED', operation['x-error-codes'])
+                self.assertEqual({'$ref': '#/components/responses/' + (
+                    'Identity400Problem' if path.startswith('/api/v1/admin/identity/') or path == '/api/v1/session/context'
+                    else 'BadRequestProblem')}, operation['responses'].get('400'))
+                for missing in ('response', 'code'):
+                    document = copy.deepcopy(self.api)
+                    target = document['paths'][path][method]
+                    if missing == 'response':
+                        target['responses'].pop('400')
+                    else:
+                        target['x-error-codes'].remove('VALIDATION_FAILED')
+                    self.assertIn('Task9 public selector requires exact validation400 binding: ' + operation['operationId'], validate(document))
+
     def test_delegated_context_rejects_transport_and_disclosure_expansion(self):
         validate = self.validator().validate_document
         self.assertIn('OnBehalfAppointmentSelection', self.api['components']['parameters'])

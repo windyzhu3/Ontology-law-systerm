@@ -147,7 +147,7 @@ CONSUMER_PROFILES = {
     PLAN: 'R1_RECEIPT_RECOVERY_ACTIVATION_V1',
 }
 # ADR-0015 exact transport successor; ADR-0013's registry itself remains historical and immutable.
-OPENAPI_FROZEN_HASH = '5e912176a32b49aaa68f182be7832f8355fa2060082812351c9847624fb42717'
+OPENAPI_FROZEN_HASH = '680a8e551ab69bf7cab38e09595c94100a39115452e068032c8c2feb6b6edbf0'
 OPENAPI_DESCRIPTION = (
     'ADR-0013 / R1-HTTP-V1.3: only the identical original trusted Actor and on-behalf pair may recover a public command receipt. '
     'R1_RECEIPT_RECOVERY_METADATA_LOOKUP_V1 obtains bounded metadata inside Audit Owner; current Owner authorization is recomputed without rerunning terminal command eligibility. '
