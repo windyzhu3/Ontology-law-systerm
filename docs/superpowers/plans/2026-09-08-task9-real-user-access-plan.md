@@ -10,7 +10,7 @@
 
 **Spec:** [Task9 扩展设计](../specs/2026-09-08-task9-real-user-access-design.md)。[验收矩阵](../../acceptance/2026-09-08-task9-real-user-access-acceptance.md)是本计划每个交付单元的共同验收输入。
 
-**Status:** DRAFT。扩大范围和 Keycloak 方向已由用户确认；详细设计须书面确认后才允许派发 Task9.1。当前没有执行下列新增任务，不将本计划当成批准生产权限或活动合同。
+**Status:** APPROVED。用户于 2026-09-08 确认详细设计及计划，现从 Task9.1 合同后继开始实施；后续功能与实际用户/权限变更仍按各单元门禁，不将设计批准当成完成证据。
 
 ## Global Constraints
 
@@ -37,7 +37,7 @@
 
 9.3 与 9.4 只能在 9.2 的共享 DTO/接口冻结后并行；共享 Runtime/认证变更串行。每单元记录自己的 BASE，先 RED、再 GREEN、独立评审后单独提交。不能把“页面存在”作为 9.3 后端完成证明。
 
-## Task9.1：受控合同后继与精确接口
+## Task 9.1: 受控合同后继与精确接口
 
 **Files:**
 
@@ -87,7 +87,7 @@ Identity self context 拟定：`displayName`、`state`、`appointmentChoices[{id
 
 静态验收用例 `test_task9_inventory` 必须读取真实 OpenAPI 的 paths，逐一枚举 HTTP method operation，并按 operation 的 security 分类，断言实际 37/32/5、21 个新增 operationId 唯一且与上表完全一致，再读取 `TerminalRejectionCode` 断言包含 NOT_FOUND。另分别删除一个 operation、改变一次 security、加入任意 Tenant 字段、移除 NOT_FOUND 运行拒绝变异；不得把期望计数写成输入常量冒充实际解析结果。
 
-## Task9.2：Keycloak、动态映射、context 与引导
+## Task 9.2: Keycloak、动态映射、context 与引导
 
 **Files:**
 
@@ -108,7 +108,7 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 - [ ] 实现一次性 bootstrap，先 dry-run 展示无秘密的创建集合，只有明确离线执行才写；正向、同 manifest 重放、部分存在和冲突各自有准确断言。
 - [ ] 运行定向 IT、ArchitectureTest 与 Task8 安全/角色回归，检查没有 Worker 用户管理 Bean/权限，独立评审后提交。
 
-## Task9.3：Identity 管理后端
+## Task 9.3: Identity 管理后端
 
 **Files:**
 
@@ -124,7 +124,7 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 - [ ] 扩展回执元数据与授权 resolver 以处理 Identity Subject；直接查回执也必须当前管理授权，普通业务原 Actor 规则不退化。
 - [ ] 通过精确 delta、双连接锁序、跨 Tenant、撤权与技术回滚测试，独立评审后提交。
 
-## Task9.4：SPA 登录、会话与恢复
+## Task 9.4: SPA 登录、会话与恢复
 
 **Files:**
 
@@ -141,7 +141,7 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 
 关键新增用例必须观察公共行为：在首联页面向“结果说明”输入“尚未保存的输入”，通过受控 OIDC 测试 adapter 实际完成一次同身份凭据更新，不重新挂载 App；等待续期完成后断言文本仍在、未保存状态仍在、“记录联系结果”仍禁用且没有 POST。随后保存候选并确认一次，断言 HTTP 携带新 Bearer、原正确任职且只产生一次业务写入。只断言 identityEpoch/private ref 或省略触发续期事件不能通过 T9-L07。
 
-## Task9.5：管理页面与完整状态提示
+## Task 9.5: 管理页面与完整状态提示
 
 **Files:**
 
@@ -156,7 +156,7 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 - [ ] 按 360/768/1440 在真实浏览器检查状态、焦点、弹层、权限屏与 composer，无遮挡或横向溢出；登录/任职页采用已获确认的设计。
 - [ ] 运行管理与工作台 DOM 回归、typecheck/build，保存冻结图与实际页面联合比较证据，独立评审后提交。
 
-## Task9.6：真实用户全链路与总验收
+## Task 9.6: 真实用户全链路与总验收
 
 **Files:**
 
@@ -192,4 +192,4 @@ git diff --check
 
 使用仓库锁定工具链；Windows 使用 `mvnw.cmd` 或 Git Bash wrapper，不误用系统全局旧 Node/npm。每一环记录实际退出码，不把最后一个命令成功覆盖前序失败。
 
-当前停点：详细设计审阅。本文已经把用户新增要求加入原 Task9 范围、分段和验收，但没有批准任何真实用户/权限变更，也没有自动开始上述实施。
+当前执行单元：Task9.1。详细设计审阅已通过；合同修改与独立验证尚待完成。本文不是任何真实账号/权限写入的执行凭据，新增画面的视觉确认、后续功能及人工 UAT 仍有各自门禁。

@@ -1,6 +1,6 @@
 # R1 基础功能闭环与原始设计对齐规格
 
-> 2026-09-08 Task9 范围设计修订：用户新增真实登录/会话、受控 ADM-01～04 与完整工作台状态及真实用户验收，并确认 Keycloak/OIDC。详见 [Task9 扩展设计草案](2026-09-08-task9-real-user-access-design.md)与[原计划 Task9](../plans/2026-09-05-r1-business-closure-plan.md)。旧工作台验收仅为 Task9.0；扩展 Task9 未完成。本文旧身份管理排除与认证边界不会因草案自动失效：详细设计确认后先实施 Task9.1 具名合同后继，保持其余范围、物理合同与历史证据。
+> 2026-09-08 Task9 范围设计修订：用户新增真实登录/会话、受控 ADM-01～04 与完整工作台状态及真实用户验收，并确认 Keycloak/OIDC 和详细设计。详见 [批准 Task9 扩展设计](2026-09-08-task9-real-user-access-design.md)与[原计划 Task9](../plans/2026-09-05-r1-business-closure-plan.md)。旧工作台验收仅为 Task9.0；扩展 Task9 未完成。本文旧身份管理排除与认证边界只由 Task9.1 的具名活动合同后继替代，不因设计批准自动失效；其余范围、物理合同与历史证据保持。
 
 Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_RECOVERY_ACTIVATION_V1
 

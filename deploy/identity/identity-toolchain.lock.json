@@ -1,0 +1,43 @@
+{
+  "profile": "TASK9_IDENTITY_TOOLCHAIN_V1",
+  "resolvedAt": "2026-09-08",
+  "platform": "linux/amd64",
+  "keycloak": {
+    "version": "26.7.3",
+    "image": "quay.io/keycloak/keycloak",
+    "indexDigest": "sha256:ff4257d0d64efbe99ed1ddfaf07765cc3c36dc7518bf8324d41961327f441c54",
+    "platformDigest": "sha256:88943b6ad06d6293a239f0dfca5acec64218c9b3ab327bf9c936acf408a6ae3b",
+    "releaseUrl": "https://github.com/keycloak/keycloak/releases/tag/26.7.3",
+    "releasedAt": "2026-08-31T09:29:37Z"
+  },
+  "identityDatabase": {
+    "engine": "postgres",
+    "majorVersion": "18",
+    "image": "postgres",
+    "digest": "sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280",
+    "sourceLock": "database/schema-contract-52-plus-2/runtime/toolchain.lock.json",
+    "ownership": "KEYCLOAK_ONLY_SEPARATE_DATABASE"
+  },
+  "oidcAdapter": {
+    "package": "keycloak-js",
+    "version": "26.2.4",
+    "tarball": "https://registry.npmjs.org/keycloak-js/-/keycloak-js-26.2.4.tgz",
+    "integrity": "sha512-PnXpR3ubETGOt0B/Qt2lxmPbkZr5bc3vlQsOqDoTPPQsZRp7JjhTKxlJ187uWh8qJhvBab6Gsjb06a8ayOPfuw=="
+  },
+  "browserTests": {
+    "package": "@playwright/test",
+    "version": "1.63.0",
+    "tarball": "https://registry.npmjs.org/@playwright/test/-/test-1.63.0.tgz",
+    "integrity": "sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==",
+    "releaseUrl": "https://github.com/microsoft/playwright/releases/tag/v1.63.0",
+    "releasedAt": "2026-09-04T22:40:31Z",
+    "image": "mcr.microsoft.com/playwright",
+    "tag": "v1.63.0-noble",
+    "indexDigest": "sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27",
+    "platformDigest": "sha256:bc6ab0d6d44ff4826e4cb8c1e6d801e185bfc42bb0753f8e2a30efc70db054c7",
+    "chromiumRevision": "1243",
+    "chromiumVersion": "153.0.8010.12",
+    "browserManifestUrl": "https://raw.githubusercontent.com/microsoft/playwright/v1.63.0/packages/playwright-core/browsers.json"
+  },
+  "verificationBoundary": "UPSTREAM_METADATA_RESOLVED_NOT_RUNTIME_ACCEPTED"
+}

@@ -1,6 +1,6 @@
 # Task9 扩展验收矩阵
 
-日期：2026-09-08。状态：**验收设计 DRAFT；新增项全部未执行，扩展 Task9 未完成。**
+日期：2026-09-08。状态：**验收设计已获用户确认；Task9.1 静态合同验证进行中，新增运行时/人工验收尚未执行，扩展 Task9 未完成。**
 
 设计：[真实用户接入与状态设计](../superpowers/specs/2026-09-08-task9-real-user-access-design.md)。计划：[Task9 扩展实施计划](../superpowers/plans/2026-09-08-task9-real-user-access-plan.md)。
 

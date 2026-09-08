@@ -1,6 +1,6 @@
 # MVP Delivery Ledger
 
-Task9 planning amendment (2026-09-08): 用户将真实登录/会话、受控 ADM-01～04、完整工作台状态和人工真实用户验收纳入 Task9，并确认 Keycloak/OIDC。原登录独立验收仅记为 Task9.0；扩展 Task9 重新打开，新增能力尚未实施。见[扩展设计草案](../superpowers/specs/2026-09-08-task9-real-user-access-design.md)、[计划](../superpowers/plans/2026-09-08-task9-real-user-access-plan.md)与[验收矩阵](../acceptance/2026-09-08-task9-real-user-access-acceptance.md)。本条仅记录范围，不激活活动合同、不更改下表历史证据状态，不提升 Task10/容量/R1 发布门。
+Task9 planning amendment (2026-09-08): 用户将真实登录/会话、受控 ADM-01～04、完整工作台状态和人工真实用户验收纳入 Task9，并确认 Keycloak/OIDC 及详细设计，当前进入 Task9.1 合同实施。原登录独立验收仅记为 Task9.0；扩展 Task9 重新打开，新增运行时能力尚未实施。见[批准设计](../superpowers/specs/2026-09-08-task9-real-user-access-design.md)、[计划](../superpowers/plans/2026-09-08-task9-real-user-access-plan.md)与[验收矩阵](../acceptance/2026-09-08-task9-real-user-access-acceptance.md)。本条仅记录批准与范围，不自动激活活动合同、不更改下表历史证据状态，不提升 Task10/容量/R1 发布门。
 
 Baseline context amendment (2026-09-08): [ADR-0013](../adr/ADR-0013-r1-command-receipt-recovery.md) activates `MVP-2026-09-08.1`, HTTP `R1-HTTP-V1.3` and command `R1-COMMAND-POLICY-EVENT-V1.2`. New rows are FROZEN static successor evidence only. Original Task8 jointly implements new V2 terminal writes and original-Actor receipt GET with current authorization and committed disclosure Audit. OpenAPI 1.2.0, 16/11/5, physical 52-plus-2-v1.2 and all non-static delivery states remain unchanged; older dated context and evidence are historical.
 

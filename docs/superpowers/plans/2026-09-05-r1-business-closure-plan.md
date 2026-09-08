@@ -1,6 +1,6 @@
 # R1 Business Closure Implementation Plan
 
-> 2026-09-08 Task9 范围修订：用户将真实登录/会话、受控用户/组织/任职/授权、完整工作台状态和真实用户验收纳入原 Task9，并确认 Keycloak/OIDC 方向。原登录独立交付仅记作 Task9.0，扩大后的 Task9 重新打开。详见 [扩展设计](../specs/2026-09-08-task9-real-user-access-design.md)、[分段实施计划](2026-09-08-task9-real-user-access-plan.md)和[验收矩阵](../../acceptance/2026-09-08-task9-real-user-access-acceptance.md)。详细设计仍为 DRAFT；须经书面确认，再由 Task9.1 激活具名合同后继。以下 Task1–8 历史证据和当时 inventory 不改写，现行冻结合同不因本计划自动变更。
+> 2026-09-08 Task9 范围修订：用户将真实登录/会话、受控用户/组织/任职/授权、完整工作台状态和真实用户验收纳入原 Task9，并确认 Keycloak/OIDC 及详细设计。原登录独立交付仅记作 Task9.0，扩大后的 Task9 重新打开。详见 [批准扩展设计](../specs/2026-09-08-task9-real-user-access-design.md)、[分段实施计划](2026-09-08-task9-real-user-access-plan.md)和[验收矩阵](../../acceptance/2026-09-08-task9-real-user-access-acceptance.md)。当前由 Task9.1 实施并独立验证具名合同后继。以下 Task1–8 历史证据和当时 inventory 不改写，现行冻结合同不因本计划或批准记录自动变更。
 
 Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_RECOVERY_ACTIVATION_V1
 
