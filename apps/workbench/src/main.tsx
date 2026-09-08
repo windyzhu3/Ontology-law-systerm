@@ -1,9 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-
-function WorkbenchShell() {
-  return <main aria-label="Ontology Law Workbench" />;
-}
+import { App } from "./App";
 
 const rootElement = document.getElementById("root");
 if (rootElement === null) {
@@ -12,6 +9,6 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <WorkbenchShell />
+    <App />
   </StrictMode>,
 );
