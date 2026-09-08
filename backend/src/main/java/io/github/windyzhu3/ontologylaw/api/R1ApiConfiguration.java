@@ -12,4 +12,5 @@ class R1ApiConfiguration {
     @Bean ActorContextResolver actorContextResolver(R1ApiDeployment deployment){return deployment.actors;}
     @Bean R1ApiServices r1ApiServices(R1ApiDeployment deployment){return deployment.services;}
     @Bean ApiRuntimeHealth apiRuntimeHealth(R1ApiDeployment deployment,org.springframework.context.ApplicationContext context){return new ApiRuntimeHealth(deployment.database,context);}
+    @Bean ApiAvailability applicationAvailability(ApiRuntimeHealth health){return new ApiAvailability(health);}
 }
