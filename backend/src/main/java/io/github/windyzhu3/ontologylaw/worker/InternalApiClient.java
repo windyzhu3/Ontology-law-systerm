@@ -45,7 +45,12 @@ public final class InternalApiClient implements AutoCloseable {
     public record Result(int status,String body) {public String toString(){return "R1_HTTP_STATUS_"+status;}}
     private final URI origin;
     private final Map<R1WorkerTenantBindings.Binding,HttpClient> clients;
+    private final java.util.function.BooleanSupplier deploymentGate;
     public InternalApiClient(URI origin,R1WorkerTenantBindings registry,Map<String,Credentials> credentials) {
+        this(origin,registry,credentials,()->true);
+    }
+    public InternalApiClient(URI origin,R1WorkerTenantBindings registry,Map<String,Credentials> credentials,java.util.function.BooleanSupplier deploymentGate) {
+        this.deploymentGate=Objects.requireNonNull(deploymentGate);
         if(origin==null||!"https".equals(origin.getScheme())||origin.getHost()==null||origin.getUserInfo()!=null||origin.getQuery()!=null||origin.getFragment()!=null||!(origin.getPath().isEmpty()||origin.getPath().equals("/")))throw new IllegalArgumentException("R1_HTTPS_ORIGIN_REQUIRED");
         this.origin=origin;var clients=new HashMap<R1WorkerTenantBindings.Binding,HttpClient>();
         try{if(credentials.size()!=registry.bindings().size())throw new GeneralSecurityException();for(var binding:registry.bindings()){
@@ -64,6 +69,7 @@ public final class InternalApiClient implements AutoCloseable {
     }
     private Result send(R1WorkerTenantBindings.Binding binding,String path,String body,UUID key,boolean readiness){
         var client=clients.get(binding);if(client==null)return new Result(503,"");
+        try{if(!deploymentGate.getAsBoolean())return new Result(503,"");}catch(RuntimeException unavailable){return new Result(503,"");}
         var request=HttpRequest.newBuilder(origin.resolve(path)).timeout(Duration.ofSeconds(10)).header("Accept","application/json");
         if(body==null)request.GET();else request.header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body));if(key!=null)request.header("Idempotency-Key",key.toString());
         long began=System.nanoTime();var future=client.sendAsync(request.build(),ignored->new BoundedBody());

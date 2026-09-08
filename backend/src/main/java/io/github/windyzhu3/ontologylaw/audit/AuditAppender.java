@@ -8,11 +8,30 @@ import java.util.*;
 /** Append-only owner port. Writes on the caller's active AUDIT capability connection. */
 public interface AuditAppender {
     record Entry(UUID id,UUID commandId,String commandType,UUID correlationId,String result,
-            AuthorizationSnapshot authorization,String summary,byte[] summaryDigest) {
-        public Entry {summaryDigest=summaryDigest.clone();}
+            AuthorizationSnapshot authorization,String summary,byte[] summaryDigest,int schemaVersion) {
+        public Entry(UUID id,UUID commandId,String commandType,UUID correlationId,String result,
+                AuthorizationSnapshot authorization,String summary,byte[] summaryDigest) {
+            this(id,commandId,commandType,correlationId,result,authorization,summary,summaryDigest,1);
+        }
+        public Entry {summaryDigest=summaryDigest.clone();if(schemaVersion!=1&&schemaVersion!=2)throw new IllegalArgumentException("Unsupported command Audit schema");}
         @Override public byte[] summaryDigest(){return summaryDigest.clone();}
     }
     void append(Connection connection,Entry entry) throws SQLException;
+    record ReceiptDisclosureEntry(UUID id,UUID correlationId,UUID commandId,UUID receiptId,
+            Subject disclosedSource,Subject authorizationAnchor,AuthorizationSnapshot authorization) {
+        public ReceiptDisclosureEntry {
+            Objects.requireNonNull(id);Objects.requireNonNull(correlationId);Objects.requireNonNull(commandId);Objects.requireNonNull(receiptId);
+            if(!"execution.command_receipt".equals(disclosedSource.type())||disclosedSource.hash()==null||!receiptId.equals(disclosedSource.id())
+                    ||!authorization.allowed()||!authorizationAnchor.equals(authorization.request().subject()))throw new IllegalArgumentException("Invalid receipt disclosure");
+        }
+        public String summary() {
+            return io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.encode(Map.of("profile","R1_COMMAND_RECEIPT_DISCLOSURE_V1","version",1,"responseMode","BODY",
+                    "commandId",commandId.toString(),"receiptId",receiptId.toString(),"disclosedSource",selector(disclosedSource),"authorizationAnchor",selector(authorizationAnchor)));
+        }
+        private static Map<String,Object> selector(Subject s) {return s.revision()==null?Map.of("type",s.type(),"id",s.id().toString(),"hash",s.hash()):Map.of("type",s.type(),"id",s.id().toString(),"revision",s.revision());}
+        public byte[] summaryDigest(){return io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.digest(summary());}
+    }
+    default void append(Connection connection,ReceiptDisclosureEntry entry)throws SQLException {throw new SQLException("Receipt disclosure unsupported","0A000");}
     enum ResponseMode { BODY, CACHE_REVALIDATED }
     record ReadDisclosureEntry(UUID id,UUID correlationId,Subject disclosedSource,Subject authorizationAnchor,
             AuthorizationSnapshot authorization,ResponseMode responseMode) {

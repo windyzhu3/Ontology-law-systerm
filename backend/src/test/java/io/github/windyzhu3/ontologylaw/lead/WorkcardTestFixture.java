@@ -23,7 +23,7 @@ public abstract class WorkcardTestFixture extends PostgresIntegrationTest {
         setupCard(type,null);
     }
     protected void setupCard(TaskFactory.Type type,Instant createdAt)throws Exception {
-        seed=AuthorizationServiceIT.seed(database,"HUMAN",type.authority);
+        seed=seedFor(type);
         try(var c=database.apiConnection()){inTransaction(c,Capability.COMMAND,x->{
             var leads=LeadIngressService.databaseBacked(protection);var tasks=TaskFactory.databaseBacked();var now=createdAt==null?leads.now(x):createdAt;
             var lead=leads.capture(x,seed.tenant(),input(type!=TaskFactory.Type.COMPLETE_LEAD_INGRESS),CanonicalJson.digest(UUID.randomUUID().toString()),now);
@@ -54,6 +54,7 @@ public abstract class WorkcardTestFixture extends PostgresIntegrationTest {
             current=tasks.create(x,seed.tenant(),type,seed.appointment(),lead.selector(),ZoneId.of("Asia/Shanghai"),now.plusNanos(1000));return null;
         });}
     }
+    protected AuthorizationServiceIT.Seed seedFor(TaskFactory.Type type)throws Exception {return AuthorizationServiceIT.seed(database,"HUMAN",type.authority);}
     protected Map<String,Object> input(boolean contacts) {
         var result=new TreeMap<String,Object>();result.put("sourceChannelCode","TEST");result.put("sourceAccountCode","FIXTURE");result.put("capturedAt","2026-09-04T00:00:00.000000Z");
         result.put("capturedName","张测试");result.put("serviceCategoryCode","CONSULTATION");result.put("jurisdictionCode","CN");result.put("urgencyCode","NORMAL");result.put("legalNeedSummary","测试咨询");

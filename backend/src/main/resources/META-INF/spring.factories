@@ -1,0 +1,1 @@
+org.springframework.boot.EnvironmentPostProcessor=io.github.windyzhu3.ontologylaw.bootstrap.RuntimeWebRoleEnvironment

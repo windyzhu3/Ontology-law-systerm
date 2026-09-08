@@ -5,7 +5,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantLock;
 public final class R1ProjectionDispatcher implements AutoCloseable {
-    private static final class State {final ReentrantLock check=new ReentrantLock();long generation;long reapedExhausted;boolean frozen;int failures;java.time.Instant retryAt=java.time.Instant.MIN;}
+    private static final class State {final ReentrantLock check=new ReentrantLock();long generation;long reapedExhausted;boolean frozen;int failures;java.time.Instant retryAt=java.time.Instant.MIN;volatile boolean pollHealthy,deliveryHealthy=true;}
     private final Map<R1WorkerTenantBindings.Binding,State> states;private final InternalApiClient api;private final R1ProjectionOutboxPort outbox;private final String workerId;private final Clock clock;
     private final Semaphore permits=new Semaphore(4);private final ExecutorService requests=Executors.newVirtualThreadPerTaskExecutor();private ScheduledExecutorService scheduler;private volatile boolean closed;
     public R1ProjectionDispatcher(R1WorkerTenantBindings registry,InternalApiClient api,R1ProjectionOutboxPort outbox,String workerId,Clock clock){
@@ -33,6 +33,7 @@ public final class R1ProjectionDispatcher implements AutoCloseable {
                 // A consume failure may arrive while this HTTP request is in flight.
                 if(state.generation!=generation)return 0;state.frozen=false;state.failures=0;state.retryAt=java.time.Instant.MIN;
                 claims=outbox.claim(binding.tenantId(),workerId,reserved);
+                state.pollHealthy=true;
             }
             for(var claim:claims){
                 if(closed)break;
@@ -47,23 +48,24 @@ public final class R1ProjectionDispatcher implements AutoCloseable {
         if(closed||!clock.instant().isBefore(claim.leaseUntil()))return;
         var result=api.consume(binding,claim);if(closed)return;
         try{switch(result.status()){
-            case 204 -> outbox.ack(claim);
+            case 204 -> {if(outbox.ack(claim))state.deliveryHealthy=true;}
             case 409 -> {} // Old results never mutate the current claim.
-            case 401,403 -> freeze(state);
-            case 400 -> {if(outbox.exhaust(claim,"VALIDATION_FAILED"))warn("R1_PROJECTION_EXHAUSTED");}
-            case 404 -> {if(outbox.exhaust(claim,"NOT_FOUND"))warn("R1_PROJECTION_EXHAUSTED");}
-            case 422 -> {if(outbox.exhaust(claim,"PROJECTION_EVENT_INVALID"))warn("R1_PROJECTION_EXHAUSTED");}
-            default -> {boolean changed=outbox.retry(claim,switch(result.status()){case 408 -> "HTTP_TIMEOUT";case 429 -> "RATE_LIMITED";case 503 -> "SERVICE_UNAVAILABLE";default -> "INTERNAL_ERROR";});if(changed&&claim.attempt()>=8)warn("R1_PROJECTION_EXHAUSTED");}
-        }}catch(Exception failure){warn("R1_WORKER_UNAVAILABLE");}
+            case 401,403 -> {state.deliveryHealthy=false;freeze(state);}
+            case 400 -> {state.deliveryHealthy=false;if(outbox.exhaust(claim,"VALIDATION_FAILED"))warn("R1_PROJECTION_EXHAUSTED");}
+            case 404 -> {state.deliveryHealthy=false;if(outbox.exhaust(claim,"NOT_FOUND"))warn("R1_PROJECTION_EXHAUSTED");}
+            case 422 -> {state.deliveryHealthy=false;if(outbox.exhaust(claim,"PROJECTION_EVENT_INVALID"))warn("R1_PROJECTION_EXHAUSTED");}
+            default -> {state.deliveryHealthy=false;boolean changed=outbox.retry(claim,switch(result.status()){case 408 -> "HTTP_TIMEOUT";case 429 -> "RATE_LIMITED";case 503 -> "SERVICE_UNAVAILABLE";default -> "INTERNAL_ERROR";});if(changed&&claim.attempt()>=8)warn("R1_PROJECTION_EXHAUSTED");}
+        }}catch(Exception failure){state.deliveryHealthy=false;warn("R1_WORKER_UNAVAILABLE");}
     }
-    private static void freeze(State state){synchronized(state){state.generation++;state.frozen=true;}warn("R1_PROJECTION_AUTHORIZATION_FROZEN");}
-    private void backoff(State state){long[] delays={1,5,30,120,600,1800,7200};state.failures=Math.min(7,state.failures+1);state.retryAt=clock.instant().plusSeconds(delays[state.failures-1]);}
+    private static void freeze(State state){synchronized(state){state.generation++;state.frozen=true;state.pollHealthy=false;}warn("R1_PROJECTION_AUTHORIZATION_FROZEN");}
+    private void backoff(State state){state.pollHealthy=false;long[] delays={1,5,30,120,600,1800,7200};state.failures=Math.min(7,state.failures+1);state.retryAt=clock.instant().plusSeconds(delays[state.failures-1]);}
     private State state(R1WorkerTenantBindings.Binding binding){var state=states.get(binding);if(state==null)throw new IllegalArgumentException("R1_WORKER_BINDING_INVALID");return state;}
     public boolean frozen(R1WorkerTenantBindings.Binding binding){var state=state(binding);synchronized(state){return state.frozen;}}
     public int availablePermits(){return permits.availablePermits();}
+    public boolean healthy(R1WorkerTenantBindings.Binding binding){var state=state(binding);return !closed&&state.pollHealthy&&state.deliveryHealthy&&!frozen(binding);}
     /** Process-local committed lease-exhaustion metric, not backlog, durable state, or authorization. */
     public long reapedExhausted(R1WorkerTenantBindings.Binding binding){var state=state(binding);synchronized(state){return state.reapedExhausted;}}
-    public synchronized void start(){if(closed||scheduler!=null)throw new IllegalStateException("R1_WORKER_ALREADY_STARTED");scheduler=Executors.newScheduledThreadPool(states.size(),Thread.ofPlatform().daemon(true).factory());for(var binding:states.keySet())scheduler.scheduleWithFixedDelay(()->poll(binding),0,1,TimeUnit.SECONDS);}
+    public synchronized void start(){if(closed||scheduler!=null)throw new IllegalStateException("R1_WORKER_ALREADY_STARTED");scheduler=Executors.newScheduledThreadPool(states.size(),Thread.ofPlatform().daemon(true).name("r1-projection-",0).factory());for(var binding:states.keySet())scheduler.scheduleWithFixedDelay(()->poll(binding),0,1,TimeUnit.SECONDS);}
     private static void warn(String code){org.slf4j.LoggerFactory.getLogger(R1ProjectionDispatcher.class).warn(code);}
     public synchronized void close(){closed=true;if(scheduler!=null)scheduler.shutdownNow();requests.shutdownNow();}
 }

@@ -26,13 +26,17 @@ public final class JooqR1AuthorizationFacts implements R1AuthorizationFacts {
     public boolean serviceSourceAllowed(Connection c,AuthorizationService.Actor actor,String account)throws SQLException {
         return sources.contains(account) && services!=null && services.allows(c,actor,account);
     }
+    public Evidence evidence(Connection c,UUID tenant,UUID submission)throws SQLException {
+        var value=io.github.windyzhu3.ontologylaw.evidence.EvidenceReferenceReader.databaseBacked().read(c,tenant,submission);
+        return value==null?null:new Evidence(value.submission(),value.binding(),value.target(),value.active());
+    }
     public Capture capture(Connection c,UUID tenant,String account,String digest) throws SQLException {
         var policy=sources.find(account);
         if(policy==null)return null;
         var organization=identities.organization(c,tenant,policy.sourceIntakeRootCode());
         if(organization==null)return null;
         var l=LEAD_;
-        var rows=DSL.using(c,SQLDialect.POSTGRES).select(l.LEAD_ID,l.REVISION).from(l).where(l.TENANT_ID.eq(tenant))
+        var rows=DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)).select(l.LEAD_ID,l.REVISION).from(l).where(l.TENANT_ID.eq(tenant))
                 .and(l.SOURCE_ACCOUNT_CODE.eq(account)).and(l.SOURCE_RECORD_KEY_DIGEST.eq(Base64.getUrlDecoder().decode(digest))).fetch();
         if(rows.size()>1)return null;
         return new Capture(organization,rows.isEmpty()?null:new AuthorizationService.Subject("lead.lead",rows.getFirst().value1(),rows.getFirst().value2(),null));
@@ -41,7 +45,7 @@ public final class JooqR1AuthorizationFacts implements R1AuthorizationFacts {
         var task=tasks.read(c,tenant,taskId);
         if(task==null || !"lead.lead".equals(task.lead().type()))return null;
         var l=LEAD_;
-        var lead=DSL.using(c,SQLDialect.POSTGRES).select(l.REVISION).from(l).where(l.TENANT_ID.eq(tenant)).and(l.LEAD_ID.eq(task.lead().id())).fetchOne();
+        var lead=DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)).select(l.REVISION).from(l).where(l.TENANT_ID.eq(tenant)).and(l.LEAD_ID.eq(task.lead().id())).fetchOne();
         if(lead==null)return null;
         var owner=identities.owner(c,tenant,task.ownerAppointmentId(),now);
         var draft=task.draft();

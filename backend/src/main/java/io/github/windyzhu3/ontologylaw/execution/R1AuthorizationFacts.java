@@ -8,6 +8,8 @@ import java.util.UUID;
 /** Named Owner read contract. Implementations compose public Owner ports; no authority decisions or callbacks. */
 public interface R1AuthorizationFacts {
     record Capture(Subject organization, Subject existingLead) {}
+    record Evidence(Subject submission,Subject binding,Subject target,boolean active) {}
+    default Evidence evidence(Connection connection,UUID tenant,UUID submission)throws SQLException {return null;}
     record Task(Subject selector, UUID ownerAppointmentId, String taskType, String primaryCommand,
             Subject lead, Subject currentLead, Draft draft, Owner owner) {}
     record Draft(Subject selector, UUID taskId, String actionCode, String schemaCode, int schemaVersion) {}

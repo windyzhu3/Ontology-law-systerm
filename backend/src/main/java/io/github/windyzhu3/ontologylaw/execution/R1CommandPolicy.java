@@ -133,4 +133,6 @@ public final class R1CommandPolicy {
     static String primaryPolicy(CommandEnvelope.Type type) {
         return DRAFTS.values().stream().filter(p->p.command()==type).map(p->p.slot()+":"+p.code()).findFirst().orElse(null);
     }
+    static boolean matchesTask(CommandEnvelope.Type type,String taskType){var policy=DRAFTS.get(taskType);return policy!=null&&policy.command()==type;}
+    static String primarySchema(CommandEnvelope.Type type){return DRAFTS.values().stream().filter(p->p.command()==type).map(DraftPolicy::schema).findFirst().orElse(null);}
 }

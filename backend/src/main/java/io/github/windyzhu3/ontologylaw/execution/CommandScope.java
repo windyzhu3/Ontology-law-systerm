@@ -9,10 +9,14 @@ public final class CommandScope {
     private final CommandEnvelope.Type type;
     private final String canonical;
     private final UUID taskId;
-    private CommandScope(UUID tenantId,CommandEnvelope.Type type,Map<String,?> fields){this.tenantId=Objects.requireNonNull(tenantId);this.type=Objects.requireNonNull(type);this.canonical=CanonicalJson.encode(fields);this.taskId=fields.containsKey("taskId")?UUID.fromString((String)fields.get("taskId")):null;}
+    private final Map<String,Object> fields;
+    @SuppressWarnings("unchecked")
+    private CommandScope(UUID tenantId,CommandEnvelope.Type type,Map<String,?> fields){this.tenantId=Objects.requireNonNull(tenantId);this.type=Objects.requireNonNull(type);this.canonical=CanonicalJson.encode(fields);this.fields=(Map<String,Object>)CanonicalJson.freeze(fields);this.taskId=fields.containsKey("taskId")?UUID.fromString((String)fields.get("taskId")):null;}
     public UUID tenantId(){return tenantId;}
     public CommandEnvelope.Type type(){return type;}
     public String canonical(){return canonical;}
+    /** Immutable server-resolved tree; identical bytes remain the scope digest authority. */
+    public Map<String,Object> fields(){return fields;}
     public UUID taskId(){return taskId;}
     public byte[] digest(){return CanonicalJson.digest(canonical);}
     public static CommandScope capture(UUID tenant,String sourceAccountCode,String sourceRecordKeyDigest){

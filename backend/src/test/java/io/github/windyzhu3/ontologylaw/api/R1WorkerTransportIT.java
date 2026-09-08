@@ -53,7 +53,7 @@ class R1WorkerTransportIT extends ContactFlowFixture {
         final List<String> recoveryKeys=new CopyOnWriteArrayList<>(),recoveryBodies=new CopyOnWriteArrayList<>();final AtomicInteger dueStatus=new AtomicInteger(200),recoveryStatus=new AtomicInteger(200);volatile String firstDuePage;
         volatile byte[] dueCursorKey=new byte[32];final List<String> dueCursors=new CopyOnWriteArrayList<>();
         Harness()throws Exception {
-            actor=service("R1_PROJECTION_CONSUME");var serverKeys=key("SERVER");var clientKeys=key("CLIENT");binding=binding(actor,clientKeys,"CLIENT");registry=new R1WorkerTenantBindings("MVP-2026-09-07.1",List.of(binding));
+            actor=service("R1_PROJECTION_CONSUME");var serverKeys=key("SERVER");var clientKeys=key("CLIENT");binding=binding(actor,clientKeys,"CLIENT");registry=new R1WorkerTenantBindings("MVP-2026-09-08.1",List.of(binding));
             server=HttpsServer.create(new InetSocketAddress("localhost",0),0);var context=ssl(serverKeys,trust(clientKeys,"CLIENT"));server.setHttpsConfigurator(new HttpsConfigurator(context){public void configure(HttpsParameters parameters){var p=context.getDefaultSSLParameters();p.setNeedClientAuth(true);parameters.setSSLParameters(p);}});
             server.createContext("/internal/v1/projections/r1/readiness",exchange->{try{readinessCalls.incrementAndGet();int status=readinessStatus.get();if(status==204)try(var c=database.apiConnection()){status=new R1ProjectionReadinessService(policies).check(c,actor).status();}var readyGate=readyEntered;var readyContinue=readyRelease;if(readyGate!=null){readyGate.countDown();if(!readyContinue.await(15,TimeUnit.SECONDS))throw new AssertionError("Readiness transport latch");}if(noStore)exchange.getResponseHeaders().set("Cache-Control","no-store");exchange.sendResponseHeaders(status,-1);}catch(Exception failure){throw new RuntimeException(failure);}finally{exchange.close();}});
             server.createContext("/internal/v1/projections/r1/consume",exchange->{try{consumeCalls.incrementAndGet();fourConsumers.countDown();var request=new JsonMapper().readValue(exchange.getRequestBody(),ConsumeR1ProjectionV1.class);consumedEvents.add(request.getDomainEventId());var consumeGate=consumeEntered;var consumeContinue=consumeRelease;if(consumeGate!=null){consumeGate.countDown();if(!consumeContinue.await(15,TimeUnit.SECONDS))throw new AssertionError("Consume transport latch");}if(consumeDelay>0)Thread.sleep(consumeDelay);int status=consumeStatus.get();if(status==204)try(var c=database.apiConnection()){status=new R1ProjectionConsumer(policies).consume(c,actor,request).status();}if(!loseConsumeResponse)exchange.sendResponseHeaders(status,-1);}catch(Exception failure){throw new RuntimeException(failure);}finally{exchange.close();}});
@@ -111,6 +111,7 @@ class R1WorkerTransportIT extends ContactFlowFixture {
     }
     @Test void seventh_and_eighth_auth_failures_reap_normally_and_restart_never_redrives_exhausted()throws Exception{
         var logs=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();logs.start();var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(R1ProjectionDispatcher.class);logger.addAppender(logs);
+        var previousLevel=logger.getLevel();logger.setLevel(ch.qos.logback.classic.Level.WARN);
         try{
         for(int target:List.of(7,8)){
             logs.list.clear();
@@ -123,18 +124,19 @@ class R1WorkerTransportIT extends ContactFlowFixture {
                 assertEquals(target==8?1L:0L,logs.list.stream().filter(e->e.getFormattedMessage().equals("R1_PROJECTION_EXHAUSTED")).count());
             }
         }
-        }finally{logger.detachAppender(logs);logs.stop();}
+        }finally{logger.detachAppender(logs);logs.stop();logger.setLevel(previousLevel);}
     }
     @Test void failed_reaper_commit_never_publishes_exhaustion_log_or_process_metric()throws Exception{
         setupFlow(io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.CONTACT_LEAD);emit(1);
         var logs=new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();logs.start();var logger=(ch.qos.logback.classic.Logger)org.slf4j.LoggerFactory.getLogger(R1ProjectionDispatcher.class);logger.addAppender(logs);
+        var previousLevel=logger.getLevel();logger.setLevel(ch.qos.logback.classic.Level.WARN);
         try(var h=new Harness()){
             for(int attempt=1;attempt<8;attempt++){assertTrue(h.outbox.retry(h.outbox.claim(seed.tenant(),"PRIOR_WORKER",1).getFirst(),"NETWORK_ERROR"));pastOutbox("available_at");}
             assertEquals(8,h.outbox.claim(seed.tenant(),"LAST_WORKER",1).getFirst().attempt());pastOutbox("lease_until");
             var failing=R1ProjectionOutboxPort.databaseBacked(()->{var raw=database.workerConnection();return (java.sql.Connection)java.lang.reflect.Proxy.newProxyInstance(java.sql.Connection.class.getClassLoader(),new Class<?>[]{java.sql.Connection.class},(proxy,method,args)->{if(method.getName().equals("commit"))throw new java.sql.SQLException("REAPER_COMMIT_ACK_FAILURE");try{return method.invoke(raw,args);}catch(java.lang.reflect.InvocationTargetException failure){throw failure.getCause();}});});
             try(var dispatcher=new R1ProjectionDispatcher(h.registry,h.client,failing,"FAILED_REAPER",java.time.Clock.systemUTC())){assertEquals(0,dispatcher.poll(h.binding));assertEquals(0L,dispatcher.reapedExhausted(h.binding));assertEquals(1,h.outbox.counts(seed.tenant(),100).claimed());assertTrue(logs.list.stream().noneMatch(e->e.getFormattedMessage().equals("R1_PROJECTION_EXHAUSTED")));assertEquals(0,h.readinessCalls.get());}
             try(var dispatcher=new R1ProjectionDispatcher(h.registry,h.client,h.outbox,"HEALTHY_REAPER",java.time.Clock.systemUTC())){assertEquals(0,dispatcher.poll(h.binding));assertEquals(1L,dispatcher.reapedExhausted(h.binding));assertEquals(0,dispatcher.poll(h.binding));assertEquals(1L,dispatcher.reapedExhausted(h.binding));assertEquals(1,h.outbox.counts(seed.tenant(),100).exhausted());assertEquals(1L,logs.list.stream().filter(e->e.getFormattedMessage().equals("R1_PROJECTION_EXHAUSTED")).count());}
-        }finally{logger.detachAppender(logs);logs.stop();}
+        }finally{logger.detachAppender(logs);logs.stop();logger.setLevel(previousLevel);}
     }
     @Test void real_timeout_discards_late_readiness_without_claim_and_response_loss_retries_readonly_consume()throws Exception{
         setupFlow(io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.CONTACT_LEAD);emit(1);var clock=new MutableClock();
@@ -202,20 +204,20 @@ class R1WorkerTransportIT extends ContactFlowFixture {
     }
     @Test void registry_rejects_empty_duplicate_tenant_certificate_actor_and_wrong_release()throws Exception{
         var b=new R1WorkerTenantBindings.Binding(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"CLIENT","a".repeat(64));
-        assertThrows(IllegalArgumentException.class,()->new R1WorkerTenantBindings("MVP-2026-09-07.1",List.of()));
+        assertThrows(IllegalArgumentException.class,()->new R1WorkerTenantBindings("MVP-2026-09-08.1",List.of()));
         assertThrows(IllegalArgumentException.class,()->new R1WorkerTenantBindings("MVP-2026-09-06.3",List.of(b)));
-        assertThrows(IllegalArgumentException.class,()->new R1WorkerTenantBindings("MVP-2026-09-07.1",List.of(b,b)));
-        assertThrows(IllegalArgumentException.class,()->new R1WorkerTenantBindings("MVP-2026-09-07.1",List.of(b,new R1WorkerTenantBindings.Binding(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"SECOND",b.certificateSha256()))));
+        assertThrows(IllegalArgumentException.class,()->new R1WorkerTenantBindings("MVP-2026-09-08.1",List.of(b,b)));
+        assertThrows(IllegalArgumentException.class,()->new R1WorkerTenantBindings("MVP-2026-09-08.1",List.of(b,new R1WorkerTenantBindings.Binding(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),"SECOND",b.certificateSha256()))));
     }
     @Test void real_mtls_readiness_calls_query_service_and_rejects_untrusted_or_mismatched_credentials()throws Exception{
         setupFlow(io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.CONTACT_LEAD);var actor=service("R1_PROJECTION_CONSUME");
-        var serverKeys=key("SERVER");var clientKeys=key("CLIENT");var rogueKeys=key("ROGUE");var binding=binding(actor,clientKeys,"CLIENT");var registry=new R1WorkerTenantBindings("MVP-2026-09-07.1",List.of(binding));var calls=new AtomicInteger();
+        var serverKeys=key("SERVER");var clientKeys=key("CLIENT");var rogueKeys=key("ROGUE");var binding=binding(actor,clientKeys,"CLIENT");var registry=new R1WorkerTenantBindings("MVP-2026-09-08.1",List.of(binding));var calls=new AtomicInteger();
         var server=HttpsServer.create(new InetSocketAddress("localhost",0),0);var context=ssl(serverKeys,trust(clientKeys,"CLIENT"));server.setHttpsConfigurator(new HttpsConfigurator(context){public void configure(HttpsParameters parameters){var p=context.getDefaultSSLParameters();p.setNeedClientAuth(true);parameters.setSSLParameters(p);}});
         server.createContext("/internal/v1/projections/r1/readiness",exchange->{try{assertEquals("GET",exchange.getRequestMethod());assertNull(exchange.getRequestURI().getQuery());assertEquals(0,exchange.getRequestBody().readAllBytes().length);assertEquals(binding.certificateSha256(),HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(((HttpsExchange)exchange).getSSLSession().getPeerCertificates()[0].getEncoded())));calls.incrementAndGet();try(var c=database.apiConnection()){var response=new R1ProjectionReadinessService(policies).check(c,actor);exchange.getResponseHeaders().set("Cache-Control",response.cacheControl());exchange.sendResponseHeaders(response.status(),-1);}}catch(Exception failure){throw new RuntimeException(failure);}finally{exchange.close();}});server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());server.start();
         try {var origin=URI.create("https://localhost:"+server.getAddress().getPort());
         try(var client=new InternalApiClient(origin,registry,Map.of("CLIENT",new InternalApiClient.Credentials(clientKeys,password,trust(serverKeys,"SERVER"))))){assertEquals(204,client.readiness(binding).status());assertEquals(204,client.readiness(binding).status());assertEquals(2,calls.get());}
         try(var client=new InternalApiClient(origin,registry,Map.of("CLIENT",new InternalApiClient.Credentials(clientKeys,password,trust(rogueKeys,"ROGUE"))))){assertEquals(503,client.readiness(binding).status());assertEquals(2,calls.get());}
-        var rogueBinding=binding(actor,rogueKeys,"ROGUE");var rogueRegistry=new R1WorkerTenantBindings("MVP-2026-09-07.1",List.of(rogueBinding));
+        var rogueBinding=binding(actor,rogueKeys,"ROGUE");var rogueRegistry=new R1WorkerTenantBindings("MVP-2026-09-08.1",List.of(rogueBinding));
         try(var client=new InternalApiClient(origin,rogueRegistry,Map.of("ROGUE",new InternalApiClient.Credentials(rogueKeys,password,trust(serverKeys,"SERVER"))))){assertEquals(503,client.readiness(rogueBinding).status());assertEquals(2,calls.get());}
         assertThrows(IllegalArgumentException.class,()->new InternalApiClient(origin,registry,Map.of("CLIENT",new InternalApiClient.Credentials(rogueKeys,password,trust(serverKeys,"SERVER")))));
         }finally{server.stop(0);}

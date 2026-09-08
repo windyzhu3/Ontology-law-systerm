@@ -33,6 +33,12 @@ public final class CommandRuntime {
     }
     /** Caller owns a fresh connection. Commit acknowledgement loss has unknown durability; retry the same key. */
     public CommandResult execute(Connection connection,CommandEnvelope envelope) throws SQLException {
+        return executeProjected(connection,envelope,(c,result)->result);
+    }
+    /** Projection executes under the final authorization locks; nothing escapes before commit acknowledgement. */
+    @FunctionalInterface public interface Projection<T> { T project(Connection connection,CommandResult result)throws SQLException; }
+    public <T> T executeProjected(Connection connection,CommandEnvelope envelope,Projection<T> projection) throws SQLException {
+        Objects.requireNonNull(projection);
         CommandHandler handler=handlers.get(envelope.type());
         if(handler==null)throw new CommandHandler.Rejected("VALIDATION_FAILED");
         byte[] payload=CanonicalJson.digest(CanonicalJson.encode(envelope.payload()));
@@ -53,8 +59,9 @@ public final class CommandRuntime {
                 setLocalRole(c,Capability.QUERY);
                 var current=policy.authorize(c,envelope,context,true);
                 if(!current.allowed())throw new CommandHandler.Rejected(current.rejectionCode());
-                return existing;
+                return projection.project(c,existing);
             }
+            var recovery=envelope.type().recovery()?null:CommandRecoveryMetadata.freeze(envelope,context);
             UUID slot=store.occupy(envelope,context.scope(),payload);Savepoint business=c.setSavepoint();
             CommandHandler.Result result=null;String rejection=null;AuthorizationSnapshot terminal=null;
             try {
@@ -84,10 +91,13 @@ public final class CommandRuntime {
             if(status==CommandOutcome.Status.SUCCEEDED)store.event(envelope,result);
             var receipt=store.receipt(envelope,slot,status,result==null?null:result.fact(),rejection);
             UUID auditId=store.newId();
-            String summary=CanonicalJson.encode(Map.of("result",status.name(),"authorizationEvidence",terminal.evidence()));
+            var summaryValues=new TreeMap<String,Object>();summaryValues.put("result",status.name());summaryValues.put("authorizationEvidence",terminal.evidence());
+            if(recovery!=null)summaryValues.put("receiptRecovery",recovery);
+            String summary=CanonicalJson.encode(summaryValues);
             setLocalRole(c,Capability.AUDIT);
-            audit.append(c,new AuditAppender.Entry(auditId,envelope.commandId(),envelope.type().name(),envelope.correlationId(),status.name(),terminal,summary,CanonicalJson.digest(summary)));
-            return receipt;
+            audit.append(c,new AuditAppender.Entry(auditId,envelope.commandId(),envelope.type().name(),envelope.correlationId(),status.name(),terminal,summary,CanonicalJson.digest(summary),recovery==null?1:2));
+            setLocalRole(c,Capability.QUERY);
+            return projection.project(c,receipt);
         });
     }
 }
