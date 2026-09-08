@@ -1417,7 +1417,7 @@ paths:
         }
       ],
       "x-tenant-source": "ACTOR_CONTEXT",
-      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-subject-binding": "IDENTITY_ROOT",
       "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
       "x-error-codes": [
         "VALIDATION_FAILED",

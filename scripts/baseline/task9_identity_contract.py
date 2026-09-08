@@ -60,27 +60,74 @@ ADR = 'docs/adr/ADR-0014-task9-real-user-access.md'
 # Closed reviewed transport successor, including exact schemas, conditions,
 # DTO/response bindings and metadata; independent inventory checks below give
 # actionable diagnostics and count actual security declarations.
-OPENAPI_SHA256 = '8a6ca6677cc058dd10244f840c3e347a247cff668f29af07ba709d6ce616c9cc'
+OPENAPI_SHA256 = '9b52bc6c14c17e1a4855a9454a4aab169c46eb6850ee63d4286a1285b86a1ed5'
 
 def canonical_hash(document):
     return hashlib.sha256(json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
+def validate_identity_text(identity):
+    required = (
+        '| createAppointment | CREATE_APPOINTMENT | IDENTITY_APPOINTMENT_MANAGE | CreateAppointmentV1 | AppointmentCommandReceiptV1 | ROOT |',
+        '`R1_IDENTITY_BOOTSTRAP_CANDIDATE_V1`',
+        'restricted offline execution environment', 'exactly one real account',
+        'There is no Actor, browser endpoint, persistent operator session or candidate table.',
+        'different-purpose envelopes cannot cross online/bootstrap boundaries',
+        'NEW bootstrap requires an unexpired envelope and fresh verification',
+        'envelope integrity is always checked',
+        'Original-key completed-manifest verification precedes candidate freshness/IdP availability checks only after exact original key, canonical digest, operator/target bindings and complete stored Slot/Receipt/Audit/initial Fact set agree.',
+    )
+    return ['Task9 offline bootstrap profile / appointment root scope differs'] if any(value not in identity for value in required) else []
+
 def validate_document(document):
+    try:
+        return _validate_document(document)
+    except (AttributeError, KeyError, TypeError, ValueError):
+        # Malformed transport is a finding, never a CLI traceback or acceptance.
+        return ['Task9 OpenAPI transport shape is invalid']
+
+def _validate_document(document):
     findings = []
     if not isinstance(document, dict) or not isinstance(document.get('paths'), dict):
         return ['Task9 OpenAPI must have real paths']
+    if any(not isinstance(path, str) or not isinstance(item, dict)
+           for path, item in document['paths'].items()):
+        return ['Task9 OpenAPI path items must be mappings']
     found = [(method, path, operation) for path, item in document['paths'].items()
              if isinstance(item, dict) for method, operation in item.items() if method in METHODS]
+    if any(not isinstance(op, dict) or not isinstance(op.get('operationId'), str)
+           for _, _, op in found):
+        return ['Task9 OpenAPI operations must be named mappings']
     if len(found) != 37 or len({op.get('operationId') for _, _, op in found}) != 37:
         findings.append('Task9 requires exactly 37 unique HTTP operations')
-    security = Counter(tuple((op.get('security') or [{}])[0]) for _, _, op in found)
+    if any(op.get('security') not in ([{'publicBearer': []}], [{'internalMutualTls': []}])
+           for _, _, op in found):
+        return ['Task9 OpenAPI security must be an exact single named requirement']
+    security = Counter(tuple(op['security'][0]) for _, _, op in found)
     if security != Counter({('publicBearer',): 32, ('internalMutualTls',): 5}):
         findings.append('Task9 requires actual 32 public Bearer / 5 internal mTLS security')
     actual = {(m, p): op.get('operationId') for m, p, op in found
               if p.startswith('/api/v1/admin/identity/') or p == '/api/v1/session/context'}
     if actual != OPERATIONS:
         findings.append('Task9 exact 21 method/path/operationId additions differ')
-    schemas = document.get('components', {}).get('schemas', {})
+    components = document.get('components')
+    if not isinstance(components, dict) or not isinstance(components.get('schemas'), dict):
+        return ['Task9 OpenAPI component schemas must be a mapping']
+    schemas = components['schemas']
+    if any(not isinstance(schema, dict) for schema in schemas.values()):
+        return ['Task9 OpenAPI named schemas must be mappings']
+    def well_shaped(node):
+        if isinstance(node, dict):
+            if 'properties' in node and not isinstance(node['properties'], dict):
+                return False
+            if 'enum' in node and (not isinstance(node['enum'], list)
+                                   or any(isinstance(value, (dict, list)) for value in node['enum'])):
+                return False
+            return all(well_shaped(value) for value in node.values())
+        if isinstance(node, list):
+            return all(well_shaped(value) for value in node)
+        return True
+    if not well_shaped(document):
+        return ['Task9 OpenAPI properties and enum shapes are invalid']
     if 'NOT_FOUND' not in schemas.get('TerminalRejectionCode', {}).get('enum', []):
         findings.append('Task9 terminal rejection must include NOT_FOUND')
     for method, path, operation in found:
@@ -94,6 +141,8 @@ def validate_document(document):
             findings.append('Task9 self identity must not impersonate business Actor')
         if not self_query and operation.get('x-authority-path') != 'DIRECT':
             findings.append('Task9 management requires DIRECT only')
+        if operation.get('operationId') == 'createAppointment' and operation.get('x-subject-binding') != 'IDENTITY_ROOT':
+            findings.append('Task9 new appointment requires Tenant-root scope')
         if method != 'get' and operation.get('x-command-type') != COMMANDS.get(operation.get('operationId')):
             findings.append('Task9 mutation requires exact static command')
     if set(schemas.get('GrantableAuthorityCodeV1', {}).get('enum', [])) != GRANTABLE:
@@ -123,7 +172,10 @@ def validate(root: Path):
     try:
         document = yaml.load((root / API).read_text(encoding='utf-8'), Loader=_StrictSafeLoader)
         findings.extend(validate_document(document))
+        if findings:
+            return findings
         identity = (root / IDENTITY).read_text(encoding='utf-8')
+        findings.extend(validate_identity_text(identity))
         adr = (root / ADR).read_text(encoding='utf-8')
         http = (root / 'docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md').read_text(encoding='utf-8')
         rows = [tuple(cell.strip() for cell in line.strip('|').split('|')) for line in http.splitlines()

@@ -1,6 +1,6 @@
 # Task9.1 implementation report
 
-Status: REVIEW SNAPSHOT — bounded contract implementation delivered for review; final full baseline verification pending. No Task9 runtime, login, UAT, Task10 or R1 release completion claim.
+Status: REVIEW CORRECTION SNAPSHOT — three Important findings addressed; stable-source final full baseline verification pending. No Task9 runtime, login, UAT, Task10 or R1 release completion claim.
 
 Review BASE: 0cf0646. Worktree: C:/Users/Jacob/.cache/codex-worktrees/ontology-law-r1-business. Root separately owns approval/progress/deployment files and commits dee06ea/389eb55. This report covers the contract implementation agent's files.
 
@@ -36,18 +36,35 @@ All commands ran in this worktree. Python uses python@sha256:581429e3df12d76e6af
 | Frontend build | npm run build: tsc and Vite pass, exit0 | tool output |
 | Java generation diagnostic | Initial compile failed only new uniqueItems→Set output importing unavailable Jackson2 JsonDeserialize | tool output |
 | Java resolution | Equivalent array allOf(uniqueItems) produces List<IdentityRoleCodeV1>/List<GrantableAuthorityCodeV1>; no dependency/generator version change. JSON schema valid lists accepted, exact duplicates rejected | OpenApiContractTest |
-| Java contract | ./mvnw.cmd -f backend/pom.xml -Dtest=OpenApiContractTest test:19/19 PASS, exit0; final repeat pending at snapshot | java-contract.log; java-contract-final.log |
+| Java contract | ./mvnw.cmd -f backend/pom.xml -Dtest=OpenApiContractTest test:19/19 PASS, exit0; repeat after review correction also19/19 PASS,29.519s | java-contract.log; java-contract-final.log; java-contract-review-final.log |
 | Actual HTTP regression | ./mvnw.cmd -f backend/pom.xml -Pit -Dtest=OpenApiContractTest -Dit.test=R1CommandHttpIT verify:11 HTTP cases PASS plus19 contract cases, BUILD SUCCESS exit0 | http-regression-final.log; backend/target/failsafe-reports |
 | Exact preservation | Nine business request DTOs and47 transitive request schemas equal BASE; original16 method/path/id/security equal BASE | preservation-final.log |
 | Physical/event preservation | git diff --exit-code 0cf0646 -- contracts/events database/schema-contract-52-plus-2/generated backend/src/generated/jooq: exit0, no diff | tool output |
 | Complete baseline diagnostics | Earlier82-case run had443 failing subtests due stale full-schema fingerprints and old-fixture controls during updates; earlier202-case run had112 failures predominantly new baseline MERGED fixture evidence missing. These are integration diagnostics, not feature RED | contract-python.log; baseline-python.log |
-| Final complete baseline | python -m unittest discover -s scripts/baseline/tests -v currently running after fixture/metadata corrections | baseline-final.log |
-| Real baseline/topology CLI | Pending tracked-index final snapshot check using root-provided verify-baseline-locked.ps1 | pending |
+| Complete baseline diagnostic2 |294 tests/725.916s/17 failures:1 stale baseline mutation literal;1 null-operation guard crash;15 exact legacy assertions gained the same spurious finding because a mid-run guard edit temporarily rejected valid enum null/bool. This changing-source diagnostic is NOT acceptance | baseline-final.log |
+| Real baseline/topology CLI | verify-baseline-locked.ps1 at74697c4: baseline consistency PASS; topology PASS; exit0. R2 stays BLOCKED with7 non-fatal out-of-scope blockers | cli-final-v2.log; root independent repeat |
 
 HTTP cases: seven_generated_primary_operations_commit_exact_facts_and_original_receipt_projection[7]; capture_generated_operation_uses_inputless_authority_context_and_same_key_original_receipt; draft_save_update_and_old_key_replay_keep_original_receipt_but_current_authorized_projection; rejected_inactive_assignee_or_stale_candidate_receipt_is_recovered_without_new_command_eligibility[2]. Actual PostgreSQL/HTTP regression is existing business behavior only, not new real-login acceptance.
 
 Feature RED excerpt: `test_task9_inventory ... FAIL`, `AssertionError: 37 != 16`; `test_successor_contract_is_active ... FAIL`, `AssertionError: Task9 fail-closed contract validator is not implemented`; `Ran 4 tests ... FAILED (failures=4)`, exit1.
 
+## Review corrections and stable targeted verification
+
+Owned commits6e9a0e2 (contract implementation),74697c4 (real-test topology guard). Root review01 found no Critical and three Important issues; fixes are limited to the approved contract/guard boundary:
+
+- Offline bootstrap now names R1_IDENTITY_BOOTSTRAP_CANDIDATE_V1: approved operator in restricted offline environment, exact unique fixed-realm directory lookup, separate authenticated-encryption purpose, operator/target binding, no Actor/session/table/endpoint; dry-run zero writes; NEW requires fresh existing account; complete original-key/digest/set verification can precede freshness but never envelope integrity. This is the already-approved offline trust root, not new authority.
+- createAppointment is ROOT consistently in Identity registry, OpenAPI x-subject-binding and HTTP matrix; existing Appointment lifecycle operations remain SCOPED. This metadata-only OpenAPI correction regenerates identical TypeScript DTO bytes.
+- Malformed path/operation/security/components/schema/properties produces findings rather than a traceback. Primitive enum null/bool remains legal JSON Schema; malformed nested shapes remain fail-closed. Existing malformed readiness integration exercises both total verifier and actual CLI, preserving exact stdout/stderr assertions. Old baseline mutation now replaces active .2 instead of searching for obsolete .1.
+
+RED: guard-malformed-red.log has2 failures (old literal and actual null-operation AttributeError); task9-malformed-red.log has1 test with5 malformed-shape errors; review-correction-red.log has1 assertion failure for absent offline profile. The first attempted shape fix incorrectly rejected legal primitive enum values (guard-malformed-green.log,8 tests/5 failures), corrected without weakening mutations.
+GREEN: guard-malformed-green-v2.log8 tests/25.604s; review-correction-green.log9 tests/23.117s; all15 affected old exact diagnostic assertions separately pass in51.187s (baseline-diagnostic-targets-green.log). Final Task9+topology40 tests/7.983s PASS (review-topology-green.log). Pinned Node openapi:generate/check/typecheck/test/build all exit0 after the correction;75 tests/7 files PASS at17:17:20. No source changes will run concurrently with the next full suite.
+
+## Warning provenance and generation limitations
+
+HTTP/regeneration logs are not warning-free. They retain OAS3.1 beta, default JsonInclude/JsonSetter annotation settings, failed null schema name, oneOf advisory, CurrentWorkCardEnvelope_currentCard discriminator/null and ModelNull naming, complex request example, JAXB XmlAccessType and Flyway already-exists warnings. CurrentWorkCardEnvelope schema, old request schemas, generator/dependency settings, JooqAuditAppender and generated migrations are unchanged; these point to existing surfaces, but this task does not claim a measured before/after count for every warning. Generic oneOf/complex-example warnings have no precise schema attribution in the generator output, so new IdentityProblemV1 conditional schemas may contribute; they are not asserted all pre-existing.
+
+The concrete new generation failure was direct uniqueItems on IdentityAdminOptionsV1.roleCodes/grantableAuthorityCodes yielding Set and unavailable Jackson2 JsonDeserialize (original raw tool output retained in the task). Equivalent allOf uniqueness constraints keep typed List<IdentityRoleCodeV1>/List<GrantableAuthorityCodeV1> output. Valid arrays and exact duplicates are actually schema-validated in the19-case contract test. No Jackson2 dependency was added, no uniqueness or wire condition was relaxed, and successful Java compile/contract tests plus11 real business HTTP tests are the bounded mitigation evidence. They do not prove new Identity handlers/runtime validation are implemented.
+
 ## Remaining review/verification work
 
-Wait for final complete baseline log; fix only real remaining fixture/contract issues without suppressing semantic mutations. Run actual tracked baseline/topology CLI and final generator drift checks, preserve logs, then update this report and commit final evidence. Independent reviewer dispatched by root must review final diff; contract textual precision may need review refinements. No new capability or production deployment is requested. Actual IdP configuration, trusted resolver selection, management execution, bootstrap runtime and real-user UAT remain Task9.2–9.6 unimplemented.
+Run stable-source full baseline, final tracked CLI, and same-reviewer delta review; preserve diagnostics and append actual final evidence. No new capability or production deployment is requested. Actual IdP configuration, trusted resolver selection, management execution, bootstrap runtime and real-user UAT remain Task9.2–9.6 unimplemented.

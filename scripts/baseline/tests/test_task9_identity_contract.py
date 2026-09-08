@@ -80,6 +80,42 @@ class Task9IdentityContractTest(unittest.TestCase):
     def test_successor_contract_is_active(self):
         self.assertEqual([], self.validator().validate(ROOT))
 
+    def test_bootstrap_candidate_profile_and_appointment_root_are_enforced(self):
+        module = self.validator()
+        identity = (ROOT / module.IDENTITY).read_text(encoding='utf-8')
+        self.assertIn('R1_IDENTITY_BOOTSTRAP_CANDIDATE_V1', identity)
+        self.assertIn('| createAppointment | CREATE_APPOINTMENT | IDENTITY_APPOINTMENT_MANAGE | CreateAppointmentV1 | AppointmentCommandReceiptV1 | ROOT |', identity)
+        self.assertEqual('IDENTITY_ROOT', self.api['paths']['/api/v1/admin/identity/appointments']['post']['x-subject-binding'])
+        self.assertEqual([], module.validate_identity_text(identity))
+        for original, replacement in [
+            ('R1_IDENTITY_BOOTSTRAP_CANDIDATE_V1', 'R1_IDENTITY_ADMIN_ACTOR_V1'),
+            ('AppointmentCommandReceiptV1 | ROOT |', 'AppointmentCommandReceiptV1 | SCOPED |'),
+            ('different-purpose envelopes cannot cross online/bootstrap boundaries', 'online selectors are also accepted'),
+            ('exactly one real account', 'the first account'),
+            ('envelope integrity is always checked', 'envelope integrity is optional'),
+        ]:
+            with self.subTest(mutation=original):
+                self.assertIn(original, identity)
+                self.assertTrue(module.validate_identity_text(identity.replace(original, replacement)))
+
+    def test_malformed_transport_shapes_report_findings_without_crashing(self):
+        validate = self.validator().validate_document
+        self.assertEqual([], validate(self.api))
+        mutations = [
+            lambda d: d['paths'].update({'/api/v1/session/context': None}),
+            lambda d: d['paths']['/api/v1/session/context'].update({'get': None}),
+            lambda d: d['paths']['/api/v1/session/context']['get'].update({'security': 'publicBearer'}),
+            lambda d: d.update({'components': None}),
+            lambda d: d['components'].update({'schemas': None}),
+            lambda d: d['components']['schemas'].update({'SessionContextV1': None}),
+            lambda d: d['components']['schemas']['SessionContextV1'].update({'properties': None}),
+        ]
+        for mutate in mutations:
+            with self.subTest(mutation=mutate):
+                document = copy.deepcopy(self.api)
+                mutate(document)
+                self.assertTrue(validate(document))
+
     def test_tenant_self_actor_fake_appointment_and_authority_expansion_are_rejected(self):
         validate = self.validator().validate_document
         self.assertEqual([], validate(self.api))
@@ -90,6 +126,7 @@ class Task9IdentityContractTest(unittest.TestCase):
             lambda d: d['components']['schemas']['GrantableAuthorityCodeV1']['enum'].append('IDENTITY_AUTHORITY_MANAGE'),
             lambda d: d['components']['schemas']['CreateAuthorityGrantV1'].update({'additionalProperties': True}),
             lambda d: d['paths']['/api/v1/admin/identity/principals']['post'].update({'x-authority-path': 'DIRECT,DELEGATED'}),
+            lambda d: d['paths']['/api/v1/admin/identity/appointments']['post'].update({'x-subject-binding': 'IDENTITY_SCOPED'}),
         ]
         for mutate in mutations:
             with self.subTest(mutation=mutate):
