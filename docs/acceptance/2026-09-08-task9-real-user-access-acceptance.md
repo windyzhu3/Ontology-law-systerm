@@ -1,12 +1,12 @@
 # Task9 扩展验收矩阵
 
-日期：2026-09-08。状态：**Task9.1 静态合同验证及独立复审已通过；新增运行时/人工验收尚未执行，扩展 Task9 未完成。**
+日期：2026-09-08。状态：**Task9.1/Task9.2a 静态合同验证及独立复审已通过；新增运行时/人工验收尚未完成，扩展 Task9 未完成。**
 
 设计：[真实用户接入与状态设计](../superpowers/specs/2026-09-08-task9-real-user-access-design.md)。计划：[Task9 扩展实施计划](../superpowers/plans/2026-09-08-task9-real-user-access-plan.md)。
 
 阶段证据：[Task9.1 本地验收](../progress/2026-09-08-task9-contract-acceptance.md)。C01 合同及 C02～04 静态部分已验证；C02～04 的运行时权限、错误配置、回执披露仍随后续实现验收，不将这些混合项整体提前判为通过。
 
-代办接入补充：[具体补充设计](../superpowers/specs/2026-09-08-task9-delegated-context-amendment-design.md)已获用户书面确认，T9-D01～08 正式加入本矩阵，全部新增项尚未验收；原 C/L/I/W/U 验收不被替代，Task9.1 历史通过不覆盖这次后继修订。
+代办接入补充：[具体补充设计](../superpowers/specs/2026-09-08-task9-delegated-context-amendment-design.md)已获用户书面确认，T9-D01～08 正式加入本矩阵；T9-D01静态项已通过，见[代办合同验收](../progress/2026-09-08-task9-delegated-contract-acceptance.md)，T9-D02～08运行时项尚未验收；原 C/L/I/W/U 验收不被替代，Task9.1 历史通过不覆盖这次后继修订。
 
 ## 1. 通过条件
 

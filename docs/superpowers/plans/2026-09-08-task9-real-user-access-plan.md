@@ -12,7 +12,7 @@
 
 **Status:** APPROVED。用户于 2026-09-08 确认详细设计及计划，现从 Task9.1 合同后继开始实施；后续功能与实际用户/权限变更仍按各单元门禁，不将设计批准当成完成证据。
 
-**Execution:** Task9.1 已通过本地静态验证及独立复审，见[阶段证据](../../progress/2026-09-08-task9-contract-acceptance.md)。用户已书面确认[合法代办补充设计](../specs/2026-09-08-task9-delegated-context-amendment-design.md)，现执行 Task9.2a 合同前置及独立评审，再恢复原 Task9.2 implementer。运行时代码在此前置通过前继续暂停；Task9.2～9.6 尚未验收，Task10/R1 发布不晋级。
+**Execution:** Task9.1 与 Task9.2a 静态合同均已验收及独立复审通过，见[代办合同证据](../../progress/2026-09-08-task9-delegated-contract-acceptance.md)。现在恢复 Task9.2 原运行时实施子代理，补齐可信登录、本人/代办 context 与离线引导；Task9.2～9.6 运行时尚未验收，Task10/R1 发布不晋级。
 
 ## Global Constraints
 
@@ -105,7 +105,7 @@ Identity self context 拟定：`displayName`、`state`、`appointmentChoices[{id
 
 **Consumes:** ADR-0014 生效合同、原九公共请求 DTO 及其传递依赖、原 16 method/path/operationId/security、冻结业务事件/物理字节。**Produces:** MVP-2026-09-08.3 / Identity V1.1 / HTTP V1.5 / Workbench V1.3 / OpenAPI 1.4.0，Command V1.3 与物理版本不变；37/32/5不变。下游依赖准确 header `X-On-Behalf-Appointment-Id` 及两个 required context 字段，不能提前假设运行时已接受它们。
 
-- [ ] **Step 1 — 写真实文档与拒绝变异 RED。** 在现有 `Task9IdentityContractTest` 中增加以下实际结构断言，并扩展对应变异。测试必须先因缺少 header/字段/版本而失败，而非 import/环境错误。
+- [x] **Step 1 — 写真实文档与拒绝变异 RED。** 在现有 `Task9IdentityContractTest` 中增加以下实际结构断言，并扩展对应变异。测试必须先因缺少 header/字段/版本而失败，而非 import/环境错误。
 
 ```python
 def test_delegated_context_successor_shape(self):
@@ -121,8 +121,8 @@ def test_delegated_context_successor_shape(self):
 
 覆盖：删除 header、required/nullable 改错、数组上限扩大、候选 item 放入 Principal/Grant/权限字段、管理 operation 接受 DELEGATED、internal operation 接入 selector、missing paired-header 规则或 SELF max101/恢复时机约束被删、malformed transport 不抛未处理异常。变异必须实际调用生产 validator，而不只是重复测试 helper；验证原业务 shape/事件/权限集合相等。
 
-- [ ] **Step 2 — 运行定向 RED 并留真实退出码。** 锁定 Linux Python 容器中执行 `python -m unittest scripts.baseline.tests.test_task9_identity_contract -v`。环境/路径错误先处理，不算功能 RED。
-- [ ] **Step 3 — 最小激活。** 新 ADR 精确列出替代项；同步闭合 HTTP/Identity/Workbench 规则与实际 baseline gate，保留业务 Command 注册。OpenAPI 新字段使用下面结构；state/选择互相匹配等不可由 JSON Schema 跨数组比较的约束，必须在合同与 runtime 验收中显式保留，不能声称生成器自动保证。
+- [x] **Step 2 — 运行定向 RED 并留真实退出码。** 锁定 Linux Python 容器中执行 `python -m unittest scripts.baseline.tests.test_task9_identity_contract -v`。环境/路径错误先处理，不算功能 RED。
+- [x] **Step 3 — 最小激活。** 新 ADR 精确列出替代项；同步闭合 HTTP/Identity/Workbench 规则与实际 baseline gate，保留业务 Command 注册。OpenAPI 新字段使用下面结构；state/选择互相匹配等不可由 JSON Schema 跨数组比较的约束，必须在合同与 runtime 验收中显式保留，不能声称生成器自动保证。
 
 ```yaml
 delegatedAppointmentChoices:
@@ -137,11 +137,11 @@ selectedOnBehalfAppointmentId:
 
 将两项加入 `SessionContextV1.required`；保留原七字段/三 state。未选本人时数组空/代办选择 null；代办选中时管理入口 false。header 为 optional/UUID/单值，具体哪些 operation 接受或拒绝由补充设计 §2 精确声明；不修改业务 body 来携带认证选择器。
 
-- [ ] **Step 4 — GREEN、生成与覆盖回归。** 锁定 Node 24.20.0 / npm 11.9.0 执行 `npm run openapi:generate`、`npm run openapi:check`、`npm run typecheck`、`npm test`、`npm run build`；JDK 25 用 `./mvnw.cmd -f backend/pom.xml -Dtest=OpenApiContractTest test`。定向 Python 通过后，稳定源码运行全量 `python -m unittest discover -s scripts/baseline/tests -v` 与 `python -m unittest tests.test_topology -v`，实际树 baseline/topology CLI 也必须通过。各命令独立记录退出码；全量基线只在稳定版本运行一次，修复后按实际覆盖重跑。
+- [x] **Step 4 — GREEN、生成与覆盖回归。** 锁定 Node 24.20.0 / npm 11.9.0 执行 `npm run openapi:generate`、`npm run openapi:check`、`npm run typecheck`、`npm test`、`npm run build`；JDK 25 用 `./mvnw.cmd -f backend/pom.xml -Dtest=OpenApiContractTest test`。定向 Python 通过后，稳定源码运行全量 `python -m unittest discover -s scripts/baseline/tests -v` 与 `python -m unittest tests.test_topology -v`，实际树 baseline/topology CLI 也必须通过。各命令独立记录退出码；全量基线只在稳定版本运行一次，修复后按实际覆盖重跑。
 
 已有 Windows 路径/符号链接测试限制：Python suite 在锁定 Linux Python 镜像执行，挂载 worktree readonly，不向 synthetic Git repo 单元测试注入 GIT_DIR/GIT_COMMON_DIR。实际树 CLI 可用本计划 SDD 目录 `verify-baseline-locked.ps1` 的只读 Git mount。镜像固定 `python@sha256:581429e3df12d76e6af4be5ab7d0e7fc2013eb57dc23d2de691411c8efdbb970`，PyYAML 依既有 requirements 安装，不修改依赖。
 
-- [ ] **Step 5 — 自审、准确提交与独立评审。** 只暂存本任务命名文件，`git diff --cached --check` 后提交 `feat(contract): preserve delegated identity access`。报告 RED/GREEN 命令、case/exit、源版本、旧 DTO/事件/物理相等证据及未解决项。控制代理以完整 task BASE→HEAD 生成 review package，独立审阅 spec compliance 和 quality；重要问题交回同 implementer 修复。此门通过才恢复 9.2，不将 T9-D02～08 标成 runtime PASS。
+- [x] **Step 5 — 自审、准确提交与独立评审。** 只暂存本任务命名文件，`git diff --cached --check` 后提交 `feat(contract): preserve delegated identity access`。报告 RED/GREEN 命令、case/exit、源版本、旧 DTO/事件/物理相等证据及未解决项。控制代理以完整 task BASE→HEAD 生成 review package，独立审阅 spec compliance 和 quality；重要问题交回同 implementer 修复。此门通过才恢复 9.2，不将 T9-D02～08 标成 runtime PASS。
 
 ## Task 9.2: Keycloak、动态映射、context 与引导
 
