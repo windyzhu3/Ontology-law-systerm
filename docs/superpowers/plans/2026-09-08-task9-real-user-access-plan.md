@@ -12,7 +12,7 @@
 
 **Status:** APPROVED。用户于 2026-09-08 确认详细设计及计划，现从 Task9.1 合同后继开始实施；后续功能与实际用户/权限变更仍按各单元门禁，不将设计批准当成完成证据。
 
-**Execution:** Task9.1 已通过本地静态验证及独立复审，见[阶段证据](../../progress/2026-09-08-task9-contract-acceptance.md)。下一步 Task9.2；Task9.2～9.6 未完成，Task10/R1 发布不晋级。
+**Execution:** Task9.1 已通过本地静态验证及独立复审，见[阶段证据](../../progress/2026-09-08-task9-contract-acceptance.md)。用户确认继续，当前实施 Task9.2；Task9.2～9.6 尚未验收，Task10/R1 发布不晋级。
 
 ## Global Constraints
 
@@ -195,4 +195,4 @@ git diff --check
 
 使用仓库锁定工具链；Windows 使用 `mvnw.cmd` 或 Git Bash wrapper，不误用系统全局旧 Node/npm。每一环记录实际退出码，不把最后一个命令成功覆盖前序失败。
 
-当前执行单元：Task9.1。详细设计审阅已通过；合同修改与独立验证尚待完成。本文不是任何真实账号/权限写入的执行凭据，新增画面的视觉确认、后续功能及人工 UAT 仍有各自门禁。
+当前执行单元：Task9.2。Task9.1 合同修改及独立验证已完成；本步仅实施 Keycloak、可信映射、self context 和离线引导，并使用隔离合成测试资源验证。本文不是任何真实账号/权限写入的执行凭据，新增画面的视觉确认、后续功能及人工 UAT 仍有各自门禁。
