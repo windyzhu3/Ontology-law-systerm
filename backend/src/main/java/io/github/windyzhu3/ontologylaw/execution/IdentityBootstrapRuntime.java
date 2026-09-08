@@ -34,18 +34,18 @@ public final class IdentityBootstrapRuntime {
             R1BusinessFence.databaseBacked().exclusive(c,tenant);store.commandFence(tenant,manifest.commandId());AuthorizationService.databaseBacked().lockForMutation(c,tenant);
             // Re-read after the complete lock sequence. An original commit is verified before freshness/network checks.
             initialized=identity.initialized(c,tenant,binding.tenantCode());
-            UUID receipt=store.original(tenant,manifest.commandId(),scope,digest);
+            var closure=store.original(tenant,manifest.commandId(),scope,digest);
             if(initialized) {
                 var original=audit.bootstrapOriginal(c,tenant,manifest.commandId());
-                if(receipt==null||original==null||!hex.equals(original.manifestDigest())||!binding.operatorAssertion().equals(original.operatorAssertion()))throw new SQLException("BOOTSTRAP_ORIGINAL_STATE_CONFLICT","23000");
-                identity.verify(c,manifest,hmac,original.facts());return new Outcome("VERIFIED_ORIGINAL",tenant,receipt,Map.of());
+                if(closure==null||original==null||!hex.equals(original.manifestDigest())||!binding.operatorAssertion().equals(original.operatorAssertion())||!closure.completedAt().equals(original.facts().createdAt()))throw new SQLException("BOOTSTRAP_ORIGINAL_STATE_CONFLICT","23000");
+                identity.verify(c,manifest,hmac,original.facts());return new Outcome("VERIFIED_ORIGINAL",tenant,closure.receiptId(),Map.of());
             }
-            if(verifyOnly||receipt!=null||audit.bootstrapOriginal(c,tenant,manifest.commandId())!=null)throw new SQLException("BOOTSTRAP_ORIGINAL_STATE_CONFLICT","23000");
+            if(verifyOnly||closure!=null||audit.bootstrapOriginal(c,tenant,manifest.commandId())!=null)throw new SQLException("BOOTSTRAP_ORIGINAL_STATE_CONFLICT","23000");
             Instant now=SensitiveReadClock.now(c);candidate.requireFresh(now);if(manifest.effectiveFrom().isAfter(now))throw new IllegalArgumentException("BOOTSTRAP_MANIFEST_INVALID");
             if(!candidate.subject().equals(directory.enabled(candidate.subject()).subject()))throw new IllegalArgumentException("BOOTSTRAP_CANDIDATE_INVALID");
             candidate.requireFresh(SensitiveReadClock.now(c));
             if(dryRun)return new Outcome("DRY_RUN",tenant,null,DELTA);
-            setLocalRole(c,Capability.COMMAND);var facts=identity.create(c,tenant,manifest,hmac);receipt=store.write(tenant,manifest.commandId(),scope,digest,facts.createdAt());
+            setLocalRole(c,Capability.COMMAND);var facts=identity.create(c,tenant,manifest,hmac);UUID receipt=store.write(tenant,manifest.commandId(),scope,digest,facts.createdAt());
             setLocalRole(c,Capability.AUDIT);audit.append(c,new AuditAppender.BootstrapEntry(UUID.randomUUID(),manifest.commandId(),UUID.randomUUID(),hex,binding.operatorAssertion(),facts));
             return new Outcome("CREATED",tenant,receipt,DELTA);
         });

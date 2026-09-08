@@ -32,18 +32,38 @@ class IdentityBootstrapIT extends PostgresIntegrationTest {
             assertCounts(tenant);
             try(var c=database.apiConnection()){var replay=runtime.run(c,manifest,false);assertEquals("VERIFIED_ORIGINAL",replay.mode());assertEquals(created.receiptId(),replay.receiptId());}assertCounts(tenant);
             long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(8);while(Instant.now().isBefore(issued.plusSeconds(300))&&System.nanoTime()<deadline)Thread.sleep(50);assertFalse(Instant.now().isBefore(issued.plusSeconds(300)));
-            idp.unavailable(()->{try(var c=database.apiConnection()){assertEquals(created.receiptId(),runtime.run(c,manifest,false).receiptId());}catch(Exception failure){throw new AssertionError(failure);}});assertCounts(tenant);
+            var restarted=new IdentityBootstrapRuntime(tenant,binding,candidates,new ExternalSubjectProtection(t->subjectKey),directory,AuditAppender.databaseBacked("TASK92_RESTARTED_NODE"));
+            idp.unavailable(()->{try(var c=database.apiConnection()){assertEquals(created.receiptId(),restarted.run(c,manifest,false).receiptId());}catch(Exception failure){throw new AssertionError(failure);}});assertCounts(tenant);
         }
     }
     record Scenario(UUID tenant,IdentityBootstrapService.Manifest manifest,IdentityBootstrapRuntime runtime){}
-    Scenario scenario(boolean expired)throws Exception {
+    Scenario scenario(boolean expired)throws Exception {return scenario(expired?301:0);}
+    Scenario scenario(int ageSeconds)throws Exception {
         UUID tenant=UUID.randomUUID();byte[] candidateKey=new byte[32],subjectKey=new byte[32];new java.security.SecureRandom().nextBytes(candidateKey);new java.security.SecureRandom().nextBytes(subjectKey);
         var directory=KeycloakDirectoryReader.isolatedLoopback(new KeycloakDirectoryReader.Trust(idp.issuer(),"task92-directory",idp.directorySecret));
         var candidates=new BootstrapCandidateProtection("offline-v1",Map.of("offline-v1",candidateKey));
         var binding=new BootstrapCandidateProtection.Binding("Approved synthetic test operator","T"+tenant.toString().replace("-",""),"TASK92",idp.issuer());
-        String selector=candidates.issue(binding,idp.username,directory,Instant.now().minusSeconds(expired?301:0));
+        String selector=candidates.issue(binding,idp.username,directory,Instant.now().minusSeconds(ageSeconds));
         var manifest=new IdentityBootstrapService.Manifest("R1_IDENTITY_BOOTSTRAP_V1",UUID.randomUUID(),binding.tenantCode(),"Synthetic tenant","ROOT","Synthetic root",binding.provider(),binding.issuer(),selector,"Synthetic founder",Instant.now().minusSeconds(60),binding.operatorAssertion());
         return new Scenario(tenant,manifest,new IdentityBootstrapRuntime(tenant,binding,candidates,new ExternalSubjectProtection(t->subjectKey),directory,AuditAppender.databaseBacked("TASK92_BOOTSTRAP_IT")));
+    }
+    @ParameterizedTest @ValueSource(strings={"SLOT_TIME","RECEIPT_TIME","BOTH_TIMES","SERVICE_ROLE","TRACE","CAUSATION"})
+    void expired_offline_original_recovery_rejects_each_corrupted_closure_time_or_audit_source_without_repair(String defect)throws Exception {
+        Instant started=Instant.now();var s=scenario(295);try(var c=database.apiConnection()){assertEquals("CREATED",s.runtime().run(c,s.manifest(),false).mode());}
+        String mutation=switch(defect){
+            case "SLOT_TIME"->"update execution.command_execution_slot set occupied_at=occupied_at+interval '1 second' where tenant_id=?";
+            case "RECEIPT_TIME"->"update execution.command_receipt set completed_at=completed_at+interval '1 second' where tenant_id=?";
+            case "BOTH_TIMES"->"with changed as (update execution.command_execution_slot set occupied_at=occupied_at+interval '1 second' where tenant_id=? returning tenant_id) update execution.command_receipt set completed_at=completed_at+interval '1 second' where tenant_id in (select tenant_id from changed)";
+            case "SERVICE_ROLE"->"update audit.audit_entry set service_role_code='WORKER' where tenant_id=?";
+            case "TRACE"->"update audit.audit_entry set trace_id=gen_random_uuid() where tenant_id=?";
+            case "CAUSATION"->"update audit.audit_entry set causation_id=gen_random_uuid() where tenant_id=?";
+            default->throw new IllegalArgumentException("Unsupported isolated corruption case");};
+        // Isolated corruption fixture only: no production grants or trigger definitions are changed.
+        try(var c=database.adminConnection()){c.setAutoCommit(false);AuthorizationServiceIT.sql(c,"set local session_replication_role=replica");AuthorizationServiceIT.sql(c,mutation,s.tenant());c.commit();}
+        while(Instant.now().isBefore(started.plusSeconds(6)))Thread.sleep(25);
+        var before=snapshot(s.tenant());idp.unavailable(()->{try(var c=database.apiConnection()){
+            assertThrows(SQLException.class,()->s.runtime().run(c,s.manifest(),false));assertThrows(SQLException.class,()->s.runtime().verifyOriginal(c,s.manifest()));
+        }catch(SQLException failure){throw new AssertionError("Isolated original-state verification connection unavailable",failure);}});assertEquals(before,snapshot(s.tenant()));
     }
     @ParameterizedTest @ValueSource(strings={"EXPIRED","PARTIAL","CHANGED_MANIFEST","NEW_COMMAND","CHANGED_PRINCIPAL","REVOKED_GRANT"})
     void invalid_or_incomplete_original_attempt_never_initializes_repairs_or_adds_permissions(String defect)throws Exception {

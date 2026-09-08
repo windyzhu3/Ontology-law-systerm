@@ -15,13 +15,15 @@ public final class JooqIdentityBootstrapStore {
     public void tenantCodeFence(String code)throws SQLException{lock("R1_IDENTITY_BOOTSTRAP_TENANT_CODE_V1:"+code);}
     public void commandFence(UUID tenant,UUID command)throws SQLException{lock("R1_COMMAND_UUID_LOCK_V1:"+tenant+":"+command);}
     private void lock(String purpose)throws SQLException {try(var p=connection.prepareStatement("select pg_advisory_xact_lock(?)")){p.setLong(1,java.nio.ByteBuffer.wrap(CanonicalJson.digest(purpose)).getLong());p.execute();}}
-    public UUID original(UUID tenant,UUID command,byte[] scope,byte[] digest)throws SQLException {
+    public record Original(UUID receiptId,Instant completedAt) {}
+    public Original original(UUID tenant,UUID command,byte[] scope,byte[] digest)throws SQLException {
         var s=COMMAND_EXECUTION_SLOT;var r=COMMAND_RECEIPT;
         var slots=db.selectFrom(s).where(s.TENANT_ID.eq(tenant)).and(s.COMMAND_ID.eq(command)).limit(2).fetch();if(slots.isEmpty())return null;if(slots.size()!=1)throw invalid();var slot=slots.getFirst();
         var rows=db.selectFrom(r).where(r.TENANT_ID.eq(tenant)).and(r.COMMAND_EXECUTION_SLOT_ID.eq(slot.get(s.COMMAND_EXECUTION_SLOT_ID))).limit(2).fetch();if(rows.size()!=1)throw invalid();var receipt=rows.getFirst();
         if(!"INTERNAL_ADMIN".equals(slot.get(s.ENVELOPE_TYPE))||!"BOOTSTRAP_IDENTITY_ADMIN".equals(slot.get(s.COMMAND_TYPE))||!java.security.MessageDigest.isEqual(scope,slot.get(s.COMMAND_SCOPE_DIGEST))||!java.security.MessageDigest.isEqual(digest,slot.get(s.PAYLOAD_DIGEST))
-                ||!"SUCCEEDED".equals(receipt.get(r.OUTCOME))||receipt.get(r.REJECTION_CODE)!=null||!"identity.tenant".equals(receipt.get(r.RESULT_FACT_TYPE))||!tenant.equals(receipt.get(r.RESULT_FACT_ID))||!Long.valueOf(0).equals(receipt.get(r.RESULT_FACT_REVISION))||receipt.get(r.RESULT_FACT_HASH)!=null)throw invalid();
-        return receipt.get(r.COMMAND_RECEIPT_ID);
+                ||!"SUCCEEDED".equals(receipt.get(r.OUTCOME))||receipt.get(r.REJECTION_CODE)!=null||!"identity.tenant".equals(receipt.get(r.RESULT_FACT_TYPE))||!tenant.equals(receipt.get(r.RESULT_FACT_ID))||!Long.valueOf(0).equals(receipt.get(r.RESULT_FACT_REVISION))||receipt.get(r.RESULT_FACT_HASH)!=null
+                ||!slot.get(s.OCCUPIED_AT).toInstant().equals(receipt.get(r.COMPLETED_AT).toInstant()))throw invalid();
+        return new Original(receipt.get(r.COMMAND_RECEIPT_ID),receipt.get(r.COMPLETED_AT).toInstant());
     }
     public UUID write(UUID tenant,UUID command,byte[] scope,byte[] digest,Instant created)throws SQLException {
         var s=COMMAND_EXECUTION_SLOT;var r=COMMAND_RECEIPT;UUID slot=UUID.randomUUID(),receipt=UUID.randomUUID();var at=OffsetDateTime.ofInstant(created,ZoneOffset.UTC);

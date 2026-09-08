@@ -67,7 +67,10 @@ public final class HumanCredentialVerifier {
             var response=send(HttpRequest.newBuilder(URI.create(trust.issuer()+"/protocol/openid-connect/token/introspect"))
                     .header("Content-Type","application/x-www-form-urlencoded").POST(HttpRequest.BodyPublishers.ofString(form(Map.of("client_id",trust.introspectionClientId(),"client_secret",trust.introspectionSecret(),"token",token)))).timeout(Duration.ofSeconds(2)).build());
             var active=JSON.readTree(response);
-            if(!active.path("active").isBoolean()||!active.path("active").asBoolean()||!claims.getSubject().equals(active.path("sub").asString())||!trust.issuer().equals(active.path("iss").asString()))throw invalid();
+            if(!active.isObject()||!active.path("active").isBoolean())throw unavailable();
+            if(!active.path("active").asBoolean())throw invalid();
+            if(!active.path("sub").isString()||active.path("sub").asString().isBlank()||!active.path("iss").isString()||active.path("iss").asString().isBlank())throw unavailable();
+            if(!claims.getSubject().equals(active.path("sub").asString())||!trust.issuer().equals(active.path("iss").asString()))throw invalid();
             return new Credential(trust.tenantId(),trust.provider(),claims.getSubject());
         }catch(AuthenticationServiceException|BadCredentialsException classified){throw classified;}
         catch(java.text.ParseException|JOSEException|IllegalArgumentException invalid){throw invalid();}

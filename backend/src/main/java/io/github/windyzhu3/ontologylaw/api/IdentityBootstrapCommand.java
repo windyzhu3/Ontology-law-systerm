@@ -43,7 +43,14 @@ public final class IdentityBootstrapCommand {
             var runtime=new IdentityBootstrapRuntime(settings.tenantId(),binding,candidates,new ExternalSubjectProtection(t->{if(!t.equals(settings.tenantId()))throw new IllegalArgumentException();return subjectKey;}),directory,AuditAppender.databaseBacked(settings.node()));
             try(var connection=database.open()) {
                 var result=args[0].equals("verify")?runtime.verifyOriginal(connection,manifest):runtime.run(connection,manifest,args[0].equals("dry-run"));
-                output.println(JSON.writeValueAsString(Map.of("mode",result.mode(),"plannedDelta",result.plannedDelta())));return 0;
+                var response=new TreeMap<String,Object>();response.put("mode",result.mode());response.put("plannedDelta",result.plannedDelta());
+                if(args[0].equals("dry-run")&&result.mode().equals("DRY_RUN"))response.put("preview",Map.of(
+                        "tenant",Map.of("id",result.tenantId().toString(),"code",manifest.tenantCode(),"displayName",manifest.tenantDisplayName()),
+                        "rootOrganization",Map.of("code",manifest.rootCode(),"displayName",manifest.rootDisplayName()),
+                        "administrator",Map.of("displayName",manifest.principalDisplayName(),"principalKind","HUMAN","identityProviderCode",manifest.identityProviderCode()),
+                        "appointment",Map.of("roleCode","IDENTITY_ADMIN","organizationCode",manifest.rootCode(),"effectiveFrom",manifest.effectiveFrom().toString()),
+                        "authorityGrants",IdentityBootstrapService.MANAGEMENT_CODES.stream().map(code->Map.of("authorityCode",code,"path","DIRECT","scope","ROOT","scopeOrganizationCode",manifest.rootCode())).toList()));
+                output.println(JSON.writeValueAsString(response));return 0;
             }
         }catch(Exception failure){errors.println("IDENTITY_BOOTSTRAP_FAILED_OR_UNCERTAIN: retain the original manifest and command; do not replace the key or infer rollback.");return 2;}
     }

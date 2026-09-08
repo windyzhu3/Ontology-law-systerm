@@ -67,7 +67,9 @@ public final class JooqAuditAppender implements AuditAppender {
                     ||!"EVENT".equals(row.get("entry_type"))||!"OBJECT".equals(row.get("audit_scope_code"))||!"SUCCEEDED".equals(row.get("result_code"))||!"BOOTSTRAP_IDENTITY_ADMIN".equals(row.get("command_type"))||!"BOOTSTRAP_IDENTITY_ADMIN".equals(row.get("action_code"))
                     ||!"R1_IDENTITY_BOOTSTRAP_V1".equals(row.get("summary_schema_code"))||!Integer.valueOf(1).equals(row.get("summary_schema_version",Integer.class))||!"IDENTITY_BOOTSTRAP".equals(row.get("authorization_slot_code"))||!"SYSTEM".equals(row.get("authorization_path_code"))
                     ||!facts.principal().equals(row.get("actor_principal_id"))||row.get("actor_appointment_id")!=null||row.get("on_behalf_of_principal_id")!=null||row.get("on_behalf_of_appointment_id")!=null||row.get("authorization_fact_type")!=null||row.get("authorization_fact_id")!=null||row.get("authorization_fact_revision")!=null
-                    ||!facts.root().equals(row.get("authorization_scope_organization_unit_id"))||!"identity.tenant".equals(row.get("subject_type"))||!tenant.equals(row.get("subject_id"))||!Long.valueOf(0).equals(row.get("subject_revision",Long.class))||row.get("subject_hash")!=null)throw invalidBootstrap();
+                    ||!facts.root().equals(row.get("authorization_scope_organization_unit_id"))||!"identity.tenant".equals(row.get("subject_type"))||!tenant.equals(row.get("subject_id"))||!Long.valueOf(0).equals(row.get("subject_revision",Long.class))||row.get("subject_hash")!=null
+                    ||!"API".equals(row.get("service_role_code"))||!entry.correlationId().equals(row.get("trace_id"))||row.get("causation_id")!=null
+                    ||row.get("correction_target_type")!=null||row.get("correction_target_id")!=null||row.get("correction_target_revision")!=null||row.get("correction_target_hash")!=null||row.get("authorization_fact_hash")!=null)throw invalidBootstrap();
             return entry;
         }catch(RuntimeException corrupt){throw invalidBootstrap();}
     }

@@ -39,6 +39,8 @@ public final class ActorContextResolver {
         try {var credential=humans.verify(token);try(var c=connections.open()){return new CredentialIdentityRuntime().human(c,credential.tenantId(),credential.provider(),subjects.digest(credential.tenantId(),credential.subject()));}}
         catch(SQLException unavailable){throw new org.springframework.security.authentication.AuthenticationServiceException("SERVICE_UNAVAILABLE");}
         catch(HumanIdentityReader.Failure failure){throw humanFailure(failure);}
+        catch(org.springframework.security.core.AuthenticationException classified){throw classified;}
+        catch(RuntimeException failure){throw classify(failure);}
     }
     public Object authenticate(String token,UUID selector,boolean self) {
         return authenticate(token,selector,null,self,false);
@@ -55,6 +57,8 @@ public final class ActorContextResolver {
             try(var c=connections.open()){return new CredentialIdentityRuntime().selectHuman(c,identity,selector,behalf);}
             catch(SQLException unavailable){throw new org.springframework.security.authentication.AuthenticationServiceException("SERVICE_UNAVAILABLE");}
             catch(HumanIdentityReader.Failure failure){throw humanFailure(failure);}
+            catch(org.springframework.security.core.AuthenticationException classified){throw classified;}
+            catch(RuntimeException failure){throw classify(failure);}
         }
         if(!(principal instanceof Actor actor))throw invalid();
         if(behalf!=null||selector!=null&&!selector.equals(actor.appointmentId()))throw ActorSelectionFailure.denied();return actor;

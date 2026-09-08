@@ -21,6 +21,7 @@ import static io.github.windyzhu3.ontologylaw.execution.internal.persistence.Cap
 /** Existing one-hop delegations are explicitly initialized synthetic compatibility fixtures, not ADM-05 CRUD. */
 class DelegatedSessionContextHttpIT extends PostgresIntegrationTest {
     KeycloakFixture idp;
+    java.util.function.UnaryOperator<Connection> credentialConnection=c->c;
     @BeforeAll void startIdentity()throws Exception{idp=new KeycloakFixture().start();}
     @AfterAll void stopIdentity(){if(idp!=null)idp.close();}
     record Fixture(UUID tenant,UUID organization,UUID principal,UUID own,UUID represented,UUID representedPrincipal,UUID source,UUID delegation,ActorContextResolver resolver,ActorScopeProtection scopes,String token) {
@@ -34,7 +35,7 @@ class DelegatedSessionContextHttpIT extends PostgresIntegrationTest {
             sql(x,"insert into identity.appointment (tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) values (?,?,?,?,'CONTACT_OPERATOR',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",seed.tenant(),own,principal,seed.org());
             sql(x,"insert into identity.delegation_grant (tenant_id,delegation_grant_id,source_authority_grant_id,delegator_appointment_id,delegate_appointment_id,scope_organization_unit_id,valid_from,state,created_at) values (?,?,?,?,?,?,clock_timestamp()-interval '1 hour','ACTIVE',clock_timestamp())",seed.tenant(),delegation,seed.grant(),seed.appointment(),own,seed.org());return null;});}
         var verifier=HumanCredentialVerifier.isolatedLoopback(List.of(new HumanCredentialVerifier.Trust(idp.issuer(),KeycloakFixture.AUDIENCE,"TASK92",seed.tenant(),KeycloakFixture.AUDIENCE,idp.introspectionSecret)));
-        return new Fixture(seed.tenant(),seed.org(),principal,own,seed.appointment(),seed.principal(),seed.grant(),delegation,new ActorContextResolver(database::apiConnection,subjects,verifier),new ActorScopeProtection(t->scopeKey),login.accessToken());
+        return new Fixture(seed.tenant(),seed.org(),principal,own,seed.appointment(),seed.principal(),seed.grant(),delegation,new ActorContextResolver(()->credentialConnection.apply(database.apiConnection()),subjects,verifier),new ActorScopeProtection(t->scopeKey),login.accessToken());
     }
     final class Http implements AutoCloseable {
         final org.springframework.context.ConfigurableApplicationContext context;final HttpClient client=HttpClient.newHttpClient();final Fixture f;
@@ -55,6 +56,20 @@ class DelegatedSessionContextHttpIT extends PostgresIntegrationTest {
     static tools.jackson.databind.JsonNode json(HttpResponse<String> response){return tools.jackson.databind.json.JsonMapper.builder().build().readTree(response.body());}
     void mutate(String statement,Object...args)throws Exception {try(var c=database.apiConnection()){inTransaction(c,Capability.COMMAND,x->{sql(x,statement,args);return null;});}}
     long audits(Fixture f)throws Exception {try(var c=database.migratorConnection();var p=c.prepareStatement("select count(*) from audit.audit_entry where tenant_id=?")){p.setObject(1,f.tenant());try(var r=p.executeQuery()){r.next();return r.getLong(1);}}}
+    @ParameterizedTest @ValueSource(ints={1,2})
+    void real_dynamic_human_mapping_or_selection_database_disconnect_is_safe_503(int connectionNumber)throws Exception {
+        var f=fixture();var opened=new java.util.concurrent.atomic.AtomicInteger();var disconnected=new java.util.concurrent.atomic.AtomicBoolean();
+        credentialConnection=c->{int number=opened.incrementAndGet();return (Connection)java.lang.reflect.Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(proxy,method,args)->{
+            if(number==connectionNumber&&method.getName().equals("prepareStatement")&&args[0] instanceof String sql&&(sql.contains("\"identity\".")||sql.contains("identity."))){c.close();disconnected.set(true);}
+            try{return method.invoke(c,args);}catch(java.lang.reflect.InvocationTargetException failure){throw failure.getCause();}
+        });};
+        try(var http=new Http(f)) {
+            long before=audits(f);var response=http.request("GET","/api/v1/workcards/current",selected(f));
+            assertTrue(disconnected.get(),"Fault must close the real JDBC connection at the selected dynamic identity query");
+            assertEquals(503,response.statusCode());assertEquals("SERVICE_UNAVAILABLE",json(response).path("code").asString());
+            assertTrue(response.headers().firstValue("WWW-Authenticate").isEmpty());assertTrue(response.headers().firstValue("ETag").isEmpty());assertFalse(response.body().contains("SQLException"));assertFalse(response.body().contains("identity"));assertEquals(before,audits(f));
+        }finally{credentialConnection=c->c;}
+    }
     @Test void candidates_are_deduplicated_and_never_implicitly_selected_but_explicit_tuple_has_stable_distinct_key()throws Exception {
         // Break caught: ignoring the new selector silently executes as the logged-in person's own identity.
         var f=fixture();
