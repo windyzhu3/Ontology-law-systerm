@@ -12,7 +12,7 @@
 
 **Status:** APPROVED。用户于 2026-09-08 确认详细设计及计划，现从 Task9.1 合同后继开始实施；后续功能与实际用户/权限变更仍按各单元门禁，不将设计批准当成完成证据。
 
-**Execution:** Task9.1/9.2a静态合同及Task9.2身份接入后端均已本地阶段验收、独立复审通过，见[代办合同证据](../../progress/2026-09-08-task9-delegated-contract-acceptance.md)与[运行时证据](../../progress/2026-09-09-task9-identity-runtime-acceptance.md)。本次执行单元止于Task9.2；下一单元为Task9.3。Task9.3～9.6未完成，Task10/R1发布不晋级。
+**Execution:** Task9.1/9.2a静态合同及Task9.2身份接入后端均已本地阶段验收、独立复审通过，见[代办合同证据](../../progress/2026-09-08-task9-delegated-contract-acceptance.md)与[运行时证据](../../progress/2026-09-09-task9-identity-runtime-acceptance.md)。用户于2026-09-09启动Task9.3，并明确确认在线账号候选采用完整用户名精确查询、返回0～1项；其他管理列表正常分页。当前仅恢复9.3受控身份管理后端实施，见[9.3记录](../../progress/2026-09-09-task9-identity-admin-acceptance.md)。Task9.4～9.6仍待实施，Task10/R1发布不晋级。
 
 ## Global Constraints
 
@@ -181,6 +181,8 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 **Consumes:** 9.1 精确 14 mutation 合同、9.2 Actor；**Produces:** `IdentityCommands.handlers()` 静态集合、受 scope 限制的查询、准确 Identity Fact Receipt、原 Actor 当前权限下的恢复。
 
 9.2a 不给任何管理 operation 开放代办：本单元补齐 T9-D05 的20个管理接口拒绝，不能在 Controller 抹去 on-behalf 后回落到本人权限。
+
+**用户确认的最小搜索澄清（2026-09-09）：** 在线IdP账号候选只按完整用户名精确查询，返回0或1个当前有效HUMAN账号，`nextCursor=null`；不提供姓名／邮箱／模糊搜索。保留既有query/DTO形状、limit范围和错误结构，所供cursor因本查询从不签发后续页而按无效cursor拒绝；本地Principal／组织／任职／Grant及options分页不变。先同步设计／Identity合同／OpenAPI说明，再实现实测；不增加目录缓存、表、Provider扩展或IdP权限，不改变合同版本／operation inventory／原业务形状。验收须覆盖不存在／停用／SERVICE、不同用户名共享姓名／邮箱、查询文本不能触发通配或特殊lookup、0/1结果和无续页。
 
 - [ ] 编写 I02～I12 的实库/HTTP RED：创建、CAS、状态机、冻结字段、跨 scope、自授权、开放责任依赖、最后管理员、回执重放与注入失败。
 - [ ] 通过 Owner 窄口实现四类事实与受信 IdP 账号目录读取；落实 Principal/IdP 候选与新任职用户候选的根 scope 边界，不能从局部任职扩大到 Tenant 级用户权限。只有密码/账号凭据在 Keycloak，不在本系统创建密码 handler。
