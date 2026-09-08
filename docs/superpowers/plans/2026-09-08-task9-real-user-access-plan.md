@@ -12,7 +12,7 @@
 
 **Status:** APPROVED。用户于 2026-09-08 确认详细设计及计划，现从 Task9.1 合同后继开始实施；后续功能与实际用户/权限变更仍按各单元门禁，不将设计批准当成完成证据。
 
-**Execution:** Task9.1 已通过本地静态验证及独立复审，见[阶段证据](../../progress/2026-09-08-task9-contract-acceptance.md)。用户确认继续，当前实施 Task9.2；Task9.2～9.6 尚未验收，Task10/R1 发布不晋级。
+**Execution:** Task9.1 已通过本地静态验证及独立复审，见[阶段证据](../../progress/2026-09-08-task9-contract-acceptance.md)。用户已确认补齐新登录链路的合法代办及旧代办回执入口；[具体补充设计](../specs/2026-09-08-task9-delegated-context-amendment-design.md)待书面审阅，Task9.2 代码继续暂停。审阅后先完成合同前置子步骤及独立评审，再恢复原 Task9.2 implementer，随后按原任务顺序推进。不默增授权入口或降级旧业务能力；Task9.2～9.6 尚未验收，Task10/R1 发布不晋级。
 
 ## Global Constraints
 
