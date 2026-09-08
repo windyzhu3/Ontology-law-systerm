@@ -1,6 +1,6 @@
 # R1 Task9 工作台实施进度
 
-日期：2026-09-08。当前状态：**Task9.1 与 Task9.2a 静态合同已验收及独立复审通过；正在恢复 Task9.2 登录身份后端实施，尚未验收。扩大后的 Task9 与 R1 整体未完成。**
+日期：2026-09-08。当前状态：**Task9.1 与 Task9.2a 静态合同已验收及独立复审通过；Task9.2 登录身份后端实施中，尚未整体验收。扩大后的 Task9 与 R1 整体未完成。**
 
 ## Task9.2 恢复实施
 
@@ -11,6 +11,18 @@
 用户已确认：补齐基于既有有效 DelegationGrant 的显式代办上下文选择、后端当前复验、actorScopeKey 和原回执恢复规则；不开放 ADM-05 委托授权管理、不新增表、不扩大委托权限，不采用 DIRECT-only 能力降级。
 
 [最小补充设计](../superpowers/specs/2026-09-08-task9-delegated-context-amendment-design.md)已批准并由 ADR-0015 激活。Task9.2a 最终300项全量基线、33项拓扑、19项Java合同、75项前端回归及实际工作树CLI通过；独立评审发现的回执400声明遗漏已修复并复审通过，见[完整静态证据](2026-09-08-task9-delegated-contract-acceptance.md)。这不等于新增代办/登录运行时已通过；现在恢复原Task9.2子代理，不修改实际用户/权限。
+
+### Task9.2 实施检查点（尚非最终验收）
+
+| 后端能力 | 已取得的证据 | 尚待完成 |
+|---|---|---|
+| 真实登录与动态映射 | `HumanLoginMappingIT` 首批4项通过；修正固定 API audience 与 introspection client 不一致，保留活动性及凭据校验 | 最终生产装配、完整失败边界和回归 |
+| 无任职本人会话 | 真实 IdP＋DB＋HTTP 的1项用例由401失败转为通过；返回 NO_APPOINTMENT/no-store，SELF审计落库 | 多任职、失效选择、披露故障和完整边界 |
+| 合法代办上下文 | 已取得有效 RED：既有合法关系应返回去重候选1，当前返回0 | 有界候选、显式选择、撤销/DENY、原Actor回执与全部管理接口拒绝 |
+| 离线候选与首位管理员引导 | 已冻结合同，尚无本阶段通过证据 | 真账号验证、零写dry-run、原清单重放、部分状态拒绝及原子回滚 |
+| 生产装配、角色隔离、独立评审 | 前置52项基线通过，不是新代码验收 | 稳定提交上的完整Task9.2验证与独立评审 |
+
+上述运行日志位于本地 `.superpowers/sdd/2026-09-08-task9-real-user-access-plan/`，包括 `task92-resume-green-01.log`、`task92-self-red-01.log`、`task92-self-green-02.log` 和 `task92-delegated-red-01.log`。局部用例通过不代表浏览器登录、管理建档链或人工UAT通过。
 
 ## 当前范围变更与实施差距
 
@@ -81,7 +93,9 @@ Task9 起点：`8ce4d30599cb400ec06b9389a54bf2cefe1edd1e`，分支 `codex/r1-lea
 
 两项已通过先失败后通过的回归测试修复：RED 10 失败 / 9 通过，定向 GREEN 19/19，全量 GREEN 75/75。同一独立评审者完成修复差异复核，结论为 **Spec compliant / Approved**，没有剩余 Critical 或 Important 前端问题。未改变样式、后端、合同或生成文件。修复后的真实浏览器再次完成首联保存、整页恢复、提交与等待 1，控制台 error/warn 为 0。
 
-## 受控遗留项：终态拒绝枚举
+## Task9.0 历史遗留项：终态拒绝枚举（已由Task9.1关闭）
+
+以下保留原阶段的问题记录；该枚举已在Task9.1后继合同中对齐，见[Task9.1验收](2026-09-08-task9-contract-acceptance.md)。它不是当前仍待澄清的合同冲突。
 
 `docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md:307` 已允许 Evidence 通过占槽前检查、最终复验失效时形成 `REJECTED/NOT_FOUND` 回执；但 `contracts/openapi/ontology-law-api.yaml:3466` 的 `TerminalRejectionCode` 缺少该值，生成类型也忠实保留了遗漏。这是既存源合同之间的差异，不是简单重新生成即可解决。
 
