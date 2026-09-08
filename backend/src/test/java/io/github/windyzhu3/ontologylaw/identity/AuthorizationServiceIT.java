@@ -72,7 +72,8 @@ public class AuthorizationServiceIT extends PostgresIntegrationTest {
             inTransaction(c,Capability.QUERY,x -> {assertFalse(service.evaluate(x,system,true).allowed());return null;});
         }
         Seed serviceSeed=seed(database,"SERVICE");
-        var serviceRequest=new AuthorizationService.Request(serviceSeed.request().actor(),serviceSeed.request().subject(),serviceSeed.org,
+        var serviceActor=new AuthorizationService.Actor(serviceSeed.tenant,serviceSeed.principal,serviceSeed.appointment,null,null,AuthorizationService.PrincipalKind.SERVICE);
+        var serviceRequest=new AuthorizationService.Request(serviceActor,serviceSeed.request().subject(),serviceSeed.org,
                 new AuthorizationService.Requirement("LEAD_INGRESS_COMPLETE","SOURCE_INTAKE_OWNER",AuthorizationService.Path.SYSTEM,serviceSeed.grant));
         try(var c=database.apiConnection()) {
             inTransaction(c,Capability.QUERY,x->{assertTrue(service.evaluate(x,serviceRequest,true).allowed());assertFalse(service.evaluate(x,serviceSeed.request(),true).allowed());return null;});

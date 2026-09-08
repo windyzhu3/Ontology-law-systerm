@@ -4,6 +4,7 @@ import re
 import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 
@@ -60,8 +61,13 @@ EXPECTED_V1_1_MIGRATION_SHA256 = {
     "V850__lead_ingress_completion_slot.sql": "6f784b95ae823bf5d97ef742d5494396911828c9ddc88ff07d35a6bc816e488b",
 }
 EXPECTED_CONTRACT_SHA256 = (
-    "0c04d48ddae6891b53fdacabdba34d1124e757b070a4c9018597e4e0a4674301"
+    "a4beeb91ed93be455736eafa3abb829f6a94fed3a263be5996832e458b7c4b39"
 )
+EXPECTED_V1_2_MIGRATIONS = (*EXPECTED_V1_1_MIGRATIONS, "V860__lead_ingress_query_read_capability.sql")
+EXPECTED_V1_2_MIGRATION_SHA256 = {
+    **EXPECTED_V1_1_MIGRATION_SHA256,
+    "V860__lead_ingress_query_read_capability.sql": "d77ed64f116e8e9e109da3fede48a040b7268848ff513180dbfd5d9073da8881",
+}
 EXPECTED_FIELD_CONTRACT_SHA256 = (
     "f4c17c4c0a8697820b30adb61b8cdb209666a4672393d4f8fc9d73a5f169addf"
 )
@@ -141,12 +147,12 @@ class FrozenDomainSemanticsTest(unittest.TestCase):
         }
         expected_manifest_hashes = {
             f"db/migration/{name}": digest
-            for name, digest in EXPECTED_V1_1_MIGRATION_SHA256.items()
+            for name, digest in EXPECTED_V1_2_MIGRATION_SHA256.items()
         }
 
-        self.assertEqual(EXPECTED_V1_1_MIGRATIONS, actual_migrations)
+        self.assertEqual(EXPECTED_V1_2_MIGRATIONS, actual_migrations)
         self.assertEqual(
-            EXPECTED_V1_1_MIGRATION_SHA256,
+            EXPECTED_V1_2_MIGRATION_SHA256,
             actual_hashes,
         )
         self.assertEqual(
@@ -190,10 +196,14 @@ class FrozenDomainSemanticsTest(unittest.TestCase):
 
     def test_v850_is_only_append_and_v1_migrations_keep_exact_sha256(self):
         from contract.render import generate_all
+        from contract.evolutions import V850_LEAD_INGRESS_COMPLETION
+        from contract import schema_contract
 
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            generate_all(root)
+            # Exercise the historical V850 stage with its unchanged literal expectations.
+            with patch.object(schema_contract, "EVOLUTIONS", (V850_LEAD_INGRESS_COMPLETION,)), patch.object(schema_contract, "CONTRACT_VERSION", "52-plus-2-v1.1"):
+                generate_all(root)
             migration_root = root / "db/migration"
             migrations = tuple(path.name for path in sorted(migration_root.glob("*.sql")))
             hashes = {

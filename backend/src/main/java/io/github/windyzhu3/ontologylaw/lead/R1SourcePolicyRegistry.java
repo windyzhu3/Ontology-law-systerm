@@ -25,6 +25,8 @@ public final class R1SourcePolicyRegistry {
         this.sources=Map.copyOf(sources);
     }
     public SourcePolicy find(String sourceAccountCode) { return sources.get(sourceAccountCode); }
+    public boolean contains(String sourceAccountCode) {return sources.containsKey(sourceAccountCode);}
+    public Set<String> intakeRootCodes() {return sources.values().stream().map(SourcePolicy::sourceIntakeRootCode).collect(java.util.stream.Collectors.toUnmodifiableSet());}
     private static void code(String code) {
         if(code==null || !code.matches("[A-Za-z][A-Za-z0-9_]{0,63}"))throw new IllegalArgumentException("Registered ASCII code required");
     }

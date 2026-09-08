@@ -14,8 +14,14 @@ from scripts.baseline.tests.test_r1_command_contract import R1CommandContractTes
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "verify_baseline.py"
-CANONICAL_BASELINE_ID = "MVP-2026-09-05.2"
+CANONICAL_BASELINE_ID = "MVP-2026-09-07.1"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
+R1_CONTACT_EVIDENCE_BASELINE_MARKERS = (
+    "[ADR-0012](../adr/ADR-0012-r1-projection-readiness-protocol.md)",
+    "Task contract `R1-TASK-COMPLETION-V1.2`",
+    "physical capability `52-plus-2-v1.2` remain unchanged",
+    "no production Handler, Evidence port, Workbench or R1 business status is advanced",
+)
 CANONICAL_MATTER_PUBLICATION_CLAUSE = (
     "同一本地事务必须写入完整MatterRef槽：稳定`matter_id`、`matter_no`、类型、"
     "能力包版本和可信创建时间，并发布`MatterCreated`事实通知供Post-MVP消费者使用。"
@@ -186,6 +192,7 @@ R1_ERROR_CODES = [
     ("APPOINTMENT_INACTIVE", "403", "NO", "NONE", "NONE"),
     ("NOT_FOUND", "404", "NO", "NONE", "NONE"),
     ("COMMAND_PAYLOAD_CONFLICT", "409", "NO", "NONE", "NONE"),
+    ("STALE_OUTBOX_CLAIM", "409", "NO", "NONE", "NONE"),
     ("TASK_NOT_OPEN", "409", "NO", "NONE", "TASK"),
     ("TASK_ALREADY_COMPLETED", "409", "NO", "NONE", "TASK"),
     ("DRAFT_DIGEST_MISMATCH", "409", "NEW_KEY_AFTER_REFRESH", "NONE", "DRAFT"),
@@ -195,6 +202,7 @@ R1_ERROR_CODES = [
     ("STALE_SUBJECT", "412", "NEW_KEY_AFTER_REFRESH", "NONE", "SUBJECT"),
     ("SUPERVISOR_UNRESOLVED", "422", "NEW_KEY_AFTER_ADMIN_FIX", "NONE", "NONE"),
     ("SOURCE_INTAKE_OWNER_UNRESOLVED", "422", "NEW_KEY_AFTER_ADMIN_FIX", "NONE", "NONE"),
+    ("PROJECTION_EVENT_INVALID", "422", "NO", "NONE", "NONE"),
     ("DRAFT_PRECONDITION_REQUIRED", "428", "SAME_KEY_AFTER_FIX", "NONE", "DRAFT"),
     ("TASK_PRECONDITION_REQUIRED", "428", "SAME_KEY_AFTER_FIX", "NONE", "TASK"),
     ("RATE_LIMITED", "429", "SAME_KEY_AFTER_BACKOFF", "NONE", "NONE"),
@@ -352,28 +360,37 @@ class VerifyBaselineTest(unittest.TestCase):
                 "CandidateLeadPartyMutation",
                 "DecisionDigest",
                 "SuccessorSelector",
+                "ConditionalAssignment",
             ),
-            markdown_row(*(["---"] * 8)),
+            markdown_row(*(["---"] * 9)),
             markdown_row(
                 "P0_01_LINK_EXISTING",
                 "CAPTURED",
                 "candidateLead@revision+party@revision:revalidate",
                 "parsed_party_id=candidate.parsed_party_id;party_resolution_code=RESOLVED;disposition_code=LINK_EXISTING_PARTY;revision=old+1",
-                "current_assignment_id,capture_fields,ingress_slot",
+                "capture_fields,ingress_slot",
                 "NONE",
                 "old-current-lead-selector+candidate-lead-party-selectors+new-values+new-revision",
                 "post-CAS-lead-revision;duplicate-only-when-CAPTURED",
+                "R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1",
             ),
             markdown_row(
                 "P0_01_KEEP_SEPARATE",
                 "CAPTURED",
                 "candidateLead@revision+party@revision:revalidate",
                 "disposition_code=KEEP_SEPARATE;revision=old+1",
-                "parsed_party_id,party_resolution_code,current_assignment_id,capture_fields,ingress_slot",
+                "parsed_party_id,party_resolution_code,capture_fields,ingress_slot",
                 "NONE",
                 "old-current-lead-selector+candidate-lead-party-selectors+KEEP_SEPARATE+new-revision",
                 "post-CAS-lead-revision;duplicate-only-when-CAPTURED",
+                "R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1",
             ),
+        ]
+        from scripts.baseline.tests.test_p0_contract_amendment import POLICY_HEADERS, POLICY_VALUES
+        assignment_policy_lines = [
+            markdown_row(*POLICY_HEADERS),
+            markdown_row(*(["---"] * len(POLICY_HEADERS))),
+            markdown_row(*POLICY_VALUES),
         ]
         code_allowlist_lines = [
             markdown_row("Code domain", "Allowed values"),
@@ -390,7 +407,7 @@ class VerifyBaselineTest(unittest.TestCase):
                 [
                     "# R1 task completion matrix",
                     "",
-                    "Contract ID: R1-TASK-COMPLETION-V1",
+                    "Contract ID: R1-TASK-COMPLETION-V1.2",
                     "",
                     "Status: FROZEN",
                     "",
@@ -401,6 +418,9 @@ class VerifyBaselineTest(unittest.TestCase):
                     "R1_BUSINESS_WINDOW_V1",
                     "**Pre-slot gate：**",
                     "`legalNeed: SafeText2000`",
+                    "NOT_CONNECTED且contact_no>=3",
+                    "第3次及以后不得自动创建CONTACT重试",
+                    "第1次`SUSPECT_INVALID`后重开所得第2次`NOT_CONNECTED`",
                     "",
                     "## Task registry",
                     "",
@@ -421,6 +441,10 @@ class VerifyBaselineTest(unittest.TestCase):
                     "## Duplicate resolution transition registry",
                     "",
                     *duplicate_transition_lines,
+                    "",
+                    "## Duplicate automatic assignment registry",
+                    "",
+                    *assignment_policy_lines,
                     "",
                     "## R1 code allowlists",
                     "",
@@ -450,6 +474,7 @@ class VerifyBaselineTest(unittest.TestCase):
             "Preconditions", "SubjectBinding", "SuccessStatus", "ErrorCodes",
         )
         operation_rows = [
+            ("checkR1ProjectionReadiness", "GET", "/internal/v1/projections/r1/readiness", "ACTOR_CONTEXT", "NONE", "NONE", "CURRENT_R1_OWNER_ORGANIZATION_COVERAGE", "204"),
             ("captureLead", "POST", "/api/v1/leads", "ACTOR_CONTEXT", "REQUIRED", "NONE", "SOURCE_NATURAL_KEY", "201"),
             ("getCurrentWorkCard", "GET", "/api/v1/workcards/current", "ACTOR_CONTEXT", "NONE", "OPTIONAL_WORKBENCH_ETAG", "ACTOR_SCOPE", "200/304"),
             ("saveActionDraft", "PUT", "/api/v1/tasks/{taskId}/draft", "ACTOR_CONTEXT", "REQUIRED", "IF_NONE_MATCH_STAR_OR_DRAFT_ETAG", "TASK_AND_DRAFT", "200/201"),
@@ -463,6 +488,8 @@ class VerifyBaselineTest(unittest.TestCase):
             ("getCommandReceipt", "GET", "/api/v1/commands/{commandId}/receipt", "ACTOR_CONTEXT", "NONE", "NONE", "COMMAND_ID_AND_ACTOR_SCOPE", "200"),
             ("reopenDueContactTasks", "POST", "/internal/v1/tasks/commands/reopen-due-contact-tasks", "ACTOR_CONTEXT", "REQUIRED", "NONE", "DUE_CUTOFF_AND_OWNER_QUEUE", "200"),
             ("reopenDueRoutingReviewTasks", "POST", "/internal/v1/tasks/commands/reopen-due-routing-review-tasks", "ACTOR_CONTEXT", "REQUIRED", "NONE", "DUE_CUTOFF_AND_OWNER_QUEUE", "200"),
+            ("listDueR1Tasks", "GET", "/internal/v1/tasks/due", "ACTOR_CONTEXT", "NONE", "RECOVERY_TYPE_LIMIT_CURSOR", "DUE_TASK_OWNER_SCOPE", "200"),
+            ("consumeR1Projection", "POST", "/internal/v1/projections/r1/consume", "ACTOR_CONTEXT", "NONE", "OUTBOX_REVISION_LEASE_FENCE", "EVENT_OUTBOX_CURRENT_OWNER_FACTS", "204"),
         ]
         operation_lines = [
             markdown_row(*operation_header),
@@ -470,6 +497,8 @@ class VerifyBaselineTest(unittest.TestCase):
         ]
         for row in operation_rows:
             errors = ",".join(sorted(verify_baseline_module.R1_OPERATION_ERRORS[row[0]]))
+            if row[0] == "checkR1ProjectionReadiness":
+                errors = "VALIDATION_FAILED,UNAUTHENTICATED,NOT_AUTHORIZED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"
             operation_lines.append(markdown_row(*row, errors))
         idempotency_header = ("Property", "FrozenValue")
         idempotency_lines = [
@@ -493,7 +522,7 @@ class VerifyBaselineTest(unittest.TestCase):
             ),
             markdown_row(
                 "internalMutualTls",
-                "reopenDueContactTasks,reopenDueRoutingReviewTasks",
+                "checkR1ProjectionReadiness,listDueR1Tasks,consumeR1Projection,reopenDueContactTasks,reopenDueRoutingReviewTasks",
                 "TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE",
             ),
         ]
@@ -504,12 +533,16 @@ class VerifyBaselineTest(unittest.TestCase):
                 [
                     "# R1 HTTP error and precondition matrix",
                     "",
-                    "Contract ID: R1-HTTP-V1",
+                    "Contract ID: R1-HTTP-V1.2",
                     "",
                     "Status: FROZEN",
                     "",
                     "## Request DTO catalog",
                     "`legalNeed: SafeText2000`",
+                    "Task、Lead、Submission、Binding四个准确Subject的DENY",
+                    "返回同一既有`NOT_FOUND`",
+                    "post-slot `REJECTED Slot:+1, Receipt:+1, Audit:+1`",
+                    "Runtime现有QUERY阶段",
                     "## Successful response projections",
                     "## ETag contract",
                     "## ActionDraft confirmation lifecycle",
@@ -559,7 +592,7 @@ class VerifyBaselineTest(unittest.TestCase):
                 [
                     "# R1 workbench presentation contract",
                     "",
-                    "Contract ID: R1-WORKBENCH-V1",
+                    "Contract ID: R1-WORKBENCH-V1.1",
                     "",
                     "Status: FROZEN",
                     "",
@@ -567,6 +600,10 @@ class VerifyBaselineTest(unittest.TestCase):
                     "`PreconditionTokens`",
                     "## Command form and Draft projection",
                     "`ActionDraftProjection`",
+                    "不得返回文件内容、文件名、对象位置或下载URL",
+                    "200 BODY和304 CACHE_REVALIDATED",
+                    "旧ETag不得绕过撤权或Binding撤回",
+                    "选择下一张合格卡或返回安全零态",
                     "",
                     "## Envelope fields",
                     "",
@@ -610,7 +647,7 @@ class VerifyBaselineTest(unittest.TestCase):
             ),
         )
 
-    def create_valid_repository(self, root: Path) -> None:
+    def create_valid_repository(self, root: Path, *, runtime_version: str = "v1.2") -> None:
         self.write(
             root,
             "README.md",
@@ -632,6 +669,10 @@ class VerifyBaselineTest(unittest.TestCase):
                     "# Current MVP Baseline",
                     "",
                     f"Baseline ID: {CANONICAL_BASELINE_ID}",
+                    "[ADR-0012](../adr/ADR-0012-r1-projection-readiness-protocol.md)",
+                    "Task contract `R1-TASK-COMPLETION-V1.2`",
+                    "physical capability `52-plus-2-v1.2` remain unchanged",
+                    "no production Handler, Evidence port, Workbench or R1 business status is advanced",
                     "",
                     "状态：`FROZEN`",
                     "",
@@ -659,6 +700,41 @@ class VerifyBaselineTest(unittest.TestCase):
             "# R1 plan\n\nStatus: FROZEN\n",
         )
         self.write_r1_contract_fixture(root)
+        self.write(
+            root,
+            "docs/adr/ADR-0011-r1-contact-reopen-evidence-read.md",
+            "# ADR-0011\n\nStatus: Accepted\n\nSemantic baseline: MVP-2026-09-06.3\n"
+            "Task contract: R1-TASK-COMPLETION-V1.2\n"
+            "Physical capability: 52-plus-2-v1.2\n"
+            "本次只激活文档与静态验证器\n",
+        )
+        self.write(
+            root,
+            "docs/superpowers/specs/2026-09-06-r1-contact-reopen-evidence-read-design.md",
+            "# Approved amendment\n\n状态：APPROVED\n\n"
+            "## 2. 联系总序号与自动重试\n\n"
+            "## 3. Evidence引用的最小读口\n",
+        )
+        self.write(
+            root,
+            "docs/superpowers/specs/2026-09-05-r1-business-closure-alignment-design.md",
+            "# Supersession index\n\nADR-0011-r1-contact-reopen-evidence-read.md\n"
+            "原Task 6生产实现仍未完成\n",
+        )
+        self.write(
+            root,
+            "docs/superpowers/plans/2026-09-05-r1-business-closure-plan.md",
+            "# Supersession index\n\nADR-0011-r1-contact-reopen-evidence-read.md\n"
+            "历史Task 6正文/checkbox不改写且仍未完成\n",
+        )
+        self.write(
+            root,
+            "docs/progress/2026-09-06-r1-local-progress.md",
+            "原Task 6仍未完成\n本次只激活`MVP-2026-09-06.3`静态合同与验证器\n"
+            "物理能力仍为`52-plus-2-v1.2`\n",
+        )
+        self.write(root, "scripts/baseline/r1_contact_evidence_contract.py", "# validator fixture\n")
+        self.write(root, "scripts/baseline/tests/test_r1_contact_evidence_contract.py", "# validator test fixture\n")
         repository_root = Path(__file__).resolve().parents[3]
         for relative_path in (
             Path("docs/adr/ADR-0007-r1-command-policy-event-closure.md"),
@@ -676,7 +752,11 @@ class VerifyBaselineTest(unittest.TestCase):
             "# Approved R1 closure design\n",
         )
         self.write(root, "docs/superpowers/plans/2026-08-28-postgresql-runtime-verification-plan.md", "# Runtime plan\n")
-        self.write(root, "contracts/openapi/ontology-law-api.yaml", "openapi: 3.1.0\n")
+        for relative_path in (
+            "contracts/openapi/ontology-law-api.yaml",
+            "docs/adr/ADR-0012-r1-projection-readiness-protocol.md",
+        ):
+            self.write(root, relative_path, (repository_root / relative_path).read_text(encoding="utf-8"))
         self.write(root, "contracts/openapi/tests/test_ontology_law_api.py", "# OpenAPI test\n")
         self.write(root, "backend/src/main.py", "# backend source\n")
         self.write(root, "backend/tests/test_main.py", "# backend test\n")
@@ -721,7 +801,12 @@ class VerifyBaselineTest(unittest.TestCase):
             markdown_row("BASE-CLOSURE-DESIGN", "PR2", "Closure design", "Docs", "[Closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md)", "Product", HISTORICAL_BASELINE_ID, "PR2 merge", "MERGED", "[confirmed closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md); `merge-commit=abcdef0`", "none", "—"),
             markdown_row("BASE-PR2-CLOSURE-PLAN", "PR2", "Closure plan", "Plan", "[PR2 plan](../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md)", "Product", "2026-08-28", "PR2 merge", "MERGED", "[plan](../superpowers/plans/2026-08-28-pr2-baseline-and-ledger-closure-plan.md); `merge-commit=abcdef0`", "none", "—"),
             markdown_row("BASE-CURRENT-MVP", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", HISTORICAL_BASELINE_ID, "PR2 merge", "MERGED", "[closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05"),
-            markdown_row("BASE-CURRENT-MVP-2026-09-05", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", CANONICAL_BASELINE_ID, "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "—"),
+            markdown_row("BASE-CURRENT-MVP-2026-09-05", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", "MVP-2026-09-05.3", "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1"),
+            markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", "MVP-2026-09-06.1", "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2"),
+            markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", "MVP-2026-09-06.2", "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3"),
+            markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", "MVP-2026-09-06.3", "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1"),
+            markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", CANONICAL_BASELINE_ID, "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "fixture only", "—"),
+            markdown_row("R1-CONTACT-EVIDENCE-CONTRACT", "R1", "Contact ordinal and Evidence reference contract", "Docs", "[ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md)", "Engineering", "r1-contact-evidence-v1", "R1 implementation", "FROZEN", "[ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md); [Task matrix](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md); [command contract](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md); [validator](../../scripts/baseline/r1_contact_evidence_contract.py); [validator tests](../../scripts/baseline/tests/test_r1_contact_evidence_contract.py)", "Contract-only delivery; original Task 6 must implement", "—"),
             markdown_row("R1-COMMAND-POLICY-EVENT-CONTRACT", "R1", "R1 command policy and event contract", "Docs", "[R1 command contract](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)", "Engineering", "r1-command-policy-event-v1", "R1 implementation", "FROZEN", "[R1 command contract](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)", "Runtime enforcement remains separate", "—"),
             markdown_row("R1-IMPLEMENTATION-PLAN", "R1", "Lead-contact plan", "Plan", "[R1 plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Engineering", "2026-08-28", "R1 implementation", "FROZEN", "[plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Production code is not yet implemented", "—"),
             markdown_row("R1-IMPLEMENTATION-CONTRACT", "R1", "R1 scaffold, HTTP, task, and workbench contract", "Docs", "[ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)", "Engineering", "r1-contract-v1", "R1 implementation", "FROZEN", "[ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md); [task matrix](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md); [HTTP matrix](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md); [workbench contract](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)", "Production scaffold is not yet implemented", "—"),
@@ -733,6 +818,32 @@ class VerifyBaselineTest(unittest.TestCase):
             markdown_row("R1-E2E-GOLDEN", "R1", "Golden path", "E2E", "[runtime record](../evidence/ledger/r1-e2e-golden.md)", "Engineering", "r1", "R2 entry", "RUNTIME_VERIFIED", "[runtime record](../evidence/ledger/r1-e2e-golden.md)", "none", "—"),
             markdown_row("R1-E2E-FAILURES", "R1", "Failure paths", "E2E", "[runtime record](../evidence/ledger/r1-e2e-failures.md)", "Engineering", "r1", "R2 entry", "RUNTIME_VERIFIED", "[runtime record](../evidence/ledger/r1-e2e-failures.md)", "none", "—"),
         ]
+        previous_id = "DB-52P2-PG18-RUNTIME"
+        for version, row_id in (
+            ("v1.1", "DB-52P2-PG18-RUNTIME-V1-1"),
+            ("v1.2", "DB-52P2-PG18-RUNTIME-V1-1-V1-2"),
+        ):
+            previous_index = next(
+                index for index, row in enumerate(ledger_rows)
+                if row.startswith(f"| {previous_id} |")
+            )
+            ledger_rows[previous_index] = ledger_rows[previous_index].removesuffix("— |") + f"{row_id} |"
+            record = f"db-runtime-{version}.md"
+            self.write(
+                root, f"docs/evidence/ledger/{record}",
+                f"ID: {row_id}\nVersion: pg18-52-plus-2-{version}\n"
+                "Command: python3 runtime/verify_runtime.py verify --ci-only --runs 2 "
+                "--evidence-dir ../../.artifacts/schema-runtime\nExit code: 0\n",
+            )
+            ledger_rows.append(markdown_row(
+                row_id, "MVP", "PostgreSQL 18 runtime verification", "Runtime",
+                "[runtime verifier](../../database/schema-contract-52-plus-2/runtime/verify_runtime.py)",
+                "Database", f"pg18-52-plus-2-{version}", "R2 entry", "RUNTIME_VERIFIED",
+                f"[runtime record](../evidence/ledger/{record})", "none", "—",
+            ))
+            previous_id = row_id
+            if version == runtime_version:
+                break
         for row_id, asset in visual_assets():
             relative_asset = "../" + asset.removeprefix("docs/")
             index = "../design/sales-mvp-workcards/README.md" if "SALES" in row_id else "../design/identity-admin-mvp/README.md"
@@ -855,12 +966,15 @@ class VerifyBaselineTest(unittest.TestCase):
         )
 
     def assert_finding(self, root: Path, expected_finding: str) -> None:
+        self.assert_findings(root, [expected_finding])
+
+    def assert_findings(self, root: Path, expected_findings: list[str]) -> None:
         findings = verify_repository(root)
-        self.assertEqual(findings, [expected_finding])
+        self.assertEqual(findings, expected_findings)
 
         cli_result = self.run_cli(root)
         self.assertEqual(cli_result.returncode, 1)
-        self.assertEqual(cli_result.stdout.strip().splitlines(), [expected_finding])
+        self.assertEqual(cli_result.stdout.strip().splitlines(), expected_findings)
         self.assertEqual(cli_result.stderr, "")
 
     def assert_gate_finding(self, root: Path, expected_finding: str) -> None:
@@ -974,6 +1088,15 @@ class VerifyBaselineTest(unittest.TestCase):
 
             expected = [
                 "Missing canonical baseline: docs/baseline/CURRENT-MVP-BASELINE.md",
+                "R1 contact/evidence artifact missing or invalid UTF-8: docs/baseline/CURRENT-MVP-BASELINE.md",
+                "R1 contact/evidence active physical capability declarations must all equal 52-plus-2-v1.2",
+                "R1 contact/evidence contract missing active baseline: Baseline ID: MVP-2026-09-07.1",
+                "R1 contact/evidence contract missing active Task contract: Task contract `R1-TASK-COMPLETION-V1.2`",
+                "R1 contact/evidence contract missing physical capability: physical capability `52-plus-2-v1.2` remain unchanged",
+                "R1 contact/evidence contract missing contract-only baseline: no production Handler, Evidence port, Workbench or R1 business status is advanced",
+                "R1 readiness artifact missing or invalid UTF-8: docs/baseline/CURRENT-MVP-BASELINE.md",
+                "R1 readiness active baseline must be exactly MVP-2026-09-07.1",
+                "R1 readiness active baseline must name ADR-0012 supersession",
                 "Delivery ledger row BASE-CURRENT-MVP Artifact must contain safe Git-tracked in-repository regular-file links",
             ]
             self.assertEqual(verify_repository(root), expected)
@@ -996,14 +1119,19 @@ class VerifyBaselineTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            self.assert_finding(
+            self.assert_findings(
                 root,
-                "Current baseline must declare Baseline ID: "
-                f"{CANONICAL_BASELINE_ID}",
+                [
+                    "Current baseline must declare Baseline ID: "
+                    f"{CANONICAL_BASELINE_ID}",
+                    "R1 contact/evidence contract missing active baseline: "
+                    f"Baseline ID: {CANONICAL_BASELINE_ID}",
+                    "R1 readiness active baseline must be exactly MVP-2026-09-07.1",
+                ],
             )
 
     def test_runtime_baseline_version_accepts_only_the_approved_successor(self) -> None:
-        for version, valid in [("MVP-2026-09-05.2", True), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.1", False), ("MVP-2026-09-05.10", False)]:
+        for version, valid in [("MVP-2026-09-07.1", True), ("MVP-2026-09-06.3", False), ("MVP-2026-09-06.2", False), ("MVP-2026-09-05.3", False), ("MVP-2026-09-06.1", False), ("MVP-2026-09-05.2", False), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.1", False), ("MVP-2026-09-05.10", False)]:
             with self.subTest(version=version), tempfile.TemporaryDirectory() as temp_dir:
                 root = Path(temp_dir)
                 baseline = root / "docs/baseline/CURRENT-MVP-BASELINE.md"
@@ -1370,6 +1498,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         "",
                         "状态：`FROZEN`",
                         "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
+                        "",
                         "## task-waiting-contract",
                         "OPEN → WAITING 允许进入等待。",
                         "",
@@ -1398,6 +1528,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         f"Baseline ID: {CANONICAL_BASELINE_ID}",
                         "",
                         "状态：`FROZEN`",
+                        "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
                         "",
                         "SYSTEM_RECOVERY 这个术语在前言中被提到，但不属于等待规则。",
                         "",
@@ -1430,6 +1562,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         "",
                         "状态：`FROZEN`",
                         "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
+                        "",
                         "## waiting-glossary",
                         "SYSTEM_RECOVERY 只是术语解释，不是冻结的等待契约。",
                         "",
@@ -1458,6 +1592,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         f"Baseline ID: {CANONICAL_BASELINE_ID}",
                         "",
                         "状态：`FROZEN`",
+                        "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
                         "",
                         "## task-waiting-contract",
                         "OPEN → WAITING 只允许在 SYSTEM_RECOVERY 安全暂停时进入。",
@@ -1658,6 +1794,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         "",
                         "状态：`FROZEN`",
                         "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
+                        "",
                         "MatterCreated 与第二Matter身份在这里被顺带提到，但不属于 Matter 终点章节。",
                         "",
                         "## task-waiting-contract",
@@ -1690,6 +1828,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         "",
                         "状态：`FROZEN`",
                         "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
+                        "",
                         "## task-waiting-contract",
                         "OPEN → WAITING 只允许在 SYSTEM_RECOVERY 安全暂停时进入。",
                         "",
@@ -1719,6 +1859,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         f"Baseline ID: {CANONICAL_BASELINE_ID}",
                         "",
                         "状态：`FROZEN`",
+                        "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
                         "",
                         CANONICAL_MATTER_PUBLICATION_CLAUSE,
                         "",
@@ -1854,6 +1996,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         "",
                         "状态：`FROZEN`",
                         "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
+                        "",
                         CANONICAL_MATTER_PROHIBITION_CLAUSE,
                         "",
                         "## task-waiting-contract",
@@ -1888,6 +2032,8 @@ class VerifyBaselineTest(unittest.TestCase):
                         f"Baseline ID: {CANONICAL_BASELINE_ID}",
                         "",
                         "状态：`FROZEN`",
+                        "",
+                        *R1_CONTACT_EVIDENCE_BASELINE_MARKERS,
                         "",
                         CANONICAL_MATTER_PROHIBITION_CLAUSE,
                         "",
@@ -2291,19 +2437,14 @@ class VerifyBaselineTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.create_valid_repository(root)
-            self.write(
-                root,
-                "docs/progress/MVP-DELIVERY-LEDGER.md",
-                "\n".join(
-                    [
-                        "# MVP Delivery Ledger",
-                        "",
-                        "| ID | Release | Capability | Layer | Artifact | Owner | Version | Target gate | State | Evidence | Blocker/next gate | Superseded by |",
-                        "|---|---|---|---|---|---|---|---|---|---|---|---|",
-                        "| BL-1 | MVP | Baseline | Docs | [Current baseline](../baseline/CURRENT-MVP-BASELINE.md) | Product | v1 | merge | SHIPPING | [Closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md) | next | — |",
-                        "",
-                    ]
-                ),
+            ledger = root / "docs/progress/MVP-DELIVERY-LEDGER.md"
+            ledger.write_text(
+                ledger.read_text(encoding="utf-8").rstrip()
+                + "\n| BL-1 | MVP | Baseline | Docs | "
+                "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md) | Product | "
+                "v1 | merge | SHIPPING | "
+                "[Closure spec](../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md) | next | — |\n",
+                encoding="utf-8",
             )
 
             self.assert_finding(
@@ -2591,6 +2732,64 @@ class VerifyBaselineTest(unittest.TestCase):
                 "Gate R2 entry unmet: missing required delivery row "
                 "DB-52P2-PG18-RUNTIME; a runtime plan is not runtime evidence",
             )
+
+    def test_r2_gate_requires_v1_2_runtime_even_when_all_other_gates_pass(self) -> None:
+        """Break caught: a terminal v1.1 hosted record makes the v1.2 baseline ready."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root, runtime_version="v1.1")
+            structural_findings = []
+            gates = verify_baseline_module.verify_delivery_ledger(root, structural_findings)
+            self.assertEqual([], structural_findings)
+            self.assertEqual([
+                "Gate R2 entry unmet: DB-52P2-PG18-RUNTIME must resolve to "
+                "DB-52P2-PG18-RUNTIME-V1-1-V1-2 at pg18-52-plus-2-v1.2; "
+                "historical runtime evidence cannot satisfy the current baseline"
+            ], gates)
+            self.assert_gate_finding(root, gates[0])
+
+    def test_r2_gate_keeps_implemented_v1_2_runtime_unmet(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_ledger_cell(root, "DB-52P2-PG18-RUNTIME-V1-1-V1-2", "State", "IMPLEMENTED")
+            self.assert_gate_finding(
+                root,
+                "Gate R2 entry unmet: DB-52P2-PG18-RUNTIME active successor "
+                "DB-52P2-PG18-RUNTIME-V1-1-V1-2 is IMPLEMENTED, requires RUNTIME_VERIFIED",
+            )
+
+    def test_r2_gate_rejects_detached_or_wrong_version_current_runtime(self) -> None:
+        for fault in ("detached", "wrong_version"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                self.create_valid_repository(root)
+                if fault == "detached":
+                    self.replace_ledger_cell(root, "DB-52P2-PG18-RUNTIME-V1-1", "Superseded by", "—")
+                else:
+                    self.replace_ledger_cell(root, "DB-52P2-PG18-RUNTIME-V1-1-V1-2", "Version", "pg18-52-plus-2-v0")
+                    record = root / "docs/evidence/ledger/db-runtime-v1.2.md"
+                    record.write_text(record.read_text(encoding="utf-8").replace(
+                        "pg18-52-plus-2-v1.2", "pg18-52-plus-2-v0"), encoding="utf-8")
+                structural_findings = []
+                gates = verify_baseline_module.verify_delivery_ledger(root, structural_findings)
+                self.assertEqual([], structural_findings)
+                self.assertEqual([
+                    "Gate R2 entry unmet: DB-52P2-PG18-RUNTIME must resolve to "
+                    "DB-52P2-PG18-RUNTIME-V1-1-V1-2 at pg18-52-plus-2-v1.2; "
+                    "historical runtime evidence cannot satisfy the current baseline"
+                ], gates)
+
+    def test_v1_2_runtime_cannot_reuse_v1_1_structured_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.replace_ledger_cell(
+                root, "DB-52P2-PG18-RUNTIME-V1-1-V1-2", "Evidence",
+                "[old runtime record](../evidence/ledger/db-runtime-v1.1.md)",
+            )
+            self.assert_finding(root, "Delivery ledger row DB-52P2-PG18-RUNTIME-V1-1-V1-2 "
+                                "RUNTIME_VERIFIED evidence must link a structured row-bound evidence record")
 
     def test_invalid_utf8_is_structural_for_every_governed_read_path(self) -> None:
         governed_paths = (

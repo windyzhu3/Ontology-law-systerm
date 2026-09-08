@@ -28,6 +28,7 @@ class JooqGenerationIT extends PostgresIntegrationTest {
             "execution", List.of("command_execution_slot", "command_receipt", "domain_event", "domain_event_outbox"),
             "responsibility", List.of("task_occurrence", "decision_record", "wait_receipt", "action_draft"),
             "party", List.of("party"),
+            "evidence", List.of("evidence_submission", "evidence_binding"),
             "lead", List.of("lead", "lead_assignment", "lead_contact_result"),
             "opportunity", List.of("opportunity")));
 
@@ -56,7 +57,7 @@ class JooqGenerationIT extends PostgresIntegrationTest {
         }
         Map<String, byte[]> actual = contents(generated);
         long pojos = actual.keySet().stream().filter(name -> name.contains("/tables/pojos/")).count();
-        assertEquals(21, pojos, "Only the explicit R1 tables may be generated");
+        assertEquals(23, pojos, "Only the explicit R1 tables may be generated");
         for (var file : actual.entrySet()) {
             String source = new String(file.getValue(), StandardCharsets.UTF_8);
             assertFalse(source.contains("\r"), file.getKey() + " must use platform-independent LF");

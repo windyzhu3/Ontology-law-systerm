@@ -1,5 +1,9 @@
 # 52＋2 运行时重验合同
 
+> ADR-0010 / `52-plus-2-v1.2`：QUERY仅新增`lead.lead`的`ingress_completion_phone_hmac`、`ingress_completion_email_hmac`、`ingress_completion_phone_ciphertext`、`ingress_completion_email_ciphertext`列级SELECT，无GRANT OPTION。其余五个补全元数据列、SELECT *和写入仍拒绝；登录权限、成员关系和业务披露审计不变。V860只从v1.1推进部署状态且revision加一，故障整事务回滚；当前21迁移、最大860、revision 2。当前manifest与迁移完整字节绑定；v1/v1.1证据继续按原profile验证，不继承为新版本验收。生产HTTP readiness组装留在原Task 8。
+
+R1 v1.1 amendment: the complete frozen R1 notification registry has 14 event types; none is an unfrozen non-completion event. Projection consumption validates the real Event/Outbox and re-reads current Owner facts under `R1_BUSINESS_TENANT_LOCK` shared then identity shared locks. `R1_PROJECTION` DELIVERED means API validation followed by fenced Worker CAS; it creates no projection table or business mutation. The lease profile is concurrency/batch 4, poll 1 second, lease 60 seconds, HTTP timeout 10 seconds, eight cumulative claims, retry delays 1s/5s/30s/2m/10m/30m/2h, and expired-claim reaping to PENDING or EXHAUSTED.
+
 ## 1. 目的与适用范围
 
 本文件是[当前MVP语义基线](../../../docs/baseline/CURRENT-MVP-BASELINE.md)与52＋2结构/物理合同的从属运行时补充，规定API、CommandRuntime、各 Fact Owner、Query Facade、Dispatcher、ProviderIngress 与 DeploymentRuntime共同执行的验证。这里的“必须”“不得”只在上位基线已定义的边界内构成运行时要求；如与上位基线冲突，验证必须失败关闭，不得据此放宽或改写上位规则。

@@ -1,20 +1,30 @@
 # 当前MVP基线
 
-Baseline ID: MVP-2026-09-05.2
+Baseline ID: MVP-2026-09-07.1
+
+[ADR-0012](../adr/ADR-0012-r1-projection-readiness-protocol.md) activates the named `R1_PROJECTION_READINESS_V1` successor: OpenAPI `1.2.0`, HTTP `R1-HTTP-V1.2`, exactly 16 operations (11 public Bearer + 5 internal mTLS). It supersedes only ADR-0008's operation inventory and original closure §6.3 readiness/invalidation semantics. One successful final locked API evaluation enables one immediate bounded Worker claim; post-evaluation changes and natural expiry can race transport/claim, and every consume still reauthorizes. All responses are no-store; no proof, new authority, persistence or business delta exists. Physical capability stays `52-plus-2-v1.2`, Worker stays execution-only, and original Tasks7/8 retain production implementation/acceptance ownership. This static contract amendment does not promote backend, SPA, E2E, capacity or release readiness.
+
+Previous Baseline IDs `MVP-2026-09-06.2`, `MVP-2026-09-06.1`, `MVP-2026-09-05.3` and older merge evidence remain historical. [ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md) activates Task contract `R1-TASK-COMPLETION-V1.2`: ContactResult uses a Lead-global monotonic `contactNo`, only values `<3` receive automatic retry, values `>=3` enter supervisor review, and every `REOPEN_CONTACT` creates one new OPEN Task without replenishing the automatic budget. The same ADR adds the Evidence Owner `QUERY_ONLY` boundary for the existing optional Submission reference, including exact current-Lead-revision binding, four-subject DENY, safe NOT_FOUND and audited 200/304 disclosure. ADR-0008 through ADR-0010 otherwise remain active. Event schema, event counts, operation/DTO shapes and physical capability `52-plus-2-v1.2` remain unchanged; no production Handler, Evidence port, Workbench or R1 business status is advanced.
 
 状态：`FROZEN`
 
-确认日期：2026-09-05；前版MVP-2026-09-05.1与MVP-2026-08-28.1的已合并证据保留为历史。
+确认日期：2026-09-06；前版MVP-2026-09-05.3及更早已合并证据保留为历史。
 
 R1实施合同确认日期：2026-09-02
 
-当前数据库合同版本：`52-plus-2-v1.1`（静态合同与真实PostgreSQL 18 v1.1运行证据均已保持独立可定位）
-当前52＋2合同摘要：`0c04d48ddae6891b53fdacabdba34d1124e757b070a4c9018597e4e0a4674301`
+当前数据库合同版本：`52-plus-2-v1.2`（追加V860四列QUERY读取；21迁移、最大860、部署revision 2；本地门禁见进度记录，旧v1.1托管证据仅证明旧合同）
+当前52＋2合同摘要：`a4beeb91ed93be455736eafa3abb829f6a94fed3a263be5996832e458b7c4b39`
 字段合同摘要：`f4c17c4c0a8697820b30adb61b8cdb209666a4672393d4f8fc9d73a5f169addf`
 
 本文件是当前销售MVP唯一人工阅读入口和语义总纲。未在本基线明确保留的历史语义不得自动复活；任何未决事项只能通过新的ADR和新的基线版本处理。[ADR-0001](../adr/ADR-0001-pr2-runtime-gate-order.md)冻结PR #2合并与后续PostgreSQL运行时门禁的执行顺序。
 
 ## authority-order
+
+[ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md)与第5项同层；只替代联系次数解释并补齐既有Evidence引用的最小只读Owner/授权/披露边界。它不改变字段、事件数量、operation、数据库GRANT、迁移或物理能力版本；生产实现仍由原Task 6验收。
+
+[ADR-0010](../adr/ADR-0010-lead-ingress-query-read-capability.md)与第5项同层；仅对QUERY读取补全phone/email各自HMAC及密文四列、v1.2能力版本作具名supersession。其余五列、整表SELECT和写权限仍禁止，业务披露审计不因数据库授权而豁免。
+
+[ADR-0008](../adr/ADR-0008-r1-business-closure-alignment.md)和[ADR-0009](../adr/ADR-0009-p0-duplicate-automatic-assignment.md)与下列第5项同层，按各自显式局部supersession解释；ADR-0009仅覆盖P0-01自动后继指针及CAS评估时序，不覆盖其余冻结约束。
 
 [ADR-0006](../adr/ADR-0006-command-runtime-authorization-boundary.md)记录CommandRuntime授权裁定时点、Scope binding、静态信封和提交确认丢失语义；[ADR-0007](../adr/ADR-0007-r1-command-policy-event-closure.md)与[R1命令授权及事件合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)承接四类专属授权和完整R1成功事件集合。52＋2物理合同、迁移、工程版本与产品范围不变。
 
@@ -24,7 +34,7 @@ R1实施合同确认日期：2026-09-02
 2. `database/schema-contract-52-plus-2/contract/`：当前MVP数据结构唯一人工维护源。
 3. 由合同机械生成的manifest、字段合同和Flyway DDL。
 4. `database/schema-contract-52-plus-2/docs/runtime-validation-contract.md`：DDL无法证明的运行时规则。
-5. [ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)、[ADR-0005](../adr/ADR-0005-r1-foundation-readiness.md)、[ADR-0006](../adr/ADR-0006-command-runtime-authorization-boundary.md)、[ADR-0007](../adr/ADR-0007-r1-command-policy-event-closure.md)、[R1命令授权及事件合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)、[R1 Task完成矩阵](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)、[R1 HTTP矩阵](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md)和[R1 Workbench合同](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)：决定R1工程、授权、事件、HTTP、责任完成与呈现语义；涉及持久化形态、唯一键或Receipt基数时必须服从第2至4项。
+5. [ADR-0004](../adr/ADR-0004-r1-scaffold-and-http-contract.md)、[ADR-0005](../adr/ADR-0005-r1-foundation-readiness.md)、[ADR-0006](../adr/ADR-0006-command-runtime-authorization-boundary.md)、[ADR-0007](../adr/ADR-0007-r1-command-policy-event-closure.md)、[ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md)、[R1命令授权及事件合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)、[R1 Task完成矩阵](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md)、[R1 HTTP矩阵](../contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md)和[R1 Workbench合同](../contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md)：决定R1工程、授权、事件、HTTP、责任完成与呈现语义；涉及持久化形态、唯一键或Receipt基数时必须服从第2至4项。
 6. [冻结R1计划](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)：只决定上述合同的实施顺序，不能覆盖合同或数据库权威。
 7. `docs/progress/MVP-DELIVERY-LEDGER.md`：仅记录交付状态，不改变产品或数据库语义。
 8. `docs/design/`：视觉验收证据，不产生领域规则。

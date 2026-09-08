@@ -77,7 +77,7 @@ class R1CommandPolicyIT extends CommandRuntimeIT {
         mutate(h,"insert into identity.principal (tenant_id,principal_id,principal_kind,identity_provider_code,external_subject_hmac,display_name,state,created_at) values (?,?,?,?,decode(repeat('02',32),'hex'),'service','ACTIVE',clock_timestamp())",h.seed.tenant(),principal,kind,principal.toString());
         mutate(h,"insert into identity.appointment (tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) values (?,?,?,?,'SERVICE',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",h.seed.tenant(),app,principal,appointmentOrg);
         mutate(h,"insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values (?,?,?,?,?,?,clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",h.seed.tenant(),grant,app,h.seed.appointment(),scope,code);
-        return new Service(new Actor(h.seed.tenant(),principal,app,null,null),grant);
+        return new Service(new Actor(h.seed.tenant(),principal,app,null,null,PrincipalKind.valueOf(kind)),grant);
     }
     CommandHandler.Context recovery(Handler h,Service service,CommandEnvelope.Type type,String code) {
         UUID wait=UUID.randomUUID();String hash=hash("wait");
@@ -187,7 +187,7 @@ class R1CommandPolicyIT extends CommandRuntimeIT {
             var wrong=request(context,service.actor(),h.seed.org(),new Requirement("CONTACT_TASK_RECOVER".equals(code)?"ROUTING_REVIEW_TASK_RECOVER":"CONTACT_TASK_RECOVER","SYSTEM_RECOVERY",Path.SYSTEM,service.grant()));
             assertFalse(decision(e,wrong).allowed());
             var human=request(context,h.seed.request().actor(),h.seed.org(),new Requirement(code,"SYSTEM_RECOVERY",Path.SYSTEM,h.seed.grant()));
-            assertFalse(decision(recoveryEnvelope(h,human),human).allowed());
+            assertThrows(IllegalArgumentException.class,()->recoveryEnvelope(h,human));
             mutate(h,"update identity.appointment set state='SUSPENDED',revision=revision+1 where tenant_id=? and appointment_id=?",h.seed.tenant(),h.seed.appointment());
             var result=decision(e,context);assertFalse(result.allowed());assertEquals("NOT_AUTHORIZED",result.rejectionCode());
             assertEquals(List.of(0L,0L,0L,0L,0L),counts(h).subList(0,5));
@@ -339,9 +339,10 @@ class R1CommandPolicyIT extends CommandRuntimeIT {
     @Test void capture_final_revocation_after_slot_rolls_back_to_rejected_receipt_and_audit()throws Exception {
         var h=captureHandler();var context=capture(h,"FIXTURE",captureGrant(h));
         var handler=new NoChangeHandler(h,context,h.seed.request().subject()) {
-            @Override public void validateBeforeCommit(Connection c,CommandEnvelope e,Context context,Result result) {
+            @Override public Result execute(Connection c,CommandEnvelope e,Context context) {
                 try {mutate(h,"update identity.authority_grant set state='REVOKED',revoked_at=clock_timestamp(),revocation_reason_code='TEST',revision=revision+1 where tenant_id=? and authority_grant_id=?",h.seed.tenant(),h.seed.grant());}
                 catch(Exception failure){throw new AssertionError(failure);}
+                return Result.noChange(h.seed.request().subject());
             }
         };
         var result=run(new CommandRuntime(List.of(handler),auth,"POLICY_IT",readers),envelope(h,CommandEnvelope.Type.CAPTURE_LEAD,h.seed.request().actor(),Map.of("sourceAccountCode","FIXTURE")));

@@ -42,6 +42,10 @@ public final class CommandRuntime {
                     || !context.authorization().actor().equals(envelope.actor()))throw new CommandHandler.Rejected("NOT_AUTHORIZED");
             AuthorizationSnapshot initial=policy.authorize(c,envelope,context,false);
             if(!initial.allowed())throw new CommandHandler.Rejected(initial.rejectionCode());
+            R1BusinessFence.databaseBacked().exclusive(c,envelope.actor().tenantId());
+            // The fence may have waited while identity or source facts changed. No roots or writes yet.
+            var afterFence=policy.authorize(c,envelope,context,false);
+            if(!afterFence.allowed())throw new CommandHandler.Rejected(afterFence.rejectionCode());
             setLocalRole(c,Capability.COMMAND);handler.lockRoots(c,envelope,context);
             var store=new JooqCommandStore(c);store.lockCommand(envelope);
             var existing=store.existingOrValidateNew(envelope,context.scope(),payload,x->{handler.recoveryEligibility(x,envelope,context);return null;});
@@ -59,7 +63,12 @@ public final class CommandRuntime {
                 var eventPolicy=new R1EventPolicy(eventFacts);eventPolicy.beforeWork(c,envelope,context);
                 setLocalRole(c,Capability.COMMAND);handler.validateBeforeWork(c,envelope,context);result=handler.execute(c,envelope,context);
                 if(result.status()==CommandOutcome.Status.NO_CHANGE)c.rollback(business);
-                setLocalRole(c,Capability.QUERY);handler.validateBeforeCommit(c,envelope,context,result);
+                setLocalRole(c,Capability.QUERY);
+                // Capture denials on newly written exact selectors before rollback restores old
+                // revisions. The shared identity lock also precedes all final Owner reads.
+                terminal=policy.authorize(c,envelope,context,true);
+                if(!terminal.allowed())throw new CommandHandler.Rejected(terminal.rejectionCode());
+                handler.validateBeforeCommit(c,envelope,context,result);
                 eventPolicy.validate(c,envelope,context,result);
                 terminal=policy.authorize(c,envelope,context,true);
                 if(!terminal.allowed())throw new CommandHandler.Rejected(terminal.rejectionCode());

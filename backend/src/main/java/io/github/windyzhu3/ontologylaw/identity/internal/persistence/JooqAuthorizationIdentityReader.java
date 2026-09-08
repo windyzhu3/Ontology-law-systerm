@@ -9,7 +9,14 @@ import org.jooq.impl.DSL;
 import static io.github.windyzhu3.ontologylaw.identity.internal.persistence.jooq.Tables.*;
 
 public final class JooqAuthorizationIdentityReader implements AuthorizationIdentityReader {
-    private DSLContext db(Connection c) { return DSL.using(c,SQLDialect.POSTGRES); }
+    private DSLContext db(Connection c) { return DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)); }
+    public Registration registration(Connection c,UUID tenant,UUID appointment) {
+        var a=APPOINTMENT;var p=PRINCIPAL;
+        var row=db(c).select(p.PRINCIPAL_ID,p.PRINCIPAL_KIND,p.IDENTITY_PROVIDER_CODE).from(a).join(p)
+                .on(p.TENANT_ID.eq(a.TENANT_ID).and(p.PRINCIPAL_ID.eq(a.PRINCIPAL_ID)))
+                .where(a.TENANT_ID.eq(tenant)).and(a.APPOINTMENT_ID.eq(appointment)).fetchOne();
+        return row==null?null:new Registration(tenant,row.value1(),appointment,AuthorizationService.PrincipalKind.valueOf(row.value2()),row.value3());
+    }
     public AuthorizationService.Subject organization(Connection c, UUID tenant, String code) {
         var t=ORGANIZATION_UNIT;
         var rows=db(c).select(t.ORGANIZATION_UNIT_ID,t.REVISION).from(t)

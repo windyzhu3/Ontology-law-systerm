@@ -13,6 +13,21 @@ import org.jooq.impl.DSL;
 import static io.github.windyzhu3.ontologylaw.responsibility.internal.persistence.jooq.Tables.*;
 
 public final class JooqEventResponsibilityReader implements EventResponsibilityReader {
+    public R1EventFacts.Draft draft(Connection c,UUID tenant,UUID id){
+        var d=ACTION_DRAFT;var r=DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)).select(d.REVISION,d.TASK_OCCURRENCE_ID,d.ACTION_CODE,d.PAYLOAD_SCHEMA_CODE,d.PAYLOAD_SCHEMA_VERSION,d.STATE).from(d).where(d.TENANT_ID.eq(tenant)).and(d.ACTION_DRAFT_ID.eq(id)).fetchOne();
+        return r==null?null:new R1EventFacts.Draft(new Subject("responsibility.action_draft",id,r.value1(),null),r.value2(),r.value3(),r.value4(),r.value5(),r.value6());
+    }
+    public R1EventFacts.Task completedIngress(Connection c,UUID tenant,UUID leadId,long revision){
+        var t=TASK_OCCURRENCE;var ids=DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)).select(t.TASK_OCCURRENCE_ID).from(t).where(t.TENANT_ID.eq(tenant)).and(t.BUSINESS_PURPOSE_CODE.eq("COMPLETE_LEAD_INGRESS")).and(t.STATE.eq("DONE")).and(t.SUBJECT_TYPE.eq("lead.lead")).and(t.SUBJECT_ID.eq(leadId)).and(t.COMPLETION_FACT_TYPE.eq("lead.lead")).and(t.COMPLETION_FACT_ID.eq(leadId)).and(t.COMPLETION_FACT_REVISION.eq(revision)).and(t.COMPLETION_FACT_HASH.isNull()).limit(2).fetch(t.TASK_OCCURRENCE_ID);
+        return ids.size()==1?task(c,tenant,ids.getFirst()):null;
+    }
+    public Set<UUID> retainedR1OwnerAppointments(Connection c,UUID tenant) {
+        var t=TASK_OCCURRENCE;
+        return new HashSet<>(DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false))
+            .selectDistinct(t.OWNER_APPOINTMENT_ID).from(t).where(t.TENANT_ID.eq(tenant))
+            .and(t.BUSINESS_PURPOSE_CODE.in(Arrays.stream(io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.values()).map(Enum::name).toList()))
+            .fetch(t.OWNER_APPOINTMENT_ID));
+    }
     public R1EventFacts.Task task(Connection c,UUID tenant,UUID id) {
         var db=DSL.using(c,SQLDialect.POSTGRES);var t=TASK_OCCURRENCE;var d=ACTION_DRAFT;
         var r=db.selectFrom(t).where(t.TENANT_ID.eq(tenant)).and(t.TASK_OCCURRENCE_ID.eq(id)).fetchOne();

@@ -5,6 +5,9 @@ import java.sql.*;
 import java.util.UUID;
 
 public interface EventResponsibilityReader {
+    R1EventFacts.Draft draft(Connection c,UUID tenant,UUID id)throws SQLException;
+    R1EventFacts.Task completedIngress(Connection c,UUID tenant,UUID leadId,long completionRevision)throws SQLException;
+    java.util.Set<UUID> retainedR1OwnerAppointments(Connection c,UUID tenant) throws SQLException;
     R1EventFacts.Task task(Connection c,UUID tenant,UUID id) throws SQLException;
     R1EventFacts.Decision decision(Connection c,UUID tenant,UUID id) throws SQLException;
     R1EventFacts.Wait latestWait(Connection c,UUID tenant,UUID taskId) throws SQLException;

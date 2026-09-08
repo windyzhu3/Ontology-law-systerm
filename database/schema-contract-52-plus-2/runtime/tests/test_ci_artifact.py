@@ -218,6 +218,14 @@ def _current_v1_1_passed_summary() -> dict[str, object]:
     }
 
 
+def _current_v1_2_passed_summary() -> dict[str, object]:
+    summary = _current_v1_1_passed_summary()
+    summary["schemaVersion"] = "postgresql-runtime-ci-artifact-v1.2"
+    summary["contractSummary"]["migrationCount"] = 21
+    summary["contractSummary"]["contractSha256"] = "a4beeb91ed93be455736eafa3abb829f6a94fed3a263be5996832e458b7c4b39"
+    return summary
+
+
 def _legacy_v1_passed_summary() -> dict[str, object]:
     summary = _current_v1_1_passed_summary()
     summary["schemaVersion"] = "postgresql-runtime-ci-artifact-v1"
@@ -278,6 +286,39 @@ def _locked_toolchain() -> dict[str, object]:
 
 
 class CiArtifactTests(unittest.TestCase):
+    def test_historical_v1_1_failure_diagnostics_remain_decodable(self):
+        from runtime import verify_runtime
+        for code in ("verifier_schema_v850_success", "verifier_schema_v850_query_completion_select"):
+            with self.subTest(code=code):
+                summary = _current_v1_1_passed_summary()
+                summary.update({"workflowOutcome": "FAILED", "reasonCode": "compose_up_failed", "failureScenarios": []})
+                summary["toolchain"].update({"postgresVersion": None, "flywayVersion": None})
+                summary["contractSummary"] = {field: False if field == "verified" else None for field in CONTRACT_FIELDS}
+                next(stage for stage in summary["runs"][0]["stages"] if stage["stageName"] == "verifier-wait").update({"exitCode": 3, "diagnosticCode": code})
+                self.assertEqual(summary, verify_runtime._validate_ci_runtime_summary(summary))
+
+    def test_v1_2_profile_requires_matching_inventory_hash_and_retains_v1_1_decoding(self):
+        from runtime import verify_runtime
+
+        current = _current_v1_2_passed_summary()
+        self.assertEqual(current, verify_runtime._validate_ci_runtime_summary(current))
+        historical = _current_v1_1_passed_summary()
+        self.assertEqual(historical, verify_runtime._validate_ci_runtime_summary(historical))
+        manifest = json.loads((Path(__file__).resolve().parents[2] / "generated/schema-contract-manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(current["contractSummary"], verify_runtime._ci_verified_contract_summary(manifest))
+        for fault in ("version", "hash", "omitted_v860", "unauthorized_grant"):
+            with self.subTest(fault=fault):
+                changed = copy.deepcopy(manifest)
+                if fault == "version": changed["contractVersion"] = "52-plus-2-v1.1"
+                if fault == "hash": changed["contractSha256"] = "0" * 64
+                if fault == "omitted_v860": del changed["generatedArtifactSha256"]["db/migration/V860__lead_ingress_query_read_capability.sql"]
+                if fault == "unauthorized_grant": changed["generatedArtifactSha256"]["db/migration/V860__lead_ingress_query_read_capability.sql"] = "f" * 64
+                with self.assertRaises(ValueError): verify_runtime._ci_verified_contract_summary(changed)
+        for summary in (current, historical):
+            changed = copy.deepcopy(summary)
+            changed["contractSummary"]["contractSha256"] = historical["contractSummary"]["contractSha256"] if summary is current else current["contractSummary"]["contractSha256"]
+            with self.assertRaises(ValueError): verify_runtime._validate_ci_runtime_summary(changed)
+
     def _public(self, name: str):
         from runtime import verify_runtime
 
@@ -1378,19 +1419,7 @@ class HostedCiOnlyVerificationTests(unittest.TestCase):
             encoding="utf-8",
         )
         (generated_directory / "schema-contract-manifest.json").write_text(
-            json.dumps(
-                {
-                    "contractVersion": "52-plus-2-v1.1",
-                    "applicationTableCount": 52,
-                    "physicalTableCountAfterFlywayBootstrap": 54,
-                    "schemas": [f"schema-{index}" for index in range(13)],
-                    "physicalForeignKeyWhitelist": [f"fk-{index}" for index in range(207)],
-                    "contractSha256": CONTRACT_DIGEST,
-                    "fieldContractSha256": FIELD_DIGEST,
-                },
-                indent=2,
-            )
-            + "\n",
+            (Path(__file__).resolve().parents[2] / "generated/schema-contract-manifest.json").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
         for arguments in (
@@ -1443,11 +1472,11 @@ class HostedCiOnlyVerificationTests(unittest.TestCase):
 
         def summary(value: str) -> dict[str, object]:
             return {
-                "contractRevision": 1,
-                "contractVersion": "52-plus-2-v1.1",
+                "contractRevision": 2,
+                "contractVersion": "52-plus-2-v1.2",
                 "fingerprint": value,
-                "maximumMigrationVersion": 850,
-                "migrationCount": 20,
+                "maximumMigrationVersion": 860,
+                "migrationCount": 21,
                 "postgresVersion": postgres_version,
                 "serverVersion": "18.0 fixture",
                 "status": "PASSED",
@@ -2215,8 +2244,8 @@ class HostedCiOnlyVerificationTests(unittest.TestCase):
         self.assertEqual(json.loads(stdout)["status"], "PASSED")
         safe_directory = repository / ".artifacts" / "schema-runtime-ci"
         validated = verify_runtime.validate_ci_runtime_artifact(safe_directory)
-        self.assertEqual(validated["schemaVersion"], "postgresql-runtime-ci-artifact-v1.1")
-        self.assertEqual(validated["contractSummary"]["migrationCount"], 20)
+        self.assertEqual(validated["schemaVersion"], "postgresql-runtime-ci-artifact-v1.2")
+        self.assertEqual(validated["contractSummary"]["migrationCount"], 21)
         self.assertEqual(validated["contractSummary"]["physicalForeignKeyCount"], 207)
         self.assertTrue(
             all(not path.exists() for path in verify_runtime.fixed_publication_targets(repository))

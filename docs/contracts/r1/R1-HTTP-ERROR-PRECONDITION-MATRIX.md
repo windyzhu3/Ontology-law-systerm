@@ -1,8 +1,22 @@
 # R1 HTTP、错误与前置条件合同
 
-Contract ID: R1-HTTP-V1
+Contract ID: R1-HTTP-V1.2
+
+R1 v1.2 freezes 16 operations: 11 public Bearer and 5 mutualTLS. `listDueR1Tasks` accepts only `recoveryType=CONTACT_TASK|ROUTING_REVIEW_TASK`, limit default 50 bounded 1..100, and optional opaque cursor; it returns `candidates` plus optional `nextCursor`. Each candidate has exactly recoveryType/taskId/expectedTaskRevision/waitReceiptId/waitReceiptHash/dueCutoff/idempotencyKey. Pagination orders by `(resume_due_at, task_id)` with an Actor-scoped cursor and stable UUIDv5 recovery key. `consumeR1Projection` accepts exactly domainEventOutboxId/domainEventId/expectedOutboxRevision/leaseOwner/fencingToken and succeeds with 204 and no body. Both DTOs reject unknown fields.
+
+`STALE_OUTBOX_CLAIM` and `PROJECTION_EVENT_INVALID` belong only to consumeR1Projection's typed internal Problem allowlist; no public operation error allowlist changes. Internal authorization failures are 403, never disguised as permanent 404.
+
+[ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md) previously activated semantic baseline `MVP-2026-09-06.3` with unchanged DTO shape and physical capability `52-plus-2-v1.2`. It narrows the existing optional `evidenceSubmissionId` to an exact, authorized Evidence reference and keeps all production implementation gates separate.
 
 Status: FROZEN
+
+[ADR-0012](../../adr/ADR-0012-r1-projection-readiness-protocol.md) is the active named successor at `MVP-2026-09-07.1`. `checkR1ProjectionReadiness` is read-only authorization preflight, not a command or event consumer. It takes no body/parameters/Tenant selector and uses only the unique trusted certificate Tenant/SERVICE/Appointment binding. All responses carry `Cache-Control: no-store`; success is 204/no body, with no ETag/304 or reusable attestation. Existing safe six-code errors below apply; missing Grant, incomplete coverage and inactive/expired SERVICE/Appointment/organization yield 403. Malformed configuration or technical evaluation never yields success. Slot/Receipt/Audit/Event/Outbox/business deltas are zero; responses/logs expose no organization/Grant identifiers, source selectors, business fields, raw exceptions or credentials.
+
+Coverage is the deduplicated union of current trusted R1 source-policy intake organizations and real R1 Task/Assignment Owner organizations needed by all fourteen frozen event routes, including retained DONE/CANCELLED Tasks and Assignment/Decision/Contact/Opportunity lineages for late notifications. Narrow API QUERY Owner ports resolve facts and policy; SQL/generated types stay in Owner internal.persistence and Worker receives only HTTP outcome. SERVICE organization, selected Grant roots, all Tenant organizations indiscriminately and first queue page are not coverage universes. Unresolved required anchors fail closed. Every organization requires one independently complete effective direct Grant of the exact SERVICE Appointment for `SYSTEM_PROJECTION/R1_PROJECTION_CONSUME/SYSTEM`; complete grants may separately cover organizations, but incomplete fields cannot be stitched. HUMAN/onBehalf/delegation/OBJECT ALLOW/recovery/LEAD_CAPTURE cannot substitute. Empty coverage still requires valid SERVICE/Appointment and effective projection Grant.
+
+API checks trusted Actor, takes shared Tenant `R1_BUSINESS_TENANT_LOCK`, then shared identity lock, and re-reads current facts/authority with fresh `clock_timestamp()` under READ COMMITTED. Locks remain held through successful read-transaction completion before HTTP success. The decision point is the final locked database-time evaluation. Committed earlier identity/policy/Owner changes must be seen; later locked writers wait for transaction completion. Changes and natural expiry afterward, including response transport before claim, are an accepted in-flight race: there is no atomic check-and-claim or instantaneous cross-process invalidation. Event-specific DENY, causal binding, source/hash integrity and lease validity are separately mandatory on every consume.
+
+Worker acquires available permits first; no permits means no check or claim. Each Tenant binding serializes check-to-claim; only the active request's success enables its one immediate bounded claim (up to permits, maximum four). Discard success after that call even for zero rows and on retry/binding change/error/restart; no proof/cache/token/TTL/persistence or local pre-authorized queue. Each later batch needs a new check. Existing ten-second timeout applies and late/cancelled responses are discarded. Failed preflight performs no claim and no attempt increment; 401/403 freezes binding, other failures withhold claims with bounded existing backoff, and no batch substitutes as a probe. Consume 401/403 freezes further claims without ack or failure-CAS. The generation/freeze guard rejects earlier success after a newer authorization failure; only a newly initiated successful check against the repaired binding resumes work. Existing claims keep attempts and reap below eight to PENDING with frozen retry delay, at eight to EXHAUSTED; no automatic EXHAUSTED redrive or waived authorization-failure attempt. Original Tasks7/8 own runtime implementation and assembly.
 
 确认日期：2026-09-02
 
@@ -12,6 +26,7 @@ Status: FROZEN
 
 | OperationId | Method | Path | TenantSource | IdempotencyKey | Preconditions | SubjectBinding | SuccessStatus | ErrorCodes |
 |---|---|---|---|---|---|---|---|---|
+| checkR1ProjectionReadiness | GET | /internal/v1/projections/r1/readiness | ACTOR_CONTEXT | NONE | NONE | CURRENT_R1_OWNER_ORGANIZATION_COVERAGE | 204 | VALIDATION_FAILED,UNAUTHENTICATED,NOT_AUTHORIZED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 | captureLead | POST | /api/v1/leads | ACTOR_CONTEXT | REQUIRED | NONE | SOURCE_NATURAL_KEY | 201 | VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,COMMAND_PAYLOAD_CONFLICT,SUPERVISOR_UNRESOLVED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 | getCurrentWorkCard | GET | /api/v1/workcards/current | ACTOR_CONTEXT | NONE | OPTIONAL_WORKBENCH_ETAG | ACTOR_SCOPE | 200/304 | UNAUTHENTICATED,NOT_AUTHORIZED,NOT_FOUND,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 | saveActionDraft | PUT | /api/v1/tasks/{taskId}/draft | ACTOR_CONTEXT | REQUIRED | IF_NONE_MATCH_STAR_OR_DRAFT_ETAG | TASK_AND_DRAFT | 200/201 | VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,DRAFT_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
@@ -25,6 +40,8 @@ Status: FROZEN
 | getCommandReceipt | GET | /api/v1/commands/{commandId}/receipt | ACTOR_CONTEXT | NONE | NONE | COMMAND_ID_AND_ACTOR_SCOPE | 200 | UNAUTHENTICATED,NOT_AUTHORIZED,NOT_FOUND,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 | reopenDueContactTasks | POST | /internal/v1/tasks/commands/reopen-due-contact-tasks | ACTOR_CONTEXT | REQUIRED | NONE | DUE_CUTOFF_AND_OWNER_QUEUE | 200 | VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,COMMAND_PAYLOAD_CONFLICT,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 | reopenDueRoutingReviewTasks | POST | /internal/v1/tasks/commands/reopen-due-routing-review-tasks | ACTOR_CONTEXT | REQUIRED | NONE | DUE_CUTOFF_AND_OWNER_QUEUE | 200 | VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,COMMAND_PAYLOAD_CONFLICT,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
+| listDueR1Tasks | GET | /internal/v1/tasks/due | ACTOR_CONTEXT | NONE | RECOVERY_TYPE_LIMIT_CURSOR | DUE_TASK_OWNER_SCOPE | 200 | VALIDATION_FAILED,UNAUTHENTICATED,NOT_AUTHORIZED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
+| consumeR1Projection | POST | /internal/v1/projections/r1/consume | ACTOR_CONTEXT | NONE | OUTBOX_REVISION_LEASE_FENCE | EVENT_OUTBOX_CURRENT_OWNER_FACTS | 204 | VALIDATION_FAILED,UNAUTHENTICATED,NOT_AUTHORIZED,NOT_FOUND,STALE_OUTBOX_CLAIM,PROJECTION_EVENT_INVALID,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE |
 
 TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提供 Tenant，并用于授权、查询和 SQL 绑定。公共调用方不能提交或覆盖 Tenant；内部入口只接受 mTLS worker 身份并映射到受限 ActorContext。
 
@@ -61,6 +78,9 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 | getCommandReceipt | `commandId: Uuid` | `Authorization: Bearer …` | none |
 | reopenDueContactTasks | none | mutual-TLS client identity; `Idempotency-Key: Uuid` | `ReopenDueContactTaskV1` |
 | reopenDueRoutingReviewTasks | none | mutual-TLS client identity; `Idempotency-Key: Uuid` | `ReopenDueRoutingReviewTaskV1` |
+| listDueR1Tasks | none | mutual-TLS client identity; query `recoveryType`, optional `limit`, optional opaque `cursor` | none |
+| checkR1ProjectionReadiness | none | mutual-TLS client identity only; no parameters | none |
+| consumeR1Projection | none | mutual-TLS client identity | `ConsumeR1ProjectionV1` |
 
 “same command headers”恰指表中三项，不允许额外的 Tenant、subject revision、Draft ETag 或自由 command/action header。`If-Match`、`If-None-Match` 都只接受一个标签，不接受逗号列表、弱标签或 `If-Match: *`。`reopenDueContactTasks` 保留冻结的 operationId/path，但一次请求准确恢复一张 Task，不是批处理。
 
@@ -86,15 +106,17 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 |---|---|---|
 | `CaptureLeadV1` | `sourceChannelCode: Code64` (1), `sourceAccountCode: string[1..128]` (1), `sourceRecordKey: string[1..256]` (1), `capturedAt: Instant` (1), `capturedName: string[1..200]` (0..1), `phone: string[2..16]` (0..1), `email: email-string[1..320]` (0..1), `cityCode: Code64` (0..1), `serviceCategoryCode: Code64` (1), `jurisdictionCode: Code64` (1), `urgencyCode: Code64` (1), `legalNeedSummary: SafeText2000` (1) | phone 若出现必须匹配 `^\+[1-9][0-9]{0,14}$`；phone/email 可同时缺失并进入 P0-02。sourceRecordKey 区分大小写且不 trim。客户端不得提交 Lead/Party/Assignment ID、摘要、密文、HMAC、捕获内容 digest 或 Tenant；服务端按 Task 合同规范化并保护自然键和敏感值 |
 | `SaveActionDraftV1` | `actionCode: Code64` (1), `schemaVersion: integer` (1), `values: object` (1) | `actionCode` 必须等于 Task 冻结 `primaryCommand`；`schemaVersion=1`；`values` 必须逐字段等于相应 command DTO 去掉 `draftId`、`expectedDraftRevision`、`draftDigest` 后的 Schema |
-| `ResolveDuplicateLeadV1` | Draft confirmation fields (各 1), `decisionCode` (1), `candidateLeadId: Uuid` (1), `candidateLeadRevision: Revision` (1), `partyId: Uuid` (1), `partyRevision: Revision` (1), `rationaleSummary: SafeText500` (1) | `decisionCode ∈ {LINK_EXISTING_PARTY,KEEP_SEPARATE}`；两个 exact selector 两分支均必填并须等于 Task 创建时按 Task 合同确定、提交时重验的候选及其同一活动 Party；两分支均要求当前Lead仍为`CAPTURED`并做`revision=old+1` CAS：LINK写入Party解析和`LINK_EXISTING_PARTY`处置，KEEP只写`disposition_code=KEEP_SEPARATE`且禁止修改Party解析、assignment、捕获/V850字段及candidate Lead/Party |
+| `ResolveDuplicateLeadV1` | Draft confirmation fields (各 1), `decisionCode` (1), `candidateLeadId: Uuid` (1), `candidateLeadRevision: Revision` (1), `partyId: Uuid` (1), `partyRevision: Revision` (1), `rationaleSummary: SafeText500` (1) | `decisionCode ∈ {LINK_EXISTING_PARTY,KEEP_SEPARATE}`；两个 exact selector 两分支均必填并须等于 Task 创建时按 Task 合同确定、提交时重验的候选及其同一活动 Party；两分支均要求当前Lead仍为`CAPTURED`并执行一次最终`revision=old+1` CAS：LINK写Party解析和处置，KEEP只改变解析相关处置`disposition_code=KEEP_SEPARATE`并保持Party解析；两分支只按Task V1.1的`R1_DUPLICATE_AUTOMATIC_ASSIGNMENT_V1`在同一次CAS允许NULL指针绑定同命令事务新建的同Tenant/Lead/准确Owner OPEN Assignment，其他结果指针不变。禁止任意改指、复用/跨Lead/重新分配、调用方指定自动Owner及捕获/V850字段或candidate Lead/Party修改；选择器评估解析后预期事实，后继冻结最终revision，Decision仍是唯一完成/Receipt/Event Fact且不扩展digest或事件数。见[ADR-0009](../../adr/ADR-0009-p0-duplicate-automatic-assignment.md) |
 | `CompleteLeadIngressV1` | Draft confirmation fields (各 1), `phone: string[2..16]` (0..1), `email: email-string[1..320]` (0..1), `sourceCode: Code64` (1), `sourceSummary: SafeText500` (1) | phone/email 至少一个；phone 若出现必须匹配 `^\+[1-9][0-9]{0,14}$`；`sourceCode ∈ {OWNER_CONFIRMED,CUSTOMER_PROVIDED}`；仅当原始 phone/email 和完整 ingress 槽均为空时允许；服务端生成密文、HMAC、完成时间和 digest |
 | `AssignLeadV1` | Draft confirmation fields (各 1), `ownerAppointmentId: Uuid` (1) | Appointment 必须来自当前卡允许候选，且提交前仍为同 Tenant、ACTIVE、有准确 authority 且无 DENY |
 | `RecordRoutingDispositionV1` | Draft confirmation fields (各 1), `decisionCode` (1), `rationaleSummary: SafeText500` (1) | `decisionCode ∈ {SCHEDULE_ROUTING_REVIEW,RETRY_ASSIGNMENT_NOW,REQUEST_SOURCE_INTAKE_STOP}`；恢复时间、候选选择和准确 intake Owner 均由服务器策略决定 |
 | `AcknowledgeSourceIntakeStopRequestV1` | Draft confirmation fields (各 1), `causalDecisionId: Uuid` (1), `causalDecisionHash: Digest32` (1), `rationaleSummary: SafeText500` (1) | causal selector 必须等于 Task 创建时按 Task 合同确定、提交时重验的 routing Decision selector；唯一 outcome 隐含为 `SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED`，不接受自由 decisionCode |
-| `RecordContactResultV1` | Draft confirmation fields (各 1), `leadAssignmentId: Uuid` (1), `leadAssignmentRevision: Revision` (1), `contactChannelCode: Code64` (1), `resultCode: Code64` (1), `resultSummary: SafeText500` (0..1), `legalNeed: SafeText2000` (0..1), `evidenceSubmissionId: Uuid` (0..1) | `contactChannelCode ∈ {PHONE,EMAIL}`；`resultCode ∈ {CONNECTED_VALID,NOT_CONNECTED,SUSPECT_INVALID}`；`legalNeed`在CONNECTED_VALID时必填并作为新Opportunity的受保护原始描述，在其他结果时禁止；Assignment selector 必须等于Task创建时按Task合同确定、提交时重验的绑定；Evidence若出现必须为同Tenant可见的准确Submission |
+| `RecordContactResultV1` | Draft confirmation fields (各 1), `leadAssignmentId: Uuid` (1), `leadAssignmentRevision: Revision` (1), `contactChannelCode: Code64` (1), `resultCode: Code64` (1), `resultSummary: SafeText500` (0..1), `legalNeed: SafeText2000` (0..1), `evidenceSubmissionId: Uuid` (0..1) | `contactChannelCode ∈ {PHONE,EMAIL}`；`resultCode ∈ {CONNECTED_VALID,NOT_CONNECTED,SUSPECT_INVALID}`；`legalNeed`在CONNECTED_VALID时必填并作为新Opportunity的受保护原始描述，在其他结果时禁止；Assignment selector 必须等于Task创建时按Task合同确定、提交时重验的绑定；Evidence缺省时零读取，出现时必须为Actor Tenant中绑定当前Task准确Lead revision、ACTIVE且未撤回并通过四Subject授权的既有Submission |
 | `ReviewLeadValidityV1` | Draft confirmation fields (各 1), `triggeringContactResultId: Uuid` (1), `triggeringContactResultHash: Digest32` (1), `decisionCode` (1), `rationaleSummary: SafeText500` (1) | `decisionCode ∈ {CONFIRM_INVALID,CLOSE_UNREACHED,REOPEN_CONTACT}`；ContactResult selector 必须等于 Task 创建时按 Task 合同确定、提交时重验的触发结果 |
 | `ReopenDueContactTaskV1` | `taskId: Uuid` (1), `expectedTaskRevision: Revision` (1), `waitReceiptId: Uuid` (1), `waitReceiptHash: Digest32` (1), `dueCutoff: Instant` (1) | Task 必须为 WAITING `CONTACT_LEAD`；最新 WaitReceipt 必须绑定 expected revision 且 `resumeDueAt <= dueCutoff <=` 服务端事务可信当前时间；恰做一次 WAITING→OPEN CAS。若同一 selector 已使 Task 成为 OPEN/revision=`expectedTaskRevision+1`，返回 NO_CHANGE；不允许空批成功 |
 | `ReopenDueRoutingReviewTaskV1` | `taskId: Uuid` (1), `expectedTaskRevision: Revision` (1), `waitReceiptId: Uuid` (1), `waitReceiptHash: Digest32` (1), `dueCutoff: Instant` (1) | Task 必须为 WAITING `RESOLVE_LEAD_ROUTING_GAP`且最新WaitReceipt为`R1_ROUTING_REVIEW_WAIT_V1`；其余due、CAS和NO_CHANGE语义与contact恢复相同 |
+| `DueR1TaskPageV1` | `candidates: DueR1TaskCandidateV1[]` (1), `nextCursor` (0..1) | candidate 恰含 recoveryType/taskId/expectedTaskRevision/waitReceiptId/waitReceiptHash/dueCutoff/idempotencyKey；不得含 Tenant/Grant/organization 或展示内容 |
+| `ConsumeR1ProjectionV1` | `domainEventOutboxId: Uuid`, `domainEventId: Uuid`, `expectedOutboxRevision: Revision`, `leaseOwner: TechnicalIdentifier64`, `fencingToken: 1..9007199254740991` (all 1) | 恰五字段，拒绝未知字段；Tenant 只来自 mTLS ActorContext |
 
 七种 TaskOccurrence 的唯一持久 `subject` 均为 `lead.lead@revision`（revision 必填、hash 为空）。RESOLVE 的 candidate Lead/Party、ACK 的 causal Decision、CONTACT 的 LeadAssignment、REVIEW 的 triggering ContactResult 是具名次级 command-scope/提交前重验 selector，不得伪装成第二个 Task subject。scope digest 覆盖 commandType、taskId、准确持久 Lead selector 和按字段名排序的次级 selector。
 
@@ -112,6 +134,8 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 | getCommandReceipt | 200 | none | `CommandReceipt`，逐字段等于原终态 Receipt 投影 |
 | reopenDueContactTasks | 200 | `Location: /api/v1/commands/{commandId}/receipt`; `ETag: TaskETag` | `CommandReceipt`；resultFact 必须为恢复后的 `TASK_OCCURRENCE@postReopenRevision` |
 | reopenDueRoutingReviewTasks | 200 | `Location: /api/v1/commands/{commandId}/receipt`; `ETag: TaskETag` | `CommandReceipt`；resultFact 必须为恢复后的 `TASK_OCCURRENCE@postReopenRevision` |
+| listDueR1Tasks | 200 | none | `DueR1TaskPageV1` |
+| consumeR1Projection | 204 | none | no body |
 
 `ActionDraftWriteResult` 恰含 `receipt: CommandReceipt`、`draft: ActionDraftProjection` 和 `preconditions: PreconditionTokens`，三者均必填；其中 `preconditions.draftETag` 必须等于响应 `ETag`。七个 Task command 指 Operations 表中从 `resolveDuplicateLead` 到 `reviewLeadValidity` 的七行。
 
@@ -185,7 +209,7 @@ digest43    = 43(ALPHA / DIGIT / "-" / "_")
 | Scheme name | OpenAPI shape | Exact operation binding |
 |---|---|---|
 | `publicBearer` | `type: http`, `scheme: bearer` | 所有 `/api/v1/**` 十一个 operation 各自且只使用 `[{publicBearer: []}]` |
-| `internalMutualTls` | `type: mutualTLS` | 两个具名reopen operation各自且只使用 `[{internalMutualTls: []}]` |
+| `internalMutualTls` | `type: mutualTLS` | checkR1ProjectionReadiness,listDueR1Tasks,consumeR1Projection,reopenDueContactTasks,reopenDueRoutingReviewTasks 各自且只使用 `[{internalMutualTls: []}]` |
 
 不得使用空 security、两个 scheme 的 OR/AND 组合、API key、`X-Tenant-Id` 或浏览器持有的内部证书。mTLS 身份只在服务端映射受限 ActorContext；它不允许请求提交 Tenant。
 
@@ -194,7 +218,7 @@ digest43    = 43(ALPHA / DIGIT / "-" / "_")
 | SecurityScheme | Operations | UnauthenticatedTransport |
 |---|---|---|
 | publicBearer | /api/v1/** | HTTP_401_PROBLEM_WITH_WWW_AUTHENTICATE_BEARER |
-| internalMutualTls | reopenDueContactTasks,reopenDueRoutingReviewTasks | TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE |
+| internalMutualTls | checkR1ProjectionReadiness,listDueR1Tasks,consumeR1Projection,reopenDueContactTasks,reopenDueRoutingReviewTasks | TLS_REJECTION_OR_HTTP_401_PROBLEM_WITHOUT_WWW_AUTHENTICATE |
 
 公网Bearer operation的HTTP 401使用`application/problem+json`并带标准`WWW-Authenticate: Bearer` challenge。内部mTLS operation优先在TLS握手层拒绝无证书/无效证书；若证书已通过握手但服务端身份映射失败而产生HTTP 401，则仍返回Problem，但禁止发送Bearer challenge或任何`WWW-Authenticate` header。
 
@@ -245,6 +269,7 @@ capture 不对尚不存在的资源要求 `If-Match`。Draft 首次创建使用 
 | APPOINTMENT_INACTIVE | 403 | NO | NONE | NONE | 当前任职不可用于此操作 |
 | NOT_FOUND | 404 | NO | NONE | NONE | 资源不存在或不可见 |
 | COMMAND_PAYLOAD_CONFLICT | 409 | NO | NONE | NONE | 幂等键已绑定其他请求 |
+| STALE_OUTBOX_CLAIM | 409 | NO | NONE | NONE | 投影领取 revision、owner、token 或 lease 已失效 |
 | TASK_NOT_OPEN | 409 | NO | NONE | TASK | Task 当前不可执行 |
 | TASK_ALREADY_COMPLETED | 409 | NO | NONE | TASK | Task 已完成 |
 | DRAFT_DIGEST_MISMATCH | 409 | NEW_KEY_AFTER_REFRESH | NONE | DRAFT | 提交内容与草稿摘要不一致 |
@@ -254,6 +279,7 @@ capture 不对尚不存在的资源要求 `If-Match`。Draft 首次创建使用 
 | STALE_SUBJECT | 412 | NEW_KEY_AFTER_REFRESH | NONE | SUBJECT | 业务对象版本已变化 |
 | SUPERVISOR_UNRESOLVED | 422 | NEW_KEY_AFTER_ADMIN_FIX | NONE | NONE | 无法唯一解析准确主管 |
 | SOURCE_INTAKE_OWNER_UNRESOLVED | 422 | NEW_KEY_AFTER_ADMIN_FIX | NONE | NONE | 无法唯一解析准确来源接入负责人 |
+| PROJECTION_EVENT_INVALID | 422 | NO | NONE | NONE | Event/Outbox/source selector 不符合冻结投影合同 |
 | DRAFT_PRECONDITION_REQUIRED | 428 | SAME_KEY_AFTER_FIX | NONE | DRAFT | 缺少 Draft 创建或更新前置条件 |
 | TASK_PRECONDITION_REQUIRED | 428 | SAME_KEY_AFTER_FIX | NONE | TASK | 缺少 Task 命令前置条件 |
 | RATE_LIMITED | 429 | SAME_KEY_AFTER_BACKOFF | NONE | NONE | 请求过于频繁，请稍后重试 |
@@ -263,3 +289,11 @@ capture 不对尚不存在的资源要求 `If-Match`。Draft 首次创建使用 
 错误响应使用 RFC 9457 Problem Details，并只允许 `type`、`title`、`status`、`code`、`detail`、`instance`、`fieldErrors`、`currentETag`、`receiptRef`、`retryPolicy`。`detail` 和 `SafeText` 不得泄露 SQL、堆栈、Tenant、主体可见性、内部 ID 或授权规则。`fieldErrors` 只在表中标为 REQUIRED 时出现；`currentETag` 只返回表中指定的资源种类，首次创建 Draft 且资源尚不存在时可以不返回具体值。
 
 零分配候选是 P0-04 正常业务分支：完成当前责任并创建 `RESOLVE_LEAD_ROUTING_GAP`，不是 HTTP 错误。技术异常整体回滚；业务拒绝若已占用 command slot，则只留下不可变 REJECTED Receipt 和 REJECTED Audit。
+
+## R1 Evidence reference HTTP boundary
+
+`evidenceSubmissionId`只能出现在冻结的`RecordContactResultV1`候选shape中，不能增加Tenant、Grant、Binding ID、revision/hash、对象地址、文件内容或下载字段。服务端先完成Task/Lead/Owner准确授权，再由Evidence Owner查询`evidence_submission`及唯一`evidence_binding`；target必须为当前Task绑定的准确`lead.lead@revision`且绑定ACTIVE未撤回。Task、Lead、Submission、Binding四个准确Subject的DENY都适用`SALES_CONTACT_OWNER`，HUMAN只接受DIRECT或合法一跳DELEGATED，OBJECT-only、提交人身份或外键存在不能替代。
+
+缺失、跨Tenant、其他Lead或revision、其他target、无Binding、已撤回或不可见都返回同一既有`NOT_FOUND`，不得指明失败来源。发现于占slot前时Slot/Receipt/Audit/业务写均为0；只有已通过pre-slot而在最终复验失效时才允许既有post-slot `REJECTED Slot:+1, Receipt:+1, Audit:+1`，其他事实/Event/Outbox仍为0。技术故障整体回滚。
+
+读取只发生在Runtime现有QUERY阶段，执行阶段消费已验证Submission hash/Binding revision selector，最终QUERY阶段在同连接和既有业务/identity锁下复验；不得在Evidence Owner内部切换角色。该引用不产生Evidence写入，不改变Operation、状态码或Problem shape。

@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class OpenApiContractTest {
+public class OpenApiContractTest {
 
     private static final String SCHEMA_REF_PREFIX = "#/components/schemas/";
     private static final String PARAMETER_REF_PREFIX = "#/components/parameters/";
@@ -247,7 +247,7 @@ class OpenApiContractTest {
     }
 
     @Test
-    void freezesExactlyTwelveNamedOperations() {
+    void freezesExactlySixteenNamedOperations() {
         Map<OperationKey, String> actual = new LinkedHashMap<>();
         JsonNode paths = document.path("paths");
         paths.fields().forEachRemaining(pathEntry -> pathEntry.getValue().fields().forEachRemaining(methodEntry -> {
@@ -327,11 +327,15 @@ class OpenApiContractTest {
                 JsonNode response = dereference(rawResponse);
                 assertEquals(expected.headerComponents().keySet(), fieldNames(response.path("headers")),
                         () -> operationId + " " + status + " exact success headers");
-                expected.headerComponents().forEach((headerName, componentName) -> assertEquals(
-                        "#/components/headers/" + componentName,
-                        response.path("headers").path(headerName).path("$ref").asText(),
-                        () -> operationId + " " + status + " " + headerName
-                ));
+                expected.headerComponents().forEach((headerName, componentName) -> {
+                    if (operationId.equals("checkR1ProjectionReadiness")) {
+                        assertReadinessNoStore(response);
+                    } else {
+                        assertEquals("#/components/headers/" + componentName,
+                                response.path("headers").path(headerName).path("$ref").asText(),
+                                () -> operationId + " " + status + " " + headerName);
+                    }
+                });
 
                 JsonNode content = response.path("content");
                 if (expected.responseSchema() == null) {
@@ -398,6 +402,14 @@ class OpenApiContractTest {
     void freezesPerOperationErrorStatusCodeAndMetadataMatrix() {
         REQUIRED_OPERATIONS.forEach((key, operationId) -> {
             JsonNode operation = operationNode(key);
+            if (operationId.equals("checkR1ProjectionReadiness")) {
+                assertReadinessResponses(operation);
+                return;
+            }
+            if (Set.of("listDueR1Tasks", "consumeR1Projection").contains(operationId)) {
+                assertInternalClosureErrors(operationId, operation);
+                return;
+            }
             Map<String, Set<String>> expectedByStatus = expectedErrorsByStatus(operationId);
             assertEquals(
                     ERROR_CODES_BY_OPERATION.get(operationId),
@@ -454,7 +466,7 @@ class OpenApiContractTest {
     @Test
     void freezesIdempotencyAndConditionalRequestHeaders() {
         REQUIRED_OPERATIONS.forEach((key, operationId) -> {
-            if (!key.method().equals("GET")) {
+            if (!key.method().equals("GET") && !operationId.equals("consumeR1Projection")) {
                 JsonNode idempotencyKey = requiredParameter(key, "header", "Idempotency-Key");
                 assertTrue(idempotencyKey.path("required").asBoolean(), () -> operationId + " requires Idempotency-Key");
                 JsonNode schema = dereference(idempotencyKey.path("schema"));
@@ -501,6 +513,134 @@ class OpenApiContractTest {
             assertParameterAbsent(key, "If-Match");
             assertParameterAbsent(key, "If-None-Match");
         }
+    }
+
+    @Test
+    void freezesR1BusinessClosureInternalDtosAndErrors() {
+        assertEquals("1.2.0", document.path("info").path("version").asText());
+        JsonNode candidate = document.path("components").path("schemas").path("DueR1TaskCandidateV1");
+        assertFalse(candidate.path("additionalProperties").asBoolean());
+        assertEquals(Set.of("recoveryType", "taskId", "expectedTaskRevision", "waitReceiptId",
+                "waitReceiptHash", "dueCutoff", "idempotencyKey"), stringSet(candidate.path("required")));
+        assertEquals(7, candidate.path("properties").size());
+        JsonNode page = document.path("components").path("schemas").path("DueR1TaskPageV1");
+        assertFalse(page.path("additionalProperties").asBoolean());
+        assertEquals(Set.of("candidates"), stringSet(page.path("required")));
+        assertEquals(Set.of("candidates", "nextCursor"), fieldNames(page.path("properties")));
+        JsonNode limit = dereference(document.path("components").path("parameters").path("DueLimitQuery"));
+        assertEquals(1L, limit.path("schema").path("minimum").asLong());
+        assertEquals(100L, limit.path("schema").path("maximum").asLong());
+        assertEquals(50L, limit.path("schema").path("default").asLong());
+        JsonNode recoveryType = document.path("components").path("schemas").path("RecoveryTypeV1");
+        assertEquals(Set.of("CONTACT_TASK", "ROUTING_REVIEW_TASK"), stringSet(recoveryType.path("enum")));
+        JsonNode consume = document.path("components").path("schemas").path("ConsumeR1ProjectionV1");
+        assertFalse(consume.path("additionalProperties").asBoolean());
+        assertEquals(Set.of("domainEventOutboxId", "domainEventId", "expectedOutboxRevision",
+                "leaseOwner", "fencingToken"), stringSet(consume.path("required")));
+        assertEquals(5, consume.path("properties").size());
+        JsonNode leaseOwner = dereference(consume.path("properties").path("leaseOwner"));
+        assertEquals(1L, leaseOwner.path("minLength").asLong());
+        assertEquals(64L, leaseOwner.path("maxLength").asLong());
+        assertEquals(1L, consume.path("properties").path("fencingToken").path("minimum").asLong());
+        assertEquals(9_007_199_254_740_991L,
+                consume.path("properties").path("fencingToken").path("maximum").asLong());
+        assertEquals(Set.of("VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "RATE_LIMITED",
+                "INTERNAL_ERROR", "SERVICE_UNAVAILABLE"),
+                stringSet(operationNode(operationKey("listDueR1Tasks")).path("x-error-codes")));
+        assertEquals(Set.of("VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND",
+                "STALE_OUTBOX_CLAIM", "PROJECTION_EVENT_INVALID", "RATE_LIMITED", "INTERNAL_ERROR",
+                "SERVICE_UNAVAILABLE"),
+                stringSet(operationNode(operationKey("consumeR1Projection")).path("x-error-codes")));
+        JsonNode internalProblem = document.path("components").path("schemas").path("InternalProblem");
+        assertFalse(internalProblem.path("additionalProperties").asBoolean());
+        assertEquals(Set.of("type", "title", "status", "code", "retryPolicy", "correlationId"),
+                stringSet(internalProblem.path("required")));
+        assertEquals(Set.of("VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND",
+                "STALE_OUTBOX_CLAIM", "PROJECTION_EVENT_INVALID", "RATE_LIMITED", "INTERNAL_ERROR",
+                "SERVICE_UNAVAILABLE"), stringSet(internalProblem.path("properties").path("code").path("enum")));
+        assertEquals(Set.of("NO", "FIRST_PAGE", "AFTER_REAUTH", "BACKOFF"),
+                stringSet(internalProblem.path("properties").path("retryPolicy").path("enum")));
+        assertEquals(Set.of("400", "401", "403", "404", "409", "422", "429", "500", "503"),
+                longStringSet(internalProblem.path("properties").path("status").path("enum")));
+    }
+
+    @Test
+    void readinessGeneratesAnInputlessVoidOperationWithUncacheableSafeResponses() throws Exception {
+        // Break caught: the generated internal interface omits or broadens readiness input/output.
+        var method = Class.forName("io.github.windyzhu3.ontologylaw.api.adapter.generated.api.InternalTaskCommandsApi")
+                .getMethod("checkR1ProjectionReadiness");
+        assertEquals(0, method.getParameterCount());
+        assertEquals("org.springframework.http.ResponseEntity<java.lang.Void>", method.getGenericReturnType().getTypeName());
+        assertEquals(16, REQUIRED_OPERATIONS.size());
+        assertEquals(11L, REQUIRED_OPERATIONS.keySet().stream().filter(key -> key.path().startsWith("/api/")).count());
+        assertEquals(5L, REQUIRED_OPERATIONS.keySet().stream().filter(key -> key.path().startsWith("/internal/")).count());
+        OperationKey key = operationKey("checkR1ProjectionReadiness");
+        assertEquals(new OperationKey("GET", "/internal/v1/projections/r1/readiness"), key);
+        JsonNode operation = operationNode(key);
+        assertEquals(List.of(), rawParameters(key));
+        assertFalse(operation.has("requestBody"));
+        assertEquals("ACTOR_CONTEXT", operation.path("x-tenant-source").asText());
+        assertEquals("CURRENT_R1_OWNER_ORGANIZATION_COVERAGE", operation.path("x-subject-binding").asText());
+        assertReadinessResponses(operation);
+    }
+
+    private static void assertReadinessNoStore(JsonNode response) {
+        assertEquals(Set.of("Cache-Control"), fieldNames(response.path("headers")));
+        JsonNode header = response.path("headers").path("Cache-Control");
+        assertEquals(Set.of("required", "schema"), fieldNames(header));
+        assertTrue(header.path("required").asBoolean());
+        assertEquals(Set.of("type", "const"), fieldNames(header.path("schema")));
+        assertEquals("string", header.path("schema").path("type").asText());
+        assertEquals("no-store", header.path("schema").path("const").asText());
+    }
+
+    private static void assertReadinessResponses(JsonNode operation) {
+        assertEquals(Set.of("VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE"),
+                stringSet(operation.path("x-error-codes")));
+        JsonNode responses = operation.path("responses");
+        assertEquals(Set.of("204", "400", "401", "403", "429", "500", "503"), fieldNames(responses));
+        responses.fields().forEachRemaining(entry -> {
+            JsonNode response = entry.getValue();
+            assertReadinessNoStore(response);
+            if (entry.getKey().equals("204")) {
+                assertEquals(Set.of("description", "headers"), fieldNames(response));
+            } else {
+                assertEquals(Set.of("description", "headers", "content"), fieldNames(response));
+                assertEquals(Set.of("application/problem+json"), fieldNames(response.path("content")));
+                assertEquals(SCHEMA_REF_PREFIX + "InternalProblem", response.path("content").path("application/problem+json").path("schema").path("$ref").asText());
+            }
+        });
+    }
+
+    private static void assertInternalClosureErrors(String operationId, JsonNode operation) {
+        Map<String, String> components = operationId.equals("listDueR1Tasks")
+                ? Map.of("400", "InternalBadRequestProblem", "401", "InternalClosureUnauthorizedProblem",
+                "403", "InternalForbiddenProblem", "429", "InternalRateLimitedProblem",
+                "500", "InternalServerProblem", "503", "InternalUnavailableProblem")
+                : Map.of("400", "InternalBadRequestProblem", "401", "InternalClosureUnauthorizedProblem",
+                "403", "InternalForbiddenProblem", "404", "InternalNotFoundProblem",
+                "409", "InternalConflictProblem", "422", "InternalUnprocessableProblem",
+                "429", "InternalRateLimitedProblem", "500", "InternalServerProblem",
+                "503", "InternalUnavailableProblem");
+        JsonNode responses = operation.path("responses");
+        assertEquals(components.keySet(), fieldNames(responses).stream()
+                .filter(status -> !status.startsWith("2")).collect(java.util.stream.Collectors.toSet()));
+        components.forEach((status, component) -> {
+            JsonNode response = responses.path(status);
+            assertEquals(RESPONSE_REF_PREFIX + component, response.path("$ref").asText());
+            JsonNode resolved = dereference(response);
+            assertEquals(SCHEMA_REF_PREFIX + "InternalProblem",
+                    resolved.path("content").path("application/problem+json").path("schema").path("$ref").asText());
+            assertEquals(0, resolved.path("headers").size());
+        });
+    }
+
+    private static Set<String> longStringSet(JsonNode node) {
+        Set<String> values = new HashSet<>();
+        for (JsonNode value : node) {
+            values.add(Long.toString(value.asLong()));
+        }
+        return Set.copyOf(values);
     }
 
     @Test
@@ -1002,6 +1142,9 @@ class OpenApiContractTest {
         operations.put(new OperationKey("GET", "/api/v1/commands/{commandId}/receipt"), "getCommandReceipt");
         operations.put(new OperationKey("POST", "/internal/v1/tasks/commands/reopen-due-contact-tasks"), "reopenDueContactTasks");
         operations.put(new OperationKey("POST", "/internal/v1/tasks/commands/reopen-due-routing-review-tasks"), "reopenDueRoutingReviewTasks");
+        operations.put(new OperationKey("GET", "/internal/v1/tasks/due"), "listDueR1Tasks");
+        operations.put(new OperationKey("POST", "/internal/v1/projections/r1/consume"), "consumeR1Projection");
+        operations.put(new OperationKey("GET", "/internal/v1/projections/r1/readiness"), "checkR1ProjectionReadiness");
         return Map.copyOf(operations);
     }
 
@@ -1056,6 +1199,19 @@ class OpenApiContractTest {
                 parameters("IdempotencyKey"),
                 success("200", null, "TaskOccurrenceCommandReceipt",
                         headers("Location", "ReceiptLocation", "ETag", "TaskETagHeader"))
+        ));
+        contracts.put("listDueR1Tasks", operationContract(
+                null,
+                parameters("RecoveryTypeQuery", "DueLimitQuery", "DueCursorQuery"),
+                success("200", null, "DueR1TaskPageV1", Map.of())
+        ));
+        contracts.put("consumeR1Projection", operationContract(
+                "ConsumeR1ProjectionV1",
+                parameters(),
+                success("204", null, null, Map.of())
+        ));
+        contracts.put("checkR1ProjectionReadiness", operationContract(
+                null, parameters(), success("204", null, null, headers("Cache-Control", "INLINE_NO_STORE"))
         ));
         return Map.copyOf(contracts);
     }
@@ -1719,6 +1875,10 @@ class OpenApiContractTest {
     private static void assertSchemaAccepts(Object instance, JsonNode schema, String context) {
         List<String> violations = schemaViolations(JsonNode.wrap(instance), schema, "$", new HashSet<>());
         assertEquals(List.of(), violations, () -> context + " must be accepted: " + violations);
+    }
+    public static void assertCurrentWorkcardWire(Object body)throws IOException {
+        if(document==null)loadCanonicalContract();
+        assertSchemaAccepts(body,document.path("components").path("schemas").path("CurrentWorkCardEnvelope"),"Actual workcard response");
     }
 
     private static void assertSchemaRejects(Object instance, JsonNode schema, String context) {

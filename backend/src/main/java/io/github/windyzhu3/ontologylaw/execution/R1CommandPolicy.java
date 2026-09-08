@@ -25,14 +25,30 @@ public final class R1CommandPolicy {
         var request=context.authorization();
         boolean dedicated=dedicated(e.type());
         // The shared lock precedes the clock and ALL current Owner/organization reads, not only Grant evaluation.
-        if(finalCheck && dedicated)authorization.lockForEvaluation(c,e.actor().tenantId());
+        if(finalCheck)authorization.lockForEvaluation(c,e.actor().tenantId());
         var first=authorization.evaluate(c,request,finalCheck);
         var checks=new ArrayList<AuthorizationSnapshot>();checks.add(first);
         String failure=null;String ownerEvidence="";
         if(!context.scope().tenantId().equals(e.actor().tenantId()) || context.scope().type()!=e.type() || !request.actor().equals(e.actor()))failure="NOT_AUTHORIZED";
         else if(!dedicated) {
             String expected=primaryPolicy(e.type());
-            if(expected==null || request.requirement().path()==Path.SYSTEM || !expected.equals(request.requirement().slot()+":"+request.requirement().authorityCode()))failure="NOT_AUTHORIZED";
+            if(expected==null || (request.requirement().path()!=Path.DIRECT&&request.requirement().path()!=Path.DELEGATED) || !expected.equals(request.requirement().slot()+":"+request.requirement().authorityCode()) || facts==null || context.scope().taskId()==null)failure="NOT_AUTHORIZED";
+            else {
+                var task=facts.task(c,e.actor().tenantId(),context.scope().taskId(),first.checkedAt());
+                UUID represented=request.requirement().path()==Path.DELEGATED?e.actor().onBehalfAppointmentId():e.actor().appointmentId();
+                ownerEvidence="primaryTask="+task;
+                if(task==null||task.owner()==null||!task.owner().active()||!task.ownerAppointmentId().equals(represented)
+                        ||!task.lead().equals(request.subject())||!request.scopeOrganizationId().equals(task.owner().organizationId())
+                        ||!e.type().name().equals(task.primaryCommand())||!DRAFTS.containsKey(task.taskType())||DRAFTS.get(task.taskType()).command()!=e.type())failure="NOT_AUTHORIZED";
+                else {add(c,checks,request,task.selector());add(c,checks,request,task.lead());add(c,checks,request,task.currentLead());
+                    if(e.type()==CommandEnvelope.Type.RECORD_CONTACT_RESULT&&context.binding() instanceof CommandAuthorizationBinding.Contact b){
+                        for(var subject:List.of(b.submission(),b.binding())){
+                            var check=authorization.evaluate(c,new Request(request.actor(),subject,request.scopeOrganizationId(),request.requirement()),false);
+                            checks.add(check.allowed()?check:new AuthorizationSnapshot(check.request(),check.checkedAt(),false,"NOT_FOUND",check.authorityFact(),check.evidence(),check.digest()));
+                        }
+                    }
+                }
+            }
         } else if(facts==null || context.binding()==null)failure="NOT_AUTHORIZED";
         else {
             try {
@@ -43,7 +59,10 @@ public final class R1CommandPolicy {
                             && request.scopeOrganizationId().equals(current.organization().id())
                             && context.scope().canonical().equals(CommandScope.capture(e.actor().tenantId(),b.sourceAccountCode(),b.sourceRecordKeyDigest()).canonical())
                             && e.payload() instanceof Map<?,?> payload && b.sourceAccountCode().equals(payload.get("sourceAccountCode"))
-                            && human(request,"SOURCE_INTAKE_OWNER","LEAD_CAPTURE");
+                            && (e.actor().principalKind()==PrincipalKind.HUMAN?human(request,"SOURCE_INTAKE_OWNER","LEAD_CAPTURE"):
+                                request.requirement().path()==Path.SYSTEM && e.actor().onBehalfPrincipalId()==null
+                                && "SOURCE_INTAKE_OWNER".equals(request.requirement().slot()) && "LEAD_CAPTURE".equals(request.requirement().authorityCode())
+                                && facts.serviceSourceAllowed(c,e.actor(),b.sourceAccountCode()));
                     ownerEvidence="binding="+b+";scope="+context.scope().canonical()+";facts="+current;
                     if(!matches)failure="NOT_AUTHORIZED";
                     if(current!=null && current.existingLead()!=null)add(c,checks,request,current.existingLead());
@@ -54,8 +73,8 @@ public final class R1CommandPolicy {
                     } else if(e.type().recovery() && context.binding() instanceof CommandAuthorizationBinding.Recovery b) {
                         taskId=b.taskId();boundLead=b.lead();taskRevision=b.taskRevision();
                         if(!context.scope().canonical().equals(CommandScope.reopen(e.actor().tenantId(),e.type(),taskId,b.waitReceiptId(),b.waitReceiptHash()).canonical()))failure="NOT_AUTHORIZED";
-                        if(!(e.payload() instanceof Map<?,?> payload) || !taskId.toString().equals(payload.get("taskId"))
-                                || !b.waitReceiptId().toString().equals(payload.get("waitReceiptId")) || !b.waitReceiptHash().equals(payload.get("waitReceiptHash")))failure="NOT_AUTHORIZED";
+                        if(!(e.payload() instanceof Map<?,?> payload) || !sameUuid(payload.get("taskId"),taskId)
+                                || !sameUuid(payload.get("waitReceiptId"),b.waitReceiptId()) || !b.waitReceiptHash().equals(payload.get("waitReceiptHash")))failure="NOT_AUTHORIZED";
                         // Type/profile/latest WaitReceipt/revision/dueCutoff are NEW-only eligibility in recoveryEligibility.
                     } else return merge(first,checks,"NOT_AUTHORIZED","wrong Task binding",e.type().recovery());
                     var task=facts.task(c,e.actor().tenantId(),taskId,first.checkedAt());
@@ -99,6 +118,7 @@ public final class R1CommandPolicy {
         return (r.requirement().path()==Path.DIRECT || r.requirement().path()==Path.DELEGATED)
                 && slot.equals(r.requirement().slot()) && code.equals(r.requirement().authorityCode());
     }
+    private static boolean sameUuid(Object value,UUID expected){return value instanceof String text&&expected.toString().equalsIgnoreCase(text);}
     private static AuthorizationSnapshot merge(AuthorizationSnapshot original,List<AuthorizationSnapshot> checks,String failure,String facts,boolean recovery) {
         for(var check:checks)if(!check.allowed()) {failure=check.rejectionCode();break;}
         if(recovery && "APPOINTMENT_INACTIVE".equals(failure))failure="NOT_AUTHORIZED";

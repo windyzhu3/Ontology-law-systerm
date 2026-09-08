@@ -191,6 +191,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/projections/r1/consume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate a fenced R1 projection claim and re-read current owner facts */
+        post: operations["consumeR1Projection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/projections/r1/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check current R1 organization coverage for one immediate Worker claim
+         * @description Read-only R1_PROJECTION_READINESS_V1 preflight from the unique trusted mTLS Tenant/SERVICE/Appointment binding. No caller selectors. API QUERY Owner facts and trusted source policies define coverage, including retained lineages. Final locked READ COMMITTED evaluation uses fresh database time; locks last through successful read-transaction completion before success. One active response enables one immediate bounded claim only. Changes and natural expiry after evaluation, including response transport, can race the claim. Every consume must reauthorize; no reusable proof or business writes.
+         */
+        get: operations["checkR1ProjectionReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/tasks/commands/reopen-due-contact-tasks": {
         parameters: {
             query?: never;
@@ -219,6 +256,23 @@ export interface paths {
         put?: never;
         /** Reopen one exact due RESOLVE_LEAD_ROUTING_GAP Task */
         post: operations["reopenDueRoutingReviewTasks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/tasks/due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Discover one bounded page of authorized due R1 task selectors */
+        get: operations["listDueR1Tasks"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -600,6 +654,14 @@ export interface components {
             resultCode: "CONNECTED_VALID";
             resultSummary?: components["schemas"]["SafeText500"];
         };
+        ConsumeR1ProjectionV1: {
+            domainEventId: components["schemas"]["Uuid"];
+            domainEventOutboxId: components["schemas"]["Uuid"];
+            expectedOutboxRevision: components["schemas"]["Revision"];
+            /** Format: int64 */
+            fencingToken: number;
+            leaseOwner: components["schemas"]["TechnicalIdentifier"];
+        };
         ContactLeadBusinessPurpose: {
             /** @enum {string} */
             code: "CONTACT_LEAD";
@@ -681,6 +743,20 @@ export interface components {
         DraftText200: string;
         DraftText500: string;
         DraftText2000: string;
+        DueR1TaskCandidateV1: {
+            /** Format: date-time */
+            dueCutoff: string;
+            expectedTaskRevision: components["schemas"]["Revision"];
+            idempotencyKey: components["schemas"]["Uuid"];
+            recoveryType: components["schemas"]["RecoveryTypeV1"];
+            taskId: components["schemas"]["Uuid"];
+            waitReceiptHash: components["schemas"]["Digest32"];
+            waitReceiptId: components["schemas"]["Uuid"];
+        };
+        DueR1TaskPageV1: {
+            candidates: components["schemas"]["DueR1TaskCandidateV1"][];
+            nextCursor?: string;
+        };
         /** @enum {string} */
         ErrorCode: "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_INVALID" | "UNAUTHENTICATED" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "NOT_FOUND" | "COMMAND_PAYLOAD_CONFLICT" | "TASK_NOT_OPEN" | "TASK_ALREADY_COMPLETED" | "DRAFT_DIGEST_MISMATCH" | "INGRESS_COMPLETION_ALREADY_RECORDED" | "STALE_TASK" | "STALE_DRAFT" | "STALE_SUBJECT" | "SUPERVISOR_UNRESOLVED" | "SOURCE_INTAKE_OWNER_UNRESOLVED" | "DRAFT_PRECONDITION_REQUIRED" | "TASK_PRECONDITION_REQUIRED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE";
         FieldError: {
@@ -707,6 +783,18 @@ export interface components {
         };
         /** Format: date-time */
         Instant: string;
+        InternalProblem: {
+            /** @enum {string} */
+            code: "VALIDATION_FAILED" | "UNAUTHENTICATED" | "NOT_AUTHORIZED" | "NOT_FOUND" | "STALE_OUTBOX_CLAIM" | "PROJECTION_EVENT_INVALID" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE";
+            correlationId: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            retryPolicy: "NO" | "FIRST_PAGE" | "AFTER_REAUTH" | "BACKOFF";
+            /** @enum {integer} */
+            status: 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500 | 503;
+            title: string;
+            /** Format: uri */
+            type: string;
+        };
         LabeledCode: {
             code: components["schemas"]["Code64"];
             label: components["schemas"]["SafeText200"];
@@ -989,6 +1077,8 @@ export interface components {
             decisionCode: "SCHEDULE_ROUTING_REVIEW" | "RETRY_ASSIGNMENT_NOW" | "REQUEST_SOURCE_INTAKE_STOP";
             rationaleSummary: components["schemas"]["SafeText500"];
         };
+        /** @enum {string} */
+        RecoveryTypeV1: "CONTACT_TASK" | "ROUTING_REVIEW_TASK";
         RejectedCommandReceipt: {
             commandId: components["schemas"]["Uuid"];
             completedAt: components["schemas"]["Instant"];
@@ -1297,6 +1387,7 @@ export interface components {
         };
         /** @enum {string} */
         TaskType: "RESOLVE_LEAD_DUPLICATE" | "COMPLETE_LEAD_INGRESS" | "ASSIGN_LEAD" | "RESOLVE_LEAD_ROUTING_GAP" | "ACK_SOURCE_INTAKE_STOP_REQUEST" | "CONTACT_LEAD" | "REVIEW_LEAD_VALIDITY";
+        TechnicalIdentifier: string;
         /**
          * @description Post-slot business rejection codes that may be persisted in a terminal REJECTED CommandReceipt. Pre-slot, payload-conflict, rate-limit, and technical failures never create a new receipt.
          * @enum {string}
@@ -1344,6 +1435,51 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description Internal request validation failed. */
+        InternalBadRequestProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["InternalProblem"];
+            };
+        };
+        /** @description The mTLS identity could not be mapped to a ready internal ActorContext. */
+        InternalClosureUnauthorizedProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["InternalProblem"];
+            };
+        };
+        /** @description The projection claim is stale. */
+        InternalConflictProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["InternalProblem"];
+            };
+        };
+        /** @description Internal actor is not authorized. */
+        InternalForbiddenProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["InternalProblem"];
+            };
+        };
+        /** @description Internal selector is absent in the authenticated tenant. */
+        InternalNotFoundProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["InternalProblem"];
+            };
+        };
         /** @description The service could not complete the request. */
         InternalProblem: {
             headers: {
@@ -1353,6 +1489,24 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description Internal caller is rate limited. */
+        InternalRateLimitedProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["InternalProblem"];
+            };
+        };
+        /** @description Internal processing failed safely. */
+        InternalServerProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["InternalProblem"];
+            };
+        };
         /** @description The mTLS identity passed transport but could not be mapped to an ActorContext. */
         InternalUnauthorizedProblem: {
             headers: {
@@ -1360,6 +1514,24 @@ export interface components {
             };
             content: {
                 "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Internal processing is temporarily unavailable. */
+        InternalUnavailableProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["InternalProblem"];
+            };
+        };
+        /** @description The projection event violates its frozen contract. */
+        InternalUnprocessableProblem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["InternalProblem"];
             };
         };
         /** @description The Task command completed with a Lead Assignment revision fact. */
@@ -1463,7 +1635,10 @@ export interface components {
         CommandIdPath: components["schemas"]["Uuid"];
         DraftCreateIfNoneMatch: "*";
         DraftIfMatch: components["schemas"]["DraftETag"];
+        DueCursorQuery: string;
+        DueLimitQuery: number;
         IdempotencyKey: components["schemas"]["Uuid"];
+        RecoveryTypeQuery: components["schemas"]["RecoveryTypeV1"];
         TaskIdPath: components["schemas"]["Uuid"];
         TaskIfMatch: components["schemas"]["TaskETag"];
         WorkbenchIfNoneMatch: components["schemas"]["WorkbenchETag"];
@@ -1861,6 +2036,116 @@ export interface operations {
             503: components["responses"]["UnavailableProblem"];
         };
     };
+    consumeR1Projection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsumeR1ProjectionV1"];
+            };
+        };
+        responses: {
+            /** @description Current facts were validated for the active claim; no response body. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["InternalBadRequestProblem"];
+            401: components["responses"]["InternalClosureUnauthorizedProblem"];
+            403: components["responses"]["InternalForbiddenProblem"];
+            404: components["responses"]["InternalNotFoundProblem"];
+            409: components["responses"]["InternalConflictProblem"];
+            422: components["responses"]["InternalUnprocessableProblem"];
+            429: components["responses"]["InternalRateLimitedProblem"];
+            500: components["responses"]["InternalServerProblem"];
+            503: components["responses"]["InternalUnavailableProblem"];
+        };
+    };
+    checkR1ProjectionReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current organization coverage passed final locked evaluation; no response body. */
+            204: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid readiness request. */
+            400: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["InternalProblem"];
+                };
+            };
+            /** @description No valid trusted mTLS identity; no WWW-Authenticate header. */
+            401: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["InternalProblem"];
+                };
+            };
+            /** @description Missing Grant, incomplete coverage, or inactive or expired SERVICE, Appointment or organization. */
+            403: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["InternalProblem"];
+                };
+            };
+            /** @description Readiness evaluation is rate limited. */
+            429: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["InternalProblem"];
+                };
+            };
+            /** @description Safe technical evaluation failure; never success. */
+            500: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["InternalProblem"];
+                };
+            };
+            /** @description Readiness evaluation is unavailable. */
+            503: {
+                headers: {
+                    "Cache-Control": "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["InternalProblem"];
+                };
+            };
+        };
+    };
     reopenDueContactTasks: {
         parameters: {
             query?: never;
@@ -1929,6 +2214,36 @@ export interface operations {
             429: components["responses"]["RateLimitedProblem"];
             500: components["responses"]["InternalProblem"];
             503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    listDueR1Tasks: {
+        parameters: {
+            query: {
+                cursor?: components["parameters"]["DueCursorQuery"];
+                limit?: components["parameters"]["DueLimitQuery"];
+                recoveryType: components["parameters"]["RecoveryTypeQuery"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized due selectors ordered by resume due time and task UUID. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DueR1TaskPageV1"];
+                };
+            };
+            400: components["responses"]["InternalBadRequestProblem"];
+            401: components["responses"]["InternalClosureUnauthorizedProblem"];
+            403: components["responses"]["InternalForbiddenProblem"];
+            429: components["responses"]["InternalRateLimitedProblem"];
+            500: components["responses"]["InternalServerProblem"];
+            503: components["responses"]["InternalUnavailableProblem"];
         };
     };
 }

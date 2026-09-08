@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: Ontology Law System R1 API
-  version: 1.0.0
+  version: 1.2.0
   description: >-
     The single executable R1 HTTP contract for Lead intake, task completion,
     ActionDraft persistence, Current Work Card projection, receipt recovery,
@@ -834,6 +834,136 @@ paths:
         '503':
           $ref: '#/components/responses/UnavailableProblem'
 
+  /internal/v1/projections/r1/readiness:
+    get:
+      tags: [InternalTaskCommands]
+      operationId: checkR1ProjectionReadiness
+      summary: Check current R1 organization coverage for one immediate Worker claim
+      description: >-
+        Read-only R1_PROJECTION_READINESS_V1 preflight from the unique trusted mTLS
+        Tenant/SERVICE/Appointment binding. No caller selectors. API QUERY Owner
+        facts and trusted source policies define coverage, including retained
+        lineages. Final locked READ COMMITTED evaluation uses fresh database time;
+        locks last through successful read-transaction completion before success.
+        One active response enables one immediate bounded claim only. Changes and
+        natural expiry after evaluation, including response transport, can race the
+        claim. Every consume must reauthorize; no reusable proof or business writes.
+      security:
+        - internalMutualTls: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: CURRENT_R1_OWNER_ORGANIZATION_COVERAGE
+      x-error-codes: [VALIDATION_FAILED, UNAUTHENTICATED, NOT_AUTHORIZED, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE]
+      responses:
+        '204':
+          description: Current organization coverage passed final locked evaluation; no response body.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+        '400':
+          description: Invalid readiness request.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/InternalProblem'}
+        '401':
+          description: No valid trusted mTLS identity; no WWW-Authenticate header.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/InternalProblem'}
+        '403':
+          description: Missing Grant, incomplete coverage, or inactive or expired SERVICE, Appointment or organization.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/InternalProblem'}
+        '429':
+          description: Readiness evaluation is rate limited.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/InternalProblem'}
+        '500':
+          description: Safe technical evaluation failure; never success.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/InternalProblem'}
+        '503':
+          description: Readiness evaluation is unavailable.
+          headers:
+            Cache-Control:
+              required: true
+              schema: {type: string, const: no-store}
+          content:
+            application/problem+json:
+              schema: {$ref: '#/components/schemas/InternalProblem'}
+  /internal/v1/tasks/due:
+    get:
+      tags: [InternalTaskCommands]
+      operationId: listDueR1Tasks
+      summary: Discover one bounded page of authorized due R1 task selectors
+      security:
+        - internalMutualTls: []
+      x-error-codes: [VALIDATION_FAILED, UNAUTHENTICATED, NOT_AUTHORIZED, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE]
+      parameters:
+        - $ref: '#/components/parameters/RecoveryTypeQuery'
+        - $ref: '#/components/parameters/DueLimitQuery'
+        - $ref: '#/components/parameters/DueCursorQuery'
+      responses:
+        '200':
+          description: Authorized due selectors ordered by resume due time and task UUID.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DueR1TaskPageV1' }
+        '400': { $ref: '#/components/responses/InternalBadRequestProblem' }
+        '401': { $ref: '#/components/responses/InternalClosureUnauthorizedProblem' }
+        '403': { $ref: '#/components/responses/InternalForbiddenProblem' }
+        '429': { $ref: '#/components/responses/InternalRateLimitedProblem' }
+        '500': { $ref: '#/components/responses/InternalServerProblem' }
+        '503': { $ref: '#/components/responses/InternalUnavailableProblem' }
+
+  /internal/v1/projections/r1/consume:
+    post:
+      tags: [InternalTaskCommands]
+      operationId: consumeR1Projection
+      summary: Validate a fenced R1 projection claim and re-read current owner facts
+      security:
+        - internalMutualTls: []
+      x-error-codes: [VALIDATION_FAILED, UNAUTHENTICATED, NOT_AUTHORIZED, NOT_FOUND, STALE_OUTBOX_CLAIM, PROJECTION_EVENT_INVALID, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConsumeR1ProjectionV1' }
+      responses:
+        '204': { description: Current facts were validated for the active claim; no response body. }
+        '400': { $ref: '#/components/responses/InternalBadRequestProblem' }
+        '401': { $ref: '#/components/responses/InternalClosureUnauthorizedProblem' }
+        '403': { $ref: '#/components/responses/InternalForbiddenProblem' }
+        '404': { $ref: '#/components/responses/InternalNotFoundProblem' }
+        '409': { $ref: '#/components/responses/InternalConflictProblem' }
+        '422': { $ref: '#/components/responses/InternalUnprocessableProblem' }
+        '429': { $ref: '#/components/responses/InternalRateLimitedProblem' }
+        '500': { $ref: '#/components/responses/InternalServerProblem' }
+        '503': { $ref: '#/components/responses/InternalUnavailableProblem' }
+
 components:
   securitySchemes:
     publicBearer:
@@ -843,6 +973,21 @@ components:
       type: mutualTLS
 
   parameters:
+    RecoveryTypeQuery:
+      name: recoveryType
+      in: query
+      required: true
+      schema: { $ref: '#/components/schemas/RecoveryTypeV1' }
+    DueLimitQuery:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+    DueCursorQuery:
+      name: cursor
+      in: query
+      required: false
+      schema: { type: string, minLength: 1, maxLength: 2048 }
     TaskIdPath:
       name: taskId
       in: path
@@ -947,6 +1092,33 @@ components:
       externalValue: ./examples/problem.response.json
 
   responses:
+    InternalBadRequestProblem:
+      description: Internal request validation failed.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/InternalProblem' } } }
+    InternalClosureUnauthorizedProblem:
+      description: The mTLS identity could not be mapped to a ready internal ActorContext.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/InternalProblem' } } }
+    InternalForbiddenProblem:
+      description: Internal actor is not authorized.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/InternalProblem' } } }
+    InternalNotFoundProblem:
+      description: Internal selector is absent in the authenticated tenant.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/InternalProblem' } } }
+    InternalConflictProblem:
+      description: The projection claim is stale.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/InternalProblem' } } }
+    InternalUnprocessableProblem:
+      description: The projection event violates its frozen contract.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/InternalProblem' } } }
+    InternalRateLimitedProblem:
+      description: Internal caller is rate limited.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/InternalProblem' } } }
+    InternalServerProblem:
+      description: Internal processing failed safely.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/InternalProblem' } } }
+    InternalUnavailableProblem:
+      description: Internal processing is temporarily unavailable.
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/InternalProblem' } } }
     DecisionRecordCommandSucceeded:
       description: The Task command completed with a Decision Record fact.
       headers:
@@ -1069,6 +1241,59 @@ components:
             $ref: '#/components/schemas/Problem'
 
   schemas:
+    RecoveryTypeV1:
+      type: string
+      enum: [CONTACT_TASK, ROUTING_REVIEW_TASK]
+    DueR1TaskCandidateV1:
+      type: object
+      additionalProperties: false
+      required: [recoveryType, taskId, expectedTaskRevision, waitReceiptId, waitReceiptHash, dueCutoff, idempotencyKey]
+      properties:
+        recoveryType: { $ref: '#/components/schemas/RecoveryTypeV1' }
+        taskId: { $ref: '#/components/schemas/Uuid' }
+        expectedTaskRevision: { $ref: '#/components/schemas/Revision' }
+        waitReceiptId: { $ref: '#/components/schemas/Uuid' }
+        waitReceiptHash: { $ref: '#/components/schemas/Digest32' }
+        dueCutoff: { type: string, format: date-time }
+        idempotencyKey: { $ref: '#/components/schemas/Uuid' }
+    DueR1TaskPageV1:
+      type: object
+      additionalProperties: false
+      required: [candidates]
+      properties:
+        candidates:
+          type: array
+          maxItems: 100
+          items: { $ref: '#/components/schemas/DueR1TaskCandidateV1' }
+        nextCursor: { type: string, minLength: 1, maxLength: 2048 }
+    TechnicalIdentifier:
+      type: string
+      minLength: 1
+      maxLength: 64
+      pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
+    ConsumeR1ProjectionV1:
+      type: object
+      additionalProperties: false
+      required: [domainEventOutboxId, domainEventId, expectedOutboxRevision, leaseOwner, fencingToken]
+      properties:
+        domainEventOutboxId: { $ref: '#/components/schemas/Uuid' }
+        domainEventId: { $ref: '#/components/schemas/Uuid' }
+        expectedOutboxRevision: { $ref: '#/components/schemas/Revision' }
+        leaseOwner: { $ref: '#/components/schemas/TechnicalIdentifier' }
+        fencingToken: { type: integer, format: int64, minimum: 1, maximum: 9007199254740991 }
+    InternalProblem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, code, retryPolicy, correlationId]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer, enum: [400, 401, 403, 404, 409, 422, 429, 500, 503] }
+        code:
+          type: string
+          enum: [VALIDATION_FAILED, UNAUTHENTICATED, NOT_AUTHORIZED, NOT_FOUND, STALE_OUTBOX_CLAIM, PROJECTION_EVENT_INVALID, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE]
+        retryPolicy: { type: string, enum: ['NO', FIRST_PAGE, AFTER_REAUTH, BACKOFF] }
+        correlationId: { $ref: '#/components/schemas/Uuid' }
     # Scalar wire types
     Uuid:
       type: string

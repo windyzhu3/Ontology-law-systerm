@@ -81,7 +81,7 @@ class R1ContractClosureIT extends PostgresIntegrationTest {
         public void validateBeforeCommit(Connection c,CommandEnvelope e,Context context,Result result) {}
     }
     CommandRuntime runtime(ContactHandler h){return runtime(h,AuditAppender.databaseBacked("CLOSURE_IT"));}
-    CommandRuntime runtime(ContactHandler h,AuditAppender audit){return new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),audit,null,R1EventReaders.databaseBacked());}
+    CommandRuntime runtime(ContactHandler h,AuditAppender audit){return new CommandRuntime(List.of(h),AuthorizationService.databaseBacked(),audit,CommandRuntimeIT.ownerFacts(),R1EventReaders.databaseBacked());}
     CommandOutcome run(CommandRuntime runtime,CommandEnvelope e)throws Exception{try(var c=database.apiConnection()){return assertInstanceOf(CommandOutcome.class,runtime.execute(c,e));}}
     List<Long> counts(UUID tenant)throws Exception {
         try(var c=database.apiConnection()){return inTransaction(c,Capability.QUERY,x->{var result=new ArrayList<Long>();
@@ -115,7 +115,9 @@ class R1ContractClosureIT extends PostgresIntegrationTest {
     @Test void missing_extra_duplicate_and_wrong_sources_roll_back_all_effects()throws Exception {
         for(var fault:List.of(Fault.DROP_OPPORTUNITY,Fault.ADD_OPPORTUNITY,Fault.WRONG_OPPORTUNITY,Fault.WRONG_CONTACT,Fault.WRONG_HASH,Fault.DUPLICATE,Fault.WRONG_OWNER,Fault.MISSING_OPPORTUNITY,Fault.OPPORTUNITY_REVISION,Fault.MISSING_DONE,Fault.MISSING_CONFIRM)) {
             var h=new ContactHandler(10+fault.ordinal(),fault==Fault.ADD_OPPORTUNITY?"NOT_CONNECTED":"CONNECTED_VALID",1,fault);
-            assertEquals("22000",assertThrows(SQLException.class,()->run(runtime(h),h.envelope()),fault.name()).getSQLState(),fault.name());assertRolledBack(h);
+            if(fault==Fault.WRONG_OWNER)assertEquals("NOT_AUTHORIZED",assertThrows(CommandHandler.Rejected.class,()->run(runtime(h),h.envelope())).code());
+            else assertEquals("22000",assertThrows(SQLException.class,()->run(runtime(h),h.envelope()),fault.name()).getSQLState(),fault.name());
+            assertRolledBack(h);
         }
     }
     @Test void previously_confirmed_draft_without_current_confirm_write_rolls_back_command()throws Exception {
