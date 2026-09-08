@@ -16,7 +16,7 @@ import {
   validReceipt,
   type Envelope,
   type Values,
-  type Schema,
+  type PublicReceipt,
 } from "./contract";
 
 interface State {
@@ -151,7 +151,7 @@ export function useCurrentCard(
   }, [session?.sessionKey, session?.accessToken, api, update]);
 
   const acceptReceipt = async (
-    receipt: Schema["CommandReceipt"],
+    receipt: PublicReceipt,
     original: OriginalWrite,
   ) => {
     if (correction.current?.key === original.key) correction.current = null;
@@ -245,6 +245,7 @@ export function useCurrentCard(
             taskId: original.taskId,
             kind: original.kind,
           };
+        else correction.current = null;
         update({ pending: null, error: error.message, needsRefresh: true });
       } else update({ error: ambiguous });
     } finally {
@@ -425,10 +426,7 @@ export function useCurrentCard(
   };
 }
 
-function matchesFact(
-  receipt: Schema["CommandReceipt"],
-  original: OriginalWrite,
-) {
+function matchesFact(receipt: PublicReceipt, original: OriginalWrite) {
   if (receipt.outcome === "REJECTED") return true;
   const fact =
     original.kind === "draft"

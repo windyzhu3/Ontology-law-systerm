@@ -1,5 +1,12 @@
 import type { components } from "../../generated/api/schema";
 export type Schema = components["schemas"];
+// The current HTTP Evidence contract permits terminal NOT_FOUND after final
+// revalidation; preserve that public result without modifying generated types.
+export type PublicReceipt =
+  | Schema["CommandReceipt"]
+  | (Omit<Schema["RejectedCommandReceipt"], "rejectionCode"> & {
+      rejectionCode: "NOT_FOUND";
+    });
 export type Card = Schema["CurrentCard"];
 export type Envelope = Schema["CurrentWorkCardEnvelope"];
 export type Values = Record<string, unknown>;
@@ -472,10 +479,7 @@ export function sameValues(a: unknown, b: unknown): boolean {
     );
   return a === b;
 }
-export function validReceipt(
-  v: unknown,
-  key: string,
-): v is Schema["CommandReceipt"] {
+export function validReceipt(v: unknown, key: string): v is PublicReceipt {
   if (
     !isObject(v) ||
     !uuid(v.commandId) ||
@@ -495,6 +499,7 @@ export function validReceipt(
       ]) &&
       [
         "NOT_AUTHORIZED",
+        "NOT_FOUND",
         "APPOINTMENT_INACTIVE",
         "TASK_NOT_OPEN",
         "TASK_ALREADY_COMPLETED",
