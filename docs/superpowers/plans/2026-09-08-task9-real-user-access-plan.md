@@ -31,7 +31,8 @@
 |---|---|---|---|
 | Task9.0 | 已有七卡/草稿/接口前端，保留历史完成记录 | 已有 424f030 | 原 75 测试及联通证据，后续持续回归 |
 | Task9.1 | 受控合同后继、精确接口/安全/拓扑清单 | 本文详细设计获确认 | T9-C01～04 的静态部分 |
-| Task9.2 | Keycloak 环境、可信 HUMAN 动态映射、self context 与 bootstrap | 9.1 | T9-L02～05、I01、I13、C04 |
+| Task9.2a | 合法代办接入的最小合同前置 | 9.1、补充设计书面批准 | T9-D01 |
+| Task9.2 | Keycloak 环境、可信 HUMAN 动态映射、self context 与 bootstrap | 9.1、9.2a | T9-L02～05、I01、I13、C04、D02～07 的后端部分 |
 | Task9.3 | 四类 Identity 管理命令、查询、权限和事务 | 9.2 | T9-I02～12 的 HTTP/实库部分 |
 | Task9.4 | SPA 登录、会话、任职与安全恢复接线 | 9.2；管理导航资格依赖 9.3 | T9-L01～12 |
 | Task9.5 | ADM-01～04 页面、完整工作台状态、统一视觉 | 9.3、9.4 | T9-I 页面部分、T9-W02～12 |
@@ -157,6 +158,8 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 
 **Produces:** `VerifiedHumanIdentity`（服务端 tenantId/principalId/provider，不含任职权限）；`HumanIdentityReader` 的唯一映射与本人任职读取；经确认的 `SessionContext` DTO；已明确选择任职才产生现有非空 `AuthorizationService.Actor`。不得给原 Actor 构造器塞 null Appointment。
 
+**9.2a 后继输入：** 完整执行已批准代办补充设计 §2～5 与 T9-D02～07 后端部分：当前本人任职及既有一跳关系候选；双 header 显式选择；当前数据库资格与最终业务授权分开；SELF max101具名披露与原 Actor 回执恢复。用 `SessionContextHttpIT`、`R1ReceiptIdentityHttpIT` 承接；新增定向测试如需单独文件可用 `api/DelegatedSessionContextHttpIT.java`，不增加业务模块。不得只测试旧 Registration 构造器，必须证明动态 HUMAN 路径实际构造和恢复代办 Actor。现有暂停草稿先核对最后失败日志，再按原 TDD 继续，不假设已通过。
+
 - [ ] 编写 L02～L05/I01/I13 的真实 IdP＋DB 失败用例；先证明当前逐人 registration 无法接入新建用户。
 - [ ] 搭建锁定身份环境，以受限客户端验证 JWT＋在线活动性；错 issuer、audience、过期、撤销、断网都失败关闭，SERVICE 路径不放宽。
 - [ ] 实现 trusted Tenant 内 provider-subject HMAC 动态 HUMAN 映射、本人 context 的先审计后披露、多任职选择与每次请求归属复验。
@@ -173,6 +176,8 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 
 **Consumes:** 9.1 精确 14 mutation 合同、9.2 Actor；**Produces:** `IdentityCommands.handlers()` 静态集合、受 scope 限制的查询、准确 Identity Fact Receipt、原 Actor 当前权限下的恢复。
 
+9.2a 不给任何管理 operation 开放代办：本单元补齐 T9-D05 的20个管理接口拒绝，不能在 Controller 抹去 on-behalf 后回落到本人权限。
+
 - [ ] 编写 I02～I12 的实库/HTTP RED：创建、CAS、状态机、冻结字段、跨 scope、自授权、开放责任依赖、最后管理员、回执重放与注入失败。
 - [ ] 通过 Owner 窄口实现四类事实与受信 IdP 账号目录读取；落实 Principal/IdP 候选与新任职用户候选的根 scope 边界，不能从局部任职扩大到 Tenant 级用户权限。只有密码/账号凭据在 Keycloak，不在本系统创建密码 handler。
 - [ ] 实现具名身份排他路径、依赖读取与先审计后披露，不取得反序业务锁，不新增业务事件/投影路由。
@@ -187,6 +192,8 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 - Modify: `apps/workbench/src/main.tsx`、`App.tsx`、`lib/api.ts`、`features/workcard/useCurrentCard.ts`、`recovery.test.tsx`、`package.json` 与根锁文件。
 
 **Interfaces:** session adapter 提供稳定 `identityEpoch`、`actorScopeKey`、`getValidAccessToken(): Promise<string>`、`login()`、`logout()`、`selectAppointment(id)`；续期不改变 identityEpoch，变换 Actor 必须改变。原 `OriginalWrite` 只存业务请求和 precondition，不保存 Bearer；transport 每次取有效凭据。
+
+9.2a 增补：adapter 增加 `selectOnBehalfAppointment(id: string | null)`；null 明确本人办理，非 null 仅服务端当前任职候选，transport 同时携带本人 header。`recoveryMarker.ts` 与测试落实 T9-D08：重登建立初始 context 不等于确认改用其他身份，选择期间保留有效未决标记且禁新写，不新增持久化字段；显式换身份先确认放弃未决线索风险。新增任职/代办选择视觉仍先确认，不能以此增管理导航。
 
 - [ ] 写 L01/L06～L12 DOM/transport RED，包括先输入 dirty 文本再 token rotation、POST 结果未知再到期重登、跨 scope 迟到响应、标记存储失败不写入。
 - [ ] 实现 PKCE 回跳、真实本人 context、多任职选择、退出/跨标签信号和安全错误；不以 Mock session 进入 main。
@@ -220,7 +227,7 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 - Create: `docs/acceptance/task9-real-user-uat-template.md`，不把空模板当实际 UAT 结果。
 - Update: 扩展验收矩阵、本轮进度报告、设计 QA；只在证据合格后更新对应交付状态。
 
-- [ ] 为全部 T9-C/L/I/W 自动项建立命名测试并先保存缺能力 RED，不使用 skip/空测试绕过。
+- [ ] 为全部 T9-C/L/I/W/D 自动项建立命名测试并先保存缺能力 RED，不使用 skip/空测试绕过；D03/D08 包含实际浏览器证据。
 - [ ] 通过真实 IdP＋管理接口创建目标身份、组织、任职、授权；从真实 capture/分配生成业务责任，逐类七卡操作并断言数据库 Fact/Receipt/Task/Wait/Event/Audit。
 - [ ] 实测 credential rotation、退出/撤销、HTTP/CAS/网络故障、恢复标记、跨 Tenant、四管理状态机和实际 Worker 等待恢复。
 - [ ] 指定真实使用者执行 U01～U03；凭据由使用者自行输入，只留脱敏结果，人工未执行不能标通过。
