@@ -129,7 +129,7 @@ def validate(root: Path) -> list[str]:
         "Vary: Authorization",
     ):
         _require(adr, value, "ADR decision", findings)
-    _require(baseline, "Baseline ID: MVP-2026-09-07.1", "active baseline id", findings)
+    _require(baseline, "Baseline ID: MVP-2026-09-08.1", "active baseline id", findings)
     findings.extend(validate_ingress_query_capability(root))
     try:
         document = yaml.load(api, Loader=_StrictSafeLoader)

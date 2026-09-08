@@ -684,6 +684,12 @@ paths:
       tags: [CommandReceipts]
       operationId: getCommandReceipt
       summary: Recover the terminal receipt for one caller command UUID
+      description: >-
+        ADR-0013 / R1-HTTP-V1.3: only the identical original trusted Actor and on-behalf pair may recover a public command receipt.
+        R1_RECEIPT_RECOVERY_METADATA_LOOKUP_V1 obtains bounded metadata inside Audit Owner; current Owner authorization is recomputed without rerunning terminal command eligibility.
+        READ_COMMAND_RECEIPT Audit must commit with acknowledgement before serialization. All responses use Cache-Control: no-store; no success ETag or 304.
+        Missing or invalid same-Actor recovery metadata safely fails with existing SERVICE_UNAVAILABLE; wrong Actor, Tenant or internal recovery is NOT_FOUND.
+        Legacy recovery requires the complete original request and original Idempotency-Key at its original endpoint, with zero replay delta; never automatically use a new key.
       security:
         - publicBearer: []
       x-tenant-source: ACTOR_CONTEXT
@@ -699,7 +705,7 @@ paths:
         - $ref: '#/components/parameters/CommandIdPath'
       responses:
         '200':
-          description: Original terminal receipt projection.
+          description: 'Original terminal receipt projection, disclosed only after READ_COMMAND_RECEIPT Audit commit acknowledgement; Cache-Control: no-store.'
           content:
             application/json:
               schema:

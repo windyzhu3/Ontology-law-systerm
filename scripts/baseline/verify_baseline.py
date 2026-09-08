@@ -20,11 +20,13 @@ try:
     from scripts.baseline.r1_business_closure_contract import validate as validate_r1_business_closure_contract
     from scripts.baseline.r1_contact_evidence_contract import validate as validate_r1_contact_evidence_contract
     from scripts.baseline.r1_projection_readiness_contract import validate as validate_r1_projection_readiness_contract
+    from scripts.baseline.r1_receipt_recovery_contract import validate as validate_r1_receipt_recovery_contract
 except ModuleNotFoundError:  # Direct script execution places this directory on sys.path.
     from r1_command_contract import validate_r1_command_contract
     from r1_business_closure_contract import validate as validate_r1_business_closure_contract
     from r1_contact_evidence_contract import validate as validate_r1_contact_evidence_contract
     from r1_projection_readiness_contract import validate as validate_r1_projection_readiness_contract
+    from r1_receipt_recovery_contract import validate as validate_r1_receipt_recovery_contract
 
 
 ALLOWED_STATES = {"DRAFT", "FROZEN", "MERGED", "IMPLEMENTED", "RUNTIME_VERIFIED"}
@@ -50,7 +52,7 @@ TARGET_GATE_STATES = {
 VISUAL_BUNDLE_VERSION = "visual-bundle-2026-08-27"
 VISUAL_OWNER = "Product Design"
 VISUAL_CONFIRMATION_DATE = "2026-08-27"
-CANONICAL_BASELINE_ID = "MVP-2026-09-07.1"
+CANONICAL_BASELINE_ID = "MVP-2026-09-08.1"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 HISTORICAL_BANNER = "历史规格（HISTORICAL_SUPERSEDED）"
 HISTORICAL_WARNING = (
@@ -879,7 +881,8 @@ def expected_visual_rows() -> dict[str, str]:
 
 EXPECTED_VISUAL_ROWS = expected_visual_rows()
 REQUIRED_NONVISUAL_ROWS = {
-    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1": ("MVP", "FROZEN", "MVP-2026-09-07.1", "../baseline/CURRENT-MVP-BASELINE.md"),
     "DB-52P2-CONTRACT": ("MVP", "MERGED", "52-plus-2-v1", "../../database/schema-contract-52-plus-2/contract/schema_contract.py"),
     "DB-52P2-MIGRATIONS": ("MVP", "MERGED", "52-plus-2-v1", "../../database/schema-contract-52-plus-2/generated/db/migration/V840__schema_contract_validation.sql"),
     "BASE-CLOSURE-DESIGN": ("PR2", "FROZEN", HISTORICAL_BASELINE_ID, "../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md"),
@@ -1654,7 +1657,7 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
         return
     metadata = (
         (task_text, "R1-TASK-COMPLETION-V1.2", "R1 task contract"),
-        (http_text, "R1-HTTP-V1.2", "R1 HTTP contract"),
+        (http_text, "R1-HTTP-V1.3", "R1 HTTP contract"),
         (workbench_text, "R1-WORKBENCH-V1.1", "R1 workbench contract"),
     )
     for text, expected_id, label in metadata:
@@ -2624,6 +2627,9 @@ def verify_delivery_ledger(root: Path, findings: list[str]) -> list[str] | None:
     if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1":
         findings.append("Delivery ledger previous baseline must point to BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1")
         return
+    if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1":
+        findings.append("Delivery ledger previous baseline must point to the exact ADR-0013 successor")
+        return
     unexpected_visual_ids = sorted(visual_row_ids - set(EXPECTED_VISUAL_ROWS))
     if unexpected_visual_ids:
         findings.append(f"Delivery ledger has unexpected visual row: {unexpected_visual_ids[0]}")
@@ -2779,6 +2785,7 @@ def _verify_repository_result_unchecked(root: Path) -> VerificationResult:
         structural_findings.extend(validate_r1_business_closure_contract(root))
     structural_findings.extend(validate_r1_contact_evidence_contract(root))
     structural_findings.extend(validate_r1_projection_readiness_contract(root))
+    structural_findings.extend(validate_r1_receipt_recovery_contract(root))
     readiness_blockers = (
         verify_delivery_ledger(root, structural_findings) or []
     )

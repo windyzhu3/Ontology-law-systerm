@@ -1,5 +1,9 @@
 # R1 Business Closure Implementation Plan
 
+Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_RECOVERY_ACTIVATION_V1
+
+> 2026-09-08原Task8具名前置：`MVP-2026-09-08.1` / `R1-HTTP-V1.3` / `R1-COMMAND-POLICY-EVENT-V1.2`只激活回执恢复静态合同。合同单元和独立审阅验收后，原Task8一次性实现V2原子写入、Audit Owner窄读口、完整当前授权、READ_COMMAND_RECEIPT审计、HTTP及联合PostgreSQL验证。必须覆盖拒绝capture无Lead/后来Lead DENY、SERVICE撤权/同组织错账户/来源组织改映射或revision变化、换Appointment/代办、终态Task/Draft、stale candidate/inactive assignee拒绝回执可读、Evidence撤回、权限变更、提交故障和全部delta。原Task8接受范围与四个认证WIP保持，历史checkbox/证据不重写；Task9/10、容量与R1状态不晋级。
+
 > 2026-09-07原Task7具名前置：[ADR-0012](../../adr/ADR-0012-r1-projection-readiness-protocol.md)、[批准readiness修订](../specs/2026-09-07-r1-projection-readiness-design.md)与[合同计划](2026-09-07-r1-projection-readiness-contract-plan.md)只替代15/11/4 inventory与readiness/失效时点措辞。后继`MVP-2026-09-07.1`/OpenAPI`1.2.0`为16/11/5，最终加锁评估后存在显式在途竞态；每次成功只允许一次紧随claim，每次consume仍完整重授权。历史步骤/checkbox和既有证据保留；合同验收后原Task7实现API evaluator、Owner读口、mTLS client和Worker gate，Task8实现生产安全/角色组装，后续门禁不因静态修订晋级。
 
 > 2026-09-06原Task 6具名前置：[ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md)与[批准修订规格](../specs/2026-09-06-r1-contact-reopen-evidence-read-design.md)已将全局联系序号、`contactNo<3`自动额度、`contactNo>=3`复核及Evidence引用最小只读边界激活为静态合同。历史Task 6正文/checkbox不改写且仍未完成；后续实施以本合同提交为新BASE，一次性完成Java/jOOQ/实库/CurrentCard验收，不重复派发合同任务。

@@ -123,12 +123,12 @@ def validate(root: Path) -> list[str]:
     if "Status: Accepted" not in _without_fenced_code(adr):
         findings.append("R1 readiness ADR-0012 must be active and Accepted")
     visible_baseline = _without_fenced_code(baseline)
-    if [line for line in visible_baseline if line.startswith("Baseline ID:")] != ["Baseline ID: MVP-2026-09-07.1"]:
-        findings.append("R1 readiness active baseline must be exactly MVP-2026-09-07.1")
+    if [line for line in visible_baseline if line.startswith("Baseline ID:")] != ["Baseline ID: MVP-2026-09-08.1"]:
+        findings.append("R1 readiness active baseline must be exactly MVP-2026-09-08.1")
     if not any("ADR-0012-r1-projection-readiness-protocol.md" in line for line in visible_baseline):
         findings.append("R1 readiness active baseline must name ADR-0012 supersession")
-    if "Contract ID: R1-HTTP-V1.2" not in _without_fenced_code(http):
-        findings.append("R1 readiness HTTP contract must activate R1-HTTP-V1.2")
+    if "Contract ID: R1-HTTP-V1.3" not in _without_fenced_code(http):
+        findings.append("R1 readiness HTTP contract must activate R1-HTTP-V1.3")
     http_rows = _rows(http, "Operations", ("OperationId", "Method", "Path", "TenantSource", "IdempotencyKey", "Preconditions", "SubjectBinding", "SuccessStatus", "ErrorCodes"), findings)
     expected_row = ("checkR1ProjectionReadiness", "GET", READINESS_PATH, "ACTOR_CONTEXT", "NONE", "NONE", "CURRENT_R1_OWNER_ORGANIZATION_COVERAGE", "204", ",".join(ERROR_CODES))
     if len(http_rows) != 16 or [row for row in http_rows if row[0] == "checkR1ProjectionReadiness"] != [expected_row]:

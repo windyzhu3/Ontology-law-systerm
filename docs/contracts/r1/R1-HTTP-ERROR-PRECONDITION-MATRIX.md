@@ -1,6 +1,16 @@
 # R1 HTTP、错误与前置条件合同
 
-Contract ID: R1-HTTP-V1.2
+Contract ID: R1-HTTP-V1.3
+
+Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_COMMAND_RECEIPT_DISCLOSURE_V1
+
+## Public receipt recovery successor
+
+`getCommandReceipt` applies ADR-0013 §§3–7 exactly: authenticated original Actor/Appointment and NULL-safe original on-behalf pair, bounded Audit Owner metadata lookup, original scopeDigest integrity and complete current Owner authorization in the same locked transaction. Historical ALLOW is not authorization; rejected attempted candidate eligibility is not rerun. The current capture organization must equal the original Audit type/id/revision and scope organization; current natural-key Lead DENY and resolved Evidence four-Subject DENY remain mandatory. Every 200 (including original REJECTED) returns the unchanged original receipt only after `READ_COMMAND_RECEIPT` Audit commit acknowledgement, with read Audit +1 and all other delta 0. No response may disclose a receipt, resultFact, receiptRef or success header before that point.
+
+All GET responses use `Cache-Control: no-store`; no successful ETag/304. Existing 401 challenge, 403/current hidden-object 404, 404 wrong Actor/Tenant/internal receipt, 503 same-Actor missing/invalid V2 metadata, Audit/lock/commit-confirmation failure, and 500 programming error retain the existing Problem shape/code/retryPolicy. Non-disclosure refusals have zero writes under this named profile; lost commit acknowledgement may already have committed the read Audit. Detail never reveals which internal recovery check failed. GET adds no business key or request parameters. Legacy records are not parsed/backfilled; complete original requests use the original endpoint and same key with all replay/conflict delta 0. Internal recovery remains original mTLS request/key only. GET failure does not create an outcome or authorize automatic new keys.
+
+## Prior transport inventory
 
 R1 v1.2 freezes 16 operations: 11 public Bearer and 5 mutualTLS. `listDueR1Tasks` accepts only `recoveryType=CONTACT_TASK|ROUTING_REVIEW_TASK`, limit default 50 bounded 1..100, and optional opaque cursor; it returns `candidates` plus optional `nextCursor`. Each candidate has exactly recoveryType/taskId/expectedTaskRevision/waitReceiptId/waitReceiptHash/dueCutoff/idempotencyKey. Pagination orders by `(resume_due_at, task_id)` with an Actor-scoped cursor and stable UUIDv5 recovery key. `consumeR1Projection` accepts exactly domainEventOutboxId/domainEventId/expectedOutboxRevision/leaseOwner/fencingToken and succeeds with 204 and no body. Both DTOs reject unknown fields.
 
@@ -131,7 +141,7 @@ TenantSource 的唯一含义是：认证完成后由服务端 ActorContext 提�
 | getCurrentWorkCard | 304 | `ETag: WorkbenchETag` | no body |
 | saveActionDraft | 201 create / 200 update | `Location: /api/v1/commands/{commandId}/receipt`; `ETag: DraftETag` | `ActionDraftWriteResult`；receipt resultFact 必须为 `ACTION_DRAFT@postWriteRevision` |
 | seven Task commands | 200 | `Location: /api/v1/commands/{commandId}/receipt` | `CommandReceipt`；resultFact 按 Task 完成矩阵绑定准确 completion Fact |
-| getCommandReceipt | 200 | none | `CommandReceipt`，逐字段等于原终态 Receipt 投影 |
+| getCommandReceipt | 200 | `Cache-Control: no-store` | `CommandReceipt`，逐字段等于原终态 Receipt 投影 |
 | reopenDueContactTasks | 200 | `Location: /api/v1/commands/{commandId}/receipt`; `ETag: TaskETag` | `CommandReceipt`；resultFact 必须为恢复后的 `TASK_OCCURRENCE@postReopenRevision` |
 | reopenDueRoutingReviewTasks | 200 | `Location: /api/v1/commands/{commandId}/receipt`; `ETag: TaskETag` | `CommandReceipt`；resultFact 必须为恢复后的 `TASK_OCCURRENCE@postReopenRevision` |
 | listDueR1Tasks | 200 | none | `DueR1TaskPageV1` |

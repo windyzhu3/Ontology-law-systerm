@@ -258,7 +258,7 @@ class R1ContactEvidenceContractTest(unittest.TestCase):
         """Break caught: missing authority or a stale active version is accepted."""
         cases = (
             (ADR, None, None, "ADR-0011"),
-            (BASELINE, "Baseline ID: MVP-2026-09-07.1", "Baseline ID: MVP-2026-09-06.2", "baseline"),
+            (BASELINE, "Baseline ID: MVP-2026-09-08.1", "Baseline ID: MVP-2026-09-06.2", "baseline"),
             (TASK, "Contract ID: R1-TASK-COMPLETION-V1.2", "Contract ID: R1-TASK-COMPLETION-V1.1", "Task contract"),
             (SPEC, "状态：APPROVED", "状态：DRAFT", "approved specification"),
         )

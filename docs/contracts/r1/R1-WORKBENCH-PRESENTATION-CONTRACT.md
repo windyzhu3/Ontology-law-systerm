@@ -2,6 +2,10 @@
 
 Contract ID: R1-WORKBENCH-V1.1
 
+Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_LEGACY_RECOVERY_V1
+
+At semantic baseline `MVP-2026-09-08.1`, receipt GET is always no-store with no ETag/304 and discloses only after current authorization and committed read Audit. The CurrentCard cache protocol below is unchanged. Preserve the complete original request and original Idempotency-Key for ambiguous writes. Old or unsupported recovery metadata safely fails; never parse/backfill legacy Audit text. Replay at the original endpoint under current authorization returns the original terminal result or conflict with no read Audit, metadata repair, business reexecution or other delta. A failed GET is not command failure and must never generate a new key automatically. Without the original request and valid metadata there is no automatic recovery or admin repair path. Browser Bearer GET cannot recover internal mTLS commands; those retain original mTLS request/key recovery.
+
 All seven nonempty CurrentCard variants are `R1_CURRENT_WORKCARD_DISCLOSURE_V1`. Both 200 BODY and 304 CACHE_REVALIDATED return only after disclosure Audit commit. Task, Lead, Owner Appointment/Principal/OrganizationUnit and every actually returned Draft/candidate/fact are separate typed disclosedSource anchors. Responses use `Cache-Control: private, no-cache` and `Vary: Authorization`; Actor-scoped ETags include authorization and every disclosed source revision/digest. The SPA uses generation/AbortController so a late older request cannot overwrite a newer envelope.
 
 [ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md) activates semantic baseline `MVP-2026-09-06.3` while this contract ID and wire DTOs remain unchanged. Its Evidence rule only secures the existing optional Contact Draft candidate; it creates no browser, upload, download or management feature.

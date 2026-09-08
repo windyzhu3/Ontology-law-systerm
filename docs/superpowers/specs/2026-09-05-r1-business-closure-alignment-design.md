@@ -1,5 +1,9 @@
 # R1 基础功能闭环与原始设计对齐规格
 
+Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_RECOVERY_ACTIVATION_V1
+
+> 2026-09-08具名后继：`MVP-2026-09-08.1`、`R1-HTTP-V1.3`、`R1-COMMAND-POLICY-EVENT-V1.2`激活九公共命令V2恢复元数据、原Actor限定Audit Owner元数据例外、当前完整Owner授权和先提交审计后披露的回执GET。旧记录只保留完整原请求同key恢复；内部recovery继续原mTLS请求和key。OpenAPI 1.2.0及16/11/5、物理合同保持。原Task8负责新写入与GET共同实库/HTTP验收；本次仅FROZEN静态合同，Task9/10、容量、整体R1不晋级，以下历史实施证据不改写。
+
 > 2026-09-07具名supersession：[ADR-0012](../../adr/ADR-0012-r1-projection-readiness-protocol.md)与[批准readiness修订](2026-09-07-r1-projection-readiness-design.md)仅替代ADR-0008 operation数量及本规格§6.3部署readiness/失效时点措辞。活动后继为`MVP-2026-09-07.1`、OpenAPI`1.2.0`、11公共＋5内部＝16；API最终加锁数据库时间评估的一次成功只允许紧随的一次claim，评估后变更/自然到期允许在途竞态，每次consume仍当前重授权。历史正文与证据保留；原Task7/8须实现具名修订，静态合同不代表生产完成。
 
 > 2026-09-06联系/Evidence具名supersession：[ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md)与[批准修订规格](2026-09-06-r1-contact-reopen-evidence-read-design.md)只替代原Task 6的联系次数解释并补齐既有Evidence引用的最小只读Owner/授权/披露边界。活动语义为`MVP-2026-09-06.3`/`R1-TASK-COMPLETION-V1.2`，物理`52-plus-2-v1.2`、事件数、operation/DTO及其他历史正文保持；原Task 6生产实现仍未完成。

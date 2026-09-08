@@ -11,12 +11,14 @@ from unittest import mock
 from scripts.baseline import verify_baseline as verify_baseline_module
 from scripts.baseline.verify_baseline import HISTORICAL_BANNER, verify_repository
 from scripts.baseline.tests.test_r1_command_contract import R1CommandContractTest
+from scripts.baseline.tests.test_r1_receipt_recovery_contract import R1ReceiptRecoveryContractTest
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "verify_baseline.py"
-CANONICAL_BASELINE_ID = "MVP-2026-09-07.1"
+CANONICAL_BASELINE_ID = "MVP-2026-09-08.1"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 R1_CONTACT_EVIDENCE_BASELINE_MARKERS = (
+    "Receipt recovery authority: [ADR-0013](../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_RECOVERY_ACTIVATION_V1",
     "[ADR-0012](../adr/ADR-0012-r1-projection-readiness-protocol.md)",
     "Task contract `R1-TASK-COMPLETION-V1.2`",
     "physical capability `52-plus-2-v1.2` remain unchanged",
@@ -533,7 +535,7 @@ class VerifyBaselineTest(unittest.TestCase):
                 [
                     "# R1 HTTP error and precondition matrix",
                     "",
-                    "Contract ID: R1-HTTP-V1.2",
+                    "Contract ID: R1-HTTP-V1.3",
                     "",
                     "Status: FROZEN",
                     "",
@@ -805,7 +807,7 @@ class VerifyBaselineTest(unittest.TestCase):
             markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", "MVP-2026-09-06.1", "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2"),
             markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", "MVP-2026-09-06.2", "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3"),
             markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", "MVP-2026-09-06.3", "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "none", "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1"),
-            markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", CANONICAL_BASELINE_ID, "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "fixture only", "—"),
+            markdown_row("BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1", "MVP", "Canonical baseline", "Docs", "[Current baseline](../baseline/CURRENT-MVP-BASELINE.md)", "Product", "MVP-2026-09-07.1", "PR2 merge", "MERGED", "[current baseline](../baseline/CURRENT-MVP-BASELINE.md); `merge-commit=abcdef0`", "fixture only", "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1"),
             markdown_row("R1-CONTACT-EVIDENCE-CONTRACT", "R1", "Contact ordinal and Evidence reference contract", "Docs", "[ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md)", "Engineering", "r1-contact-evidence-v1", "R1 implementation", "FROZEN", "[ADR-0011](../adr/ADR-0011-r1-contact-reopen-evidence-read.md); [Task matrix](../contracts/r1/R1-TASK-COMPLETION-MATRIX.md); [command contract](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md); [validator](../../scripts/baseline/r1_contact_evidence_contract.py); [validator tests](../../scripts/baseline/tests/test_r1_contact_evidence_contract.py)", "Contract-only delivery; original Task 6 must implement", "—"),
             markdown_row("R1-COMMAND-POLICY-EVENT-CONTRACT", "R1", "R1 command policy and event contract", "Docs", "[R1 command contract](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)", "Engineering", "r1-command-policy-event-v1", "R1 implementation", "FROZEN", "[R1 command contract](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)", "Runtime enforcement remains separate", "—"),
             markdown_row("R1-IMPLEMENTATION-PLAN", "R1", "Lead-contact plan", "Plan", "[R1 plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Engineering", "2026-08-28", "R1 implementation", "FROZEN", "[plan](../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md)", "Production code is not yet implemented", "—"),
@@ -863,6 +865,35 @@ class VerifyBaselineTest(unittest.TestCase):
                 markdown_row(*(["---"] * len(LEDGER_HEADERS))), *ledger_rows, "",
             ]),
         )
+
+        # Add only ADR-0013 input files/pointers to the synthetic fixture. Keep
+        # unrelated historical fixtures and runtime-evidence scenarios intact.
+        receipt_files = (
+            "docs/adr/ADR-0013-r1-command-receipt-recovery.md",
+            "docs/superpowers/specs/2026-09-05-r1-business-closure-alignment-design.md",
+            "docs/superpowers/plans/2026-09-05-r1-business-closure-plan.md",
+            "database/schema-contract-52-plus-2/docs/runtime-validation-contract.md",
+            "scripts/baseline/r1_receipt_recovery_contract.py",
+            "scripts/baseline/tests/test_r1_receipt_recovery_contract.py",
+        )
+        for relative in receipt_files:
+            self.write(root, relative, (repository_root / relative).read_text(encoding="utf-8"))
+        for relative in (
+            "docs/baseline/CURRENT-MVP-BASELINE.md",
+            "docs/contracts/r1/R1-HTTP-ERROR-PRECONDITION-MATRIX.md",
+            "docs/contracts/r1/R1-WORKBENCH-PRESENTATION-CONTRACT.md",
+        ):
+            authority = next(line for line in (repository_root / relative).read_text(encoding="utf-8").splitlines()
+                             if line.startswith("Receipt recovery authority: "))
+            target = root / relative
+            target.write_text(authority + "\n\n" + target.read_text(encoding="utf-8"), encoding="utf-8")
+        ledger_path = root / "docs/progress/MVP-DELIVERY-LEDGER.md"
+        successor_rows = [line for line in (repository_root / "docs/progress/MVP-DELIVERY-LEDGER.md").read_text(encoding="utf-8").splitlines()
+                          if line.startswith(("| BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1 |", "| R1-RECEIPT-RECOVERY-CONTRACT |"))]
+        successor_rows = [line.replace("Canonical MVP baseline", "Canonical baseline").replace(" | FROZEN | ", " | MERGED | ").replace(
+            " | Static contract only;", "; `merge-commit=abcdef0` | Static contract only;")
+            if line.startswith("| BASE-CURRENT-MVP-") else line for line in successor_rows]
+        ledger_path.write_text(ledger_path.read_text(encoding="utf-8") + "\n".join(successor_rows) + "\n", encoding="utf-8")
 
         for spec_name in HISTORICAL_SPECS:
             conflict_sections = []
@@ -1090,13 +1121,16 @@ class VerifyBaselineTest(unittest.TestCase):
                 "Missing canonical baseline: docs/baseline/CURRENT-MVP-BASELINE.md",
                 "R1 contact/evidence artifact missing or invalid UTF-8: docs/baseline/CURRENT-MVP-BASELINE.md",
                 "R1 contact/evidence active physical capability declarations must all equal 52-plus-2-v1.2",
-                "R1 contact/evidence contract missing active baseline: Baseline ID: MVP-2026-09-07.1",
+                "R1 contact/evidence contract missing active baseline: Baseline ID: MVP-2026-09-08.1",
                 "R1 contact/evidence contract missing active Task contract: Task contract `R1-TASK-COMPLETION-V1.2`",
                 "R1 contact/evidence contract missing physical capability: physical capability `52-plus-2-v1.2` remain unchanged",
                 "R1 contact/evidence contract missing contract-only baseline: no production Handler, Evidence port, Workbench or R1 business status is advanced",
                 "R1 readiness artifact missing or invalid UTF-8: docs/baseline/CURRENT-MVP-BASELINE.md",
-                "R1 readiness active baseline must be exactly MVP-2026-09-07.1",
+                "R1 readiness active baseline must be exactly MVP-2026-09-08.1",
                 "R1 readiness active baseline must name ADR-0012 supersession",
+                "R1 receipt recovery artifact missing or invalid UTF-8: docs/baseline/CURRENT-MVP-BASELINE.md",
+                "R1 receipt recovery active metadata must declare exactly Baseline ID: MVP-2026-09-08.1 in docs/baseline/CURRENT-MVP-BASELINE.md",
+                "R1 receipt recovery requires exact resolved ADR-0013 authority and profile in docs/baseline/CURRENT-MVP-BASELINE.md",
                 "Delivery ledger row BASE-CURRENT-MVP Artifact must contain safe Git-tracked in-repository regular-file links",
             ]
             self.assertEqual(verify_repository(root), expected)
@@ -1126,12 +1160,13 @@ class VerifyBaselineTest(unittest.TestCase):
                     f"{CANONICAL_BASELINE_ID}",
                     "R1 contact/evidence contract missing active baseline: "
                     f"Baseline ID: {CANONICAL_BASELINE_ID}",
-                    "R1 readiness active baseline must be exactly MVP-2026-09-07.1",
+                    "R1 readiness active baseline must be exactly MVP-2026-09-08.1",
+                    "R1 receipt recovery active metadata must declare exactly Baseline ID: MVP-2026-09-08.1 in docs/baseline/CURRENT-MVP-BASELINE.md",
                 ],
             )
 
     def test_runtime_baseline_version_accepts_only_the_approved_successor(self) -> None:
-        for version, valid in [("MVP-2026-09-07.1", True), ("MVP-2026-09-06.3", False), ("MVP-2026-09-06.2", False), ("MVP-2026-09-05.3", False), ("MVP-2026-09-06.1", False), ("MVP-2026-09-05.2", False), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.1", False), ("MVP-2026-09-05.10", False)]:
+        for version, valid in [("MVP-2026-09-08.1", True), ("MVP-2026-09-06.3", False), ("MVP-2026-09-06.2", False), ("MVP-2026-09-05.3", False), ("MVP-2026-09-06.1", False), ("MVP-2026-09-05.2", False), ("MVP-2026-08-28.1", False), ("MVP-2026-09-05.1", False), ("MVP-2026-09-05.10", False)]:
             with self.subTest(version=version), tempfile.TemporaryDirectory() as temp_dir:
                 root = Path(temp_dir)
                 baseline = root / "docs/baseline/CURRENT-MVP-BASELINE.md"
@@ -2471,9 +2506,13 @@ class VerifyBaselineTest(unittest.TestCase):
             )
             ledger.write_text(fenced_ledger, encoding="utf-8")
 
-            self.assert_finding(
+            self.assert_findings(
                 root,
-                "Delivery ledger must contain a header and at least one row",
+                [
+                    "R1 receipt recovery ledger row BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1 must remain a static successor with ADR evidence",
+                    "R1 receipt recovery ledger row R1-RECEIPT-RECOVERY-CONTRACT must remain a static successor with ADR evidence",
+                    "Delivery ledger must contain a header and at least one row",
+                ],
             )
 
     def test_ledger_baseline_rows_require_the_patch_version(self) -> None:

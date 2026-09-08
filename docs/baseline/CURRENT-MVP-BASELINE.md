@@ -1,6 +1,10 @@
 # 当前MVP基线
 
-Baseline ID: MVP-2026-09-07.1
+Baseline ID: MVP-2026-09-08.1
+
+Receipt recovery authority: [ADR-0013](../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_RECOVERY_ACTIVATION_V1
+
+2026-09-08 named successor activates HTTP `R1-HTTP-V1.3` and command `R1-COMMAND-POLICY-EVENT-V1.2`: V2 metadata for nine public command terminal Audits, original-Actor-only bounded metadata lookup, complete current Owner authorization and committed receipt disclosure Audit. The precise runtime/V830 semantic exceptions and legacy original-request replay are governed by ADR-0013. OpenAPI `1.2.0`, 16/11/5, physical capability `52-plus-2-v1.2` and all prior activation IDs stay unchanged. Original Task8 owns joint new-write/GET runtime acceptance; this static FROZEN successor does not promote R1, Task9/10, SPA, E2E, capacity or release. The 2026-09-07 activation paragraph below is retained historical context.
 
 [ADR-0012](../adr/ADR-0012-r1-projection-readiness-protocol.md) activates the named `R1_PROJECTION_READINESS_V1` successor: OpenAPI `1.2.0`, HTTP `R1-HTTP-V1.2`, exactly 16 operations (11 public Bearer + 5 internal mTLS). It supersedes only ADR-0008's operation inventory and original closure §6.3 readiness/invalidation semantics. One successful final locked API evaluation enables one immediate bounded Worker claim; post-evaluation changes and natural expiry can race transport/claim, and every consume still reauthorizes. All responses are no-store; no proof, new authority, persistence or business delta exists. Physical capability stays `52-plus-2-v1.2`, Worker stays execution-only, and original Tasks7/8 retain production implementation/acceptance ownership. This static contract amendment does not promote backend, SPA, E2E, capacity or release readiness.
 

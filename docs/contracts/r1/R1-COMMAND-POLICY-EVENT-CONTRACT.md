@@ -1,10 +1,16 @@
 # R1 Command Policy and Event Contract
 
-Contract ID: R1-COMMAND-POLICY-EVENT-V1.1
+Contract ID: R1-COMMAND-POLICY-EVENT-V1.2
 
 Status: FROZEN
 
-Semantic baseline: MVP-2026-09-07.1
+Semantic baseline: MVP-2026-09-08.1
+
+Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_COMMAND_RECEIPT_RECOVERY_V1
+
+ADR-0013 §§3–7 govern the exact closed recovery protocol. Nine public commands atomically write `R1_COMMAND_AUDIT_V2` / 2 with exactly result, authorizationEvidence and receiptRecovery for SUCCEEDED, NO_CHANGE and post-slot REJECTED. Metadata comes from immutable parsed server Context before the business savepoint; original Draft selector and resolved qualified Evidence pair are preserved, source natural-key HMAC is internal-only, and scopeDigest/Actor/on-behalf/fixed Audit columns bind the unique original command. Metadata failure rolls back the whole transaction. Internal recovery remains `R1_COMMAND_AUDIT_V1`; pre-slot rejection and original-request replay/conflict remain zero delta.
+
+Receipt lookup is not command execution: Owner ports revalidate current authorization and real binding without rerunning rejected attempted candidate/assignee eligibility. Capture must retain the original organization type/id/revision and scope ID, exact account/SERVICE binding and current natural-key Lead DENY. Task/Lead/Owner and any resolved Submission/Binding require all current DENY checks, independent complete authorization paths and the full deterministically ordered current authorization-set digest. Read disclosure audit is not a business Command, authority, permission slot, result Fact or Event; cardinalities of existing commands/events remain unchanged.
 
 Shared payload Schema: contracts/events/r1-domain-notification-v1.schema.json
 
