@@ -1,5 +1,7 @@
 # R1 基础功能闭环与原始设计对齐规格
 
+> 2026-09-08 Task9 范围设计修订：用户新增真实登录/会话、受控 ADM-01～04 与完整工作台状态及真实用户验收，并确认 Keycloak/OIDC。详见 [Task9 扩展设计草案](2026-09-08-task9-real-user-access-design.md)与[原计划 Task9](../plans/2026-09-05-r1-business-closure-plan.md)。旧工作台验收仅为 Task9.0；扩展 Task9 未完成。本文旧身份管理排除与认证边界不会因草案自动失效：详细设计确认后先实施 Task9.1 具名合同后继，保持其余范围、物理合同与历史证据。
+
 Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_RECOVERY_ACTIVATION_V1
 
 > 2026-09-08具名后继：`MVP-2026-09-08.1`、`R1-HTTP-V1.3`、`R1-COMMAND-POLICY-EVENT-V1.2`激活九公共命令V2恢复元数据、原Actor限定Audit Owner元数据例外、当前完整Owner授权和先提交审计后披露的回执GET。旧记录只保留完整原请求同key恢复；内部recovery继续原mTLS请求和key。OpenAPI 1.2.0及16/11/5、物理合同保持。原Task8负责新写入与GET共同实库/HTTP验收；本次仅FROZEN静态合同，Task9/10、容量、整体R1不晋级，以下历史实施证据不改写。
