@@ -2,7 +2,7 @@
 
 日期：2026-09-08。
 
-状态：**DRAFT FOR REVIEW**。用户已确认补齐合法代办接入的方向；本文将具体接口、披露与恢复规则写明，待书面审阅后激活。当前生效合同仍为 ADR-0014 / MVP-2026-09-08.2；本文不自行改写冻结 OpenAPI，不代表 Task9.2 已完成。
+状态：**APPROVED**。用户于 2026-09-08 审阅本文后确认具体接口、披露与恢复规则，授权按本文执行合同前置及独立评审，再恢复 Task9.2。批准时生效合同为 ADR-0014 / MVP-2026-09-08.2；后继实际激活与验证另行记账，本文批准不代表 Task9.2 已完成。
 
 依据：[Task9 批准设计](2026-09-08-task9-real-user-access-design.md) §3–4、[Identity 合同](../../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md)、[命令合同](../../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)、[原回执规则](../../adr/ADR-0013-r1-command-receipt-recovery.md)。
 
