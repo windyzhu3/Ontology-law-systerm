@@ -688,6 +688,36 @@ def _verify_setup_version(
     errors.append(f"job must use {action_name}")
 
 
+def _verify_identity_toolchain(snapshot: dict[Path, bytes], source: str, errors: list[str]) -> None:
+    """Keycloak is external infrastructure; it never changes business artifact counts."""
+    lock_path = Path("deploy/identity/identity-toolchain.lock.json")
+    try:
+        api = yaml.safe_load(snapshot.get(CANONICAL_OPENAPI, b"{}")) or {}
+        active = api.get("info", {}).get("version") == "1.3.0"
+        if not active and lock_path not in snapshot:
+            return  # Original scaffold fixtures have no Task9 activation.
+        lock = json.loads(snapshot[lock_path])
+        if lock.get("profile") != "TASK9_IDENTITY_TOOLCHAIN_V1" or lock.get("platform") != "linux/amd64":
+            raise ValueError("wrong identity lock profile/platform")
+        for section, version in (("keycloak", "26.7.3"), ("oidcAdapter", "26.2.4"), ("browserTests", "1.63.0")):
+            if lock[section]["version"] != version:
+                raise ValueError("unapproved identity tool version")
+        for section, field in (("keycloak", "indexDigest"), ("keycloak", "platformDigest"),
+                               ("browserTests", "indexDigest"), ("browserTests", "platformDigest"),
+                               ("identityDatabase", "digest")):
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", lock[section][field]):
+                raise ValueError("immutable image digest required")
+        for section in ("oidcAdapter", "browserTests"):
+            if not re.fullmatch(r"sha512-[A-Za-z0-9+/]{86}==", lock[section]["integrity"]):
+                raise ValueError("exact npm integrity required")
+        if lock["identityDatabase"]["ownership"] != "KEYCLOAK_ONLY_SEPARATE_DATABASE":
+            raise ValueError("external identity database ownership required")
+        if lock["browserTests"]["chromiumVersion"] != "153.0.8010.12":
+            raise ValueError("exact browser build required")
+    except (KeyError, TypeError, ValueError, AttributeError, yaml.YAMLError) as error:
+        errors.append(f"{source}: Task9 identity toolchain must be pinned and externally owned: {error}")
+
+
 def verify_repository(root: Path) -> list[str]:
     root = root.resolve()
     errors: list[str] = []
@@ -699,6 +729,7 @@ def verify_repository(root: Path) -> list[str]:
     for source, snapshot in snapshots.items():
         _verify_package_topology(snapshot, source, errors)
         _verify_openapi(snapshot, source, errors)
+        _verify_identity_toolchain(snapshot, source, errors)
         _verify_maven(snapshot, source, errors)
         _verify_toolchain_files(snapshot, source, errors)
         _verify_workflow(snapshot, source, errors)

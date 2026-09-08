@@ -40,13 +40,13 @@ class R1ProjectionReadinessContractTest(unittest.TestCase):
         """Break caught: no active readiness protocol or validator is delivered."""
         self.assertEqual([], validate(ROOT))
 
-    def test_parsed_transport_has_sixteen_operations_and_five_mtls(self):
+    def test_parsed_transport_has_thirty_seven_operations_and_five_mtls(self):
         """Break caught: the executable contract omits the fifth internal operation."""
         document = yaml.safe_load((ROOT / API).read_text(encoding="utf-8"))
         operations = [operation for item in document["paths"].values()
                       for method, operation in item.items()
                       if method in {"get", "post", "put", "patch", "delete", "head", "options", "trace"}]
-        self.assertEqual(16, len(operations))
+        self.assertEqual(37, len(operations))
         self.assertEqual(5, sum(op["security"] == [{"internalMutualTls": []}] for op in operations))
         operation = document["paths"][PATH]["get"]
         self.assertEqual("checkR1ProjectionReadiness", operation["operationId"])
@@ -112,7 +112,7 @@ class R1ProjectionReadinessContractTest(unittest.TestCase):
         """Break caught: the active HTTP row or baseline authority is disconnected."""
         for relative, old, replacement in (
             (HTTP, "| checkR1ProjectionReadiness | GET |", "| checkR1ProjectionReadiness | POST |"),
-            (HTTP, "Contract ID: R1-HTTP-V1.3", "Contract ID: R1-HTTP-V1.1"),
+            (HTTP, "Contract ID: R1-HTTP-V1.4", "Contract ID: R1-HTTP-V1.1"),
             (BASELINE, "ADR-0012-r1-projection-readiness-protocol.md", "missing-readiness.md"),
         ):
             with self.subTest(relative=relative, old=old), tempfile.TemporaryDirectory() as directory:
@@ -158,7 +158,7 @@ class R1ProjectionReadinessContractTest(unittest.TestCase):
             self.assertTrue(validate(root), "inactive registry must not satisfy the gate")
             path.write_text(original, encoding="utf-8")
             baseline = root / BASELINE
-            baseline.write_text(baseline.read_text(encoding="utf-8").replace("Baseline ID: MVP-2026-09-08.1", "Baseline ID: MVP-2026-09-06.3"), encoding="utf-8")
+            baseline.write_text(baseline.read_text(encoding="utf-8").replace("Baseline ID: MVP-2026-09-08.2", "Baseline ID: MVP-2026-09-06.3"), encoding="utf-8")
             self.assertTrue(validate(root), "old baseline is not an alternative accepted version")
 
     def test_missing_successor_artifacts_and_duplicate_yaml_are_rejected(self):

@@ -129,23 +129,23 @@ def validate(root: Path) -> list[str]:
         "Vary: Authorization",
     ):
         _require(adr, value, "ADR decision", findings)
-    _require(baseline, "Baseline ID: MVP-2026-09-08.1", "active baseline id", findings)
+    _require(baseline, "Baseline ID: MVP-2026-09-08.2", "active baseline id", findings)
     findings.extend(validate_ingress_query_capability(root))
     try:
         document = yaml.load(api, Loader=_StrictSafeLoader)
     except yaml.YAMLError as error:
         findings.append(f"R1 OpenAPI is not strict YAML: {error}")
         return findings
-    if not isinstance(document, dict) or document.get("info", {}).get("version") != "1.2.0":
-        findings.append("R1 OpenAPI version must be 1.2.0")
+    if not isinstance(document, dict) or document.get("info", {}).get("version") != "1.3.0":
+        findings.append("R1 OpenAPI version must be 1.3.0")
         return findings
     paths = document.get("paths", {})
     if not isinstance(paths, dict) or any(not isinstance(item, dict) for item in paths.values()):
         findings.append("R1 OpenAPI paths and path items must be mappings")
         return findings
     operations = [operation.get("operationId") for item in paths.values() for operation in item.values() if isinstance(operation, dict)]
-    if len(operations) != 16 or len(set(operations)) != 16:
-        findings.append("R1 OpenAPI must expose exactly 16 unique operations")
+    if len(operations) != 37 or len(set(operations)) != 37:
+        findings.append("R1 OpenAPI must expose exactly 37 unique operations")
     components = document.get("components", {})
     schemas = components.get("schemas", {})
     parameters = components.get("parameters", {})

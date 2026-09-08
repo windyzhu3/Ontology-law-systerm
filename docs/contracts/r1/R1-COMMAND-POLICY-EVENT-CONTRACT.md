@@ -1,10 +1,15 @@
 # R1 Command Policy and Event Contract
 
-Contract ID: R1-COMMAND-POLICY-EVENT-V1.2
+Contract ID: R1-COMMAND-POLICY-EVENT-V1.3
+
+Task9 identity authority: [ADR-0014](../../adr/ADR-0014-task9-real-user-access.md); profile: R1_IDENTITY_ACCESS_V1
+
+2026-09-08 named successor activates [Identity V1.0](R1-IDENTITY-ACCESS-CONTRACT.md), baseline MVP-2026-09-08.2, HTTP V1.4, Command V1.3, Workbench V1.2 and OpenAPI1.3.0: exactly37 operations (32 public Bearer +5 internal mTLS),14 static Identity commands and the principal-only self context. Prior activation paragraphs/counts below are historical. ADM-01–04 HUMAN production work and real login are now in Task9 scope; Task9.1 is static FROZEN only. Existing nine business request DTOs, seven Task types and fourteen events are unchanged. Keycloak independently owns external identity storage outside the business13 schemas/52+2 tables at52-plus-2-v1.2; one SPA/OpenAPI/Jar and exclusive APP_ROLE=api|worker remain. No Task9 runtime, human UAT, Task10/capacity or R1 release status is advanced.
+
 
 Status: FROZEN
 
-Semantic baseline: MVP-2026-09-08.1
+Semantic baseline: MVP-2026-09-08.2
 
 Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_COMMAND_RECEIPT_RECOVERY_V1
 

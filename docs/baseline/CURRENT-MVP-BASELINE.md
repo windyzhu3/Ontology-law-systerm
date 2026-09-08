@@ -1,6 +1,11 @@
 # 当前MVP基线
 
-Baseline ID: MVP-2026-09-08.1
+Baseline ID: MVP-2026-09-08.2
+
+Task9 identity authority: [ADR-0014](../adr/ADR-0014-task9-real-user-access.md); profile: R1_IDENTITY_ACCESS_V1
+
+2026-09-08 named successor activates [Identity V1.0](../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md), baseline MVP-2026-09-08.2, HTTP V1.4, Command V1.3, Workbench V1.2 and OpenAPI1.3.0: exactly37 operations (32 public Bearer +5 internal mTLS),14 static Identity commands and the principal-only self context. Prior activation paragraphs/counts below are historical. ADM-01–04 HUMAN production work and real login are now in Task9 scope; Task9.1 is static FROZEN only. Existing nine business request DTOs, seven Task types and fourteen events are unchanged. Keycloak independently owns external identity storage outside the business13 schemas/52+2 tables at52-plus-2-v1.2; one SPA/OpenAPI/Jar and exclusive APP_ROLE=api|worker remain. No Task9 runtime, human UAT, Task10/capacity or R1 release status is advanced.
+
 
 Receipt recovery authority: [ADR-0013](../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_RECOVERY_ACTIVATION_V1
 
@@ -78,7 +83,7 @@ R1实施合同确认日期：2026-09-02
 - capture没有不存在资源的`If-Match`。Draft创建、Draft更新、Task命令与subject重验分别使用HTTP矩阵冻结的前置条件和ETag种类，不得混用。
 - R1责任完成、后继Owner、Receipt result与E2E delta以Task完成矩阵为准；零分配候选完成P0-04正常分支，不是HTTP错误。
 - CAPTURE_LEAD、SAVE_ACTION_DRAFT及两种具名recovery的专属权限、Owner组织scope、DENY和Actor路径，以及所有R1成功分支的精确事件集合，以[R1命令授权及事件合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)为准。CONNECTED_VALID必须原子写两个事件和两个R1_PROJECTION Outbox，Receipt仍唯一且引用ContactResult。
-- Workbench envelope固定为一句`todaySummary`、零或一张完整`currentCard`、最多两条`nextSummaries`、一个`waitingCount`和一个固定`chatComposer`。普通`/workbench`无全局导航/侧栏；身份管理使用同一SPA的独立受保护route mode，生产CRUD不计入R1。
+- Workbench envelope固定为一句`todaySummary`、零或一张完整`currentCard`、最多两条`nextSummaries`、一个`waitingCount`和一个固定`chatComposer`。普通`/workbench`无全局导航/侧栏；身份管理使用同一SPA的独立受保护route mode。ADR-0014 仅纳入受控 ADM-01～04 HUMAN 子集及真实登录；其生产验收仍未完成。
 
 ## task-waiting-contract
 

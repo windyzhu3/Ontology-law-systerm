@@ -4,6 +4,282 @@
  */
 
 export interface paths {
+    "/api/v1/admin/identity/appointments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** list Appointments */
+        get: operations["listAppointments"];
+        put?: never;
+        /** create Appointment */
+        post: operations["createAppointment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/appointments/{id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** end Appointment */
+        post: operations["endAppointment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/appointments/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** resume Appointment */
+        post: operations["resumeAppointment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/appointments/{id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** suspend Appointment */
+        post: operations["suspendAppointment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/authority-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** list Authority Grants */
+        get: operations["listAuthorityGrants"];
+        put?: never;
+        /** create Authority Grant */
+        post: operations["createAuthorityGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/authority-grants/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** revoke Authority Grant */
+        post: operations["revokeAuthorityGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** get Identity Admin Options */
+        get: operations["getIdentityAdminOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** list Organization Units */
+        get: operations["listOrganizationUnits"];
+        put?: never;
+        /** create Organization Unit */
+        post: operations["createOrganizationUnit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/organizations/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** close Organization Unit */
+        post: operations["closeOrganizationUnit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/organizations/{id}/display-name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** rename Organization Unit */
+        patch: operations["renameOrganizationUnit"];
+        trace?: never;
+    };
+    "/api/v1/admin/identity/principals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** list Identity Principals */
+        get: operations["listIdentityPrincipals"];
+        put?: never;
+        /** create Identity Principal */
+        post: operations["createIdentityPrincipal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/principals/{id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** disable Identity Principal */
+        post: operations["disableIdentityPrincipal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/principals/{id}/display-name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** rename Identity Principal */
+        patch: operations["renameIdentityPrincipal"];
+        trace?: never;
+    };
+    "/api/v1/admin/identity/principals/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** resume Identity Principal */
+        post: operations["resumeIdentityPrincipal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/principals/{id}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** suspend Identity Principal */
+        post: operations["suspendIdentityPrincipal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/provider-users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** list Identity Provider Users */
+        get: operations["listIdentityProviderUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/commands/{commandId}/receipt": {
         parameters: {
             query?: never;
@@ -11,7 +287,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Recover the terminal receipt for one caller command UUID */
+        /**
+         * Recover the terminal receipt for one caller command UUID
+         * @description ADR-0013 / R1-HTTP-V1.3: only the identical original trusted Actor and on-behalf pair may recover a public command receipt. R1_RECEIPT_RECOVERY_METADATA_LOOKUP_V1 obtains bounded metadata inside Audit Owner; current Owner authorization is recomputed without rerunning terminal command eligibility. READ_COMMAND_RECEIPT Audit must commit with acknowledgement before serialization. All responses use Cache-Control: no-store; no success ETag or 304. Missing or invalid same-Actor recovery metadata safely fails with existing SERVICE_UNAVAILABLE; wrong Actor, Tenant or internal recovery is NOT_FOUND. Legacy recovery requires the complete original request and original Idempotency-Key at its original endpoint, with zero replay delta; never automatically use a new key.
+         */
         get: operations["getCommandReceipt"];
         put?: never;
         post?: never;
@@ -32,6 +311,23 @@ export interface paths {
         put?: never;
         /** Capture one Lead from a source account */
         post: operations["captureLead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/session/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** get Session Context */
+        get: operations["getSessionContext"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -392,6 +688,37 @@ export interface components {
             preconditions: components["schemas"]["PreconditionTokens"];
             receipt: components["schemas"]["ActionDraftCommandReceipt"];
         };
+        AppointmentCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED" | "NO_CHANGE";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["AppointmentFactRefV1"];
+        };
+        AppointmentFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "APPOINTMENT";
+            revision: components["schemas"]["Revision"];
+        };
+        AppointmentPageV1: {
+            items: components["schemas"]["AppointmentV1"][];
+            nextCursor: string | null;
+        };
+        AppointmentV1: {
+            effectiveFrom: components["schemas"]["Instant"];
+            /** Format: date-time */
+            effectiveUntil: string | null;
+            etag: components["schemas"]["IdentityETag"];
+            id: components["schemas"]["Uuid"];
+            organization: components["schemas"]["IdentityChoiceV1"];
+            principal: components["schemas"]["IdentityChoiceV1"];
+            /** @enum {string} */
+            roleCode: "INTAKE_OPERATOR" | "ROUTING_SUPERVISOR" | "CONTACT_OPERATOR" | "IDENTITY_ADMIN";
+            /** @enum {string} */
+            state: "ACTIVE" | "SUSPENDED" | "ENDED";
+        };
         AssignLeadBusinessPurpose: {
             /** @enum {string} */
             code: "ASSIGN_LEAD";
@@ -466,6 +793,37 @@ export interface components {
         AssignLeadValuesV1: {
             ownerAppointmentId: components["schemas"]["Uuid"];
         };
+        AuthorityGrantCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED" | "NO_CHANGE";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["AuthorityGrantFactRefV1"];
+        };
+        AuthorityGrantFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "AUTHORITY_GRANT";
+            revision: components["schemas"]["Revision"];
+        };
+        AuthorityGrantPageV1: {
+            items: components["schemas"]["AuthorityGrantV1"][];
+            nextCursor: string | null;
+        };
+        AuthorityGrantV1: {
+            appointment: components["schemas"]["IdentityChoiceV1"];
+            /** @enum {string} */
+            authorityCode: "LEAD_CAPTURE" | "LEAD_INGRESS_RESOLVE" | "LEAD_INGRESS_COMPLETE" | "LEAD_ASSIGN" | "LEAD_ROUTING_DECIDE" | "SOURCE_INTAKE_REQUEST_ACK" | "SALES_CONTACT_OWNER" | "LEAD_VALIDITY_REVIEW" | "IDENTITY_PRINCIPAL_MANAGE" | "IDENTITY_ORGANIZATION_MANAGE" | "IDENTITY_APPOINTMENT_MANAGE" | "IDENTITY_AUTHORITY_MANAGE";
+            etag: components["schemas"]["IdentityETag"];
+            id: components["schemas"]["Uuid"];
+            scopeOrganization: components["schemas"]["IdentityChoiceV1"];
+            /** @enum {string} */
+            state: "ACTIVE" | "REVOKED";
+            validFrom: components["schemas"]["Instant"];
+            /** Format: date-time */
+            validUntil: string | null;
+        };
         CaptureLeadV1: {
             capturedAt: components["schemas"]["Instant"];
             capturedName?: components["schemas"]["SafeText200"];
@@ -487,6 +845,10 @@ export interface components {
             mode: "ACTION_DRAFT";
             placeholder: components["schemas"]["SafeText200"];
             targetTaskId: components["schemas"]["Uuid"] | null;
+        };
+        CloseOrganizationUnitV1: {
+            /** @enum {string} */
+            reasonCode: "ADMINISTRATIVE_ACTION" | "SECURITY_RESPONSE";
         };
         Code64: string;
         CommandForm: {
@@ -690,6 +1052,31 @@ export interface components {
         };
         /** @enum {string} */
         ContactResultCode: "CONNECTED_VALID" | "NOT_CONNECTED" | "SUSPECT_INVALID";
+        CreateAppointmentV1: {
+            effectiveFrom: components["schemas"]["Instant"];
+            /** Format: date-time */
+            effectiveUntil: string | null;
+            organizationId: components["schemas"]["Uuid"];
+            principalId: components["schemas"]["Uuid"];
+            roleCode: components["schemas"]["IdentityRoleCodeV1"];
+        };
+        CreateAuthorityGrantV1: {
+            appointmentId: components["schemas"]["Uuid"];
+            authorityCode: components["schemas"]["GrantableAuthorityCodeV1"];
+            scopeOrganizationId: components["schemas"]["Uuid"];
+            validFrom: components["schemas"]["Instant"];
+            /** Format: date-time */
+            validUntil: string | null;
+        };
+        CreateIdentityPrincipalV1: {
+            displayName: components["schemas"]["SafeText200"];
+            providerUserSelector: string;
+        };
+        CreateOrganizationUnitV1: {
+            code: string;
+            displayName: components["schemas"]["SafeText200"];
+            parentOrganizationId: components["schemas"]["Uuid"];
+        };
         CurrentCard: {
             actionDraft: components["schemas"]["ActionDraftProjection"] | null;
             businessPurpose: components["schemas"]["LabeledCode"];
@@ -732,6 +1119,10 @@ export interface components {
             factType: "DECISION_RECORD";
         };
         Digest32: string;
+        DisableIdentityPrincipalV1: {
+            /** @enum {string} */
+            reasonCode: "ADMINISTRATIVE_ACTION" | "SECURITY_RESPONSE";
+        };
         DraftConfirmationV1: {
             draftDigest: components["schemas"]["Digest32"];
             draftId: components["schemas"]["Uuid"];
@@ -757,6 +1148,10 @@ export interface components {
             candidates: components["schemas"]["DueR1TaskCandidateV1"][];
             nextCursor?: string;
         };
+        EndAppointmentV1: {
+            /** @enum {string} */
+            reasonCode: "ADMINISTRATIVE_ACTION" | "SECURITY_RESPONSE";
+        };
         /** @enum {string} */
         ErrorCode: "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_INVALID" | "UNAUTHENTICATED" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "NOT_FOUND" | "COMMAND_PAYLOAD_CONFLICT" | "TASK_NOT_OPEN" | "TASK_ALREADY_COMPLETED" | "DRAFT_DIGEST_MISMATCH" | "INGRESS_COMPLETION_ALREADY_RECORDED" | "STALE_TASK" | "STALE_DRAFT" | "STALE_SUBJECT" | "SUPERVISOR_UNRESOLVED" | "SOURCE_INTAKE_OWNER_UNRESOLVED" | "DRAFT_PRECONDITION_REQUIRED" | "TASK_PRECONDITION_REQUIRED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE";
         FieldError: {
@@ -781,6 +1176,81 @@ export interface components {
             label: components["schemas"]["SafeText200"];
             value: string;
         };
+        /** @enum {string} */
+        GrantableAuthorityCodeV1: "LEAD_CAPTURE" | "LEAD_INGRESS_RESOLVE" | "LEAD_INGRESS_COMPLETE" | "LEAD_ASSIGN" | "LEAD_ROUTING_DECIDE" | "SOURCE_INTAKE_REQUEST_ACK" | "SALES_CONTACT_OWNER" | "LEAD_VALIDITY_REVIEW";
+        IdentityAdminOptionsV1: {
+            candidates: components["schemas"]["IdentityChoicePageV1"];
+            grantableAuthorityCodes: components["schemas"]["GrantableAuthorityCodeV1"][] & unknown;
+            optionKind: components["schemas"]["IdentityOptionKindV1"];
+            page: components["schemas"]["IdentityAdminPageV1"];
+            roleCodes: components["schemas"]["IdentityRoleCodeV1"][] & unknown;
+        };
+        /** @enum {string} */
+        IdentityAdminPageV1: "PRINCIPALS" | "ORGANIZATIONS" | "APPOINTMENTS" | "AUTHORITY_GRANTS";
+        IdentityChoicePageV1: {
+            items: components["schemas"]["IdentityChoiceV1"][];
+            nextCursor: string | null;
+        };
+        IdentityChoiceV1: {
+            id: components["schemas"]["Uuid"];
+            label: components["schemas"]["SafeText200"];
+        };
+        IdentityCursorV1: string;
+        IdentityETag: string;
+        /** @enum {string} */
+        IdentityOptionKindV1: "PRINCIPAL" | "ORGANIZATION" | "APPOINTMENT";
+        IdentityPrincipalCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED" | "NO_CHANGE";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["IdentityPrincipalFactRefV1"];
+        };
+        IdentityPrincipalFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "IDENTITY_PRINCIPAL";
+            revision: components["schemas"]["Revision"];
+        };
+        IdentityPrincipalPageV1: {
+            items: components["schemas"]["IdentityPrincipalV1"][];
+            nextCursor: string | null;
+        };
+        IdentityPrincipalV1: {
+            displayName: components["schemas"]["SafeText200"];
+            etag: components["schemas"]["IdentityETag"];
+            id: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            state: "ACTIVE" | "SUSPENDED" | "DISABLED";
+        };
+        IdentityProblemV1: {
+            /** @enum {string} */
+            code: "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_INVALID" | "UNAUTHENTICATED" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "NOT_FOUND" | "COMMAND_PAYLOAD_CONFLICT" | "IDENTITY_BINDING_CONFLICT" | "IDENTITY_STATE_CONFLICT" | "IDENTITY_SELF_LOCKOUT" | "IDENTITY_LAST_ADMIN" | "IDENTITY_ORGANIZATION_DEPENDENCY" | "IDENTITY_RESPONSIBILITY_DEPENDENCY" | "STALE_IDENTITY" | "IDENTITY_PRECONDITION_REQUIRED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE";
+            currentETag?: components["schemas"]["IdentityETag"];
+            detail: components["schemas"]["SafeText500"];
+            fieldErrors?: components["schemas"]["FieldError"][];
+            instance: string;
+            receiptRef?: components["schemas"]["ReceiptRef"];
+            retryPolicy: components["schemas"]["RetryPolicy"];
+            /** @enum {integer} */
+            status: 400 | 401 | 403 | 404 | 409 | 412 | 428 | 429 | 500 | 503;
+            title: components["schemas"]["SafeText200"];
+            /** Format: uri */
+            type: string;
+        } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
+        IdentityRejectedCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @constant */
+            outcome: "REJECTED";
+            receiptId: components["schemas"]["Uuid"];
+            rejectionCode: components["schemas"]["IdentityTerminalRejectionCodeV1"];
+        };
+        /** @enum {string} */
+        IdentityRoleCodeV1: "INTAKE_OPERATOR" | "ROUTING_SUPERVISOR" | "CONTACT_OPERATOR";
+        /** @enum {string} */
+        IdentityTerminalRejectionCodeV1: "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "NOT_FOUND" | "IDENTITY_BINDING_CONFLICT" | "IDENTITY_STATE_CONFLICT" | "IDENTITY_SELF_LOCKOUT" | "IDENTITY_LAST_ADMIN" | "IDENTITY_ORGANIZATION_DEPENDENCY" | "IDENTITY_RESPONSIBILITY_DEPENDENCY" | "STALE_IDENTITY";
         /** Format: date-time */
         Instant: string;
         InternalProblem: {
@@ -882,6 +1352,34 @@ export interface components {
             resultSummary?: components["schemas"]["SafeText500"];
         };
         OpaqueRef: string;
+        OrganizationUnitCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED" | "NO_CHANGE";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["OrganizationUnitFactRefV1"];
+        };
+        OrganizationUnitFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "ORGANIZATION_UNIT";
+            revision: components["schemas"]["Revision"];
+        };
+        OrganizationUnitPageV1: {
+            items: components["schemas"]["OrganizationUnitV1"][];
+            nextCursor: string | null;
+        };
+        OrganizationUnitV1: {
+            code: string;
+            displayName: components["schemas"]["SafeText200"];
+            etag: components["schemas"]["IdentityETag"];
+            id: components["schemas"]["Uuid"];
+            /** Format: uuid */
+            parentOrganizationId: string | null;
+            /** @enum {string} */
+            state: "ACTIVE" | "CLOSED";
+        };
         OwnerSummary: {
             displayName: components["schemas"]["SafeText200"];
             organizationLabel: components["schemas"]["SafeText200"];
@@ -956,7 +1454,15 @@ export interface components {
             /** Format: uri */
             type: string;
         } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
-        PublicFactRef: components["schemas"]["LeadFactRef"] | components["schemas"]["ActionDraftFactRef"] | components["schemas"]["TaskOccurrenceFactRef"] | components["schemas"]["DecisionRecordFactRef"] | components["schemas"]["LeadAssignmentFactRef"] | components["schemas"]["LeadContactResultFactRef"];
+        ProviderUserChoiceV1: {
+            label: components["schemas"]["SafeText200"];
+            selector: string;
+        };
+        ProviderUserPageV1: {
+            items: components["schemas"]["ProviderUserChoiceV1"][];
+            nextCursor: string | null;
+        };
+        PublicFactRef: components["schemas"]["IdentityPrincipalFactRefV1"] | components["schemas"]["OrganizationUnitFactRefV1"] | components["schemas"]["AppointmentFactRefV1"] | components["schemas"]["AuthorityGrantFactRefV1"] | components["schemas"]["LeadFactRef"] | components["schemas"]["ActionDraftFactRef"] | components["schemas"]["TaskOccurrenceFactRef"] | components["schemas"]["DecisionRecordFactRef"] | components["schemas"]["LeadAssignmentFactRef"] | components["schemas"]["LeadContactResultFactRef"];
         /** @enum {string} */
         PublicFactType: "LEAD" | "ACTION_DRAFT" | "TASK_OCCURRENCE" | "DECISION_RECORD" | "LEAD_ASSIGNMENT" | "LEAD_CONTACT_RESULT";
         ReceiptRef: {
@@ -1087,6 +1593,12 @@ export interface components {
             receiptId: components["schemas"]["Uuid"];
             rejectionCode: components["schemas"]["TerminalRejectionCode"];
         };
+        RenameIdentityPrincipalV1: {
+            displayName: components["schemas"]["SafeText200"];
+        };
+        RenameOrganizationUnitV1: {
+            displayName: components["schemas"]["SafeText200"];
+        };
         ReopenDueContactTaskV1: {
             dueCutoff: components["schemas"]["Instant"];
             expectedTaskRevision: components["schemas"]["Revision"];
@@ -1216,6 +1728,14 @@ export interface components {
         ResourceETag: string;
         /** @enum {string} */
         ResourceKind: "WORKBENCH" | "TASK" | "DRAFT" | "SUBJECT";
+        ResumeAppointmentV1: {
+            /** @enum {string} */
+            reasonCode: "ADMINISTRATIVE_ACTION" | "SECURITY_RESPONSE";
+        };
+        ResumeIdentityPrincipalV1: {
+            /** @enum {string} */
+            reasonCode: "ADMINISTRATIVE_ACTION" | "SECURITY_RESPONSE";
+        };
         /** @enum {string} */
         RetryPolicy: "NO" | "SAME_KEY_AFTER_FIX" | "SAME_KEY_AFTER_REAUTH" | "NEW_KEY_AFTER_REFRESH" | "NEW_KEY_AFTER_ADMIN_FIX" | "SAME_KEY_AFTER_BACKOFF";
         ReviewLeadValidityBusinessPurpose: {
@@ -1305,6 +1825,10 @@ export interface components {
          * @description JSON safe integer revision; values outside this range are rejected without coercion.
          */
         Revision: number;
+        RevokeAuthorityGrantV1: {
+            /** @enum {string} */
+            reasonCode: "ADMINISTRATIVE_ACTION" | "SECURITY_RESPONSE";
+        };
         SafeText200: string;
         SafeText500: string;
         SafeText2000: string;
@@ -1315,6 +1839,17 @@ export interface components {
         } & (components["schemas"]["ResolveDuplicateLeadDraftBinding"] | components["schemas"]["CompleteLeadIngressDraftBinding"] | components["schemas"]["AssignLeadDraftBinding"] | components["schemas"]["RecordRoutingDispositionDraftBinding"] | components["schemas"]["AcknowledgeSourceIntakeStopRequestDraftBinding"] | components["schemas"]["RecordContactResultDraftBinding"] | components["schemas"]["ReviewLeadValidityDraftBinding"]);
         /** @enum {integer} */
         SchemaVersionV1: 1;
+        SessionContextV1: {
+            actorScopeKey: string | null;
+            appointmentChoices: components["schemas"]["IdentityChoiceV1"][];
+            canEnterIdentityAdmin: boolean;
+            canEnterWorkbench: boolean;
+            displayName: components["schemas"]["SafeText200"];
+            /** Format: uuid */
+            selectedAppointmentId: string | null;
+            /** @enum {string} */
+            state: "NO_APPOINTMENT" | "APPOINTMENT_SELECTION_REQUIRED" | "READY";
+        } & (unknown & unknown & unknown);
         SlaSummary: {
             code: components["schemas"]["Code64"];
             dueAt: components["schemas"]["Instant"];
@@ -1370,6 +1905,14 @@ export interface components {
             resultCode: "SUSPECT_INVALID";
             resultSummary?: components["schemas"]["SafeText500"];
         };
+        SuspendAppointmentV1: {
+            /** @enum {string} */
+            reasonCode: "ADMINISTRATIVE_ACTION" | "SECURITY_RESPONSE";
+        };
+        SuspendIdentityPrincipalV1: {
+            /** @enum {string} */
+            reasonCode: "ADMINISTRATIVE_ACTION" | "SECURITY_RESPONSE";
+        };
         TaskETag: string;
         TaskOccurrenceCommandReceipt: {
             commandId: components["schemas"]["Uuid"];
@@ -1392,7 +1935,7 @@ export interface components {
          * @description Post-slot business rejection codes that may be persisted in a terminal REJECTED CommandReceipt. Pre-slot, payload-conflict, rate-limit, and technical failures never create a new receipt.
          * @enum {string}
          */
-        TerminalRejectionCode: "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "TASK_NOT_OPEN" | "TASK_ALREADY_COMPLETED" | "DRAFT_DIGEST_MISMATCH" | "INGRESS_COMPLETION_ALREADY_RECORDED" | "STALE_TASK" | "STALE_DRAFT" | "STALE_SUBJECT" | "SUPERVISOR_UNRESOLVED" | "SOURCE_INTAKE_OWNER_UNRESOLVED";
+        TerminalRejectionCode: "NOT_FOUND" | "IDENTITY_BINDING_CONFLICT" | "IDENTITY_STATE_CONFLICT" | "IDENTITY_SELF_LOCKOUT" | "IDENTITY_LAST_ADMIN" | "IDENTITY_ORGANIZATION_DEPENDENCY" | "IDENTITY_RESPONSIBILITY_DEPENDENCY" | "STALE_IDENTITY" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "TASK_NOT_OPEN" | "TASK_ALREADY_COMPLETED" | "DRAFT_DIGEST_MISMATCH" | "INGRESS_COMPLETION_ALREADY_RECORDED" | "STALE_TASK" | "STALE_DRAFT" | "STALE_SUBJECT" | "SUPERVISOR_UNRESOLVED" | "SOURCE_INTAKE_OWNER_UNRESOLVED";
         /** Format: uuid */
         Uuid: string;
         WorkbenchETag: string;
@@ -1433,6 +1976,107 @@ export interface components {
             };
             content: {
                 "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Safe Identity failure; obey the exact code, retry and disclosure contract. */
+        Identity400Problem: {
+            headers: {
+                "Cache-Control": components["headers"]["IdentityNoStore"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["IdentityProblemV1"];
+            };
+        };
+        /** @description Safe Identity failure; obey the exact code, retry and disclosure contract. */
+        Identity401Problem: {
+            headers: {
+                "Cache-Control": components["headers"]["IdentityNoStore"];
+                "WWW-Authenticate": components["headers"]["PublicBearerChallenge"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["IdentityProblemV1"];
+            };
+        };
+        /** @description Safe Identity failure; obey the exact code, retry and disclosure contract. */
+        Identity403Problem: {
+            headers: {
+                "Cache-Control": components["headers"]["IdentityNoStore"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["IdentityProblemV1"];
+            };
+        };
+        /** @description Safe Identity failure; obey the exact code, retry and disclosure contract. */
+        Identity404Problem: {
+            headers: {
+                "Cache-Control": components["headers"]["IdentityNoStore"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["IdentityProblemV1"];
+            };
+        };
+        /** @description Safe Identity failure; obey the exact code, retry and disclosure contract. */
+        Identity409Problem: {
+            headers: {
+                "Cache-Control": components["headers"]["IdentityNoStore"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["IdentityProblemV1"];
+            };
+        };
+        /** @description Safe Identity failure; obey the exact code, retry and disclosure contract. */
+        Identity412Problem: {
+            headers: {
+                "Cache-Control": components["headers"]["IdentityNoStore"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["IdentityProblemV1"];
+            };
+        };
+        /** @description Safe Identity failure; obey the exact code, retry and disclosure contract. */
+        Identity428Problem: {
+            headers: {
+                "Cache-Control": components["headers"]["IdentityNoStore"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["IdentityProblemV1"];
+            };
+        };
+        /** @description Safe Identity failure; obey the exact code, retry and disclosure contract. */
+        Identity429Problem: {
+            headers: {
+                "Cache-Control": components["headers"]["IdentityNoStore"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["IdentityProblemV1"];
+            };
+        };
+        /** @description Safe Identity failure; obey the exact code, retry and disclosure contract. */
+        Identity500Problem: {
+            headers: {
+                "Cache-Control": components["headers"]["IdentityNoStore"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["IdentityProblemV1"];
+            };
+        };
+        /** @description Safe Identity failure; obey the exact code, retry and disclosure contract. */
+        Identity503Problem: {
+            headers: {
+                "Cache-Control": components["headers"]["IdentityNoStore"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["IdentityProblemV1"];
             };
         };
         /** @description Internal request validation failed. */
@@ -1632,12 +2276,21 @@ export interface components {
         };
     };
     parameters: {
+        /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+        AppointmentSelection: components["schemas"]["Uuid"];
         CommandIdPath: components["schemas"]["Uuid"];
         DraftCreateIfNoneMatch: "*";
         DraftIfMatch: components["schemas"]["DraftETag"];
         DueCursorQuery: string;
         DueLimitQuery: number;
         IdempotencyKey: components["schemas"]["Uuid"];
+        IdentityAdminPage: components["schemas"]["IdentityAdminPageV1"];
+        IdentityCursor: components["schemas"]["IdentityCursorV1"];
+        IdentityIdPath: components["schemas"]["Uuid"];
+        IdentityIfMatch: components["schemas"]["IdentityETag"];
+        IdentityLimit: number;
+        IdentityOptionKind: components["schemas"]["IdentityOptionKindV1"];
+        IdentitySearch: string;
         RecoveryTypeQuery: components["schemas"]["RecoveryTypeV1"];
         TaskIdPath: components["schemas"]["Uuid"];
         TaskIfMatch: components["schemas"]["TaskETag"];
@@ -1647,6 +2300,8 @@ export interface components {
     headers: {
         /** @description Strong ActionDraft state and revision tag. */
         DraftETagHeader: components["schemas"]["DraftETag"];
+        IdentityETagHeader: components["schemas"]["IdentityETag"];
+        IdentityNoStore: "no-store";
         /** @description Standard Bearer authentication challenge. */
         PublicBearerChallenge: string;
         /** @description Relative URI of the original terminal CommandReceipt. */
@@ -1662,10 +2317,816 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listAppointments: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["IdentityCursor"];
+                limit?: components["parameters"]["IdentityLimit"];
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Audited bounded disclosure; no-store and no 304. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentPageV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    createAppointment: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAppointmentV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    endAppointment: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndAppointmentV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    resumeAppointment: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResumeAppointmentV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    suspendAppointment: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuspendAppointmentV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    listAuthorityGrants: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["IdentityCursor"];
+                limit?: components["parameters"]["IdentityLimit"];
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Audited bounded disclosure; no-store and no 304. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorityGrantPageV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    createAuthorityGrant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAuthorityGrantV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorityGrantCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    revokeAuthorityGrant: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevokeAuthorityGrantV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorityGrantCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    getIdentityAdminOptions: {
+        parameters: {
+            query: {
+                cursor?: components["parameters"]["IdentityCursor"];
+                limit?: components["parameters"]["IdentityLimit"];
+                optionKind: components["parameters"]["IdentityOptionKind"];
+                page: components["parameters"]["IdentityAdminPage"];
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Audited bounded disclosure; no-store and no 304. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityAdminOptionsV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    listOrganizationUnits: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["IdentityCursor"];
+                limit?: components["parameters"]["IdentityLimit"];
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Audited bounded disclosure; no-store and no 304. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationUnitPageV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    createOrganizationUnit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrganizationUnitV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationUnitCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    closeOrganizationUnit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseOrganizationUnitV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationUnitCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    renameOrganizationUnit: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameOrganizationUnitV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationUnitCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    listIdentityPrincipals: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["IdentityCursor"];
+                limit?: components["parameters"]["IdentityLimit"];
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Audited bounded disclosure; no-store and no 304. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityPrincipalPageV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    createIdentityPrincipal: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateIdentityPrincipalV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityPrincipalCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    disableIdentityPrincipal: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisableIdentityPrincipalV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityPrincipalCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    renameIdentityPrincipal: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameIdentityPrincipalV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityPrincipalCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    resumeIdentityPrincipal: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResumeIdentityPrincipalV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityPrincipalCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    suspendIdentityPrincipal: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuspendIdentityPrincipalV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityPrincipalCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    listIdentityProviderUsers: {
+        parameters: {
+            query: {
+                cursor?: components["parameters"]["IdentityCursor"];
+                limit?: components["parameters"]["IdentityLimit"];
+                search: components["parameters"]["IdentitySearch"];
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Audited bounded disclosure; no-store and no 304. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderUserPageV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
     getCommandReceipt: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
             path: {
                 commandId: components["parameters"]["CommandIdPath"];
             };
@@ -1673,7 +3134,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Original terminal receipt projection. */
+            /** @description Original terminal receipt projection, disclosed only after READ_COMMAND_RECEIPT Audit commit acknowledgement; Cache-Control: no-store. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1695,6 +3156,8 @@ export interface operations {
             query?: never;
             header: {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
             };
             path?: never;
             cookie?: never;
@@ -1725,12 +3188,45 @@ export interface operations {
             503: components["responses"]["UnavailableProblem"];
         };
     };
+    getSessionContext: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Audited bounded disclosure; no-store and no 304. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionContextV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
     acknowledgeSourceIntakeStopRequest: {
         parameters: {
             query?: never;
             header: {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 "If-Match": components["parameters"]["TaskIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -1762,6 +3258,8 @@ export interface operations {
             header: {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 "If-Match": components["parameters"]["TaskIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -1793,6 +3291,8 @@ export interface operations {
             header: {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 "If-Match": components["parameters"]["TaskIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -1825,6 +3325,8 @@ export interface operations {
             header: {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 "If-Match": components["parameters"]["TaskIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -1857,6 +3359,8 @@ export interface operations {
             header: {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 "If-Match": components["parameters"]["TaskIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -1889,6 +3393,8 @@ export interface operations {
             header: {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 "If-Match": components["parameters"]["TaskIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -1921,6 +3427,8 @@ export interface operations {
             header: {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 "If-Match": components["parameters"]["TaskIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -1953,6 +3461,8 @@ export interface operations {
                 "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 "If-Match"?: components["parameters"]["DraftIfMatch"];
                 "If-None-Match"?: components["parameters"]["DraftCreateIfNoneMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
             };
             path: {
                 taskId: components["parameters"]["TaskIdPath"];
@@ -2004,6 +3514,8 @@ export interface operations {
             query?: never;
             header?: {
                 "If-None-Match"?: components["parameters"]["WorkbenchIfNoneMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
             };
             path?: never;
             cookie?: never;

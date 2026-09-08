@@ -10,6 +10,10 @@ import string
 import subprocess
 import sys
 import unicodedata
+try:
+    from scripts.baseline.task9_identity_contract import OPERATIONS as TASK9_OPERATIONS, validate as validate_task9_identity_contract
+except ModuleNotFoundError:
+    from task9_identity_contract import OPERATIONS as TASK9_OPERATIONS, validate as validate_task9_identity_contract
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PureWindowsPath
@@ -52,7 +56,7 @@ TARGET_GATE_STATES = {
 VISUAL_BUNDLE_VERSION = "visual-bundle-2026-08-27"
 VISUAL_OWNER = "Product Design"
 VISUAL_CONFIRMATION_DATE = "2026-08-27"
-CANONICAL_BASELINE_ID = "MVP-2026-09-08.1"
+CANONICAL_BASELINE_ID = "MVP-2026-09-08.2"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 HISTORICAL_BANNER = "历史规格（HISTORICAL_SUPERSEDED）"
 HISTORICAL_WARNING = (
@@ -881,7 +885,9 @@ def expected_visual_rows() -> dict[str, str]:
 
 EXPECTED_VISUAL_ROWS = expected_visual_rows()
 REQUIRED_NONVISUAL_ROWS = {
-    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1": ("MVP", "FROZEN", "MVP-2026-09-08.1", "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "R1-IDENTITY-ACCESS-CONTRACT": ("R1", "FROZEN", "R1-IDENTITY-ACCESS-V1.0", "../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md"),
     "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1": ("MVP", "FROZEN", "MVP-2026-09-07.1", "../baseline/CURRENT-MVP-BASELINE.md"),
     "DB-52P2-CONTRACT": ("MVP", "MERGED", "52-plus-2-v1", "../../database/schema-contract-52-plus-2/contract/schema_contract.py"),
     "DB-52P2-MIGRATIONS": ("MVP", "MERGED", "52-plus-2-v1", "../../database/schema-contract-52-plus-2/generated/db/migration/V840__schema_contract_validation.sql"),
@@ -1657,8 +1663,8 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
         return
     metadata = (
         (task_text, "R1-TASK-COMPLETION-V1.2", "R1 task contract"),
-        (http_text, "R1-HTTP-V1.3", "R1 HTTP contract"),
-        (workbench_text, "R1-WORKBENCH-V1.1", "R1 workbench contract"),
+        (http_text, "R1-HTTP-V1.4", "R1 HTTP contract"),
+        (workbench_text, "R1-WORKBENCH-V1.2", "R1 workbench contract"),
     )
     for text, expected_id, label in metadata:
         if field_value(text, "Contract ID") != expected_id or field_value(text, "Status") != "FROZEN":
@@ -1995,10 +2001,12 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
     operations = unique_rows_by(operation_rows, "OperationId", "R1 HTTP operation", findings)
     if operations is None:
         return
-    if set(operations) != set(R1_OPERATION_CONTRACTS):
+    if set(operations) != set(R1_OPERATION_CONTRACTS) | set(TASK9_OPERATIONS.values()):
         findings.append("R1 HTTP operations must contain the exact frozen OperationId set")
         return
     for operation_id, row in operations.items():
+        if operation_id in TASK9_OPERATIONS.values():
+            continue  # Exact new DTO/security/error matrix is validated by Task9's closed transport guard.
         method, path, idempotency, preconditions, subject_binding, success_status = (
             R1_OPERATION_CONTRACTS[operation_id]
         )
@@ -2104,6 +2112,8 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
             findings.append(f"R1 HTTP error registry lacks safe text: {error_code}")
             return
     for operation_id, row in operations.items():
+        if operation_id in TASK9_OPERATIONS.values():
+            continue  # IdentityProblemV1 is distinct from the original business error registry.
         operation_errors = {code.strip() for code in row["ErrorCodes"].split(",")}
         for error_code in operation_errors:
             if error_code not in errors:
@@ -2630,6 +2640,9 @@ def verify_delivery_ledger(root: Path, findings: list[str]) -> list[str] | None:
     if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1":
         findings.append("Delivery ledger previous baseline must point to the exact ADR-0013 successor")
         return
+    if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2":
+        findings.append("Delivery ledger previous baseline must point to the exact ADR-0014 successor")
+        return
     unexpected_visual_ids = sorted(visual_row_ids - set(EXPECTED_VISUAL_ROWS))
     if unexpected_visual_ids:
         findings.append(f"Delivery ledger has unexpected visual row: {unexpected_visual_ids[0]}")
@@ -2786,6 +2799,7 @@ def _verify_repository_result_unchecked(root: Path) -> VerificationResult:
     structural_findings.extend(validate_r1_contact_evidence_contract(root))
     structural_findings.extend(validate_r1_projection_readiness_contract(root))
     structural_findings.extend(validate_r1_receipt_recovery_contract(root))
+    structural_findings.extend(validate_task9_identity_contract(root))
     readiness_blockers = (
         verify_delivery_ledger(root, structural_findings) or []
     )

@@ -259,6 +259,25 @@ class TopologyVerifierTest(unittest.TestCase):
     def test_valid_single_artifact_layout_passes(self) -> None:
         self.assertEqual([], self._verify())
 
+    def test_task9_external_identity_lock_rejects_floating_and_shared_storage(self) -> None:
+        verifier = self._load_verifier()
+        path = Path("deploy/identity/identity-toolchain.lock.json")
+        approved = json.loads((REPOSITORY_ROOT / path).read_text(encoding="utf-8"))
+        active_api = b"openapi: 3.1.0\ninfo: {version: 1.3.0}\n"
+        findings = []
+        verifier._verify_identity_toolchain({verifier.CANONICAL_OPENAPI: active_api, path: json.dumps(approved).encode()}, "fixture", findings)
+        self.assertEqual([], findings)
+        for section, key, value in (("keycloak", "version", "latest"), ("keycloak", "platformDigest", "latest"),
+                                    ("oidcAdapter", "integrity", ""), ("identityDatabase", "ownership", "BUSINESS_DATABASE")):
+            altered = json.loads(json.dumps(approved))
+            altered[section][key] = value
+            findings = []
+            verifier._verify_identity_toolchain({verifier.CANONICAL_OPENAPI: active_api, path: json.dumps(altered).encode()}, "fixture", findings)
+            self.assertTrue(findings)
+        findings = []
+        verifier._verify_identity_toolchain({verifier.CANONICAL_OPENAPI: active_api}, "fixture", findings)
+        self.assertTrue(findings)
+
     def test_adr_closes_party_ownership_and_query_jooq_boundaries(self) -> None:
         adr = ADR_PATH.read_text(encoding="utf-8")
 

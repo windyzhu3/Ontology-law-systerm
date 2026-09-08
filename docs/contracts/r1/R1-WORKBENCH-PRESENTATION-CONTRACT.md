@@ -1,6 +1,11 @@
 # R1 Workbench 呈现合同
 
-Contract ID: R1-WORKBENCH-V1.1
+Contract ID: R1-WORKBENCH-V1.2
+
+Task9 identity authority: [ADR-0014](../../adr/ADR-0014-task9-real-user-access.md); profile: R1_IDENTITY_ACCESS_V1
+
+2026-09-08 named successor activates [Identity V1.0](R1-IDENTITY-ACCESS-CONTRACT.md), baseline MVP-2026-09-08.2, HTTP V1.4, Command V1.3, Workbench V1.2 and OpenAPI1.3.0: exactly37 operations (32 public Bearer +5 internal mTLS),14 static Identity commands and the principal-only self context. Prior activation paragraphs/counts below are historical. ADM-01–04 HUMAN production work and real login are now in Task9 scope; Task9.1 is static FROZEN only. Existing nine business request DTOs, seven Task types and fourteen events are unchanged. Keycloak independently owns external identity storage outside the business13 schemas/52+2 tables at52-plus-2-v1.2; one SPA/OpenAPI/Jar and exclusive APP_ROLE=api|worker remain. No Task9 runtime, human UAT, Task10/capacity or R1 release status is advanced.
+
 
 Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_LEGACY_RECOVERY_V1
 
@@ -14,7 +19,7 @@ Status: FROZEN
 
 确认日期：2026-09-02
 
-R1 只交付一份响应式 Workbench。身份管理 route mode 与 Workbench 位于同一 SPA，但身份管理生产能力不属于 R1 纵切实现范围。
+R1 只交付一份响应式 Workbench。ADR-0014 纳入同一 SPA 的受保护 ADM-01～04 HUMAN 身份管理及真实登录；静态合同不代表生产能力完成。
 
 ## Envelope fields
 
@@ -128,7 +133,7 @@ Workbench 普通路径不显示全局菜单或左侧栏；操作流围绕当前�
 
 ## R1 boundary
 
-R1 只实现 `/workbench` 及其 P0-01 至 P0-04、联系和有效性复核卡。`/admin/identity/*` 的 route mode、导航隔离和权限边界在脚手架中保留，但身份管理生产页面、CRUD 和独立验收属于后续交付，不能计入 R1 完成证据。
+原 Task9.0 的 `/workbench` 及其 P0-01 至 P0-04、联系和有效性复核卡保留历史证据。ADR-0014 将真实登录、会话与受控 `/admin/identity/*` ADM-01～04 纳入扩大 Task9；新增生产实现、真实账号链路与人工 UAT 均须独立通过，不能由旧证据替代。Token 只在内存；唯一持久恢复例外为 Identity 合同的四字段、每标签页一条、24 小时 sessionStorage 标记。同 Actor Token rotation 保留 epoch、输入及轮询额度，换身份/任职清除旧视图。状态优先级：身份失效 > 未决恢复 > 已确认但刷新失败 > 读取错误 > 普通摘要；NO_APPOINTMENT、无入口权限、未知读取与业务零态必须分别呈现。
 
 ## R1 Evidence selector disclosure
 

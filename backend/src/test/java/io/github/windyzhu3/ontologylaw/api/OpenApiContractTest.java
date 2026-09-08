@@ -265,9 +265,9 @@ public class OpenApiContractTest {
 
         assertEquals(REQUIRED_OPERATIONS, actual, "The R1 HTTP surface must remain closed and exact");
         assertEquals(
-                REQUIRED_OPERATIONS.size(),
+                33,
                 paths.size(),
-                "Each frozen R1 path must expose exactly one business operation"
+                "Four Identity collection paths share GET and POST; all operation pairs stay exact"
         );
     }
 
@@ -402,6 +402,10 @@ public class OpenApiContractTest {
     void freezesPerOperationErrorStatusCodeAndMetadataMatrix() {
         REQUIRED_OPERATIONS.forEach((key, operationId) -> {
             JsonNode operation = operationNode(key);
+            if (key.path().startsWith("/api/v1/admin/identity/") || operationId.equals("getSessionContext")) {
+                assertIdentityErrors(operation);
+                return;
+            }
             if (operationId.equals("checkR1ProjectionReadiness")) {
                 assertReadinessResponses(operation);
                 return;
@@ -517,7 +521,7 @@ public class OpenApiContractTest {
 
     @Test
     void freezesR1BusinessClosureInternalDtosAndErrors() {
-        assertEquals("1.2.0", document.path("info").path("version").asText());
+        assertEquals("1.3.0", document.path("info").path("version").asText());
         JsonNode candidate = document.path("components").path("schemas").path("DueR1TaskCandidateV1");
         assertFalse(candidate.path("additionalProperties").asBoolean());
         assertEquals(Set.of("recoveryType", "taskId", "expectedTaskRevision", "waitReceiptId",
@@ -571,8 +575,8 @@ public class OpenApiContractTest {
                 .getMethod("checkR1ProjectionReadiness");
         assertEquals(0, method.getParameterCount());
         assertEquals("org.springframework.http.ResponseEntity<java.lang.Void>", method.getGenericReturnType().getTypeName());
-        assertEquals(16, REQUIRED_OPERATIONS.size());
-        assertEquals(11L, REQUIRED_OPERATIONS.keySet().stream().filter(key -> key.path().startsWith("/api/")).count());
+        assertEquals(37, REQUIRED_OPERATIONS.size());
+        assertEquals(32L, REQUIRED_OPERATIONS.keySet().stream().filter(key -> key.path().startsWith("/api/")).count());
         assertEquals(5L, REQUIRED_OPERATIONS.keySet().stream().filter(key -> key.path().startsWith("/internal/")).count());
         OperationKey key = operationKey("checkR1ProjectionReadiness");
         assertEquals(new OperationKey("GET", "/internal/v1/projections/r1/readiness"), key);
@@ -1091,13 +1095,17 @@ public class OpenApiContractTest {
                         "NOT_AUTHORIZED", "APPOINTMENT_INACTIVE", "TASK_NOT_OPEN", "TASK_ALREADY_COMPLETED",
                         "DRAFT_DIGEST_MISMATCH", "INGRESS_COMPLETION_ALREADY_RECORDED",
                         "STALE_TASK", "STALE_DRAFT", "STALE_SUBJECT",
-                        "SUPERVISOR_UNRESOLVED", "SOURCE_INTAKE_OWNER_UNRESOLVED"
+                        "SUPERVISOR_UNRESOLVED", "SOURCE_INTAKE_OWNER_UNRESOLVED",
+                        "NOT_FOUND", "IDENTITY_BINDING_CONFLICT", "IDENTITY_STATE_CONFLICT",
+                        "IDENTITY_SELF_LOCKOUT", "IDENTITY_LAST_ADMIN", "IDENTITY_ORGANIZATION_DEPENDENCY",
+                        "IDENTITY_RESPONSIBILITY_DEPENDENCY", "STALE_IDENTITY"
                 ),
                 stringSet(schema("TerminalRejectionCode").path("enum")),
                 "Terminal rejection codes must exclude pre-slot, conflict, rate-limit, and technical failures"
         );
 
-        Set<String> publicFactRefs = new HashSet<>();
+        Set<String> publicFactRefs = new HashSet<>(Set.of(schemaRef("IdentityPrincipalFactRefV1"),
+                schemaRef("OrganizationUnitFactRefV1"), schemaRef("AppointmentFactRefV1"), schemaRef("AuthorityGrantFactRefV1")));
         contracts.values().forEach(contract -> publicFactRefs.add(schemaRef(contract.factSchema())));
         assertExactOneOfRefs(
                 schema("PublicFactRef"),
@@ -1114,6 +1122,71 @@ public class OpenApiContractTest {
         assertResponseEtag("saveActionDraft", "201", "draft");
         assertResponseEtag("reopenDueContactTasks", "200", "task");
         assertResponseEtag("reopenDueRoutingReviewTasks", "200", "task");
+    }
+
+
+    private static void assertIdentityErrors(JsonNode operation) {
+        Set<String> allowed = stringSet(schema("IdentityProblemV1").path("properties").path("code").path("enum"));
+        assertTrue(allowed.containsAll(stringSet(operation.path("x-error-codes"))));
+        operation.path("responses").fields().forEachRemaining(entry -> {
+            if (isSuccessStatus(entry.getKey())) return;
+            assertEquals(responseRef("Identity" + entry.getKey() + "Problem"), entry.getValue().path("$ref").asText());
+            JsonNode response = dereference(entry.getValue());
+            assertEquals(schemaRef("IdentityProblemV1"), response.path("content").path("application/problem+json").path("schema").path("$ref").asText());
+            assertEquals("no-store", dereference(response.path("headers").path("Cache-Control")).path("schema").path("const").asText());
+        });
+    }
+
+    @Test
+    void task9SelfContextAndAdminCommandsKeepIdentityAndAuthorityServerBound() {
+        JsonNode self = operationNode(operationKey("getSessionContext"));
+        assertEquals("AUTHENTICATED_IDENTITY", self.path("x-tenant-source").asText());
+        assertEquals("R1_AUTHENTICATED_IDENTITY_V1", self.path("x-authentication-profile").asText());
+        assertEquals(Set.of("displayName", "state", "appointmentChoices", "selectedAppointmentId", "actorScopeKey",
+                "canEnterWorkbench", "canEnterIdentityAdmin"), fieldNames(schema("SessionContextV1").path("properties")));
+        assertEquals(Set.of("string", "null"), stringSet(schema("SessionContextV1").path("properties").path("selectedAppointmentId").path("type")));
+        assertEquals(Set.of("LEAD_CAPTURE", "LEAD_INGRESS_RESOLVE", "LEAD_INGRESS_COMPLETE", "LEAD_ASSIGN",
+                "LEAD_ROUTING_DECIDE", "SOURCE_INTAKE_REQUEST_ACK", "SALES_CONTACT_OWNER", "LEAD_VALIDITY_REVIEW"),
+                stringSet(schema("GrantableAuthorityCodeV1").path("enum")));
+        assertEquals(20L, document.at("/components/parameters/IdentityLimit/schema/default").asLong());
+        assertEquals(50L, document.at("/components/parameters/IdentityLimit/schema/maximum").asLong());
+        JsonNode roles = schema("IdentityAdminOptionsV1").path("properties").path("roleCodes");
+        Map<String, Object> noAppointment = new LinkedHashMap<>();
+        noAppointment.put("displayName", "Safe user");
+        noAppointment.put("state", "NO_APPOINTMENT");
+        noAppointment.put("appointmentChoices", List.of());
+        noAppointment.put("selectedAppointmentId", null);
+        noAppointment.put("actorScopeKey", null);
+        noAppointment.put("canEnterWorkbench", false);
+        noAppointment.put("canEnterIdentityAdmin", false);
+        assertSchemaAccepts(noAppointment, schema("SessionContextV1"), "authenticated own Principal without Appointment");
+        noAppointment.put("selectedAppointmentId", "01993dfe-a521-7001-8000-000000000001");
+        assertSchemaRejects(noAppointment, schema("SessionContextV1"), "no fabricated Appointment in NO_APPOINTMENT");
+        noAppointment.put("selectedAppointmentId", null);
+        noAppointment.put("canEnterWorkbench", true);
+        assertSchemaRejects(noAppointment, schema("SessionContextV1"), "no-appointment cannot imply entry permission");
+        assertSchemaAccepts(List.of("INTAKE_OPERATOR", "CONTACT_OPERATOR"), roles, "distinct role options");
+        assertSchemaRejects(List.of("INTAKE_OPERATOR", "INTAKE_OPERATOR"), roles, "duplicate role options");
+        JsonNode grants = schema("IdentityAdminOptionsV1").path("properties").path("grantableAuthorityCodes");
+        assertSchemaAccepts(List.of("LEAD_CAPTURE", "LEAD_ASSIGN"), grants, "distinct grant options");
+        assertSchemaRejects(List.of("LEAD_CAPTURE", "LEAD_CAPTURE"), grants, "duplicate grant options");
+        REQUIRED_OPERATIONS.forEach((key, id) -> {
+            if (!key.path().startsWith("/api/v1/admin/identity/")) return;
+            JsonNode operation = operationNode(key);
+            assertEquals("DIRECT", operation.path("x-authority-path").asText());
+            assertEquals("ACTOR_CONTEXT", operation.path("x-tenant-source").asText());
+            if (key.method().equals("GET")) return;
+            assertEquals("INTERNAL_ADMIN", operation.path("x-envelope").asText());
+            JsonNode body = dereference(operation.path("requestBody").path("content").path("application/json").path("schema"));
+            assertFalse(body.path("additionalProperties").asBoolean());
+            assertEquals(fieldNames(body.path("properties")), stringSet(body.path("required")));
+            assertFalse(body.path("properties").has("tenantId"));
+            if (key.path().contains("{id}")) {
+                assertStrongEtagSchema(dereference(requiredParameter(key, "header", "If-Match").path("schema")), "identity", id);
+            } else {
+                assertParameterAbsent(key, "If-Match");
+            }
+        });
     }
 
     private static Path locateRepositoryRoot() {
@@ -1145,6 +1218,27 @@ public class OpenApiContractTest {
         operations.put(new OperationKey("GET", "/internal/v1/tasks/due"), "listDueR1Tasks");
         operations.put(new OperationKey("POST", "/internal/v1/projections/r1/consume"), "consumeR1Projection");
         operations.put(new OperationKey("GET", "/internal/v1/projections/r1/readiness"), "checkR1ProjectionReadiness");
+        operations.put(new OperationKey("GET", "/api/v1/session/context"), "getSessionContext");
+        operations.put(new OperationKey("GET", "/api/v1/admin/identity/provider-users"), "listIdentityProviderUsers");
+        operations.put(new OperationKey("GET", "/api/v1/admin/identity/options"), "getIdentityAdminOptions");
+        operations.put(new OperationKey("GET", "/api/v1/admin/identity/principals"), "listIdentityPrincipals");
+        operations.put(new OperationKey("POST", "/api/v1/admin/identity/principals"), "createIdentityPrincipal");
+        operations.put(new OperationKey("PATCH", "/api/v1/admin/identity/principals/{id}/display-name"), "renameIdentityPrincipal");
+        operations.put(new OperationKey("POST", "/api/v1/admin/identity/principals/{id}/suspend"), "suspendIdentityPrincipal");
+        operations.put(new OperationKey("POST", "/api/v1/admin/identity/principals/{id}/resume"), "resumeIdentityPrincipal");
+        operations.put(new OperationKey("POST", "/api/v1/admin/identity/principals/{id}/disable"), "disableIdentityPrincipal");
+        operations.put(new OperationKey("GET", "/api/v1/admin/identity/organizations"), "listOrganizationUnits");
+        operations.put(new OperationKey("POST", "/api/v1/admin/identity/organizations"), "createOrganizationUnit");
+        operations.put(new OperationKey("PATCH", "/api/v1/admin/identity/organizations/{id}/display-name"), "renameOrganizationUnit");
+        operations.put(new OperationKey("POST", "/api/v1/admin/identity/organizations/{id}/close"), "closeOrganizationUnit");
+        operations.put(new OperationKey("GET", "/api/v1/admin/identity/appointments"), "listAppointments");
+        operations.put(new OperationKey("POST", "/api/v1/admin/identity/appointments"), "createAppointment");
+        operations.put(new OperationKey("POST", "/api/v1/admin/identity/appointments/{id}/suspend"), "suspendAppointment");
+        operations.put(new OperationKey("POST", "/api/v1/admin/identity/appointments/{id}/resume"), "resumeAppointment");
+        operations.put(new OperationKey("POST", "/api/v1/admin/identity/appointments/{id}/end"), "endAppointment");
+        operations.put(new OperationKey("GET", "/api/v1/admin/identity/authority-grants"), "listAuthorityGrants");
+        operations.put(new OperationKey("POST", "/api/v1/admin/identity/authority-grants"), "createAuthorityGrant");
+        operations.put(new OperationKey("POST", "/api/v1/admin/identity/authority-grants/{id}/revoke"), "revokeAuthorityGrant");
         return Map.copyOf(operations);
     }
 
@@ -1152,18 +1246,18 @@ public class OpenApiContractTest {
         Map<String, OperationContract> contracts = new LinkedHashMap<>();
         contracts.put("captureLead", operationContract(
                 "CaptureLeadV1",
-                parameters("IdempotencyKey"),
+                parameters("IdempotencyKey", "AppointmentSelection"),
                 success("201", null, "LeadCommandReceipt", headers("Location", "ReceiptLocation"))
         ));
         contracts.put("getCurrentWorkCard", operationContract(
                 null,
-                parameters("WorkbenchIfNoneMatch"),
+                parameters("WorkbenchIfNoneMatch", "AppointmentSelection"),
                 success("200", null, "CurrentWorkCardEnvelope", headers("ETag", "WorkbenchETagHeader")),
                 success("304", null, null, headers("ETag", "WorkbenchETagHeader"))
         ));
         contracts.put("saveActionDraft", operationContract(
                 "SaveActionDraftV1",
-                parameters("TaskIdPath", "IdempotencyKey", "DraftIfMatch", "DraftCreateIfNoneMatch"),
+                parameters("TaskIdPath", "IdempotencyKey", "DraftIfMatch", "DraftCreateIfNoneMatch", "AppointmentSelection"),
                 success("200", null, "ActionDraftWriteResult",
                         headers("Location", "ReceiptLocation", "ETag", "DraftETagHeader")),
                 success("201", null, "ActionDraftWriteResult",
@@ -1185,7 +1279,7 @@ public class OpenApiContractTest {
                 "ReviewLeadValidityV1", "DecisionRecordCommandSucceeded"));
         contracts.put("getCommandReceipt", operationContract(
                 null,
-                parameters("CommandIdPath"),
+                parameters("CommandIdPath", "AppointmentSelection"),
                 success("200", null, "CommandReceipt", Map.of())
         ));
         contracts.put("reopenDueContactTasks", operationContract(
@@ -1213,6 +1307,27 @@ public class OpenApiContractTest {
         contracts.put("checkR1ProjectionReadiness", operationContract(
                 null, parameters(), success("204", null, null, headers("Cache-Control", "INLINE_NO_STORE"))
         ));
+        contracts.put("getSessionContext", operationContract(null, parameters("AppointmentSelection"), success("200", null, "SessionContextV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("listIdentityProviderUsers", operationContract(null, parameters("AppointmentSelection", "IdentityLimit", "IdentityCursor", "IdentitySearch"), success("200", null, "ProviderUserPageV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("getIdentityAdminOptions", operationContract(null, parameters("AppointmentSelection", "IdentityLimit", "IdentityCursor", "IdentityAdminPage", "IdentityOptionKind"), success("200", null, "IdentityAdminOptionsV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("listIdentityPrincipals", operationContract(null, parameters("AppointmentSelection", "IdentityLimit", "IdentityCursor"), success("200", null, "IdentityPrincipalPageV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("createIdentityPrincipal", operationContract("CreateIdentityPrincipalV1", parameters("AppointmentSelection", "IdempotencyKey"), success("201", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("renameIdentityPrincipal", operationContract("RenameIdentityPrincipalV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("suspendIdentityPrincipal", operationContract("SuspendIdentityPrincipalV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("resumeIdentityPrincipal", operationContract("ResumeIdentityPrincipalV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("disableIdentityPrincipal", operationContract("DisableIdentityPrincipalV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "IdentityPrincipalCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("listOrganizationUnits", operationContract(null, parameters("AppointmentSelection", "IdentityLimit", "IdentityCursor"), success("200", null, "OrganizationUnitPageV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("createOrganizationUnit", operationContract("CreateOrganizationUnitV1", parameters("AppointmentSelection", "IdempotencyKey"), success("201", null, "OrganizationUnitCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("renameOrganizationUnit", operationContract("RenameOrganizationUnitV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "OrganizationUnitCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("closeOrganizationUnit", operationContract("CloseOrganizationUnitV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "OrganizationUnitCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("listAppointments", operationContract(null, parameters("AppointmentSelection", "IdentityLimit", "IdentityCursor"), success("200", null, "AppointmentPageV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("createAppointment", operationContract("CreateAppointmentV1", parameters("AppointmentSelection", "IdempotencyKey"), success("201", null, "AppointmentCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("suspendAppointment", operationContract("SuspendAppointmentV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "AppointmentCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("resumeAppointment", operationContract("ResumeAppointmentV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "AppointmentCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("endAppointment", operationContract("EndAppointmentV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "AppointmentCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("listAuthorityGrants", operationContract(null, parameters("AppointmentSelection", "IdentityLimit", "IdentityCursor"), success("200", null, "AuthorityGrantPageV1", headers("Cache-Control", "IdentityNoStore"))));
+        contracts.put("createAuthorityGrant", operationContract("CreateAuthorityGrantV1", parameters("AppointmentSelection", "IdempotencyKey"), success("201", null, "AuthorityGrantCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
+        contracts.put("revokeAuthorityGrant", operationContract("RevokeAuthorityGrantV1", parameters("AppointmentSelection", "IdempotencyKey", "IdentityIdPath", "IdentityIfMatch"), success("200", null, "AuthorityGrantCommandReceiptV1", headers("Cache-Control", "IdentityNoStore", "Location", "ReceiptLocation", "ETag", "IdentityETagHeader"))));
         return Map.copyOf(contracts);
     }
 
@@ -1283,7 +1398,7 @@ public class OpenApiContractTest {
     private static OperationContract taskCommandContract(String requestSchema, String responseComponent) {
         return operationContract(
                 requestSchema,
-                parameters("TaskIdPath", "IdempotencyKey", "TaskIfMatch"),
+                parameters("TaskIdPath", "IdempotencyKey", "TaskIfMatch", "AppointmentSelection"),
                 success("200", responseComponent, responseSchemaForComponent(responseComponent),
                         headers("Location", "ReceiptLocation"))
         );
@@ -1712,7 +1827,9 @@ public class OpenApiContractTest {
             JsonNode properties = node.path("properties");
             if (properties.isObject()) {
                 properties.fieldNames().forEachRemaining(name -> {
-                    if (FORBIDDEN_PUBLIC_NAMES.contains(name.toLowerCase(Locale.ROOT))) {
+                    boolean approvedAdminSelector = location.equals("$/components/schemas/CreateAppointmentV1")
+                            && Set.of("principalId", "organizationId").contains(name);
+                    if (FORBIDDEN_PUBLIC_NAMES.contains(name.toLowerCase(Locale.ROOT)) && !approvedAdminSelector) {
                         violations.add(location + "/properties/" + name);
                     }
                 });

@@ -268,7 +268,7 @@ def validate(root: Path) -> list[str]:
 
     requirements = {
         "command": (
-            ("Semantic baseline: MVP-2026-09-08.1", "command semantic baseline"),
+            ("Semantic baseline: MVP-2026-09-08.2", "command semantic baseline"),
             ("`lead→evidence`、`api→evidence`、`evidence→identity`；读取", "dependency DAG"),
             ("不得以`contactNo<=3`限制事件合法性", "event ordinal"),
             ("最终QUERY阶段", "final QUERY revalidation"),
@@ -295,7 +295,7 @@ def validate(root: Path) -> list[str]:
             ("选择下一张合格卡或返回安全零态", "hidden card fallback"),
         ),
         "baseline": (
-            ("Baseline ID: MVP-2026-09-08.1", "active baseline"),
+            ("Baseline ID: MVP-2026-09-08.2", "active baseline"),
             ("Task contract `R1-TASK-COMPLETION-V1.2`", "active Task contract"),
             ("physical capability `52-plus-2-v1.2` remain unchanged", "physical capability"),
             ("no production Handler, Evidence port, Workbench or R1 business status is advanced", "contract-only baseline"),

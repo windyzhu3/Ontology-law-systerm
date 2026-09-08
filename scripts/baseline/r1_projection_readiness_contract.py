@@ -91,6 +91,30 @@ PUBLIC_OPERATIONS = {
     ("get", "/api/v1/commands/{commandId}/receipt"): "getCommandReceipt",
 }
 
+PUBLIC_OPERATIONS.update({
+    ("get", "/api/v1/session/context"): "getSessionContext",
+    ("get", "/api/v1/admin/identity/provider-users"): "listIdentityProviderUsers",
+    ("get", "/api/v1/admin/identity/options"): "getIdentityAdminOptions",
+    ("get", "/api/v1/admin/identity/principals"): "listIdentityPrincipals",
+    ("post", "/api/v1/admin/identity/principals"): "createIdentityPrincipal",
+    ("patch", "/api/v1/admin/identity/principals/{id}/display-name"): "renameIdentityPrincipal",
+    ("post", "/api/v1/admin/identity/principals/{id}/suspend"): "suspendIdentityPrincipal",
+    ("post", "/api/v1/admin/identity/principals/{id}/resume"): "resumeIdentityPrincipal",
+    ("post", "/api/v1/admin/identity/principals/{id}/disable"): "disableIdentityPrincipal",
+    ("get", "/api/v1/admin/identity/organizations"): "listOrganizationUnits",
+    ("post", "/api/v1/admin/identity/organizations"): "createOrganizationUnit",
+    ("patch", "/api/v1/admin/identity/organizations/{id}/display-name"): "renameOrganizationUnit",
+    ("post", "/api/v1/admin/identity/organizations/{id}/close"): "closeOrganizationUnit",
+    ("get", "/api/v1/admin/identity/appointments"): "listAppointments",
+    ("post", "/api/v1/admin/identity/appointments"): "createAppointment",
+    ("post", "/api/v1/admin/identity/appointments/{id}/suspend"): "suspendAppointment",
+    ("post", "/api/v1/admin/identity/appointments/{id}/resume"): "resumeAppointment",
+    ("post", "/api/v1/admin/identity/appointments/{id}/end"): "endAppointment",
+    ("get", "/api/v1/admin/identity/authority-grants"): "listAuthorityGrants",
+    ("post", "/api/v1/admin/identity/authority-grants"): "createAuthorityGrant",
+    ("post", "/api/v1/admin/identity/authority-grants/{id}/revoke"): "revokeAuthorityGrant",
+})
+
 
 def _read(root: Path, relative: str, findings: list[str]) -> str:
     try:
@@ -123,24 +147,24 @@ def validate(root: Path) -> list[str]:
     if "Status: Accepted" not in _without_fenced_code(adr):
         findings.append("R1 readiness ADR-0012 must be active and Accepted")
     visible_baseline = _without_fenced_code(baseline)
-    if [line for line in visible_baseline if line.startswith("Baseline ID:")] != ["Baseline ID: MVP-2026-09-08.1"]:
-        findings.append("R1 readiness active baseline must be exactly MVP-2026-09-08.1")
+    if [line for line in visible_baseline if line.startswith("Baseline ID:")] != ["Baseline ID: MVP-2026-09-08.2"]:
+        findings.append("R1 readiness active baseline must be exactly MVP-2026-09-08.2")
     if not any("ADR-0012-r1-projection-readiness-protocol.md" in line for line in visible_baseline):
         findings.append("R1 readiness active baseline must name ADR-0012 supersession")
-    if "Contract ID: R1-HTTP-V1.3" not in _without_fenced_code(http):
-        findings.append("R1 readiness HTTP contract must activate R1-HTTP-V1.3")
+    if "Contract ID: R1-HTTP-V1.4" not in _without_fenced_code(http):
+        findings.append("R1 readiness HTTP contract must activate R1-HTTP-V1.4")
     http_rows = _rows(http, "Operations", ("OperationId", "Method", "Path", "TenantSource", "IdempotencyKey", "Preconditions", "SubjectBinding", "SuccessStatus", "ErrorCodes"), findings)
     expected_row = ("checkR1ProjectionReadiness", "GET", READINESS_PATH, "ACTOR_CONTEXT", "NONE", "NONE", "CURRENT_R1_OWNER_ORGANIZATION_COVERAGE", "204", ",".join(ERROR_CODES))
-    if len(http_rows) != 16 or [row for row in http_rows if row[0] == "checkR1ProjectionReadiness"] != [expected_row]:
-        findings.append("R1 readiness HTTP operation inventory must contain the exact readiness row among sixteen operations")
+    if len(http_rows) != 37 or [row for row in http_rows if row[0] == "checkR1ProjectionReadiness"] != [expected_row]:
+        findings.append("R1 readiness HTTP operation inventory must contain the exact readiness row among thirty-seven operations")
     try:
         document = yaml.load(source, Loader=_StrictSafeLoader)
     except (yaml.YAMLError, TypeError, ValueError) as error:
         findings.append(f"R1 readiness OpenAPI must be strict YAML: {error}")
         return findings
     document = _mapping(document)
-    if _mapping(document.get("info")).get("version") != "1.2.0":
-        findings.append("R1 readiness OpenAPI version must be exactly 1.2.0")
+    if _mapping(document.get("info")).get("version") != "1.3.0":
+        findings.append("R1 readiness OpenAPI version must be exactly 1.3.0")
     if document.get("security") not in (None, []):
         findings.append("R1 readiness does not allow a global security fallback")
     paths = _mapping(document.get("paths"))
@@ -166,8 +190,8 @@ def validate(root: Path) -> list[str]:
                 security = [{"publicBearer": []}]
             if operation.get("security") != security:
                 findings.append(f"R1 readiness exact security inventory differs: {operation['operationId']}")
-    if len(operations) != 16 or len(set(operations)) != 16 or public != PUBLIC_OPERATIONS or internal != INTERNAL_OPERATIONS:
-        findings.append("R1 readiness OpenAPI must expose exactly 16 unique operations: 11 public Bearer and 5 named internal mTLS")
+    if len(operations) != 37 or len(set(operations)) != 37 or public != PUBLIC_OPERATIONS or internal != INTERNAL_OPERATIONS:
+        findings.append("R1 readiness OpenAPI must expose exactly 37 unique operations: 32 public Bearer and 5 named internal mTLS")
     components = _mapping(document.get("components"))
     schemes = _mapping(components.get("securitySchemes"))
     if _mapping(schemes.get("internalMutualTls")).get("type") != "mutualTLS":

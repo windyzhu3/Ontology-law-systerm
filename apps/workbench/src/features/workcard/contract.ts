@@ -1,12 +1,6 @@
 import type { components } from "../../generated/api/schema";
 export type Schema = components["schemas"];
-// The current HTTP Evidence contract permits terminal NOT_FOUND after final
-// revalidation; preserve that public result without modifying generated types.
-export type PublicReceipt =
-  | Schema["CommandReceipt"]
-  | (Omit<Schema["RejectedCommandReceipt"], "rejectionCode"> & {
-      rejectionCode: "NOT_FOUND";
-    });
+export type PublicReceipt = Schema["CommandReceipt"];
 export type Card = Schema["CurrentCard"];
 export type Envelope = Schema["CurrentWorkCardEnvelope"];
 export type Values = Record<string, unknown>;

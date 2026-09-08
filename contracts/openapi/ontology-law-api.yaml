@@ -2,7 +2,7 @@ openapi: 3.1.0
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 info:
   title: Ontology Law System R1 API
-  version: 1.2.0
+  version: 1.3.0
   description: >-
     The single executable R1 HTTP contract for Lead intake, task completion,
     ActionDraft persistence, Current Work Card projection, receipt recovery,
@@ -17,6 +17,2155 @@ tags:
   - name: InternalTaskCommands
 
 paths:
+  /api/v1/session/context: {
+    "get": {
+      "tags": [
+        "Session"
+      ],
+      "operationId": "getSessionContext",
+      "summary": "get Session Context",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "AUTHENTICATED_IDENTITY",
+      "x-subject-binding": "OWN_PRINCIPAL",
+      "x-authentication-profile": "R1_AUTHENTICATED_IDENTITY_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Audited bounded disclosure; no-store and no 304.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionContextV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/provider-users: {
+    "get": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "listIdentityProviderUsers",
+      "summary": "list Identity Provider Users",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_ROOT",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityLimit"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityCursor"
+        },
+        {
+          "$ref": "#/components/parameters/IdentitySearch"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Audited bounded disclosure; no-store and no 304.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderUserPageV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-authority-path": "DIRECT"
+    }
+  }
+  /api/v1/admin/identity/options: {
+    "get": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "getIdentityAdminOptions",
+      "summary": "get Identity Admin Options",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityLimit"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityCursor"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityAdminPage"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityOptionKind"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Audited bounded disclosure; no-store and no 304.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityAdminOptionsV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "PAGE_SPECIFIC_MANAGEMENT_AUTHORITY",
+      "x-authority-path": "DIRECT"
+    }
+  }
+  /api/v1/admin/identity/principals: {
+    "get": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "listIdentityPrincipals",
+      "summary": "list Identity Principals",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_ROOT",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityLimit"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityCursor"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Audited bounded disclosure; no-store and no 304.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityPrincipalPageV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-authority-path": "DIRECT"
+    },
+    "post": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "createIdentityPrincipal",
+      "summary": "create Identity Principal",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_ROOT",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        }
+      ],
+      "responses": {
+        "201": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityPrincipalCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "CREATE_IDENTITY_PRINCIPAL",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/CreateIdentityPrincipalV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/principals/{id}/display-name: {
+    "patch": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "renameIdentityPrincipal",
+      "summary": "rename Identity Principal",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_ROOT",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "STALE_IDENTITY",
+        "IDENTITY_PRECONDITION_REQUIRED"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIdPath"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIfMatch"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityPrincipalCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "412": {
+          "$ref": "#/components/responses/Identity412Problem"
+        },
+        "428": {
+          "$ref": "#/components/responses/Identity428Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "RENAME_IDENTITY_PRINCIPAL",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RenameIdentityPrincipalV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/principals/{id}/suspend: {
+    "post": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "suspendIdentityPrincipal",
+      "summary": "suspend Identity Principal",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_ROOT",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "STALE_IDENTITY",
+        "IDENTITY_PRECONDITION_REQUIRED"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIdPath"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIfMatch"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityPrincipalCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "412": {
+          "$ref": "#/components/responses/Identity412Problem"
+        },
+        "428": {
+          "$ref": "#/components/responses/Identity428Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "SUSPEND_IDENTITY_PRINCIPAL",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SuspendIdentityPrincipalV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/principals/{id}/resume: {
+    "post": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "resumeIdentityPrincipal",
+      "summary": "resume Identity Principal",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_ROOT",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "STALE_IDENTITY",
+        "IDENTITY_PRECONDITION_REQUIRED"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIdPath"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIfMatch"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityPrincipalCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "412": {
+          "$ref": "#/components/responses/Identity412Problem"
+        },
+        "428": {
+          "$ref": "#/components/responses/Identity428Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "RESUME_IDENTITY_PRINCIPAL",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ResumeIdentityPrincipalV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/principals/{id}/disable: {
+    "post": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "disableIdentityPrincipal",
+      "summary": "disable Identity Principal",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_ROOT",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "STALE_IDENTITY",
+        "IDENTITY_PRECONDITION_REQUIRED"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIdPath"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIfMatch"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityPrincipalCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "412": {
+          "$ref": "#/components/responses/Identity412Problem"
+        },
+        "428": {
+          "$ref": "#/components/responses/Identity428Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_PRINCIPAL_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "DISABLE_IDENTITY_PRINCIPAL",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DisableIdentityPrincipalV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/organizations: {
+    "get": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "listOrganizationUnits",
+      "summary": "list Organization Units",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityLimit"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityCursor"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Audited bounded disclosure; no-store and no 304.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationUnitPageV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_ORGANIZATION_MANAGE",
+      "x-authority-path": "DIRECT"
+    },
+    "post": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "createOrganizationUnit",
+      "summary": "create Organization Unit",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        }
+      ],
+      "responses": {
+        "201": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationUnitCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_ORGANIZATION_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "CREATE_ORGANIZATION_UNIT",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/CreateOrganizationUnitV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/organizations/{id}/display-name: {
+    "patch": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "renameOrganizationUnit",
+      "summary": "rename Organization Unit",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "STALE_IDENTITY",
+        "IDENTITY_PRECONDITION_REQUIRED"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIdPath"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIfMatch"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationUnitCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "412": {
+          "$ref": "#/components/responses/Identity412Problem"
+        },
+        "428": {
+          "$ref": "#/components/responses/Identity428Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_ORGANIZATION_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "RENAME_ORGANIZATION_UNIT",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RenameOrganizationUnitV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/organizations/{id}/close: {
+    "post": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "closeOrganizationUnit",
+      "summary": "close Organization Unit",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "STALE_IDENTITY",
+        "IDENTITY_PRECONDITION_REQUIRED"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIdPath"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIfMatch"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationUnitCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "412": {
+          "$ref": "#/components/responses/Identity412Problem"
+        },
+        "428": {
+          "$ref": "#/components/responses/Identity428Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_ORGANIZATION_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "CLOSE_ORGANIZATION_UNIT",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/CloseOrganizationUnitV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/appointments: {
+    "get": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "listAppointments",
+      "summary": "list Appointments",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityLimit"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityCursor"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Audited bounded disclosure; no-store and no 304.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentPageV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_APPOINTMENT_MANAGE",
+      "x-authority-path": "DIRECT"
+    },
+    "post": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "createAppointment",
+      "summary": "create Appointment",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        }
+      ],
+      "responses": {
+        "201": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_APPOINTMENT_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "CREATE_APPOINTMENT",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/CreateAppointmentV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/appointments/{id}/suspend: {
+    "post": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "suspendAppointment",
+      "summary": "suspend Appointment",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "STALE_IDENTITY",
+        "IDENTITY_PRECONDITION_REQUIRED"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIdPath"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIfMatch"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "412": {
+          "$ref": "#/components/responses/Identity412Problem"
+        },
+        "428": {
+          "$ref": "#/components/responses/Identity428Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_APPOINTMENT_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "SUSPEND_APPOINTMENT",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SuspendAppointmentV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/appointments/{id}/resume: {
+    "post": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "resumeAppointment",
+      "summary": "resume Appointment",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "STALE_IDENTITY",
+        "IDENTITY_PRECONDITION_REQUIRED"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIdPath"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIfMatch"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "412": {
+          "$ref": "#/components/responses/Identity412Problem"
+        },
+        "428": {
+          "$ref": "#/components/responses/Identity428Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_APPOINTMENT_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "RESUME_APPOINTMENT",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ResumeAppointmentV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/appointments/{id}/end: {
+    "post": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "endAppointment",
+      "summary": "end Appointment",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "STALE_IDENTITY",
+        "IDENTITY_PRECONDITION_REQUIRED"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIdPath"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIfMatch"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppointmentCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "412": {
+          "$ref": "#/components/responses/Identity412Problem"
+        },
+        "428": {
+          "$ref": "#/components/responses/Identity428Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_APPOINTMENT_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "END_APPOINTMENT",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/EndAppointmentV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/authority-grants: {
+    "get": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "listAuthorityGrants",
+      "summary": "list Authority Grants",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityLimit"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityCursor"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Audited bounded disclosure; no-store and no 304.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorityGrantPageV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_AUTHORITY_MANAGE",
+      "x-authority-path": "DIRECT"
+    },
+    "post": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "createAuthorityGrant",
+      "summary": "create Authority Grant",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        }
+      ],
+      "responses": {
+        "201": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorityGrantCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_AUTHORITY_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "CREATE_AUTHORITY_GRANT",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/CreateAuthorityGrantV1"
+            }
+          }
+        }
+      }
+    }
+  }
+  /api/v1/admin/identity/authority-grants/{id}/revoke: {
+    "post": {
+      "tags": [
+        "IdentityAdmin"
+      ],
+      "operationId": "revokeAuthorityGrant",
+      "summary": "revoke Authority Grant",
+      "security": [
+        {
+          "publicBearer": []
+        }
+      ],
+      "x-tenant-source": "ACTOR_CONTEXT",
+      "x-subject-binding": "IDENTITY_SCOPED",
+      "x-authentication-profile": "R1_IDENTITY_ADMIN_ACTOR_V1",
+      "x-error-codes": [
+        "VALIDATION_FAILED",
+        "UNAUTHENTICATED",
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "RATE_LIMITED",
+        "INTERNAL_ERROR",
+        "SERVICE_UNAVAILABLE",
+        "IDEMPOTENCY_KEY_REQUIRED",
+        "IDEMPOTENCY_KEY_INVALID",
+        "COMMAND_PAYLOAD_CONFLICT",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "STALE_IDENTITY",
+        "IDENTITY_PRECONDITION_REQUIRED"
+      ],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AppointmentSelection"
+        },
+        {
+          "$ref": "#/components/parameters/IdempotencyKey"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIdPath"
+        },
+        {
+          "$ref": "#/components/parameters/IdentityIfMatch"
+        }
+      ],
+      "responses": {
+        "200": {
+          "description": "Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.",
+          "headers": {
+            "Cache-Control": {
+              "$ref": "#/components/headers/IdentityNoStore"
+            },
+            "Location": {
+              "$ref": "#/components/headers/ReceiptLocation"
+            },
+            "ETag": {
+              "$ref": "#/components/headers/IdentityETagHeader"
+            }
+          },
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthorityGrantCommandReceiptV1"
+              }
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/Identity400Problem"
+        },
+        "401": {
+          "$ref": "#/components/responses/Identity401Problem"
+        },
+        "403": {
+          "$ref": "#/components/responses/Identity403Problem"
+        },
+        "404": {
+          "$ref": "#/components/responses/Identity404Problem"
+        },
+        "409": {
+          "$ref": "#/components/responses/Identity409Problem"
+        },
+        "412": {
+          "$ref": "#/components/responses/Identity412Problem"
+        },
+        "428": {
+          "$ref": "#/components/responses/Identity428Problem"
+        },
+        "429": {
+          "$ref": "#/components/responses/Identity429Problem"
+        },
+        "500": {
+          "$ref": "#/components/responses/Identity500Problem"
+        },
+        "503": {
+          "$ref": "#/components/responses/Identity503Problem"
+        }
+      },
+      "x-authority-code": "IDENTITY_AUTHORITY_MANAGE",
+      "x-authority-path": "DIRECT",
+      "x-command-type": "REVOKE_AUTHORITY_GRANT",
+      "x-envelope": "INTERNAL_ADMIN",
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RevokeAuthorityGrantV1"
+            }
+          }
+        }
+      }
+    }
+  }
   /api/v1/leads:
     post:
       tags: [Leads]
@@ -40,6 +2189,7 @@ paths:
         - SERVICE_UNAVAILABLE
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/AppointmentSelection'
       requestBody:
         required: true
         content:
@@ -94,6 +2244,7 @@ paths:
         - SERVICE_UNAVAILABLE
       parameters:
         - $ref: '#/components/parameters/WorkbenchIfNoneMatch'
+        - $ref: '#/components/parameters/AppointmentSelection'
       responses:
         '200':
           description: Current Workbench envelope.
@@ -158,6 +2309,7 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/DraftIfMatch'
         - $ref: '#/components/parameters/DraftCreateIfNoneMatch'
+        - $ref: '#/components/parameters/AppointmentSelection'
       requestBody:
         required: true
         content:
@@ -244,6 +2396,7 @@ paths:
         - $ref: '#/components/parameters/TaskIdPath'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
+        - $ref: '#/components/parameters/AppointmentSelection'
       requestBody:
         required: true
         content:
@@ -313,6 +2466,7 @@ paths:
         - $ref: '#/components/parameters/TaskIdPath'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
+        - $ref: '#/components/parameters/AppointmentSelection'
       requestBody:
         required: true
         content:
@@ -380,6 +2534,7 @@ paths:
         - $ref: '#/components/parameters/TaskIdPath'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
+        - $ref: '#/components/parameters/AppointmentSelection'
       requestBody:
         required: true
         content:
@@ -446,6 +2601,7 @@ paths:
         - $ref: '#/components/parameters/TaskIdPath'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
+        - $ref: '#/components/parameters/AppointmentSelection'
       requestBody:
         required: true
         content:
@@ -513,6 +2669,7 @@ paths:
         - $ref: '#/components/parameters/TaskIdPath'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
+        - $ref: '#/components/parameters/AppointmentSelection'
       requestBody:
         required: true
         content:
@@ -579,6 +2736,7 @@ paths:
         - $ref: '#/components/parameters/TaskIdPath'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
+        - $ref: '#/components/parameters/AppointmentSelection'
       requestBody:
         required: true
         content:
@@ -646,6 +2804,7 @@ paths:
         - $ref: '#/components/parameters/TaskIdPath'
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/TaskIfMatch'
+        - $ref: '#/components/parameters/AppointmentSelection'
       requestBody:
         required: true
         content:
@@ -703,6 +2862,7 @@ paths:
         - SERVICE_UNAVAILABLE
       parameters:
         - $ref: '#/components/parameters/CommandIdPath'
+        - $ref: '#/components/parameters/AppointmentSelection'
       responses:
         '200':
           description: 'Original terminal receipt projection, disclosed only after READ_COMMAND_RECEIPT Audit commit acknowledgement; Cache-Control: no-store.'
@@ -979,6 +3139,76 @@ components:
       type: mutualTLS
 
   parameters:
+    IdentityIdPath: {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "schema": {
+        "$ref": "#/components/schemas/Uuid"
+      }
+    }
+    AppointmentSelection: {
+      "name": "X-Appointment-Id",
+      "in": "header",
+      "required": false,
+      "schema": {
+        "$ref": "#/components/schemas/Uuid"
+      },
+      "description": "Own server-provided selection only; omitted with multiple appointments safely requires explicit selection."
+    }
+    IdentityIfMatch: {
+      "name": "If-Match",
+      "in": "header",
+      "required": true,
+      "schema": {
+        "$ref": "#/components/schemas/IdentityETag"
+      }
+    }
+    IdentityLimit: {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 50,
+        "default": 20
+      }
+    }
+    IdentityCursor: {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+        "$ref": "#/components/schemas/IdentityCursorV1"
+      }
+    }
+    IdentitySearch: {
+      "name": "search",
+      "in": "query",
+      "required": true,
+      "schema": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    }
+    IdentityAdminPage: {
+      "name": "page",
+      "in": "query",
+      "required": true,
+      "schema": {
+        "$ref": "#/components/schemas/IdentityAdminPageV1"
+      }
+    }
+    IdentityOptionKind: {
+      "name": "optionKind",
+      "in": "query",
+      "required": true,
+      "schema": {
+        "$ref": "#/components/schemas/IdentityOptionKindV1"
+      }
+    }
     RecoveryTypeQuery:
       name: recoveryType
       in: query
@@ -1039,6 +3269,19 @@ components:
         $ref: '#/components/schemas/WorkbenchETag'
 
   headers:
+    IdentityNoStore: {
+      "required": true,
+      "schema": {
+        "type": "string",
+        "const": "no-store"
+      }
+    }
+    IdentityETagHeader: {
+      "required": true,
+      "schema": {
+        "$ref": "#/components/schemas/IdentityETag"
+      }
+    }
     ReceiptLocation:
       description: Relative URI of the original terminal CommandReceipt.
       schema:
@@ -1098,6 +3341,159 @@ components:
       externalValue: ./examples/problem.response.json
 
   responses:
+    Identity400Problem: {
+      "description": "Safe Identity failure; obey the exact code, retry and disclosure contract.",
+      "headers": {
+        "Cache-Control": {
+          "$ref": "#/components/headers/IdentityNoStore"
+        }
+      },
+      "content": {
+        "application/problem+json": {
+          "schema": {
+            "$ref": "#/components/schemas/IdentityProblemV1"
+          }
+        }
+      }
+    }
+    Identity401Problem: {
+      "description": "Safe Identity failure; obey the exact code, retry and disclosure contract.",
+      "headers": {
+        "Cache-Control": {
+          "$ref": "#/components/headers/IdentityNoStore"
+        },
+        "WWW-Authenticate": {
+          "$ref": "#/components/headers/PublicBearerChallenge"
+        }
+      },
+      "content": {
+        "application/problem+json": {
+          "schema": {
+            "$ref": "#/components/schemas/IdentityProblemV1"
+          }
+        }
+      }
+    }
+    Identity403Problem: {
+      "description": "Safe Identity failure; obey the exact code, retry and disclosure contract.",
+      "headers": {
+        "Cache-Control": {
+          "$ref": "#/components/headers/IdentityNoStore"
+        }
+      },
+      "content": {
+        "application/problem+json": {
+          "schema": {
+            "$ref": "#/components/schemas/IdentityProblemV1"
+          }
+        }
+      }
+    }
+    Identity404Problem: {
+      "description": "Safe Identity failure; obey the exact code, retry and disclosure contract.",
+      "headers": {
+        "Cache-Control": {
+          "$ref": "#/components/headers/IdentityNoStore"
+        }
+      },
+      "content": {
+        "application/problem+json": {
+          "schema": {
+            "$ref": "#/components/schemas/IdentityProblemV1"
+          }
+        }
+      }
+    }
+    Identity409Problem: {
+      "description": "Safe Identity failure; obey the exact code, retry and disclosure contract.",
+      "headers": {
+        "Cache-Control": {
+          "$ref": "#/components/headers/IdentityNoStore"
+        }
+      },
+      "content": {
+        "application/problem+json": {
+          "schema": {
+            "$ref": "#/components/schemas/IdentityProblemV1"
+          }
+        }
+      }
+    }
+    Identity412Problem: {
+      "description": "Safe Identity failure; obey the exact code, retry and disclosure contract.",
+      "headers": {
+        "Cache-Control": {
+          "$ref": "#/components/headers/IdentityNoStore"
+        }
+      },
+      "content": {
+        "application/problem+json": {
+          "schema": {
+            "$ref": "#/components/schemas/IdentityProblemV1"
+          }
+        }
+      }
+    }
+    Identity428Problem: {
+      "description": "Safe Identity failure; obey the exact code, retry and disclosure contract.",
+      "headers": {
+        "Cache-Control": {
+          "$ref": "#/components/headers/IdentityNoStore"
+        }
+      },
+      "content": {
+        "application/problem+json": {
+          "schema": {
+            "$ref": "#/components/schemas/IdentityProblemV1"
+          }
+        }
+      }
+    }
+    Identity429Problem: {
+      "description": "Safe Identity failure; obey the exact code, retry and disclosure contract.",
+      "headers": {
+        "Cache-Control": {
+          "$ref": "#/components/headers/IdentityNoStore"
+        }
+      },
+      "content": {
+        "application/problem+json": {
+          "schema": {
+            "$ref": "#/components/schemas/IdentityProblemV1"
+          }
+        }
+      }
+    }
+    Identity500Problem: {
+      "description": "Safe Identity failure; obey the exact code, retry and disclosure contract.",
+      "headers": {
+        "Cache-Control": {
+          "$ref": "#/components/headers/IdentityNoStore"
+        }
+      },
+      "content": {
+        "application/problem+json": {
+          "schema": {
+            "$ref": "#/components/schemas/IdentityProblemV1"
+          }
+        }
+      }
+    }
+    Identity503Problem: {
+      "description": "Safe Identity failure; obey the exact code, retry and disclosure contract.",
+      "headers": {
+        "Cache-Control": {
+          "$ref": "#/components/headers/IdentityNoStore"
+        }
+      },
+      "content": {
+        "application/problem+json": {
+          "schema": {
+            "$ref": "#/components/schemas/IdentityProblemV1"
+          }
+        }
+      }
+    }
     InternalBadRequestProblem:
       description: Internal request validation failed.
       content: { application/problem+json: { schema: { $ref: '#/components/schemas/InternalProblem' } } }
@@ -1247,6 +3643,1714 @@ components:
             $ref: '#/components/schemas/Problem'
 
   schemas:
+    IdentityETag: {
+      "type": "string",
+      "minLength": 54,
+      "maxLength": 54,
+      "pattern": "^\"identity\\.[A-Za-z0-9_-]{43}\"$"
+    }
+    IdentityCursorV1: {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    }
+    IdentityChoiceV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "label": {
+          "$ref": "#/components/schemas/SafeText200"
+        }
+      }
+    }
+    GrantableAuthorityCodeV1: {
+      "type": "string",
+      "enum": [
+        "LEAD_CAPTURE",
+        "LEAD_INGRESS_RESOLVE",
+        "LEAD_INGRESS_COMPLETE",
+        "LEAD_ASSIGN",
+        "LEAD_ROUTING_DECIDE",
+        "SOURCE_INTAKE_REQUEST_ACK",
+        "SALES_CONTACT_OWNER",
+        "LEAD_VALIDITY_REVIEW"
+      ]
+    }
+    IdentityRoleCodeV1: {
+      "type": "string",
+      "enum": [
+        "INTAKE_OPERATOR",
+        "ROUTING_SUPERVISOR",
+        "CONTACT_OPERATOR"
+      ]
+    }
+    IdentityAdminPageV1: {
+      "type": "string",
+      "enum": [
+        "PRINCIPALS",
+        "ORGANIZATIONS",
+        "APPOINTMENTS",
+        "AUTHORITY_GRANTS"
+      ]
+    }
+    IdentityOptionKindV1: {
+      "type": "string",
+      "enum": [
+        "PRINCIPAL",
+        "ORGANIZATION",
+        "APPOINTMENT"
+      ]
+    }
+    SessionContextV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "displayName",
+        "state",
+        "appointmentChoices",
+        "selectedAppointmentId",
+        "actorScopeKey",
+        "canEnterWorkbench",
+        "canEnterIdentityAdmin"
+      ],
+      "properties": {
+        "displayName": {
+          "$ref": "#/components/schemas/SafeText200"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "NO_APPOINTMENT",
+            "APPOINTMENT_SELECTION_REQUIRED",
+            "READY"
+          ]
+        },
+        "appointmentChoices": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/components/schemas/IdentityChoiceV1"
+          }
+        },
+        "selectedAppointmentId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "actorScopeKey": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^ask1\\.[A-Za-z0-9_-]{43}$",
+          "maxLength": 48
+        },
+        "canEnterWorkbench": {
+          "type": "boolean"
+        },
+        "canEnterIdentityAdmin": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "NO_APPOINTMENT"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "appointmentChoices": {
+                "maxItems": 0
+              },
+              "selectedAppointmentId": {
+                "type": "null"
+              },
+              "actorScopeKey": {
+                "type": "null"
+              },
+              "canEnterWorkbench": {
+                "const": false
+              },
+              "canEnterIdentityAdmin": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "APPOINTMENT_SELECTION_REQUIRED"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "appointmentChoices": {
+                "minItems": 2
+              },
+              "selectedAppointmentId": {
+                "type": "null"
+              },
+              "actorScopeKey": {
+                "type": "null"
+              },
+              "canEnterWorkbench": {
+                "const": false
+              },
+              "canEnterIdentityAdmin": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "READY"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "appointmentChoices": {
+                "minItems": 1
+              },
+              "selectedAppointmentId": {
+                "type": "string"
+              },
+              "actorScopeKey": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    }
+    CreateIdentityPrincipalV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "providerUserSelector",
+        "displayName"
+      ],
+      "properties": {
+        "providerUserSelector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "displayName": {
+          "$ref": "#/components/schemas/SafeText200"
+        }
+      }
+    }
+    RenameIdentityPrincipalV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "displayName"
+      ],
+      "properties": {
+        "displayName": {
+          "$ref": "#/components/schemas/SafeText200"
+        }
+      }
+    }
+    RenameOrganizationUnitV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "displayName"
+      ],
+      "properties": {
+        "displayName": {
+          "$ref": "#/components/schemas/SafeText200"
+        }
+      }
+    }
+    CreateOrganizationUnitV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parentOrganizationId",
+        "code",
+        "displayName"
+      ],
+      "properties": {
+        "parentOrganizationId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+        },
+        "displayName": {
+          "$ref": "#/components/schemas/SafeText200"
+        }
+      }
+    }
+    CreateAppointmentV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "principalId",
+        "organizationId",
+        "roleCode",
+        "effectiveFrom",
+        "effectiveUntil"
+      ],
+      "properties": {
+        "principalId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "organizationId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "roleCode": {
+          "$ref": "#/components/schemas/IdentityRoleCodeV1"
+        },
+        "effectiveFrom": {
+          "$ref": "#/components/schemas/Instant"
+        },
+        "effectiveUntil": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    }
+    CreateAuthorityGrantV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "appointmentId",
+        "authorityCode",
+        "scopeOrganizationId",
+        "validFrom",
+        "validUntil"
+      ],
+      "properties": {
+        "appointmentId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "authorityCode": {
+          "$ref": "#/components/schemas/GrantableAuthorityCodeV1"
+        },
+        "scopeOrganizationId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "validFrom": {
+          "$ref": "#/components/schemas/Instant"
+        },
+        "validUntil": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    }
+    IdentityPrincipalV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "displayName",
+        "state",
+        "etag"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "displayName": {
+          "$ref": "#/components/schemas/SafeText200"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "SUSPENDED",
+            "DISABLED"
+          ]
+        },
+        "etag": {
+          "$ref": "#/components/schemas/IdentityETag"
+        }
+      }
+    }
+    OrganizationUnitV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "parentOrganizationId",
+        "code",
+        "displayName",
+        "state",
+        "etag"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "parentOrganizationId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uuid"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+        },
+        "displayName": {
+          "$ref": "#/components/schemas/SafeText200"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "CLOSED"
+          ]
+        },
+        "etag": {
+          "$ref": "#/components/schemas/IdentityETag"
+        }
+      }
+    }
+    AppointmentV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "principal",
+        "organization",
+        "roleCode",
+        "effectiveFrom",
+        "effectiveUntil",
+        "state",
+        "etag"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "principal": {
+          "$ref": "#/components/schemas/IdentityChoiceV1"
+        },
+        "organization": {
+          "$ref": "#/components/schemas/IdentityChoiceV1"
+        },
+        "roleCode": {
+          "type": "string",
+          "enum": [
+            "INTAKE_OPERATOR",
+            "ROUTING_SUPERVISOR",
+            "CONTACT_OPERATOR",
+            "IDENTITY_ADMIN"
+          ]
+        },
+        "effectiveFrom": {
+          "$ref": "#/components/schemas/Instant"
+        },
+        "effectiveUntil": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "SUSPENDED",
+            "ENDED"
+          ]
+        },
+        "etag": {
+          "$ref": "#/components/schemas/IdentityETag"
+        }
+      }
+    }
+    AuthorityGrantV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "appointment",
+        "authorityCode",
+        "scopeOrganization",
+        "validFrom",
+        "validUntil",
+        "state",
+        "etag"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "appointment": {
+          "$ref": "#/components/schemas/IdentityChoiceV1"
+        },
+        "authorityCode": {
+          "type": "string",
+          "enum": [
+            "LEAD_CAPTURE",
+            "LEAD_INGRESS_RESOLVE",
+            "LEAD_INGRESS_COMPLETE",
+            "LEAD_ASSIGN",
+            "LEAD_ROUTING_DECIDE",
+            "SOURCE_INTAKE_REQUEST_ACK",
+            "SALES_CONTACT_OWNER",
+            "LEAD_VALIDITY_REVIEW",
+            "IDENTITY_PRINCIPAL_MANAGE",
+            "IDENTITY_ORGANIZATION_MANAGE",
+            "IDENTITY_APPOINTMENT_MANAGE",
+            "IDENTITY_AUTHORITY_MANAGE"
+          ]
+        },
+        "scopeOrganization": {
+          "$ref": "#/components/schemas/IdentityChoiceV1"
+        },
+        "validFrom": {
+          "$ref": "#/components/schemas/Instant"
+        },
+        "validUntil": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "REVOKED"
+          ]
+        },
+        "etag": {
+          "$ref": "#/components/schemas/IdentityETag"
+        }
+      }
+    }
+    ProviderUserChoiceV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "label"
+      ],
+      "properties": {
+        "selector": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "label": {
+          "$ref": "#/components/schemas/SafeText200"
+        }
+      }
+    }
+    SuspendIdentityPrincipalV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reasonCode"
+      ],
+      "properties": {
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "ADMINISTRATIVE_ACTION",
+            "SECURITY_RESPONSE"
+          ]
+        }
+      }
+    }
+    ResumeIdentityPrincipalV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reasonCode"
+      ],
+      "properties": {
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "ADMINISTRATIVE_ACTION",
+            "SECURITY_RESPONSE"
+          ]
+        }
+      }
+    }
+    DisableIdentityPrincipalV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reasonCode"
+      ],
+      "properties": {
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "ADMINISTRATIVE_ACTION",
+            "SECURITY_RESPONSE"
+          ]
+        }
+      }
+    }
+    CloseOrganizationUnitV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reasonCode"
+      ],
+      "properties": {
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "ADMINISTRATIVE_ACTION",
+            "SECURITY_RESPONSE"
+          ]
+        }
+      }
+    }
+    SuspendAppointmentV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reasonCode"
+      ],
+      "properties": {
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "ADMINISTRATIVE_ACTION",
+            "SECURITY_RESPONSE"
+          ]
+        }
+      }
+    }
+    ResumeAppointmentV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reasonCode"
+      ],
+      "properties": {
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "ADMINISTRATIVE_ACTION",
+            "SECURITY_RESPONSE"
+          ]
+        }
+      }
+    }
+    EndAppointmentV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reasonCode"
+      ],
+      "properties": {
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "ADMINISTRATIVE_ACTION",
+            "SECURITY_RESPONSE"
+          ]
+        }
+      }
+    }
+    RevokeAuthorityGrantV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reasonCode"
+      ],
+      "properties": {
+        "reasonCode": {
+          "type": "string",
+          "enum": [
+            "ADMINISTRATIVE_ACTION",
+            "SECURITY_RESPONSE"
+          ]
+        }
+      }
+    }
+    IdentityPrincipalPageV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/components/schemas/IdentityPrincipalV1"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    }
+    OrganizationUnitPageV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/components/schemas/OrganizationUnitV1"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    }
+    AppointmentPageV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/components/schemas/AppointmentV1"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    }
+    AuthorityGrantPageV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/components/schemas/AuthorityGrantV1"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    }
+    ProviderUserPageV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/components/schemas/ProviderUserChoiceV1"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    }
+    IdentityChoicePageV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "nextCursor"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/components/schemas/IdentityChoiceV1"
+          }
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 2048,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    }
+    IdentityAdminOptionsV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "page",
+        "optionKind",
+        "roleCodes",
+        "grantableAuthorityCodes",
+        "candidates"
+      ],
+      "properties": {
+        "page": {
+          "$ref": "#/components/schemas/IdentityAdminPageV1"
+        },
+        "optionKind": {
+          "$ref": "#/components/schemas/IdentityOptionKindV1"
+        },
+        "roleCodes": {
+          "type": "array",
+          "allOf": [{ "uniqueItems": true }],
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/components/schemas/IdentityRoleCodeV1"
+          }
+        },
+        "grantableAuthorityCodes": {
+          "type": "array",
+          "allOf": [{ "uniqueItems": true }],
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/components/schemas/GrantableAuthorityCodeV1"
+          }
+        },
+        "candidates": {
+          "$ref": "#/components/schemas/IdentityChoicePageV1"
+        }
+      }
+    }
+    IdentityTerminalRejectionCodeV1: {
+      "type": "string",
+      "enum": [
+        "NOT_AUTHORIZED",
+        "APPOINTMENT_INACTIVE",
+        "NOT_FOUND",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "STALE_IDENTITY"
+      ]
+    }
+    IdentityProblemV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "title",
+        "status",
+        "code",
+        "detail",
+        "instance",
+        "retryPolicy"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 512
+        },
+        "title": {
+          "$ref": "#/components/schemas/SafeText200"
+        },
+        "status": {
+          "type": "integer",
+          "enum": [
+            400,
+            401,
+            403,
+            404,
+            409,
+            412,
+            428,
+            429,
+            500,
+            503
+          ]
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "VALIDATION_FAILED",
+            "IDEMPOTENCY_KEY_REQUIRED",
+            "IDEMPOTENCY_KEY_INVALID",
+            "UNAUTHENTICATED",
+            "NOT_AUTHORIZED",
+            "APPOINTMENT_INACTIVE",
+            "NOT_FOUND",
+            "COMMAND_PAYLOAD_CONFLICT",
+            "IDENTITY_BINDING_CONFLICT",
+            "IDENTITY_STATE_CONFLICT",
+            "IDENTITY_SELF_LOCKOUT",
+            "IDENTITY_LAST_ADMIN",
+            "IDENTITY_ORGANIZATION_DEPENDENCY",
+            "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+            "STALE_IDENTITY",
+            "IDENTITY_PRECONDITION_REQUIRED",
+            "RATE_LIMITED",
+            "INTERNAL_ERROR",
+            "SERVICE_UNAVAILABLE"
+          ]
+        },
+        "detail": {
+          "$ref": "#/components/schemas/SafeText500"
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^/",
+          "maxLength": 512
+        },
+        "retryPolicy": {
+          "$ref": "#/components/schemas/RetryPolicy"
+        },
+        "fieldErrors": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/components/schemas/FieldError"
+          }
+        },
+        "currentETag": {
+          "$ref": "#/components/schemas/IdentityETag"
+        },
+        "receiptRef": {
+          "$ref": "#/components/schemas/ReceiptRef"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "VALIDATION_FAILED"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 400
+              },
+              "retryPolicy": {
+                "const": "SAME_KEY_AFTER_FIX"
+              }
+            },
+            "required": [
+              "fieldErrors"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "IDEMPOTENCY_KEY_REQUIRED"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 400
+              },
+              "retryPolicy": {
+                "const": "SAME_KEY_AFTER_FIX"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "IDEMPOTENCY_KEY_INVALID"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 400
+              },
+              "retryPolicy": {
+                "const": "SAME_KEY_AFTER_FIX"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "UNAUTHENTICATED"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 401
+              },
+              "retryPolicy": {
+                "const": "SAME_KEY_AFTER_REAUTH"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "NOT_AUTHORIZED"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 403
+              },
+              "retryPolicy": {
+                "const": "NO"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "APPOINTMENT_INACTIVE"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 403
+              },
+              "retryPolicy": {
+                "const": "NO"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "NOT_FOUND"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 404
+              },
+              "retryPolicy": {
+                "const": "NO"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "COMMAND_PAYLOAD_CONFLICT"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 409
+              },
+              "retryPolicy": {
+                "const": "NO"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "IDENTITY_BINDING_CONFLICT"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 409
+              },
+              "retryPolicy": {
+                "const": "NO"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "IDENTITY_STATE_CONFLICT"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 409
+              },
+              "retryPolicy": {
+                "const": "NEW_KEY_AFTER_REFRESH"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "IDENTITY_SELF_LOCKOUT"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 409
+              },
+              "retryPolicy": {
+                "const": "NO"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "IDENTITY_LAST_ADMIN"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 409
+              },
+              "retryPolicy": {
+                "const": "NO"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "IDENTITY_ORGANIZATION_DEPENDENCY"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 409
+              },
+              "retryPolicy": {
+                "const": "NEW_KEY_AFTER_ADMIN_FIX"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "IDENTITY_RESPONSIBILITY_DEPENDENCY"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 409
+              },
+              "retryPolicy": {
+                "const": "NEW_KEY_AFTER_ADMIN_FIX"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "STALE_IDENTITY"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 412
+              },
+              "retryPolicy": {
+                "const": "NEW_KEY_AFTER_REFRESH"
+              }
+            },
+            "required": [
+              "currentETag"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "IDENTITY_PRECONDITION_REQUIRED"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 428
+              },
+              "retryPolicy": {
+                "const": "SAME_KEY_AFTER_FIX"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "RATE_LIMITED"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 429
+              },
+              "retryPolicy": {
+                "const": "SAME_KEY_AFTER_BACKOFF"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "INTERNAL_ERROR"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 500
+              },
+              "retryPolicy": {
+                "const": "SAME_KEY_AFTER_BACKOFF"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "const": "SERVICE_UNAVAILABLE"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": 503
+              },
+              "retryPolicy": {
+                "const": "SAME_KEY_AFTER_BACKOFF"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "not": {
+                  "enum": [
+                    "VALIDATION_FAILED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "fieldErrors"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "not": {
+                  "enum": [
+                    "STALE_IDENTITY",
+                    "IDENTITY_PRECONDITION_REQUIRED"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "currentETag"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "code": {
+                "not": {
+                  "enum": [
+                    "COMMAND_PAYLOAD_CONFLICT"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "code"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "receiptRef"
+              ]
+            }
+          }
+        }
+      ]
+    }
+    IdentityPrincipalFactRefV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factType",
+        "factRef",
+        "revision"
+      ],
+      "properties": {
+        "factType": {
+          "type": "string",
+          "const": "IDENTITY_PRINCIPAL"
+        },
+        "factRef": {
+          "$ref": "#/components/schemas/OpaqueRef"
+        },
+        "revision": {
+          "$ref": "#/components/schemas/Revision"
+        }
+      }
+    }
+    IdentityPrincipalCommandReceiptV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commandId",
+        "receiptId",
+        "outcome",
+        "completedAt",
+        "resultFact"
+      ],
+      "properties": {
+        "commandId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "receiptId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "SUCCEEDED",
+            "NO_CHANGE"
+          ]
+        },
+        "completedAt": {
+          "$ref": "#/components/schemas/Instant"
+        },
+        "resultFact": {
+          "$ref": "#/components/schemas/IdentityPrincipalFactRefV1"
+        }
+      }
+    }
+    OrganizationUnitFactRefV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factType",
+        "factRef",
+        "revision"
+      ],
+      "properties": {
+        "factType": {
+          "type": "string",
+          "const": "ORGANIZATION_UNIT"
+        },
+        "factRef": {
+          "$ref": "#/components/schemas/OpaqueRef"
+        },
+        "revision": {
+          "$ref": "#/components/schemas/Revision"
+        }
+      }
+    }
+    OrganizationUnitCommandReceiptV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commandId",
+        "receiptId",
+        "outcome",
+        "completedAt",
+        "resultFact"
+      ],
+      "properties": {
+        "commandId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "receiptId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "SUCCEEDED",
+            "NO_CHANGE"
+          ]
+        },
+        "completedAt": {
+          "$ref": "#/components/schemas/Instant"
+        },
+        "resultFact": {
+          "$ref": "#/components/schemas/OrganizationUnitFactRefV1"
+        }
+      }
+    }
+    AppointmentFactRefV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factType",
+        "factRef",
+        "revision"
+      ],
+      "properties": {
+        "factType": {
+          "type": "string",
+          "const": "APPOINTMENT"
+        },
+        "factRef": {
+          "$ref": "#/components/schemas/OpaqueRef"
+        },
+        "revision": {
+          "$ref": "#/components/schemas/Revision"
+        }
+      }
+    }
+    AppointmentCommandReceiptV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commandId",
+        "receiptId",
+        "outcome",
+        "completedAt",
+        "resultFact"
+      ],
+      "properties": {
+        "commandId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "receiptId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "SUCCEEDED",
+            "NO_CHANGE"
+          ]
+        },
+        "completedAt": {
+          "$ref": "#/components/schemas/Instant"
+        },
+        "resultFact": {
+          "$ref": "#/components/schemas/AppointmentFactRefV1"
+        }
+      }
+    }
+    AuthorityGrantFactRefV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factType",
+        "factRef",
+        "revision"
+      ],
+      "properties": {
+        "factType": {
+          "type": "string",
+          "const": "AUTHORITY_GRANT"
+        },
+        "factRef": {
+          "$ref": "#/components/schemas/OpaqueRef"
+        },
+        "revision": {
+          "$ref": "#/components/schemas/Revision"
+        }
+      }
+    }
+    AuthorityGrantCommandReceiptV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commandId",
+        "receiptId",
+        "outcome",
+        "completedAt",
+        "resultFact"
+      ],
+      "properties": {
+        "commandId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "receiptId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "SUCCEEDED",
+            "NO_CHANGE"
+          ]
+        },
+        "completedAt": {
+          "$ref": "#/components/schemas/Instant"
+        },
+        "resultFact": {
+          "$ref": "#/components/schemas/AuthorityGrantFactRefV1"
+        }
+      }
+    }
+    IdentityRejectedCommandReceiptV1: {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commandId",
+        "receiptId",
+        "outcome",
+        "completedAt",
+        "rejectionCode"
+      ],
+      "properties": {
+        "commandId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "receiptId": {
+          "$ref": "#/components/schemas/Uuid"
+        },
+        "outcome": {
+          "type": "string",
+          "const": "REJECTED"
+        },
+        "completedAt": {
+          "$ref": "#/components/schemas/Instant"
+        },
+        "rejectionCode": {
+          "$ref": "#/components/schemas/IdentityTerminalRejectionCodeV1"
+        }
+      }
+    }
     RecoveryTypeV1:
       type: string
       enum: [CONTACT_TASK, ROUTING_REVIEW_TASK]
@@ -3341,6 +7445,10 @@ components:
 
     PublicFactRef:
       oneOf:
+        - $ref: '#/components/schemas/IdentityPrincipalFactRefV1'
+        - $ref: '#/components/schemas/OrganizationUnitFactRefV1'
+        - $ref: '#/components/schemas/AppointmentFactRefV1'
+        - $ref: '#/components/schemas/AuthorityGrantFactRefV1'
         - $ref: '#/components/schemas/LeadFactRef'
         - $ref: '#/components/schemas/ActionDraftFactRef'
         - $ref: '#/components/schemas/TaskOccurrenceFactRef'
@@ -3470,6 +7578,14 @@ components:
         REJECTED CommandReceipt. Pre-slot, payload-conflict, rate-limit, and
         technical failures never create a new receipt.
       enum:
+        - NOT_FOUND
+        - IDENTITY_BINDING_CONFLICT
+        - IDENTITY_STATE_CONFLICT
+        - IDENTITY_SELF_LOCKOUT
+        - IDENTITY_LAST_ADMIN
+        - IDENTITY_ORGANIZATION_DEPENDENCY
+        - IDENTITY_RESPONSIBILITY_DEPENDENCY
+        - STALE_IDENTITY
         - NOT_AUTHORIZED
         - APPOINTMENT_INACTIVE
         - TASK_NOT_OPEN

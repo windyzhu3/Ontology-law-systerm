@@ -130,9 +130,9 @@ REGISTRY = {
 ACTIVE_METADATA = {
     ADR: ('Status: Accepted', 'Semantic baseline: MVP-2026-09-08.1',
           'HTTP contract: R1-HTTP-V1.3', 'Command contract: R1-COMMAND-POLICY-EVENT-V1.2', 'OpenAPI version: 1.2.0'),
-    BASELINE: ('Baseline ID: MVP-2026-09-08.1',),
-    HTTP: ('Contract ID: R1-HTTP-V1.3',),
-    COMMAND: ('Contract ID: R1-COMMAND-POLICY-EVENT-V1.2', 'Semantic baseline: MVP-2026-09-08.1'),
+    BASELINE: ('Baseline ID: MVP-2026-09-08.2',),
+    HTTP: ('Contract ID: R1-HTTP-V1.4',),
+    COMMAND: ('Contract ID: R1-COMMAND-POLICY-EVENT-V1.3', 'Semantic baseline: MVP-2026-09-08.2'),
 }
 POINTERS = (BASELINE, HTTP, COMMAND, WORKBENCH, RUNTIME, DESIGN, PLAN)
 # Each consumer declares which exact ADR protocol it consumes, separate from a
@@ -146,7 +146,8 @@ CONSUMER_PROFILES = {
     DESIGN: 'R1_RECEIPT_RECOVERY_ACTIVATION_V1',
     PLAN: 'R1_RECEIPT_RECOVERY_ACTIVATION_V1',
 }
-OPENAPI_FROZEN_HASH = 'd945693fd5f8c8ee15c451f9a9d09745c8148051693cffdecd4b12480336102e'
+# ADR-0014 exact transport successor; ADR-0013's registry itself remains historical and immutable.
+OPENAPI_FROZEN_HASH = '542f4426a25b6631be0369ac99e09e9d318ad71417080730bca0bf5aeea184f9'
 OPENAPI_DESCRIPTION = (
     'ADR-0013 / R1-HTTP-V1.3: only the identical original trusted Actor and on-behalf pair may recover a public command receipt. '
     'R1_RECEIPT_RECOVERY_METADATA_LOOKUP_V1 obtains bounded metadata inside Audit Owner; current Owner authorization is recomputed without rerunning terminal command eligibility. '
@@ -222,7 +223,8 @@ def validate(root: Path) -> list[str]:
         matching = [line for line in ledger_lines if line.startswith(f'| {row_id} |')]
         cells = [cell.strip() for cell in matching[0].strip('|').split('|')] if len(matching) == 1 else []
         allowed_states = {'FROZEN', 'MERGED'}
-        if len(cells) != 12 or cells[6] != version or cells[8] not in allowed_states or cells[11] != '—' or ADR_NAME not in cells[9]:
+        successor = row_id + '-2026-09-08.2' if row_id.startswith('BASE-CURRENT-MVP') else '—'
+        if len(cells) != 12 or cells[6] != version or cells[8] not in allowed_states or cells[11] != successor or ADR_NAME not in cells[9]:
             findings.append(f'R1 receipt recovery ledger row {row_id} must remain a static successor with ADR evidence')
     findings.extend(_validate_transport(texts[API]))
     return findings
