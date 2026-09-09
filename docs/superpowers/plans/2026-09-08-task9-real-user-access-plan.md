@@ -12,7 +12,7 @@
 
 **Status:** APPROVED。用户于 2026-09-08 确认详细设计及计划，现从 Task9.1 合同后继开始实施；后续功能与实际用户/权限变更仍按各单元门禁，不将设计批准当成完成证据。
 
-**Execution:** Task9.1/9.2a静态合同及Task9.2身份接入后端均已本地阶段验收、独立复审通过，见[代办合同证据](../../progress/2026-09-08-task9-delegated-contract-acceptance.md)与[运行时证据](../../progress/2026-09-09-task9-identity-runtime-acceptance.md)。Task9.3受控身份管理后端现已本地阶段验收：实现bc637ad、最终修复da57aff，完整基线与修复后244项受影响回归、实际CLI和独立复审通过，见[9.3记录](../../progress/2026-09-09-task9-identity-admin-acceptance.md)。保留用户确认的完整用户名精确候选0～1项、其他管理列表正常分页；未扩展功能／权限。下一步Task9.4，9.4～9.6仍待实施，Task10/R1发布不晋级。
+**Execution:** Task9.1/9.2a静态合同及Task9.2身份接入后端均已本地阶段验收、独立复审通过，见[代办合同证据](../../progress/2026-09-08-task9-delegated-contract-acceptance.md)与[运行时证据](../../progress/2026-09-09-task9-identity-runtime-acceptance.md)。Task9.3受控身份管理后端现已本地阶段验收：实现bc637ad、最终修复da57aff，完整基线与修复后244项受影响回归、实际CLI和独立复审通过，见[9.3记录](../../progress/2026-09-09-task9-identity-admin-acceptance.md)。保留用户确认的完整用户名精确候选0～1项、其他管理列表正常分页；未扩展功能／权限。当前Task9.4部分实现（非视觉逻辑及批准的登录组件），剩余选择／恢复视觉与生产装配未完成；9.5～9.6待实施，Task10/R1发布不晋级。
 
 ## Global Constraints
 
@@ -192,7 +192,9 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 
 ## Task 9.4: SPA 登录、会话与恢复
 
-**视觉门更新（2026-09-09）：** 用户明确选择登录第3稿，已保存[LOGIN-01原图与确认记录](../../design/session-access/README.md)：左侧品牌区、右侧登录操作区、Logo及律所名称占位。该默认桌面登录入口视觉已批准；本人任职／合法代办选择、异常及恢复状态画面不因本次选择自动批准。尚未实施登录页面或production main接线。下段保留非视觉检查点时的执行记录，下列整体实施验收项继续保持未勾选。
+**登录增量修复：** 实现`73aeef4`的153项全量证据保留；独立评审指出的首次commit初始化准入窗口已由`4ebc485`修复，最终相关26项和typecheck通过。仅provider内存就绪状态与入口门禁，无新画面或业务合同。整体9.4未验收。
+
+**视觉门更新（2026-09-09）：** 用户明确选择登录第3稿，已保存[LOGIN-01原图与确认记录](../../design/session-access/README.md)：左侧品牌区、右侧登录操作区、Logo及律所名称占位。该组件及真实会话调用接点已实施为`73aeef4`，最新153项前端测试、typecheck/build/openapi通过，浏览器四尺寸／键盘抽检通过。本人任职／合法代办选择、异常及恢复新画面不因本次选择自动批准；production main/config仍未接线。下段保留非视觉检查点时的执行记录，下列整体实施验收项继续保持未勾选；完整9.4与真实登录验收不提前晋级。
 
 **当前执行（2026-09-09）：** BASE`c4aed14`，非视觉会话／恢复检查点`534e2ec`，最终锁定工具链145项前端测试、typecheck/build、生成漂移及实际基线／拓扑通过。新增登录／本人及代办选择画面按设计§7先确认再实施；production main接线与完整9.4独立评审仍未执行，原75项早期基线的npm版本纠正记录保留。详见[Task9.4阶段记录](../../progress/2026-09-09-task9-session-acceptance.md)。下列整项未完成，不能因非视觉测试通过勾选；9.5～9.6不提前实施。
 
