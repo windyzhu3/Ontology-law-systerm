@@ -11,11 +11,13 @@ export async function dispatchObserved(journal: OperationJournal, command: Comma
 export function requireReceiptLocationBuild(buildSha: string): void {
   check(/^[0-9a-f]{40}$/.test(buildSha) && buildSha !== '04bd695f7a8f656a5ed8fb96c5168e44a91bab8d');
 }
+export function requireUnmappedSelfStatus(status: number): void { check(status === 401); }
 
 export const NAMES = { intake: '本地合成受理', supervisor: '本地合成主管', contact: '本地合成首联', delegate: '本地合成代办' };
 export const GRANTS = { intake: ['LEAD_CAPTURE', 'LEAD_INGRESS_RESOLVE', 'LEAD_INGRESS_COMPLETE', 'SOURCE_INTAKE_REQUEST_ACK'], supervisor: ['LEAD_ASSIGN', 'LEAD_ROUTING_DECIDE', 'LEAD_VALIDITY_REVIEW'] };
 
 const SELF = '/api/v1/session/context';
+const SCREEN_TIMEOUT = 30_000;
 const COLLECTIONS = Object.keys(PATH_FACT);
 type Session = { context: BrowserContext; page: Page; self: any; auth: Record<string, string> };
 type Armed = { step: string; path: string; body: Record<string, unknown> };
@@ -88,14 +90,14 @@ export class IdentitySetup {
       } catch { this.dispatchFailed = true; await route.abort().catch(() => {}); }
     });
     const account = this.environment.accounts[alias];
-    await page.goto(ORIGIN + '/login');
-    await page.getByRole('button', { name: '登录工作台', exact: true }).click();
-    await page.waitForURL(url => url.origin === new URL(ISSUER).origin && url.pathname.startsWith('/realms/local-r1/'));
-    await page.locator('input[name="username"]').fill(account.username);
-    await page.locator('input[name="password"]').fill(account.password);
-    const tokenResponse = page.waitForResponse(response => response.url() === ISSUER + '/protocol/openid-connect/token' && response.request().method() === 'POST');
-    const selfResponse = page.waitForResponse(response => new URL(response.url()).origin === ORIGIN && new URL(response.url()).pathname === SELF);
-    await page.locator('input[type="submit"],button[type="submit"]').click();
+    await page.goto(ORIGIN + '/login', { waitUntil: 'domcontentloaded', timeout: SCREEN_TIMEOUT });
+    await page.getByRole('button', { name: '登录工作台', exact: true }).click({ timeout: SCREEN_TIMEOUT });
+    await page.waitForURL(url => url.origin === new URL(ISSUER).origin && url.pathname.startsWith('/realms/local-r1/'), { timeout: SCREEN_TIMEOUT });
+    await page.locator('input[name="username"]').fill(account.username, { timeout: SCREEN_TIMEOUT });
+    await page.locator('input[name="password"]').fill(account.password, { timeout: SCREEN_TIMEOUT });
+    const tokenResponse = page.waitForResponse(response => response.url() === ISSUER + '/protocol/openid-connect/token' && response.request().method() === 'POST', { timeout: SCREEN_TIMEOUT });
+    const selfResponse = page.waitForResponse(response => new URL(response.url()).origin === ORIGIN && new URL(response.url()).pathname === SELF, { timeout: SCREEN_TIMEOUT });
+    await page.locator('input[type="submit"],button[type="submit"]').click({ timeout: SCREEN_TIMEOUT });
     const token = await tokenResponse; check(token.status() === 200);
     const tokens = await token.json();
     const claims = JSON.parse(Buffer.from(tokens.access_token.split('.')[1], 'base64url').toString('utf8'));
@@ -104,8 +106,8 @@ export class IdentitySetup {
     const response = await selfResponse; this.http.push({ path: SELF, status: response.status() });
     session.self = response.status() === 200 ? await response.json() : null;
     if (!session.self) {
-      check(response.status() === 403);
-      await expect(page.getByText('账号或任职暂不可用，请联系管理员。', { exact: true })).toBeVisible();
+      requireUnmappedSelfStatus(response.status());
+      await expect(page.getByText('请重新登录以核对当前会话。', { exact: true })).toBeVisible({ timeout: SCREEN_TIMEOUT });
     }
     return session;
   }
@@ -125,9 +127,13 @@ export class IdentitySetup {
     if (this.admin) return this.admin;
     const session = await this.login('founder');
     check(session.self?.state === 'READY' && session.self.selectedAppointmentId === this.environment.bootstrap.appointmentId && session.self.canEnterIdentityAdmin && !session.self.canEnterWorkbench);
-    await session.page.goto(ORIGIN + '/admin/identity/principals');
-    await session.page.getByRole('button', { name: '确认本次身份', exact: true }).click();
-    await expect(session.page.getByRole('heading', { name: '用户与身份主体', exact: true })).toBeVisible();
+    const entry = session.page.getByRole('button', { name: '进入身份管理', exact: true });
+    await expect(entry).toBeVisible({ timeout: SCREEN_TIMEOUT });
+    await entry.click({ timeout: SCREEN_TIMEOUT });
+    await expect(session.page).toHaveURL(ORIGIN + '/admin/identity/principals', { timeout: SCREEN_TIMEOUT });
+    await expect(session.page.getByText('即将进入身份管理，请确认本次本人任职。', { exact: true })).toBeVisible({ timeout: SCREEN_TIMEOUT });
+    await session.page.getByRole('button', { name: '确认本次身份', exact: true }).click({ timeout: SCREEN_TIMEOUT });
+    await expect(session.page.getByRole('heading', { name: '用户与身份主体', exact: true })).toBeVisible({ timeout: SCREEN_TIMEOUT });
     session.self = await this.read(session, SELF); check(session.self.selectedAppointmentId === this.environment.bootstrap.appointmentId && session.self.canEnterIdentityAdmin);
     this.admin = session; return session;
   }

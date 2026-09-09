@@ -205,6 +205,10 @@
 .choice-page .choice-confirm:hover:not(:disabled) {
   background: var(--emerald-hover);
 }
+.choice-page .choice-admin-entry {
+  width: 100%;
+  margin-top: 12px;
+}
 .choice-page .choice-status {
   margin-top: 12px;
   font-size: 16px;

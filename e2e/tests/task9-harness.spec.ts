@@ -4,7 +4,7 @@ import { safeFailureCode } from '../reporters/safe-reporter';
 import { OperationJournal, type PhaseEvidence } from '../fixtures/operation-journal';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
 import { noLinks } from '../fixtures/local-environment';
-import { dispatchObserved, matchFact, requireReceiptLocationBuild } from '../fixtures/identity-setup';
+import { dispatchObserved, matchFact, requireReceiptLocationBuild, requireUnmappedSelfStatus } from '../fixtures/identity-setup';
 import SafeReporter from '../reporters/safe-reporter';
 import { createIdentityApi } from '../../apps/workbench/src/features/identity/identityApi';
 import { RecoveryStore } from '../../apps/workbench/src/features/session/recoveryMarker';
@@ -17,6 +17,12 @@ test('offline explicit-local gate', () => {
   expect(() => requireLocalAcceptance('APPROVED_SYNTHETIC_ONLY')).not.toThrow();
   expect(() => requireLocalAcceptance('production')).toThrow();
   expect(safeFailureCode('password=do-not-log')).not.toContain('do-not-log');
+});
+
+test('offline unmapped SELF contract accepts only the deployed 401 denial', () => {
+  expect(() => requireUnmappedSelfStatus(401)).not.toThrow();
+  for (const status of [200, 400, 403, 500])
+    expect(() => requireUnmappedSelfStatus(status)).toThrow();
 });
 
 const environment = {

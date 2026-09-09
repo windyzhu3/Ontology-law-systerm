@@ -166,6 +166,33 @@ function SessionRoutes({
       selected,
     );
   }
+  function enterIdentityAdmin(
+    expected: SessionContext,
+    expectedEpoch: number,
+  ) {
+    controller.checkLifetime();
+    const latest = controller.getSnapshot(),
+      selected = latest.context;
+    if (
+      !setup ||
+      latest.status !== "READY" ||
+      latest.switchConfirmation ||
+      latest.identityEpoch !== expectedEpoch ||
+      selected !== expected ||
+      !selected.actorScopeKey ||
+      !selected.selectedAppointmentId ||
+      selected.selectedOnBehalfAppointmentId !== null ||
+      !selected.canEnterIdentityAdmin
+    )
+      return;
+    setAdmission({
+      controller,
+      epoch: latest.identityEpoch,
+      scope: selected.actorScopeKey,
+      stage: "choosing",
+    });
+    navigate("/admin/identity/principals");
+  }
   if (!setup || !["READY", "SELECTING"].includes(state.status))
     return <LoginEntry controller={controller} />;
   if (
@@ -258,6 +285,7 @@ function SessionRoutes({
     <AppointmentChooser
       controller={controller}
       onConfirmed={confirmed}
+      onEnterIdentityAdmin={adminIntent ? undefined : enterIdentityAdmin}
       entryMessage={
         stage === "unqualified"
           ? adminIntent
@@ -265,6 +293,8 @@ function SessionRoutes({
             : context?.canEnterIdentityAdmin
               ? "当前任职不能进入业务工作台；具备管理资格时可使用身份管理地址。"
               : "当前任职不能进入业务工作台；请联系律所管理员。"
+          : adminIntent
+            ? "即将进入身份管理，请确认本次本人任职。"
           : undefined
       }
     />

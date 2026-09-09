@@ -13,11 +13,13 @@ import "../../styles/choice.css";
 export interface AppointmentChooserProps {
   controller: SessionController | null;
   onConfirmed?: (context: SessionContext) => void;
+  onEnterIdentityAdmin?: (context: SessionContext, identityEpoch: number) => void;
   entryMessage?: string;
 }
 export function AppointmentChooser({
   controller,
   onConfirmed,
+  onEnterIdentityAdmin,
   entryMessage,
 }: AppointmentChooserProps) {
   if (!controller)
@@ -30,7 +32,11 @@ export function AppointmentChooser({
     );
   return (
     <SessionProvider controller={controller}>
-      <ChoiceForm onConfirmed={onConfirmed} entryMessage={entryMessage} />
+      <ChoiceForm
+        onConfirmed={onConfirmed}
+        onEnterIdentityAdmin={onEnterIdentityAdmin}
+        entryMessage={entryMessage}
+      />
     </SessionProvider>
   );
 }
@@ -57,8 +63,12 @@ function ChoiceLayout({ children }: { children: React.ReactNode }) {
 }
 function ChoiceForm({
   onConfirmed,
+  onEnterIdentityAdmin,
   entryMessage,
-}: Pick<AppointmentChooserProps, "onConfirmed" | "entryMessage">) {
+}: Pick<
+  AppointmentChooserProps,
+  "onConfirmed" | "onEnterIdentityAdmin" | "entryMessage"
+>) {
   const controller = useSessionController(),
     state = useSessionState(),
     setup = useSessionSetupReady();
@@ -148,6 +158,18 @@ function ChoiceForm({
   const established =
     !!context?.selectedAppointmentId && own === context.selectedAppointmentId;
   const ownCandidate = !!context?.appointmentChoices.some((c) => c.id === own);
+  const identityAdminCandidate =
+    !!onEnterIdentityAdmin &&
+    !!context?.canEnterIdentityAdmin &&
+    context.selectedOnBehalfAppointmentId === null &&
+    established &&
+    ownCandidate;
+  const identityAdminEnabled =
+    identityAdminCandidate &&
+    enabled &&
+    state.status === "READY" &&
+    sourceEpoch === state.identityEpoch &&
+    mode === "own";
   const canDelegate =
     established && !!context?.delegatedAppointmentChoices.length;
   const targetValid =
@@ -240,6 +262,27 @@ function ChoiceForm({
       () => controller.selectOnBehalfAppointment(target.current!.delegated),
       emitConfirmed,
     );
+  }
+  function enterIdentityAdmin() {
+    if (!identityAdminEnabled || flight.current) return;
+    controller.checkLifetime();
+    const latest = controller.getSnapshot(),
+      selected = latest.context;
+    if (
+      latest.status !== "READY" ||
+      latest.switchConfirmation ||
+      latest.identityEpoch !== state.identityEpoch ||
+      latest.identityEpoch !== sourceEpoch ||
+      !selected?.actorScopeKey ||
+      selected.selectedAppointmentId !== own ||
+      selected.selectedOnBehalfAppointmentId !== null ||
+      !selected.canEnterIdentityAdmin
+    )
+      return;
+    setConfirmed(false);
+    setMessage("");
+    target.current = null;
+    onEnterIdentityAdmin(selected, latest.identityEpoch);
   }
   const ended =
     !context &&
@@ -447,6 +490,16 @@ function ChoiceForm({
         >
           确认本次身份
         </button>
+        {identityAdminCandidate && (
+          <button
+            className="choice-admin-entry"
+            type="button"
+            disabled={!identityAdminEnabled}
+            onClick={enterIdentityAdmin}
+          >
+            进入身份管理
+          </button>
+        )}
         <p role="status" className="choice-status" aria-live="polite">
           {entryMessage ?? status}
         </p>
