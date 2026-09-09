@@ -12,11 +12,11 @@
 
 **Status:** APPROVED。用户于 2026-09-08 确认详细设计及计划；当前交付位置见下节最新进度。后续功能与实际用户/权限变更仍按各单元门禁，不将设计批准当成完成证据。
 
-**Execution:** Task9.1/9.2a合同、Task9.2身份接入后端、Task9.3受控身份管理后端、Task9.4会话源码及9.5a/b/c已阶段验收；接续9.5d完整状态，9.6整链尚未完成。见[运行时证据](../../progress/2026-09-09-task9-identity-runtime-acceptance.md)、[9.3记录](../../progress/2026-09-09-task9-identity-admin-acceptance.md)与[当前前端进度](../../progress/2026-09-09-task9-identity-frontend-integration.md)。保留完整用户名精确候选0～1项、其他管理列表正常分页；未扩展功能／权限，Task10/R1发布不晋级。
+**Execution:** Task9.1/9.2a合同、Task9.2身份接入后端、Task9.3受控身份管理后端、Task9.4会话源码及Task9.5a/b/c/d均已阶段验收；9.5前端源码阶段关闭，9.6真实整链与人工UAT尚未完成。见[运行时证据](../../progress/2026-09-09-task9-identity-runtime-acceptance.md)、[9.3记录](../../progress/2026-09-09-task9-identity-admin-acceptance.md)与[当前前端进度](../../progress/2026-09-09-task9-identity-frontend-integration.md)。保留完整用户名精确候选0～1项、其他管理列表正常分页；未扩展功能／权限，Task10/R1发布不晋级。
 
 ## Global Constraints
 
-**最新进度（2026-09-09）：** Task9.4源码阶段及本地真实登录先行检查已完成；真实登录/SELF/任职确认/刷新SSO/退出/未映射拒绝已实测。9.6a原bootstrap集合核验修正也已完成：源码e925380、测试补强9a7ea56，99项受影响回归及补强后35项定向回归、原本地清单零变化核验、独立复审通过，见[核验修正记录](../../progress/2026-09-09-task9-bootstrap-original-set-verification.md)。Task9.5a非视觉API适配、9.5b四页读取／受保护入口及9.5c十四写入均已阶段验收；9.5c交付`4a6ee77`完成416项完整前端回归及受控浏览器检查，独立spec／quality通过、无Critical／Important；9.5d完整状态待收口。整体9.5和完整Task9.6仍未完成；当前不激活新API／SPA制品、不推送仓库。
+**最新进度（2026-09-09）：** Task9.4源码阶段及本地真实登录先行检查已完成；真实登录/SELF/任职确认/刷新SSO/退出/未映射拒绝已实测。9.6a原bootstrap集合核验修正也已完成：源码e925380、测试补强9a7ea56，99项受影响回归及补强后35项定向回归、原本地清单零变化核验、独立复审通过，见[核验修正记录](../../progress/2026-09-09-task9-bootstrap-original-set-verification.md)。Task9.5a非视觉API适配、9.5b四页读取／受保护入口、9.5c十四写入和9.5d工作台状态全部通过源码阶段验收。9.5c交付`4a6ee77`；9.5d实现`366468b`／修复`da9d289`，首版443项完整回归、修复后93项受影响回归与实际浏览器复验，独立spec／quality复审关闭唯一I1。9.5前端源码阶段现已关闭，完整Task9.6／Task9仍未完成；当前不激活新API／SPA制品、不推送仓库、不建立实际账号／授权。
 
 - 一个响应式业务 SPA、一份业务 OpenAPI、一个模块化单体 Jar，`APP_ROLE=api|worker` 互斥。
 - 业务数据库保持 13 Schema、52 应用表＋2 技术表、当前 `52-plus-2-v1.2`；Keycloak 独立拥有其外部身份存储，拓扑修订须明示这一基础设施依赖。
@@ -356,13 +356,15 @@ expect(api.recovery.read()?.commandId).toBe(before.headers.get('Idempotency-Key'
 
 ## Task 9.5d: 既定工作台状态提示收口
 
+**阶段验收：已完成。** `348e933→366468b→da9d289`，真实App／Request状态与恢复测试、浏览器原冻结稿及响应式核对、Root实际baseline／topology、运行中dist不变；独立评审I1经两例RED及93项受影响GREEN、浏览器复验和独立复审关闭，无开放必修项。首版443项完整回归与修复后93项是不同快照，见[最新前端证据](../../progress/2026-09-09-task9-identity-frontend-integration.md)。下列步骤均由这些证据覆盖，仅关闭9.5前端源码／受控UI阶段，不替代9.6。
+
 **Scope:** 只补设计§6、§7及T9-W02～W08/W10/W11的前端状态／交互缺口，复用Task9.0七卡及9.4会话／恢复，不重做卡片、菜单、业务协议、登录或管理页面。真实Worker恢复、权限实库与七卡开户整链仍归9.6，不能用DOM夹具替代。
 
 **Files:** Create `apps/workbench/src/features/workcard/WorkbenchStatus.tsx`及`.test.tsx`；Modify `App.tsx`/`.test.tsx`、`features/workcard/useCurrentCard.ts`、`WaitingSummary.tsx`、`CurrentCard.tsx`及直接相关测试、`styles/workbench.css`。只按职责提取状态显示；不得创建全局状态框架、第二个恢复器、客户端计数器或通用错误平台。Root维护QA和验收证据。
 
 **Interfaces:** 保持`App({session,api,sessionActions,sessionNotice})`、`useCurrentCard(session,api,options)`既有公共动作refresh/save/submit/recover/replay/abandonRecovery及RecoveryPage消费者兼容。在hook已存在read/busy/pending/recovery状态基础上补准确状态字段，`WorkbenchStatus`仅消费这些字段而不自行发请求或重推业务结论。状态优先级为身份失效／越权＞未决恢复＞已确认结果但刷新失败＞普通读取错误＞摘要。
 
-- [ ] **Step 1 — 状态表DOM RED。** 受控Request通过真实`createWorkbenchApi`和App分别返回初始慢响应／503、有效currentCard=null且waitingCount=0、仅等待正数、0/1/2后续摘要。断言加载未知不假0，零态“当前暂无可处理责任”与仅等待“当前无可处理责任，另有等待事项”可区分；今日摘要直接来自envelope.todaySummary，不用当前卡数量伪造今日总量，后续只摘要不提供提交按钮。SessionApplication已有无任职／无管理资格情形仍不能落入业务零态。
+- [x] **Step 1 — 状态表DOM RED。** 受控Request通过真实`createWorkbenchApi`和App分别返回初始慢响应／503、有效currentCard=null且waitingCount=0、仅等待正数、0/1/2后续摘要。断言加载未知不假0，零态“当前暂无可处理责任”与仅等待“当前无可处理责任，另有等待事项”可区分；今日摘要直接来自envelope.todaySummary，不用当前卡数量伪造今日总量，后续只摘要不提供提交按钮。SessionApplication已有无任职／无管理资格情形仍不能落入业务零态。
 
 ```ts
 expect(screen.queryByText('等待 0')).not.toBeInTheDocument(); // 请求尚未完成
@@ -373,15 +375,15 @@ expect(screen.getByText('等待 2')).toBeVisible();
 
 上述测试辅助须由本测试的准确Schema fixture明确构造，不新增生产mock入口。
 
-- [ ] **Step 2 — 提交／刷新分离RED/GREEN。** 分别保存候选、业务提交、回执恢复后读取失败；保留Receipt确定性而不让“正在刷新”永久残留。业务成功后明确“结果已记录，当前责任刷新失败”，仅显示重读；成功且刷新成功停止加载说明；REJECTED不得用success配色／已记录成功文案。未知POST仍保留原key/body／恢复标记与原请求重试，GET失败不能生成新key。用实际按钮流断言确认成功后手动刷新只增加GET、不增加POST。保留唯一业务主按钮与已保存候选被修改后的提交禁用。
+- [x] **Step 2 — 提交／刷新分离RED/GREEN。** 分别保存候选、业务提交、回执恢复后读取失败；保留Receipt确定性而不让“正在刷新”永久残留。业务成功后明确“结果已记录，当前责任刷新失败”，仅显示重读；成功且刷新成功停止加载说明；REJECTED不得用success配色／已记录成功文案。未知POST仍保留原key/body／恢复标记与原请求重试，GET失败不能生成新key。用实际按钮流断言确认成功后手动刷新只增加GET、不增加POST。保留唯一业务主按钮与已保存候选被修改后的提交禁用。
 
-- [ ] **Step 3 — 轮询额度RED/GREEN。** 使用假时钟驱动30秒周期，准确记录最多6次等待自动读取／3次回执自动查询；额度耗尽显示“自动刷新已暂停，可手动刷新”或对应回执查询暂停说明，不能显示仍实时。token rotation不重置额度，切后台不消耗派发额度，卸载移除timer/listener；真正的新identity epoch才重新开始。不增加独立轮询器、不触发Worker。手动重读仍允许但不能重置自动额度；回执404不清原标记。
+- [x] **Step 3 — 轮询额度RED/GREEN。** 使用假时钟驱动30秒周期，准确记录最多6次等待自动读取／3次回执自动查询；额度耗尽显示“自动刷新已暂停，可手动刷新”或对应回执查询暂停说明，不能显示仍实时。token rotation不重置额度，切后台不消耗派发额度，卸载移除timer/listener；真正的新identity epoch才重新开始。不增加独立轮询器、不触发Worker。手动重读仍允许但不能重置自动额度；回执404不清原标记。
 
-- [ ] **Step 4 — 刷新／恢复与焦点RED/GREEN。** 同scope304和语义相同200保留dirty与逻辑焦点；旧GET不能覆盖新读，selector/Task/Draft上下文改变按原规则安全重载。503/429/网络错误若保留旧内容须显式陈旧并停写，清除则不显示假0；401/403/404清敏感内容。400/428修正键与412/digest/422后续键策略不退化。共用RecoveryPage在recoveryOnly或readAfterRecovery=false时不新增业务读取／自动计数，也不把管理拒绝回执说成业务完成。
+- [x] **Step 4 — 刷新／恢复与焦点RED/GREEN。** 同scope304和语义相同200保留dirty与逻辑焦点；旧GET不能覆盖新读，selector/Task/Draft上下文改变按原规则安全重载。503/429/网络错误若保留旧内容须显式陈旧并停写，清除则不显示假0；401/403/404清敏感内容。400/428修正键与412/digest/422后续键策略不退化。共用RecoveryPage在recoveryOnly或readAfterRecovery=false时不新增业务读取／自动计数，也不把管理拒绝回执说成业务完成。
 
-- [ ] **Step 5 — 最小实现与视觉回归。** 沿用冻结工作台tokens/布局及紧凑会话操作；在既有摘要／反馈区域呈现状态，不加看板或管理导航。live region有状态变化才公告，不每次倒计时刷屏；加载／错误不只依靠颜色。真实浏览器360/768/1440检查composer不遮挡字段／结果提示／主按钮，以及刷新、续期、身份切换后的焦点；与原工作台冻结图联合比较，新增管理样式必须保持作用域隔离。
+- [x] **Step 5 — 最小实现与视觉回归。** 沿用冻结工作台tokens/布局及紧凑会话操作；在既有摘要／反馈区域呈现状态，不加看板或管理导航。live region有状态变化才公告，不每次倒计时刷屏；加载／错误不只依靠颜色。真实浏览器360/768/1440检查composer不遮挡字段／结果提示／主按钮，以及刷新、续期、身份切换后的焦点；与原工作台冻结图联合比较，新增管理样式必须保持作用域隔离。
 
-- [ ] **Step 6 — 验证与评审。** 保存实际RED/GREEN，稳定源码完整前端一次、typecheck/openapi:check及隔离outDir `../../.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task95d-dist`，不覆盖运行中dist。独立spec+quality评审包括RecoveryPage共享消费和七卡／管理回归；Root实际baseline/topology与浏览器证据。只有9.5b/c/d相应门均通过才能关闭9.5前端源码阶段；9.6真实用户整链、人工UAT、Task10/R1容量发布不得晋级。无推送、部署或实际账号／授权变更。
+- [x] **Step 6 — 验证与评审。** 保存实际RED/GREEN，稳定源码完整前端一次、typecheck/openapi:check及隔离outDir `../../.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task95d-dist`，不覆盖运行中dist。独立spec+quality评审包括RecoveryPage共享消费和七卡／管理回归；Root实际baseline/topology与浏览器证据。只有9.5b/c/d相应门均通过才能关闭9.5前端源码阶段；9.6真实用户整链、人工UAT、Task10/R1容量发布不得晋级。无推送、部署或实际账号／授权变更。
 
 ## Task 9.6a: 原 bootstrap 集合核验修正（9.5 前置窄修复）
 
