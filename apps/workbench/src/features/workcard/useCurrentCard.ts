@@ -400,7 +400,7 @@ export function useCurrentCard(
     locked.current = true;
     const controller = new AbortController();
     writeController.current = controller;
-    update({ busy: true });
+    update({ busy: true, loading: false });
     let found = false;
     try {
       const r = await api.receipt(captured, key, controller.signal);

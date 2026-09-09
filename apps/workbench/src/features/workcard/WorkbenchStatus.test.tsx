@@ -224,6 +224,52 @@ describe("workbench status through real App and transport", () => {
     await tick(60_000); expect(requests).toHaveLength(8);
   });
 
+  it.each([404, "network"] as const)(
+    "settles an interrupted slow read after receipt %s and resumes automatic recovery",
+    async (failure) => {
+      vi.useFakeTimers();
+      const slow = deferred<Response>();
+      const requests: Request[] = [];
+      let reads = 0;
+      const api = createWorkbenchApi(async r => {
+        requests.push(r);
+        if (r.method === "POST") throw new TypeError("lost response");
+        if (r.url.endsWith("/receipt")) {
+          if (failure === "network") throw new TypeError("receipt unavailable");
+          return jsonResponse({}, 404);
+        }
+        return ++reads === 1 ? jsonResponse(envelope(5, true)) : slow.promise;
+      });
+      render(<App session={testSession()} api={api} />);
+      await tick(1);
+      fireEvent.click(submit());
+      await tick(1);
+      const marker = api.recovery.read();
+      expect(marker).not.toBeNull();
+      fireEvent.click(refresh());
+      await tick(1);
+      const interrupted = requests.filter(r => r.url.endsWith("/workcards/current"))[1];
+      expect(refresh()).toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: "查询原回执" }));
+      await tick(1);
+      expect(interrupted.signal.aborted).toBe(true);
+      expect.soft(refresh()).toBeEnabled();
+      expect(screen.getByRole("alert")).toHaveTextContent("处理结果仍未确认");
+      expect(screen.getByRole("button", { name: "使用原请求重试" })).toBeEnabled();
+      expect(api.recovery.read()).toEqual(marker);
+      expect(requests.filter(r => r.url.endsWith("/receipt"))).toHaveLength(1);
+      await tick();
+      const lookups = requests.filter(r => r.url.endsWith("/receipt"));
+      expect.soft(lookups).toHaveLength(2);
+      expect(lookups.every(r => r.method === "GET" && r.url.endsWith(`/commands/${marker!.commandId}/receipt`))).toBe(true);
+      expect(requests.filter(r => r.method === "POST")).toHaveLength(1);
+      expect(reads).toBe(2);
+      expect(api.recovery.read()).toEqual(marker);
+      await act(async () => slow.resolve(jsonResponse({ ...envelope(), todaySummary: "已过期的读取" })));
+      expect(screen.queryByText("已过期的读取")).not.toBeInTheDocument();
+    },
+  );
+
   it("prioritizes a new unknown write over the previous saved-candidate confirmation", async () => {
     const api = createWorkbenchApi(async r => {
       if (r.method === "PUT") return jsonResponse({ receipt: receipt(r.headers.get("Idempotency-Key")!, "ACTION_DRAFT"), draft: envelope(5, true).currentCard!.actionDraft, preconditions: tags }, 200, tags.draftETag);
