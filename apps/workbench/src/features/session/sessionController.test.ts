@@ -141,6 +141,71 @@ it("keeps pending delegated clue through initial own context and selecting the o
   expect(controller.getSnapshot().context?.actorScopeKey).toBe(dkey);
   expect(JSON.parse(sessionStorage.getItem(markerKey)!)).toEqual(marker);
 });
+it("keeps original delegated recovery reachable through intermediate own selection after multi-appointment relogin", async () => {
+  const marker = {
+    commandId: own,
+    commandType: "RECORD_CONTACT_RESULT",
+    actorScopeKey: dkey,
+    recordedAt: new Date().toISOString(),
+  };
+  const recovery = new RecoveryStore(sessionStorage);
+  recovery.reserve(marker);
+  const requests: Request[] = [];
+  const controller = new SessionController(
+    adapter(),
+    recovery,
+    async (input, init) => {
+      const request = new Request(
+        new URL(String(input), location.origin),
+        init,
+      );
+      requests.push(request);
+      if (!request.headers.has("X-Appointment-Id"))
+        return jsonResponse({
+          ...context,
+          state: "APPOINTMENT_SELECTION_REQUIRED",
+          appointmentChoices: [
+            ...context.appointmentChoices,
+            { id: delegated, label: "另一本人任职" },
+          ],
+          selectedAppointmentId: null,
+          actorScopeKey: null,
+          delegatedAppointmentChoices: [],
+          canEnterWorkbench: false,
+        });
+      return jsonResponse(
+        request.headers.has("X-On-Behalf-Appointment-Id")
+          ? {
+              ...context,
+              selectedOnBehalfAppointmentId: delegated,
+              actorScopeKey: dkey,
+            }
+          : context,
+      );
+    },
+  );
+  await controller.initialize();
+  await controller.prepareAppointment(own);
+  expect(controller.getSnapshot().context?.delegatedAppointmentChoices).toEqual(
+    [{ id: delegated, label: "代办联系人员" }],
+  );
+  expect(controller.getSnapshot().switchConfirmation).toBe(false);
+  expect(recovery.read()).toEqual(marker);
+  expect(() =>
+    recovery.reserveWrite(delegated, "RECORD_CONTACT_RESULT", key, {}),
+  ).toThrow();
+  await controller.selectOnBehalfAppointment(delegated);
+  expect(controller.getSnapshot().context?.actorScopeKey).toBe(dkey);
+  expect(recovery.read()).toEqual(marker);
+  expect(requests).toHaveLength(3);
+  expect(
+    requests.every(
+      (r) => r.method === "GET" && r.url.endsWith("/api/v1/session/context"),
+    ),
+  ).toBe(true);
+  expect(requests[2].headers.get("X-Appointment-Id")).toBe(own);
+  expect(requests[2].headers.get("X-On-Behalf-Appointment-Id")).toBe(delegated);
+});
 it("expires on idle and absolute time without background renewal extending activity", async () => {
   let now = 0;
   const oidc = adapter();

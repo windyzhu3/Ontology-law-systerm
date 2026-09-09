@@ -259,6 +259,13 @@ export class SessionController {
       abort.abort();
     }
   }
+  async prepareAppointment(id: string): Promise<void> {
+    if (!this.state.context?.appointmentChoices.some((c) => c.id === id))
+      throw new Error("请选择当前可用任职。");
+    // Intermediate own selection exposes only current candidates. It cannot
+    // abandon a clue or authorize new writes before final identity confirmation.
+    await this.select(id, null, false);
+  }
   async selectAppointment(id: string): Promise<void> {
     const context = this.state.context;
     if (!context?.appointmentChoices.some((c) => c.id === id))
@@ -283,7 +290,7 @@ export class SessionController {
       return;
     await this.select(context.selectedAppointmentId, id);
   }
-  private async select(own: string, delegated: string | null) {
+  private async select(own: string, delegated: string | null, final = true) {
     // Selection never guesses an Actor from a recovery marker and never deletes it.
     // A mismatched clue continues blocking writes until explicit abandonment.
     const previous = this.state.context,
@@ -296,7 +303,12 @@ export class SessionController {
       message: null,
     });
     try {
-      await this.loadContext(own, delegated, generation, previous);
+      await this.loadContext(
+        own,
+        delegated,
+        generation,
+        final ? previous : undefined,
+      );
     } catch (error) {
       if (generation === this.generation) this.handleFailure(error);
     }
