@@ -126,8 +126,11 @@ must still have their original hashes.
    dirty). The named sources are the existing OpenAPI YAML, generated
    schema-contract manifest, CommandEnvelope, ActorContextResolver,
    R1CommandPolicy/R1EventPolicy, CommandHandler event definitions,
-   R1SourcePolicyRegistry and API/Worker assemblies. Complete production Java,
-   SPA source and generated schema file sets plus build files are also hashed,
+   R1SourcePolicyRegistry and API/Worker assemblies. Complete production Java
+   (including `backend/src/generated/jooq`), SPA source, HTML entry, TypeScript
+   configuration and generated schema file sets plus Maven/npm/Vite build
+   files and the Windows Maven wrapper are also hashed. The inventory and Git
+   modified/untracked checks share these same bounded input definitions,
    so indirect resolver/router/policy implementations are covered. No new
    business metadata contract is invented.
 

@@ -5,12 +5,22 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 MODULE = Path(__file__).resolve().parents[1] / 'local_release.py'
+BUILD_INPUT_FIXTURES = (
+    'backend/pom.xml', 'package.json', 'package-lock.json',
+    'apps/workbench/package.json', 'apps/workbench/vite.config.ts',
+    'apps/workbench/index.html', 'apps/workbench/tsconfig.json',
+    'backend/src/generated/jooq/Synthetic.java',
+    'mvnw.cmd', '.mvn/wrapper/maven-wrapper.properties',
+)
+REVIEW_INPUTS = ('apps/workbench/index.html', 'backend/src/generated/jooq/Synthetic.java',
+                 'apps/workbench/tsconfig.json')
 
 
 class ReleaseTest(unittest.TestCase):
@@ -34,6 +44,10 @@ class ReleaseTest(unittest.TestCase):
             p = self.root / name
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text('{}' if name.endswith('.json') else 'synthetic source')
+        for name in BUILD_INPUT_FIXTURES:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('synthetic build input')
         (self.root / 'deploy/local-login/server.mjs').write_bytes(b'old server')
         self.gate = {'deployment_state_key': 'PRIMARY', 'operating_mode': 'ACTIVE',
                      'active_release_digest': hashlib.sha256(b'old jar').hexdigest(),
@@ -209,6 +223,60 @@ class ReleaseTest(unittest.TestCase):
         self.jar.write_bytes(b'new jar')
         (self.root / self.m.SOURCE_FILES[0]).write_text('source changed during build')
         with self.assertRaises(RuntimeError): self.release.describe('2' * 40, {'jar': 0, 'spa': 0})
+
+    def test_provenance_rejects_modified_and_untracked_inputs_in_temporary_git_repository(self):
+        # Real Git diff/untracked behavior; no application processes or builds.
+        (self.root / '.gitignore').write_text('private/\nbackend/target/\napps/workbench/dist/\n')
+        hooks = self.root / 'empty-hooks'
+        hooks.mkdir()
+        def git(*args):
+            result = subprocess.run(['git', '-c', 'core.autocrlf=false', '-c', 'commit.gpgsign=false',
+                '-c', 'user.name=Release Test', '-c', 'user.email=release-test@example.invalid',
+                '-c', 'core.hooksPath=' + str(hooks), *args], cwd=self.root, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return result.stdout.strip()
+        git('init')
+        git('add', '--all')
+        git('commit', '-m', 'synthetic release input baseline')
+        commit = git('rev-parse', 'HEAD')
+        boundary = self.m.RuntimeBoundary(SimpleNamespace(ROOT=self.root))
+        boundary.provenance(commit)
+        for name in REVIEW_INPUTS:
+            with self.subTest(modified=name):
+                path = self.root / name
+                original = path.read_bytes()
+                try:
+                    path.write_bytes(b'changed build input not in recorded commit')
+                    with self.assertRaisesRegex(RuntimeError, 'source commit'):
+                        boundary.provenance(commit)
+                finally:
+                    path.write_bytes(original)
+        for name in ('backend/src/generated/jooq/Untracked.java', '.mvn/jvm.config'):
+            with self.subTest(untracked=name):
+                path = self.root / name
+                path.write_text('untracked build input')
+                try:
+                    with self.assertRaisesRegex(RuntimeError, 'source commit'):
+                        boundary.provenance(commit)
+                finally:
+                    path.unlink()
+        boundary.provenance(commit)
+
+    def test_captured_html_jooq_and_typescript_inputs_cannot_change_or_disappear_during_build(self):
+        self.snapshot()
+        for name in REVIEW_INPUTS:
+            for mutation in ('change', 'remove'):
+                with self.subTest(input=name, mutation=mutation):
+                    self.release.capture_inputs('2' * 40)
+                    path = self.root / name
+                    original = path.read_bytes()
+                    try:
+                        if mutation == 'change': path.write_bytes(b'changed after capture')
+                        else: path.unlink()
+                        with self.assertRaises(RuntimeError):
+                            self.release.describe('2' * 40, {'jar': 0, 'spa': 0})
+                    finally:
+                        path.write_bytes(original)
 
     def test_failed_cas_with_unchanged_old_gate_requires_explicit_abort_before_restaging(self):
         candidate = self.stage()

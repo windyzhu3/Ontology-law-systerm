@@ -31,6 +31,16 @@ SOURCE_FILES = (
     'apps/workbench/src/features/session/sessionConfiguration.ts',
     'deploy/local-login/server.mjs',
 )
+# Existing inputs of the Windows Maven package and tsc/Vite build only. Both
+# content inventory and Git provenance consume these definitions, including
+# generated jOOQ sources explicitly added by backend/pom.xml.
+BUILD_INPUT_FILES = SOURCE_FILES + (
+    'backend/pom.xml', 'package.json', 'package-lock.json',
+    'apps/workbench/package.json', 'apps/workbench/vite.config.ts',
+    'apps/workbench/index.html', 'apps/workbench/tsconfig.json', 'mvnw.cmd',
+)
+BUILD_INPUT_TREES = ('backend/src/main', 'backend/src/generated/jooq',
+                     'apps/workbench/src', 'database/schema-contract-52-plus-2/generated', '.mvn')
 PUBLIC_OIDC = {'VITE_OIDC_ISSUER': 'https://localhost:19443/realms/local-r1',
                'VITE_OIDC_CLIENT_ID': 'local-r1-spa', 'VITE_OIDC_AUDIENCE': 'local-r1-api',
                'VITE_APP_ORIGIN': 'https://localhost:19444'}
@@ -165,14 +175,11 @@ class LocalRelease:
             raise RuntimeError('original material drift')
 
     def sources(self):
-        result = {name: digest(regular(self.root / name).read_bytes()) for name in SOURCE_FILES}
+        result = {name: digest(regular(self.root / name).read_bytes()) for name in BUILD_INPUT_FILES}
         # Preserve exact existing inputs, including Resolver/route implementations outside
         # the named entry points. This is evidence of sources, not a substitute contract.
-        for folder in ('backend/src/main', 'apps/workbench/src', 'database/schema-contract-52-plus-2/generated'):
+        for folder in BUILD_INPUT_TREES:
             result.update({folder + '/' + name: value for name, value in files(self.root / folder).items()})
-        for name in ('pom.xml', 'backend/pom.xml', 'package.json', 'package-lock.json', 'apps/workbench/package.json', 'apps/workbench/vite.config.ts'):
-            if (self.root / name).exists():
-                result[name] = digest(regular(self.root / name).read_bytes())
         return dict(sorted(result.items()))
 
     def build_inputs(self, commit):
@@ -500,10 +507,11 @@ class RuntimeBoundary:
     def provenance(self, commit):
         run = lambda args: subprocess.run(['git', *args], cwd=self.runner.ROOT, capture_output=True)
         head = run(['rev-parse', 'HEAD'])
-        dirty = run(['diff', '--name-only', 'HEAD', '--', 'backend/src/main', 'apps/workbench/src',
-                     'database/schema-contract-52-plus-2/generated', 'contracts/openapi', 'deploy/local-login',
-                     'deploy/identity', 'pom.xml', 'backend/pom.xml', 'package.json', 'package-lock.json', 'apps/workbench/package.json', 'apps/workbench/vite.config.ts'])
-        untracked = run(['ls-files', '--others', '--exclude-standard', '--', 'backend/src/main', 'apps/workbench/src', 'contracts/openapi'])
+        inputs = (*BUILD_INPUT_FILES, *BUILD_INPUT_TREES)
+        dirty = run(['diff', '--name-only', 'HEAD', '--', *inputs])
+        # sources() inventories every file under these roots, so ignored files
+        # must not bypass the requirement that consumed inputs belong to HEAD.
+        untracked = run(['ls-files', '--others', '--', *inputs])
         if head.returncode or dirty.returncode or untracked.returncode or head.stdout.decode().strip() != commit or dirty.stdout.strip() or untracked.stdout.strip():
             raise RuntimeError('source commit is not clean at artifact inputs')
 
