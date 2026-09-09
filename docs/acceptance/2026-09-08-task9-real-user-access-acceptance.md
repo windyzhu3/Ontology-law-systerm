@@ -8,6 +8,8 @@ Task9.4生产入口`774a301`及正文超时修复`958e190`已完成，L01／L06�
 
 设计：[真实用户接入与状态设计](../superpowers/specs/2026-09-08-task9-real-user-access-design.md)。计划：[Task9 扩展实施计划](../superpowers/plans/2026-09-08-task9-real-user-access-plan.md)。
 
+视觉门更新（2026-09-09）：用户审阅ADM-01～04四张局部修订图后明确确认[原冻结稿的内容补充](../design/identity-admin-mvp/revisions/2026-09-09-contract-alignment/README.md)。原布局／样式仍有效，仅字段、控件、分页、层级说明和合同对应操作文案获批；此前替代布局作废。此项是视觉输入确认，不新增功能完成证据，不关闭任何页面、交互或真实整链混合验收项。
+
 Task9.5a非视觉管理适配器已完成：六读取、十四写入复用现有会话／恢复；实现`f2891d4`、修复`0c5b2b0`，独立评审3项Important全部关闭，最终336项前端回归、类型／隔离构建及实际基线／拓扑通过。详见[管理前端阶段进度](../progress/2026-09-09-task9-identity-frontend-integration.md)。这只补充C02～03／L10～12／I组的transport层证据，不关闭混合验收项；ADM-01～04页面、工作台完整状态、真实管理建档→登录→责任卡链与人工UAT仍未完成。
 
 阶段证据：[Task9.1 本地验收](../progress/2026-09-08-task9-contract-acceptance.md)。C01 合同及 C02～04 静态部分已验证；C02～04 的运行时权限、错误配置、回执披露仍随后续实现验收，不将这些混合项整体提前判为通过。
