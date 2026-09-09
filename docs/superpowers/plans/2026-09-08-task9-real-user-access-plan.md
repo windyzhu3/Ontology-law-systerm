@@ -10,13 +10,13 @@
 
 **Spec:** [Task9 扩展设计](../specs/2026-09-08-task9-real-user-access-design.md)。[验收矩阵](../../acceptance/2026-09-08-task9-real-user-access-acceptance.md)是本计划每个交付单元的共同验收输入。
 
-**Status:** APPROVED。用户于 2026-09-08 确认详细设计及计划，现从 Task9.1 合同后继开始实施；后续功能与实际用户/权限变更仍按各单元门禁，不将设计批准当成完成证据。
+**Status:** APPROVED。用户于 2026-09-08 确认详细设计及计划；当前交付位置见下节最新进度。后续功能与实际用户/权限变更仍按各单元门禁，不将设计批准当成完成证据。
 
-**Execution:** Task9.1/9.2a静态合同及Task9.2身份接入后端均已本地阶段验收、独立复审通过，见[代办合同证据](../../progress/2026-09-08-task9-delegated-contract-acceptance.md)与[运行时证据](../../progress/2026-09-09-task9-identity-runtime-acceptance.md)。Task9.3受控身份管理后端现已本地阶段验收：实现bc637ad、最终修复da57aff，完整基线与修复后244项受影响回归、实际CLI和独立复审通过，见[9.3记录](../../progress/2026-09-09-task9-identity-admin-acceptance.md)。保留用户确认的完整用户名精确候选0～1项、其他管理列表正常分页；未扩展功能／权限。当前Task9.4部分实现（非视觉逻辑及批准的登录组件），剩余选择／恢复视觉与生产装配未完成；9.5～9.6待实施，Task10/R1发布不晋级。
+**Execution:** Task9.1/9.2a合同、Task9.2身份接入后端、Task9.3受控身份管理后端、Task9.4会话源码及9.5a/b/c已阶段验收；接续9.5d完整状态，9.6整链尚未完成。见[运行时证据](../../progress/2026-09-09-task9-identity-runtime-acceptance.md)、[9.3记录](../../progress/2026-09-09-task9-identity-admin-acceptance.md)与[当前前端进度](../../progress/2026-09-09-task9-identity-frontend-integration.md)。保留完整用户名精确候选0～1项、其他管理列表正常分页；未扩展功能／权限，Task10/R1发布不晋级。
 
 ## Global Constraints
 
-**最新进度（2026-09-09）：** Task9.4源码阶段及本地真实登录先行检查已完成，此前顶部Execution中的“部分实现”是历史快照。真实登录/SELF/任职确认/刷新SSO/退出/未映射拒绝已实测。后续9.6a原bootstrap集合核验修正也已完成：源码e925380、测试补强9a7ea56，99项受影响回归及补强后35项定向回归、原本地清单零变化核验、独立复审通过，见[核验修正记录](../../progress/2026-09-09-task9-bootstrap-original-set-verification.md)。Task9.5a非视觉API适配及9.5b四页读取／受保护入口已验收；当前按已确认交互继续9.5c十四写入，9.5d完整状态待收口。整体9.5和完整Task9.6仍未完成；当前不激活新API／SPA制品、不推送仓库。
+**最新进度（2026-09-09）：** Task9.4源码阶段及本地真实登录先行检查已完成；真实登录/SELF/任职确认/刷新SSO/退出/未映射拒绝已实测。9.6a原bootstrap集合核验修正也已完成：源码e925380、测试补强9a7ea56，99项受影响回归及补强后35项定向回归、原本地清单零变化核验、独立复审通过，见[核验修正记录](../../progress/2026-09-09-task9-bootstrap-original-set-verification.md)。Task9.5a非视觉API适配、9.5b四页读取／受保护入口及9.5c十四写入均已阶段验收；9.5c交付`4a6ee77`完成416项完整前端回归及受控浏览器检查，独立spec／quality通过、无Critical／Important；9.5d完整状态待收口。整体9.5和完整Task9.6仍未完成；当前不激活新API／SPA制品、不推送仓库。
 
 - 一个响应式业务 SPA、一份业务 OpenAPI、一个模块化单体 Jar，`APP_ROLE=api|worker` 互斥。
 - 业务数据库保持 13 Schema、52 应用表＋2 技术表、当前 `52-plus-2-v1.2`；Keycloak 独立拥有其外部身份存储，拓扑修订须明示这一基础设施依赖。
@@ -312,7 +312,7 @@ expect(screen.queryByText('创建时间')).not.toBeInTheDocument();
 
 ## Task 9.5c: 详情区表单与十四条管理写入
 
-**状态（2026-09-09）：** 依赖9.5b已通过，用户批准的“详情区编辑＋二次确认框”进入实施，不再重复索取同一交互确认。
+**状态（2026-09-09）：已完成源码与受控UI阶段验收。** `4a6ee77`交付十四写入、受控候选、详情编辑／二次确认、共享恢复及会话guard；416项完整前端、类型／OpenAPI／隔离构建、实际baseline／topology及360/768/1440浏览器通过。独立spec compliant／quality Approved，无Critical／Important。通用成功分页提示P3保留；不据此关闭9.5d或9.6真实整链。用户批准的交互不再重复索取确认。
 
 **Scope:** 用户已明确批准新增／改名使用原右侧详情区、保留左侧列表，危险操作同风格二次确认并显示影响与原因；恢复继续遵守既定确认和原因要求。依赖9.5b独立评审通过，实施全部十四条既定管理写入，不重新出四张主页面、不新增接口／生命周期／权限。此单元是管理页面功能接线，不能替代9.6真实IdP与数据库整链或人工UAT。
 
