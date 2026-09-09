@@ -449,6 +449,8 @@ expect(screen.getByText('等待 2')).toBeVisible();
 
 ## Task 9.6d: 已批准的固定自动路由合成来源配置发布
 
+**本单元已完成（2026-09-10）：** `17a1e1d`，17项定向／75项受影响Python／4项Node通过，独立spec／quality评审通过。真实配置暂存、发布、未使用时回退、旧包Worker就绪、再发布以及最终同manifest／原闭包／登录入口通过。最终配置包`aabce4e3252946e4952cbcb41ff280d1`／revision9，业务制品仍来自`04bd695`。未创建七卡或HUMAN业务事实；已有来源事实时的回退拒绝当前仅合成测试证据，后续实际建Lead时再补现场证据。
+
 依赖9.6c已通过。用户已明确批准一个额外固定AUTOMATIC本地合成来源，原人工来源／规则／数据库结构不变。本单元只扩展既有本地不可变配置制品流程，不是来源管理产品或动态配置平台。复用当前已核验的Jar、SPA和host；不重新构建或将新runner提交冒充业务二进制的构建来源。
 
 **Files:** 新建`deploy/local-login/local_source_release.py`与`deploy/local-login/tests/test_local_source_release.py`；仅必要修改`local_release.py`的配置切换／恢复防护、`local_login.py`具名命令分派、README与受影响本地发布测试。禁止生产Java、前端、迁移、依赖、IdP、SERVICE绑定／授权变更。
