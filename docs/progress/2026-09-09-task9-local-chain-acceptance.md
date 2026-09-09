@@ -11,7 +11,7 @@ Task9.5的管理页面、十四项管理写入、工作台状态提示已完成�
 | 已有前端源码 | 本轮基线445项／27文件通过，退出0 | 不代表运行中SPA已更新 |
 | 原本地登录环境 | Keycloak TLS与准确issuer通过；原闭包核验通过 | 不代表新管理界面、业务资格和七卡已实测 |
 | 原bootstrap保护 | 当前生产类核验`VERIFIED_ORIGINAL`；54表及原文件摘要不变 | 旧运行Jar仍含旧核验逻辑，不冒充新构建 |
-| 9.6b制品切换 | 首版`281a37d`已提交，独立评审中；子代理报告24项Python／4项Node通过 | 未执行本轮API／SPA激活 |
+| 9.6b制品切换 | 首版及入口清单修复`db9086d`已复审通过；旧集快照完成，停机竞态修复`c9e85b3`待独立复审 | 未执行本轮构建／激活；当前API已停、SPA及Keycloak／数据库保留运行 |
 | 9.6c Worker | 已核实原SERVICE一身份／一任职／零授权；原证书有效，DB角色最小 | Worker尚未启动，不代表等待恢复已通过 |
 | 真实账号与受控管理链 | 已批准本轮本地临时Keycloak管理操作；尚未执行 | 目录只读账号不升级；不会直写HUMAN业务身份 |
 | 七卡、撤权与故障恢复 | 待同构建真实验收 | 既有分层测试不替代全部整链用例 |
@@ -28,6 +28,8 @@ Task9.5的管理页面、十四项管理写入、工作台状态提示已完成�
 - 当前生产类执行原引导核验返回`VERIFIED_ORIGINAL`与空delta；54张表及原manifest、operator、密钥、配置、Jar内容摘要不变。此核验不载入测试类，也不替换旧运行Jar。
 - Worker数据库登录为NOINHERIT，仅属于`law_app_worker`，无SUPERUSER／CREATEDB／CREATEROLE／REPLICATION／BYPASSRLS标志；现有SERVICE证书检查时有效，到期为2026-09-16 06:29:24 UTC。
 - `scripts/verify_topology.py`退出0；`scripts/baseline/verify_baseline.py .`退出0，基线一致性PASS，仍保留原7项非致命R2发布门阻断。没有为使检查变绿而提前修改R1／R2交付状态。
+- 首版独立评审发现构建输入清单缺项，`db9086d`统一纳入HTML入口、tsconfig、实际jOOQ源码及构建配置；21项定向测试通过，独立复审关闭阻断。
+- 真实`snapshot-release`退出0，旧Jar／dist／配置／gate已保存。随后`stop-apps`暴露Windows进程竞态：API已成功退出，但后续`Wait-Process`查不到该PID返回1，流程未继续停止SPA。只读已退出PID及新建隐藏测试子进程均重现；`c9e85b3`使用已核对进程句柄等待，24项定向测试通过（含真实停止拒绝和20秒超时），独立复审后才继续真实操作。没有开始构建、切换gate或改动数据库事实。
 
 ## 授权与保持不变的边界
 
