@@ -175,10 +175,12 @@ export class SessionController {
   }
   async login() {
     this.invalidate("INITIALIZING", null);
+    const generation = this.generation;
     try {
       await bounded(this.oidc.login());
     } catch {
-      this.invalidate("UNAVAILABLE", "登录服务暂不可用，请重新登录。");
+      if (generation === this.generation)
+        this.invalidate("UNAVAILABLE", "登录服务暂不可用，请重新登录。");
     }
   }
   async getValidAccessToken(): Promise<string> {
