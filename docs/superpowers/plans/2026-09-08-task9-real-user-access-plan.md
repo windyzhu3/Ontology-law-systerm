@@ -484,6 +484,40 @@ def test_fixed_source_delta_preserves_every_existing_property(self):
 上述`add_fixed_auto_source(bytes)->bytes`与`AUTO_SOURCE_LINES`由新模块定义；夹具`original_api_config`须使用合成非秘密属性，不依赖真实runtime。对含事实的移除场景断言CAS未调用、pointer/journal/原包未变；仅测试fixture可制造来源存在，不向真实库插入Lead/Task。
 - [ ] 运行新来源模块及受影响release／Worker／runner测试，保存命令、实际RED/GREEN输出与退出码；自查提交后独立spec／quality评审。控制者随后才执行真实暂存→停机→激活→启动、API／Worker同manifest、登录入口、原闭包核验，以及来源未使用时的真实回退／再发布。本单元不创建七卡业务事实，不关闭七卡或人工UAT。
 
+## Task 9.6e: 真实浏览器受控建档与动态资格链
+
+依赖9.6d完成；这是既定9.6真实管理链的第一个可独立验收单元，不新增产品界面或业务能力。实现者只交付测试代码与合成离线测试，不访问本地私有runtime或实际账号；经独立评审后由控制者执行真实浏览器写入。
+
+**Files:** 新建`playwright.config.ts`、`e2e/fixtures/local-environment.ts`、`e2e/fixtures/operation-journal.ts`、`e2e/fixtures/identity-setup.ts`、`e2e/reporters/safe-reporter.ts`、`e2e/tests/task9-harness.spec.ts`、`e2e/tests/task9-identity-entry.spec.ts`、`e2e/README.md`。修改根`package.json`／`package-lock.json`，仅加入锁定`@playwright/test=1.63.0`及`test:e2e:task9=playwright test --config playwright.config.ts`。现有应用依赖版本不得漂移；不修改生产Java／SPA／本地部署工具。既有本地runner已部署真实Keycloak、独立数据库、API、SPA、Worker，本单元不另建compose服务或第二套身份系统；原9.6的compose交付项在本地路径由该已验收runner承担，CI适配仍由Task10处理，不造空compose文件。
+
+**固定资料与路径：** 复用当前来源与四个已创建IdP账号`task9-local-intake/supervisor/contact/delegate`；对应显示名为“本地合成受理／本地合成主管／本地合成首联／本地合成代办”。在准确原ROOT下仅建立`LOCAL_ACCEPTANCE`组织（“本地合成验收组织”），四个任职依次为`INTAKE_OPERATOR`、`ROUTING_SUPERVISOR`、`CONTACT_OPERATOR`、`CONTACT_OPERATOR`。受理DIRECT权限为`LEAD_CAPTURE`、`LEAD_INGRESS_RESOLVE`、`LEAD_INGRESS_COMPLETE`、`SOURCE_INTAKE_REQUEST_ACK`；主管为`LEAD_ASSIGN`、`LEAD_ROUTING_DECIDE`、`LEAD_VALIDITY_REVIEW`，scope为原ROOT。首联和代办任职暂不授业务Grant；不得提前授`SALES_CONTACT_OWNER`破坏下一单元零销售Owner路由场景。组织、Principal、任职、Grant一律由真实管理页面提交，不能SQL插入或静态注册HUMAN。
+
+- [ ] RED：离线安全测试先验证固定Origin／issuer／当前制品与精确浏览器版本、无显式本轮标志则拒绝、受保护目录／链接／操作清单冲突则拒绝、日志禁止秘密、未决写入不能继续另一条写入。使用临时合成目录与非秘密假值，不读真实runtime，不冒充真实身份测试。
+- [ ] `local-environment.ts`只接受既有本地固定地址及当前已核验配置，真实运行要求进程环境`TASK9_LOCAL_ACCEPTANCE=APPROVED_SYNTHETIC_ONLY`。在读取私有资料前调用现有`RuntimeBoundary.protect()`完成Git忽略／ACL／无链接检查；不新增产品配置入口。读取原`browser-credentials.json`与已完成`task9-test-account-operation.json`／`task9-browser-credentials.json`只在执行阶段且只入内存。逐一核对四个固定账号及准确原操作provider ID，不采用同名未知账号。检查当前release文件、镜像锁、浏览器实际版本；同一运行期间release／API进程身份变化则停，不自动重启服务。
+- [ ] `operation-journal.ts`仅保存受保护的测试操作证据：runId、step、commandId（真实`Idempotency-Key`）、HTTP方法／固定路径、bodySha256、原actorScopeKey、时间、状态及已确认resultFact引用。不得写入password、token、providerUserSelector、原始subject/HMAC、完整请求正文或auth storageState。通过真实浏览器的请求观察／拦截，在POST/PATCH发往本机前保存准确原请求标识；记录失败则中止派发。响应未知时保留原commandId并停止，不新建key、不根据404推断未执行。恢复只查原回执和准确已登记事实，不按显示名收养既有业务事实，也不自动重发缺正文的写入。此清单是本地测试证据，不改SPA四字段恢复标记合同。
+- [ ] `safe-reporter.ts`仅输出固定测试ID／阶段／状态／退出结果和无秘密证据路径。禁用trace、HAR、video、storageState及自动失败截图；凭据敏感操作失败不得透传可能包含fill参数或callback code的Playwright原始错误。自定义报告中的错误为闭合阶段码；不会将失败吞掉或改为成功。截图仅在已验证非凭据页面显式采集，原材料不进入Git或公开报告。
+- [ ] `identity-setup.ts`使用真实Keycloak托管登录及生产SPA，不Mock SELF、Token、管理接口或响应。角色／字段／按钮必须依据已有页面与合同，不改冻结UI适应测试。先验证原管理员管理可进入但无销售卡、原unmapped账号拒绝；四个账号各自验证未映射状态，随后管理员在ADM-01完整用户名精确查找并绑定准确候选。记录实际CREATE命令和Receipt；再登录验证已映射但无任职提示。创建组织及四任职后，验证无业务授权不等于有工作台资格；再授上述七项DIRECT权限，验证受理／主管取得准确本人任职与有效零卡状态、首联／代办仍无业务权限。全过程不改逐人部署注册、不重启API，核对相同API进程启动标识。
+- [ ] 真实spec逐段测试，编号使用`T9-L01-entry`、`T9-L03-unmapped`、`T9-L04-qualification-stages`、`T9-I02-exact-directory-binding`、`T9-I05-appointment-no-implicit-grant`、`T9-I06-minimum-business-grants`、`T9-I13-dynamic-entry`等明确子场景，不能将这些子集叫整个ID通过。全部实际步骤均有断言；不放置未实现ID的空测试／skip，不用serial失败后的自动skip伪装执行。前置阶段失败则后继阶段安全失败且无写入。仅当前已登记同运行且相同制品可显式继续；未完成清单不自动删除。
+- [ ] 配置`workers:1`、`retries:0`，离线harness项目与显式批准的真实本地项目分开。以下纯安全测试接口由新模块定义，且在真实写入前使用同一校验：
+
+```typescript
+// local-environment.ts
+export function requireLocalAcceptance(value: string | undefined): void;
+// safe-reporter.ts
+export function safeFailureCode(stage: string): string;
+
+// task9-harness.spec.ts uses Playwright test/expect without requesting a browser.
+test("offline explicit-local gate", () => {
+  expect(() => requireLocalAcceptance(undefined)).toThrow();
+  expect(() => requireLocalAcceptance("APPROVED_SYNTHETIC_ONLY")).not.toThrow();
+  expect(() => requireLocalAcceptance("production")).toThrow();
+  expect(safeFailureCode("password=do-not-log")).not.toContain("do-not-log");
+});
+```
+
+- [ ] 同一最终环境证据包括应用buildSha（从真实二进制provenance继承，不冒充测试提交）、environmentDigest、执行时间、原测试case identity、退出码、status、reportPath。收集真实HTTP成功／拒绝、准确Receipt与resultFact关系及API进程不变；更深的Fact／Audit／Slot实库闭包由控制者具名只读核对，不授浏览器Owner凭据。用户尚未操作，U01～U03始终NOT_EXECUTED。
+- [ ] 固定npm11.9.0／Node24.20.0及锁中Playwright完整integrity；运行离线harness RED/GREEN、类型／测试列表和受影响前端回归（根依赖变动需确认既有445项不退化），保留命令／输出／退出码。不得运行实际本地项目、自评后提交并交独立spec／quality评审；控制者随后执行已批准真实链并如实记录失败。这一单元不测十四管理生命周期全覆盖、IdP禁用／撤销、七卡／代办／等待恢复或人工签认；它们仍是后续既定9.6项目。
+
 ## Task 9.6: 真实用户全链路与总验收
 
 ### 当前执行授权（2026-09-09）
