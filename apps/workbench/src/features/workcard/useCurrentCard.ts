@@ -34,6 +34,10 @@ interface State {
   recoveryConfirmed: boolean;
   recoveredCommandType: string | null;
   recoveryAbandoned: boolean;
+  receiptOutcome: PublicReceipt["outcome"] | null;
+  readFailed: boolean;
+  waitingAutoPaused: boolean;
+  receiptAutoPaused: boolean;
 }
 const initial: State = {
   envelope: null,
@@ -48,6 +52,10 @@ const initial: State = {
   recoveryConfirmed: false,
   recoveredCommandType: null,
   recoveryAbandoned: false,
+  receiptOutcome: null,
+  readFailed: false,
+  waitingAutoPaused: false,
+  receiptAutoPaused: false,
 };
 const ambiguous =
   "尚未确认保存结果。请查询原回执，或使用原请求重试；请勿重复发起。";
@@ -131,6 +139,8 @@ export function useCurrentCard(
         if (!cached || !tag || r.etag !== tag) throw new Error("Invalid cache");
         update({
           loading: false,
+          readFailed: false,
+          error: null,
           needsRefresh: cached.currentCard?.taskId === completedTask.current,
         });
         return;
@@ -140,6 +150,7 @@ export function useCurrentCard(
       update({
         envelope,
         loading: false,
+        readFailed: false,
         error: null,
         needsRefresh: envelope.currentCard?.taskId === completedTask.current,
       });
@@ -161,6 +172,7 @@ export function useCurrentCard(
       update({
         envelope: null,
         loading: false,
+        readFailed: true,
         error:
           error instanceof TransportError
             ? error.message
@@ -188,6 +200,7 @@ export function useCurrentCard(
       recoveryMarker: null,
       recoveryBlocked: false,
       recoveryConfirmed: true,
+      receiptOutcome: receipt.outcome,
       recoveredCommandType:
         original.kind === "draft" ? "SAVE_ACTION_DRAFT" : original.action,
       message:
@@ -195,7 +208,7 @@ export function useCurrentCard(
           ? "本次请求未被接受，请刷新后核对。"
           : original.kind === "draft"
             ? "候选已保存，请核对后确认。"
-            : "处理结果已记录，正在刷新当前责任。",
+            : "处理结果已记录。",
       error: null,
     });
     if (receipt.outcome === "REJECTED") update({ needsRefresh: true });
@@ -209,7 +222,16 @@ export function useCurrentCard(
     getController.current?.abort();
     const controller = new AbortController();
     writeController.current = controller;
-    update({ busy: true, loading: false, error: null, pending: original });
+    update({
+      busy: true,
+      loading: false,
+      error: null,
+      pending: original,
+      message: null,
+      recoveryConfirmed: false,
+      receiptOutcome: null,
+      readFailed: false,
+    });
     let refreshAfter = false;
     try {
       const r = await api.write(captured, original, controller.signal);
@@ -397,13 +419,14 @@ export function useCurrentCard(
           recoveryMarker: null,
           recoveryBlocked: false,
           recoveryConfirmed: true,
+          receiptOutcome: r.data.outcome,
           recoveredCommandType: marker!.commandType,
           pending: null,
           error: null,
           message:
             r.data.outcome === "REJECTED"
               ? "本次请求未被接受，请刷新后核对。"
-              : "原操作结果已确认，正在刷新当前责任。",
+              : "原操作结果已确认。",
         });
         wbTag.current = null;
       }
@@ -519,15 +542,29 @@ export function useCurrentCard(
     let waitingAttempts = 0,
       receiptAttempts = 0;
     const tick = setInterval(() => {
-      if (document.visibilityState === "hidden" || denied.current) return;
+      if (
+        document.visibilityState === "hidden" ||
+        denied.current ||
+        locked.current ||
+        stateRef.current.loading ||
+        !session?.isCurrent()
+      )
+        return;
       if (recoveryOnly) return;
       if (stateRef.current.pending) {
-        if (receiptAttempts++ < 3) void recoverRef.current();
+        if (receiptAttempts < 3) {
+          receiptAttempts++;
+          update({ receiptAutoPaused: receiptAttempts === 3 });
+          void recoverRef.current();
+        }
       } else if (
         (stateRef.current.envelope?.waitingCount ?? 0) > 0 &&
-        waitingAttempts++ < 6
-      )
+        waitingAttempts < 6
+      ) {
+        waitingAttempts++;
+        update({ waitingAutoPaused: waitingAttempts === 6 });
         void refreshRef.current();
+      }
     }, 30_000);
     const focus = () => {
       if (!recoveryOnly && document.visibilityState !== "hidden")

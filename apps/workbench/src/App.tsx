@@ -9,6 +9,7 @@ import {
 } from "./lib/api";
 import { CurrentCard } from "./features/workcard/CurrentCard";
 import { WaitingSummary } from "./features/workcard/WaitingSummary";
+import { WorkbenchStatus } from "./features/workcard/WorkbenchStatus";
 import { useCurrentCard } from "./features/workcard/useCurrentCard";
 import "./styles/tokens.css";
 import "./styles/workbench.css";
@@ -85,16 +86,7 @@ export function App({
                 <span>刷新</span>
               </button>
             </div>
-            {work.error && (
-              <div className="feedback" role="alert">
-                {work.error}
-              </div>
-            )}
-            {work.message && (
-              <p className="feedback success" role="status">
-                {work.message}
-              </p>
-            )}
+            <WorkbenchStatus work={work} />
             {(work.pending || work.recoveryMarker) && (
               <div className="recovery-actions">
                 <button
@@ -129,7 +121,11 @@ export function App({
               envelope && (
                 <section className="empty-state">
                   <CheckCircle size={36} aria-hidden="true" />
-                  <h1>当前暂无需要处理的责任</h1>
+                  <h1>
+                    {envelope.waitingCount > 0
+                      ? "当前无可处理责任，另有等待事项"
+                      : "当前暂无可处理责任"}
+                  </h1>
                   <p>新的责任出现后会在这里显示。</p>
                 </section>
               )

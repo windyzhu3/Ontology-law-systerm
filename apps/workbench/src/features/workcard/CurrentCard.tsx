@@ -144,9 +144,11 @@ export function CurrentCard({
               </p>
             )}
             <p className="candidate-state">
-              {saved
-                ? "候选已保存，请确认处理结果。"
-                : "候选尚未保存，请先保存后确认。"}
+              {blocked
+                ? "当前候选暂不可提交，请先核对上方状态。"
+                : saved
+                  ? "候选已保存，请确认处理结果。"
+                  : "候选尚未保存，请先保存后确认。"}
             </p>
             <button
               id="primary-confirm"

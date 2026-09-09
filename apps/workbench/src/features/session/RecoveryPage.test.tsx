@@ -5,7 +5,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { RecoveryPage } from "./RecoveryPage";
 import {
   SessionController,
@@ -200,6 +200,36 @@ it("queries an Identity-only Actor's marker without treating it as workbench ent
   expect(
     screen.queryByRole("button", { name: "重新读取当前责任" }),
   ).not.toBeInTheDocument();
+});
+
+it("settles an Identity rejection without business reads or automatic queries in recovery-only mode", async () => {
+  const f = fixture(async () => jsonResponse({
+    commandId: selectorId,
+    receiptId: taskId,
+    completedAt: "2026-09-08T02:10:00Z",
+    outcome: "REJECTED",
+    rejectionCode: "IDENTITY_LAST_ADMIN",
+  }), {
+    context: { ...context, canEnterWorkbench: false, canEnterIdentityAdmin: true },
+    commandType: "SUSPEND_IDENTITY_PRINCIPAL",
+  });
+  const view = await mounted(f);
+  vi.useFakeTimers();
+  try {
+    await act(async () => { await vi.advanceTimersByTimeAsync(240_000); });
+    expect(f.requests).toHaveLength(0);
+    await act(async () => { fireEvent.click(query()); });
+    expect(screen.getByText("原操作结果已确认。")).toBeVisible();
+    expect(screen.getByRole("button", { name: "继续" })).toBeEnabled();
+    expect(document.body.textContent).not.toMatch(/处理结果已记录|业务完成|正在刷新当前责任|自动.*暂停/);
+    fireEvent(window, new Event("focus"));
+    fireEvent(document, new Event("visibilitychange"));
+    await act(async () => { await vi.advanceTimersByTimeAsync(240_000); });
+    expect(f.requests).toHaveLength(1);
+    expect(f.requests[0].method).toBe("GET");
+    expect(f.requests[0].url).toContain(`/commands/${selectorId}/receipt`);
+    expect(f.controller.recovery.read()).toBeNull();
+  } finally { view.unmount(); vi.useRealTimers(); }
 });
 
 it("refuses receipt lookup for another Actor without guessing identities", async () => {
