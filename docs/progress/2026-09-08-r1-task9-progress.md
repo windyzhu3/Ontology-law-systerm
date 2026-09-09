@@ -1,6 +1,6 @@
 # R1 Task9 工作台实施进度
 
-日期：2026-09-09（计划始于2026-09-08）。当前状态：**Task9.2身份接入后端、Task9.3受控身份管理后端均已阶段验收，独立复审通过。Task9.4非视觉会话／恢复逻辑检查点534e2ec已保存，145项前端测试通过；新增登录／任职视觉待确认，生产入口尚未接线，完整9.4独立评审尚未执行。管理页面及9.6真实用户整链仍未完成，扩大后的Task9与R1整体未完成。** 详见[Task9.2验收](2026-09-09-task9-identity-runtime-acceptance.md)、[Task9.3验收](2026-09-09-task9-identity-admin-acceptance.md)及[Task9.4记录](2026-09-09-task9-session-acceptance.md)。
+日期：2026-09-09（计划始于2026-09-08）。当前状态：**Task9.2身份接入后端、Task9.3受控身份管理后端均已阶段验收，独立复审通过。Task9.4非视觉会话／恢复逻辑检查点534e2ec已保存，145项前端测试通过；登录入口第3稿已确认（Logo／律所名称占位），任职／代办选择视觉仍待确认，页面未实施、生产入口尚未接线，完整9.4独立评审尚未执行。管理页面及9.6真实用户整链仍未完成，扩大后的Task9与R1整体未完成。** 详见[Task9.2验收](2026-09-09-task9-identity-runtime-acceptance.md)、[Task9.3验收](2026-09-09-task9-identity-admin-acceptance.md)、[Task9.4记录](2026-09-09-task9-session-acceptance.md)及[登录视觉基准](../design/session-access/README.md)。
 
 ## Task9.3 本轮已完成单元（后端）
 
