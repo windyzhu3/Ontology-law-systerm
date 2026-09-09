@@ -23,6 +23,8 @@ node node_modules/@playwright/test/cli.js test --config playwright.config.ts --l
 
 实际项目是 `approved-local`，默认入口同时列出两个项目；未设置明确批准标记时真实项目失败。实现者不得运行真实项目。运行依赖现有可信本机 CA、Chromium revision1243/version153.0.8010.12、同一 API/SPA/Worker 制品及已完成的四账户操作。不得启用 DEBUG、PWDEBUG、trace、HAR、video、storageState、其他 reporter 或自动截图。
 
+控制者必须先通过原 `RuntimeBoundary.protect()`，再在启动 Node 测试进程时向该进程的环境传入 `NODE_EXTRA_CA_CERTS=C:/Users/Jacob/.cache/codex-worktrees/ontology-law-r1-business/.superpowers/sdd/2026-09-08-task9-real-user-access-plan/local-login-runtime/certs/ca.pem`，指向既有受保护 CA 的绝对路径。该环境设置仅限本次测试进程，不持久化到用户/系统环境，不修改全局信任、CA 或密钥。Chromium 信任 Windows CA 不等于 Node 的 Playwright `APIRequestContext` 自动信任同一 CA；控制者已用相同 Node/Playwright 的严格 TLS GET 隔离出未加载该 CA 时证书链失败、加载后 HTTP200。始终保持 `ignoreHTTPSErrors=false`，禁止 `NODE_TLS_REJECT_UNAUTHORIZED=0`、替换 CA 或其他跳过证书校验的办法。这项诊断不代表完整 harness 已通过：新 run 首两场景首次失败证据仍保留，控制者仅按下述同环境/同 run 的显式 CONTINUE 规则重新验证首两阶段，不据此宣称其余阶段完成；本补充不改变 PIN、journal 或恢复资格。
+
 控制者设置 `TASK9_LOCAL_ACCEPTANCE=APPROVED_SYNTHETIC_ONLY` 与新 UUID `TASK9_RUN_ID`，再执行 `npm run test:e2e:task9 -- --project approved-local`。配置固定 workers1/retries0，7 个普通测试按明确阶段声明，不使用 serial 自动 skip。前置阶段失败时后续阶段失败且不写入；不得报告未执行阶段通过。
 
 真实项目调用原 `RuntimeBoundary.protect()` 后读取当前制品、进程注册、原两份凭据、四账户操作清单和 `worker/grants.json` 的原 bootstrap 关联。API、SPA、Worker 的注册和实际进程命令必须逐一等于当前 package 派生的命令，保留 PID/创建时间检查；历史受控包不满足本测试资格。三进程身份摘要进入 environmentDigest，初始化及后续快照均须一致。只有已投影的原 tenant/ROOT/founder/appointment ID 进入测试内存；无数据库 Owner 凭据、SQL 或静态 HUMAN 注册。Keycloak 令牌 subject 仅在内存与原 providerUserId 比较；候选仍按完整用户名唯一精确查询，保持 selector 不透明。SELF 不公开 principalId，绑定主体由原 CREATE 回执事实及任职 principal 引用确认；原 subject/HMAC 的数据库闭包由控制者具名只读核对。
