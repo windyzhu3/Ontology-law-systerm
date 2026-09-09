@@ -1,14 +1,14 @@
 # Task9 扩展验收矩阵
 
-日期：2026-09-08建立，2026-09-09更新。状态：**Task9.1/9.2a静态及Task9.2身份后端已阶段验收、独立复审通过；Task9.3管理后端实施中，浏览器及人工总验收尚未完成，扩展Task9未完成。**
+日期：2026-09-08建立，2026-09-09更新。状态：**Task9.1/9.2a静态、Task9.2身份接入和Task9.3受控管理后端已阶段验收、独立复审通过；9.4～9.6浏览器、页面及人工总验收尚未完成，扩展Task9未完成。**
 
-当前仅推进T9-I02～12的后端／HTTP部分和D05全部管理拒绝，见[Task9.3阶段记录](../progress/2026-09-09-task9-identity-admin-acceptance.md)。基线通过不构成这些新增项通过，页面和最终管理API建档到真实登录链仍分别由9.5／9.6验收。
+T9-I02～12的后端／HTTP部分、D05全部管理拒绝及C02～03相关命令／回执回归已取得[Task9.3阶段证据](../progress/2026-09-09-task9-identity-admin-acceptance.md)：最终修复da57aff受影响244项、实际CLI、独立复审通过。四项Important与共享邮箱证据缺口已关闭；这不是混合验收项全部通过，页面和最终管理API建档到真实登录链仍分别由9.5／9.6验收。
 
 设计：[真实用户接入与状态设计](../superpowers/specs/2026-09-08-task9-real-user-access-design.md)。计划：[Task9 扩展实施计划](../superpowers/plans/2026-09-08-task9-real-user-access-plan.md)。
 
 阶段证据：[Task9.1 本地验收](../progress/2026-09-08-task9-contract-acceptance.md)。C01 合同及 C02～04 静态部分已验证；C02～04 的运行时权限、错误配置、回执披露仍随后续实现验收，不将这些混合项整体提前判为通过。
 
-代办接入补充：[具体补充设计](../superpowers/specs/2026-09-08-task9-delegated-context-amendment-design.md)已获用户书面确认，T9-D01～08正式加入本矩阵；T9-D01静态项已通过，见[代办合同验收](../progress/2026-09-08-task9-delegated-contract-acceptance.md)。D02～07的9.2后端实现已有[运行时阶段证据](../progress/2026-09-09-task9-identity-runtime-acceptance.md)，D03浏览器、D05全部管理处理、D08会话恢复及最终同构建总验收仍待后续；不替代原C/L/I/W/U验收。
+代办接入补充：[具体补充设计](../superpowers/specs/2026-09-08-task9-delegated-context-amendment-design.md)已获用户书面确认，T9-D01～08正式加入本矩阵；T9-D01静态项已通过，见[代办合同验收](../progress/2026-09-08-task9-delegated-contract-acceptance.md)。D02～07的9.2后端实现已有[运行时阶段证据](../progress/2026-09-09-task9-identity-runtime-acceptance.md)，D05全部20管理HTTP处理现有9.3阶段证据；D03浏览器、D08会话恢复及最终同构建总验收仍待后续，不替代原C/L/I/W/U验收。
 
 ### Task9.2 阶段证据定位（不是本矩阵总验收）
 

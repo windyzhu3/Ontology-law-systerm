@@ -12,7 +12,7 @@
 
 **Status:** APPROVED。用户于 2026-09-08 确认详细设计及计划，现从 Task9.1 合同后继开始实施；后续功能与实际用户/权限变更仍按各单元门禁，不将设计批准当成完成证据。
 
-**Execution:** Task9.1/9.2a静态合同及Task9.2身份接入后端均已本地阶段验收、独立复审通过，见[代办合同证据](../../progress/2026-09-08-task9-delegated-contract-acceptance.md)与[运行时证据](../../progress/2026-09-09-task9-identity-runtime-acceptance.md)。用户于2026-09-09启动Task9.3，并明确确认在线账号候选采用完整用户名精确查询、返回0～1项；其他管理列表正常分页。当前仅恢复9.3受控身份管理后端实施，见[9.3记录](../../progress/2026-09-09-task9-identity-admin-acceptance.md)。Task9.4～9.6仍待实施，Task10/R1发布不晋级。
+**Execution:** Task9.1/9.2a静态合同及Task9.2身份接入后端均已本地阶段验收、独立复审通过，见[代办合同证据](../../progress/2026-09-08-task9-delegated-contract-acceptance.md)与[运行时证据](../../progress/2026-09-09-task9-identity-runtime-acceptance.md)。Task9.3受控身份管理后端现已本地阶段验收：实现bc637ad、最终修复da57aff，完整基线与修复后244项受影响回归、实际CLI和独立复审通过，见[9.3记录](../../progress/2026-09-09-task9-identity-admin-acceptance.md)。保留用户确认的完整用户名精确候选0～1项、其他管理列表正常分页；未扩展功能／权限。下一步Task9.4，9.4～9.6仍待实施，Task10/R1发布不晋级。
 
 ## Global Constraints
 
@@ -184,11 +184,11 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 
 **用户确认的最小搜索澄清（2026-09-09）：** 在线IdP账号候选只按完整用户名精确查询，返回0或1个当前有效HUMAN账号，`nextCursor=null`；不提供姓名／邮箱／模糊搜索。保留既有query/DTO形状、limit范围和错误结构，所供cursor因本查询从不签发后续页而按无效cursor拒绝；本地Principal／组织／任职／Grant及options分页不变。先同步设计／Identity合同／OpenAPI说明，再实现实测；不增加目录缓存、表、Provider扩展或IdP权限，不改变合同版本／operation inventory／原业务形状。验收须覆盖不存在／停用／SERVICE、不同用户名共享姓名／邮箱、查询文本不能触发通配或特殊lookup、0/1结果和无续页。
 
-- [ ] 编写 I02～I12 的实库/HTTP RED：创建、CAS、状态机、冻结字段、跨 scope、自授权、开放责任依赖、最后管理员、回执重放与注入失败。
-- [ ] 通过 Owner 窄口实现四类事实与受信 IdP 账号目录读取；落实 Principal/IdP 候选与新任职用户候选的根 scope 边界，不能从局部任职扩大到 Tenant 级用户权限。只有密码/账号凭据在 Keycloak，不在本系统创建密码 handler。
-- [ ] 实现具名身份排他路径、依赖读取与先审计后披露，不取得反序业务锁，不新增业务事件/投影路由。
-- [ ] 扩展回执元数据与授权 resolver 以处理 Identity Subject；直接查回执也必须当前管理授权，普通业务原 Actor 规则不退化。
-- [ ] 通过精确 delta、双连接锁序、跨 Tenant、撤权与技术回滚测试，独立评审后提交。
+- [x] I02～I12实库／HTTP功能测试通过：创建、CAS、状态机、冻结字段、跨scope、自授权、开放责任依赖、最后管理员、回执重放与注入失败。过程偏差如实记录：初始仅入口等部分分支留有实施前RED，部分领域断言晚于初始框架，无法证明全部分支逐项预实现RED；本轮评审修复有实际RED18／19和GREEN20／22，不能补造历史。
+- [x] 通过 Owner 窄口实现四类事实与受信 IdP 账号目录读取；复用9.2已有IdentityProviderDirectory，不另建子系统。落实 Principal/IdP 候选与新任职用户候选的根 scope 边界，不能从局部任职扩大到 Tenant 级用户权限。只有密码/账号凭据在 Keycloak，不在本系统创建密码 handler。
+- [x] 实现具名身份排他路径、依赖读取与先审计后披露，不取得反序业务锁，不新增业务事件/投影路由。
+- [x] 扩展回执元数据与授权 resolver 以处理 Identity Subject；直接查回执也必须当前管理授权，普通业务原 Actor 规则不退化。
+- [x] 通过精确 delta、双连接锁序、跨 Tenant、撤权与技术回滚测试；最终提交da57aff受影响244项通过，独立复审4/4重要问题及共享邮箱证据缺口关闭，实际CLI通过。两项Minor及历史RED证据限制见阶段记录；不替代9.6最终同构建总验收。
 
 ## Task 9.4: SPA 登录、会话与恢复
 
@@ -237,6 +237,7 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 - [ ] 通过真实 IdP＋管理接口创建目标身份、组织、任职、授权；从真实 capture/分配生成业务责任，逐类七卡操作并断言数据库 Fact/Receipt/Task/Wait/Event/Audit。
 - [ ] 实测 credential rotation、退出/撤销、HTTP/CAS/网络故障、恢复标记、跨 Tenant、四管理状态机和实际 Worker 等待恢复。
 - [ ] 承接9.2非阻断证据建议：用同一原回执串联重登、重建服务与更换双方合法授权证据；损坏引导记录场景按候选准确到期时间等待并显式断言，不依赖从夹具开始的固定睡眠。不得把现有分离测试或未严格断言的到期前提当作本阶段完整E2E证据。
+- [ ] 承接9.3非阻断评审建议：实际部署前区分在线候选有效期／密钥轮换与离线bootstrap完整清单恢复的密钥依赖；整分支评审检查Identity仓库及测试的多语句单行可读性，不借此改变密钥策略或扩展功能。初始部分测试缺少实施前RED历史证据的限制保留，不能用后续GREEN补造历史。
 - [ ] 指定真实使用者执行 U01～U03；凭据由使用者自行输入，只留脱敏结果，人工未执行不能标通过。
 - [ ] 运行最终构建的前端、后端、合同、真实 E2E 与权限回归，记录工具链、镜像 digest、实际 case/exit，独立评审整个 Task9 扩展范围。
 - [ ] 全部必需 ID 通过后才宣布扩展 Task9 完成；交给原 Task10 复用同一身份/E2E fixture 继续全 BranchID/CI/容量，不开第二套身份或测试系统。
@@ -261,4 +262,4 @@ git diff --check
 
 使用仓库锁定工具链；Windows 使用 `mvnw.cmd` 或 Git Bash wrapper，不误用系统全局旧 Node/npm。每一环记录实际退出码，不把最后一个命令成功覆盖前序失败。
 
-本次执行单元Task9.2已完成，下一单元Task9.3。仅实施Keycloak、可信映射、self context和离线引导并使用隔离合成测试资源验证。本文不是任何真实账号／权限写入的执行凭据；Task9.3～9.6、新增画面视觉确认及人工UAT仍有各自门禁。
+本次执行单元Task9.3已完成，下一单元Task9.4。仅使用隔离合成测试资源验证受控Identity管理后端，没有管理页面、实际人员开户或生产授权变更。本文不是任何真实账号／权限写入的执行凭据；Task9.4～9.6、新增画面视觉确认及人工UAT仍有各自门禁。
