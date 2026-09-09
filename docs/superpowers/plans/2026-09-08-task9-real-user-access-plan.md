@@ -447,6 +447,41 @@ expect(screen.getByText('等待 2')).toBeVisible();
 - [ ] 所有失败和中断保留原材料与操作状态；不自动删除授权、重建SERVICE或回滚业务事实。服务停止不会撤销、重造固定授权；有冲突先明确核对。后续真实等待恢复仍由七卡验收证明，启动READY本身不替代W09。
 - [ ] GREEN：本地Worker单测及受影响release／runner／Node回归，保存RED/GREEN与退出码，自评提交，不推送，独立spec／quality评审。真实启动前后核对原bootstrap、原证书／密钥摘要；收集三loop READY、精确无新增监听、停止／恢复同资格证据，才能关闭本单元部署门。
 
+## Task 9.6d: 已批准的固定自动路由合成来源配置发布
+
+依赖9.6c已通过。用户已明确批准一个额外固定AUTOMATIC本地合成来源，原人工来源／规则／数据库结构不变。本单元只扩展既有本地不可变配置制品流程，不是来源管理产品或动态配置平台。复用当前已核验的Jar、SPA和host；不重新构建或将新runner提交冒充业务二进制的构建来源。
+
+**Files:** 新建`deploy/local-login/local_source_release.py`与`deploy/local-login/tests/test_local_source_release.py`；仅必要修改`local_release.py`的配置切换／恢复防护、`local_login.py`具名命令分派、README与受影响本地发布测试。禁止生产Java、前端、迁移、依赖、IdP、SERVICE绑定／授权变更。
+
+**Interfaces:** 复用`LocalRelease.current/load/stable/seal/switch/activate/rollback/recover`与现有运行时ACL、精确三消费者停机、七字段Owner CAS、schema/Flyway比对、历史制品保留。新增无可选来源参数的`stage-local-auto-source <operatorCommit>`命令，仅暂存并返回新制品ID；激活／停启／回退沿用现有命令。当前业务源码出处从父制品继承，operatorCommit独立记录为配置工具出处，不能改写为新构建证明。
+
+- [ ] RED：固定增量只允许以下五行；原`LOCAL_SYNTHETIC`五项MANUAL策略以及其余API／TLS／OIDC／SERVICE绑定逐字保留。重复／冲突／已有AUTO／错误ROOT或时区、配置漂移、非精确当前父制品、未提交工具代码、未知配置输入均拒绝，不覆盖任何旧包。
+
+```properties
+ols.api.sources[LOCAL_SYNTHETIC_AUTO].assignment-mode=AUTOMATIC
+ols.api.sources[LOCAL_SYNTHETIC_AUTO].routing-organization-root-codes[0]=ROOT
+ols.api.sources[LOCAL_SYNTHETIC_AUTO].routing-supervisor-root-code=ROOT
+ols.api.sources[LOCAL_SYNTHETIC_AUTO].source-intake-root-code=ROOT
+ols.api.sources[LOCAL_SYNTHETIC_AUTO].business-timezone=Asia/Shanghai
+```
+
+- [ ] 将纯增量校验与新包暂存放在单一职责模块。封闭profile=`LOCAL_SYNTHETIC_SOURCE_RELEASE_V1`；manifest绑定父制品ID／descriptorHash／manifestHash、原配置摘要、固定五项增量、operatorCommit、继承业务制品出处及完全相同Jar／SPA／host摘要。沿用当前release digest，仅manifest变更；生成API gate期待和deployment元数据。不得从live target/dist取字节，不伪造buildExitCodes、不把新工具提交称业务构建。配置中秘密只留原受保护制品，不打印。
+- [ ] RED：已登记Worker未停止则切换拒绝；应用启动／恢复仍从同一新包更新API和Worker manifest期待。原bootstrap／证书／三项固定SERVICE授权不变。不同gate／schema／父包／原材料、损坏配置或丢失CAS响应不能自动重试或将暂存当激活；保留原journal恢复路径。
+- [ ] 新来源尚未产生事实时，允许经过既有Owner CAS回退到父包，并可重新暂存／激活同一固定增量。任何切换／回退／中断恢复若会移除或改变AUTO配置，均须在三个消费者停止后，以既有Owner只读检查准确原Tenant的`lead.lead.source_account_code='LOCAL_SYNTHETIC_AUTO'`；已有任意来源Lead事实则拒绝丢失该来源配置，不删事实，不以Task已终态放行。事实存在性检查不引入新Owner产品接口／权限或SQL写入。正向保留原配置的普通业务制品升级不受无关限制。
+- [ ] RED/GREEN覆盖固定增量、来源／绑定不扩权、继承二进制来源、精确same-bytes、冲突／未提交输入／链接边界、三消费者、manifest更新、来源事实阻断和journal恢复路径。覆盖测试示意（夹具沿用既有临时release fixture，不访问真实环境）：
+
+```python
+def test_fixed_source_delta_preserves_every_existing_property(self):
+    before = self.original_api_config()
+    after = add_fixed_auto_source(before)
+    self.assertEqual(before + AUTO_SOURCE_LINES, after)
+    self.assertRaises(RuntimeError, add_fixed_auto_source, after)
+    self.assertNotIn(b'source-account-codes[1]', after)
+```
+
+上述`add_fixed_auto_source(bytes)->bytes`与`AUTO_SOURCE_LINES`由新模块定义；夹具`original_api_config`须使用合成非秘密属性，不依赖真实runtime。对含事实的移除场景断言CAS未调用、pointer/journal/原包未变；仅测试fixture可制造来源存在，不向真实库插入Lead/Task。
+- [ ] 运行新来源模块及受影响release／Worker／runner测试，保存命令、实际RED/GREEN输出与退出码；自查提交后独立spec／quality评审。控制者随后才执行真实暂存→停机→激活→启动、API／Worker同manifest、登录入口、原闭包核验，以及来源未使用时的真实回退／再发布。本单元不创建七卡业务事实，不关闭七卡或人工UAT。
+
 ## Task 9.6: 真实用户全链路与总验收
 
 ### 当前执行授权（2026-09-09）
