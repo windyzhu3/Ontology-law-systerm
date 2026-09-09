@@ -1,35 +1,30 @@
 import createClient from "openapi-fetch";
 
 import type { paths, components } from "../generated/api/schema";
-import {
-  RecoveryStore,
-  type RecoveryMarker,
-  publicCommandFacts,
-} from "../features/session/recoveryMarker";
+import { RecoveryStore } from "../features/session/recoveryMarker";
 import {
   isObject,
-  validReceipt,
   validDraft,
   validPreconditions,
   sameValues,
   etag,
 } from "../features/workcard/contract";
+import { provenWriteOutcome } from "../features/session/recoveryOutcome";
 import {
-  provenWriteOutcome,
-  allowedCommandError,
-} from "../features/session/recoveryOutcome";
+  createSessionTransport,
+  matchesReceipt,
+  TransportError,
+  type WorkbenchSession,
+} from "./sessionTransport";
+
+export {
+  matchesReceipt,
+  safeProblemMessage,
+  TransportError,
+  type WorkbenchSession,
+} from "./sessionTransport";
 
 export const apiClient = createClient<paths>();
-export interface WorkbenchSession {
-  readonly identityEpoch: number;
-  readonly actorScopeKey: string;
-  readonly selectedAppointmentId: string;
-  readonly selectedOnBehalfAppointmentId: string | null;
-  getValidAccessToken(): Promise<string>;
-  isCurrent(): boolean;
-  invalidate(status: number): void;
-  readonly displayName?: string;
-}
 type S = components["schemas"];
 export const commandPaths = {
   RESOLVE_DUPLICATE_LEAD:
@@ -61,46 +56,6 @@ export type OriginalWrite = {
   | { kind: "draft"; body: S["SaveActionDraftV1"] }
   | { kind: "command"; action: S["ActionCode"]; body: CommandBody }
 );
-export class TransportError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code?: string,
-    readonly provenOutcome = false,
-  ) {
-    super(safeProblemMessage(status, code));
-  }
-}
-export function safeProblemMessage(status: number, code?: string) {
-  if (status === 401) return "登录状态已失效，请重新登录后继续。";
-  if (status === 403 || status === 404)
-    return "当前内容不可用，请刷新或联系管理员。";
-  if (status === 412 || status === 428 || code === "DRAFT_DIGEST_MISMATCH")
-    return "内容或版本已变化，请刷新后重新核对并保存候选。";
-  if (status === 422) return "暂时无法确定负责人，请联系管理员处理后刷新。";
-  if (status === 409) return "当前责任或请求已发生变化，请刷新并核对处理结果。";
-  if (status === 400) return "请求内容未通过校验，请核对必填内容。";
-  if (status === 429) return "请求较多，请稍后重试。";
-  return "服务暂时不可用，请稍后重试。";
-}
-function unwrap<T>(r: { response: Response; data?: T; error?: unknown }) {
-  if (!r.response.ok && r.response.status !== 304) {
-    const e = r.error;
-    throw new TransportError(
-      r.response.status,
-      typeof e === "object" &&
-      e !== null &&
-      "code" in e &&
-      typeof e.code === "string"
-        ? e.code
-        : undefined,
-    );
-  }
-  return {
-    data: r.data,
-    status: r.response.status,
-    etag: r.response.headers.get("ETag"),
-  };
-}
 /** Public-only adapter. Credentials live in the injected session, never browser storage. */
 export function createWorkbenchApi(
   fetcher?: (request: Request) => Promise<Response>,
@@ -111,31 +66,7 @@ export function createWorkbenchApi(
     baseUrl,
     ...(fetcher ? { fetch: fetcher } : {}),
   });
-  const assertCurrent = (s: WorkbenchSession, signal: AbortSignal) => {
-    if (!s.isCurrent() || signal.aborted)
-      throw new Error("会话已变化，请重新核对。");
-  };
-  const auth = async (s: WorkbenchSession, signal: AbortSignal) => {
-    assertCurrent(s, signal);
-    const token = await s.getValidAccessToken();
-    assertCurrent(s, signal);
-    return {
-      Authorization: `Bearer ${token}`,
-      "X-Appointment-Id": s.selectedAppointmentId,
-      ...(s.selectedOnBehalfAppointmentId
-        ? { "X-On-Behalf-Appointment-Id": s.selectedOnBehalfAppointmentId }
-        : {}),
-    };
-  };
-  const checked = <T>(
-    s: WorkbenchSession,
-    signal: AbortSignal,
-    r: { response: Response; data?: T; error?: unknown },
-  ) => {
-    assertCurrent(s, signal);
-    if ([401, 403].includes(r.response.status)) s.invalidate(r.response.status);
-    return unwrap(r);
-  };
+  const { assertCurrent, auth, checked } = createSessionTransport(true);
   return {
     recovery,
     async current(
@@ -154,6 +85,7 @@ export function createWorkbenchApi(
           signal,
           cache: "no-store",
         }),
+        true,
       );
     },
     async write(
@@ -265,17 +197,3 @@ export function createWorkbenchApi(
   };
 }
 export type WorkbenchApi = ReturnType<typeof createWorkbenchApi>;
-export function matchesReceipt(
-  value: unknown,
-  marker: RecoveryMarker,
-): value is S["CommandReceipt"] {
-  if (
-    !Object.hasOwn(publicCommandFacts, marker.commandType) ||
-    !validReceipt(value, marker.commandId)
-  )
-    return false;
-  const fact =
-    publicCommandFacts[marker.commandType as keyof typeof publicCommandFacts];
-  if (value.outcome !== "REJECTED") return value.resultFact.factType === fact;
-  return allowedCommandError(marker.commandType, value.rejectionCode);
-}
