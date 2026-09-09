@@ -20,6 +20,8 @@
 
 **本地整链执行更新：** 9.6b已完成独立复审、真实新旧制品回退／恢复、登录与四管理入口及原闭包核验。最终应用制品来自`04bd695`；四个专用Keycloak账号已创建，临时管理权限／容器已移除并核验，原目录权限与账号／公钥保持不变。9.6c Worker装配已完成源码复审与本地三项固定授权、三循环就绪及停启复验；HUMAN业务建档、七卡整链及人工UAT尚未完成，见[本地整链进度](../../progress/2026-09-09-task9-local-chain-acceptance.md)。
 
+**2026-09-10联通前置发现：** 9.6e浏览器测试实施中核实管理成功响应Location偏离冻结ReceiptLocation：前端正确要求原命令回执地址，后端返回资源地址。新增9.6f最小修复单元；9.6e测试代码先完成离线门与独立评审，真实建档写入必须等9.6f修复、评审及同环境制品更新后执行。不是新增产品需求或合同变更。U01～U03由用户本人执行，仍未执行。
+
 - 一个响应式业务 SPA、一份业务 OpenAPI、一个模块化单体 Jar，`APP_ROLE=api|worker` 互斥。
 - 业务数据库保持 13 Schema、52 应用表＋2 技术表、当前 `52-plus-2-v1.2`；Keycloak 独立拥有其外部身份存储，拓扑修订须明示这一基础设施依赖。
 - 不修改旧迁移字节，不新增密码表、会话表、动态 RBAC/策略/通用平台表；新能力仅走具名最小前向授权迁移，若需新应用表则停止另议。
@@ -586,4 +588,31 @@ git diff --check
 
 使用仓库锁定工具链；Windows 使用 `mvnw.cmd` 或 Git Bash wrapper，不误用系统全局旧 Node/npm。每一环记录实际退出码，不把最后一个命令成功覆盖前序失败。
 
-Task9.3后端与Task9.4源码实施阶段已验收；用户尚无实际部署配置，真实身份整链及人工UAT不提前通过。本轮没有管理页面、实际人员开户或生产授权变更。本文不是任何真实账号／权限写入的执行凭据；Task9.5～9.6仍有各自门禁。
+上述全量命令属于最终验收入口，不表示已全部执行；当前部署及各分层证据以上方执行更新与本地整链进度为准。本文不是任何生产账号／权限写入的执行凭据；Task9.6真实整链与人工UAT仍有各自门禁。
+
+## Task 9.6f: 管理命令成功响应的最小合同修复
+
+本单元解决9.6e源代码联通检查发现的既有缺陷，不修改冻结设计。9.6e代码门完成后串行实施；9.6e真实写入依赖本修复部署完成。用户既定的完整功能修复与本地更新范围不扩大。
+
+**Files:** 仅修改`backend/src/main/java/io/github/windyzhu3/ontologylaw/execution/IdentityCommandRuntime.java`与`backend/src/test/java/io/github/windyzhu3/ontologylaw/api/IdentityAdminHttpIT.java`。不修改OpenAPI／前端／数据库迁移／生产依赖／管理权限；若证明还需其他生产文件，先向控制者提供准确原因，不自行扩散。
+
+**Interfaces:** 消费冻结OpenAPI的`ReceiptLocation`（`contracts/openapi/ontology-law-api.yaml:3417`）：`^/api/v1/commands/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/receipt$`。四个CREATE和十个更新命令成功响应的Location均应为原`commandId`回执，不是`receiptId`或resultFact资源地址。保留`Result`类型、201/200、ETag、no-store、Receipt投影及错误／冲突／重放语义。
+
+- [ ] RED：在真实隔离Keycloak＋PostgreSQL＋HTTP的`IdentityAdminHttpIT`中，给现有`write`成功路径增加准确Location与body.commandId对应断言，覆盖现有十四操作；添加成功创建组织及同key／同body重放的定向测试。断言首次和重放Location相同、body回执相同、重放Fact／Slot／Receipt／命令Audit无新增；使用原测试自己的独立数据库，不读或写本地验收runtime。
+
+```java
+assertEquals("/api/v1/commands/" + headers.get("Idempotency-Key") + "/receipt",
+        response.headers().firstValue("Location").orElseThrow());
+assertEquals(headers.get("Idempotency-Key"), json(response.body()).path("commandId").asString());
+```
+
+- [ ] 运行新增定向HTTP测试并记录真实期望失败（旧代码返回`/api/v1/admin/identity/organizations/{uuid}`），不能以编译错误代替行为RED。固定工具链执行`mvnw.cmd -B -f backend/pom.xml -Pit -Dit.test=IdentityAdminHttpIT#success_and_replay_keep_original_receipt_location test-compile failsafe:integration-test failsafe:verify`，保留输出／退出码；不执行package、不改变运行中API／Worker。
+- [ ] 最小修复`IdentityCommandRuntime.result`中Location构造，成功有resultFact时指向原命令回执，其余处理不变：
+
+```java
+String location = fact == null ? null : "/api/v1/commands/" + e.commandId() + "/receipt";
+```
+
+- [ ] 修正现有`IdentityAdminHttpIT.factId`不再从Location尾部提取Fact UUID。仅在隔离测试自身的数据库，以response.body.commandId与准确测试Tenant读取原Slot→Receipt的result_fact_id，核对receiptId／事实类型／revision与对应实际Receipt投影；不得将不透明`factRef`当UUID、按显示名取第一条或通过新增生产GET接口方便测试。该只读辅助不插入目标身份事实，现有十四真实HTTP命令路径保持。
+- [ ] GREEN：运行完整`IdentityAdminHttpIT`一次覆盖十四命令、准确头、重放、错误和CAS；运行后端单元`mvnw.cmd -B -f backend/pom.xml test`及既有前端`identityApi.test.ts`受影响合同回归，记录实际数量／退出码与原工具警告，不冒充完整Task9／全部IT。自评、提交这两份文件，由控制者独立spec／quality评审；无推送、无真实runtime操作。
+- [ ] 控制者通过现有已评审制品发布流程更新本地API／SPA／Worker同包，保留AUTO及原MANUAL配置、原SERVICE绑定与已存在全部身份／原引导事实、密钥和回退包。固定新的业务buildSha与环境摘要后执行9.6e真实建档；不能继续将04bd695旧二进制说成包含本修复，也不能由测试劫持响应头伪装修好。
