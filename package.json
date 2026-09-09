@@ -14,9 +14,12 @@
     "openapi:check": "openapi-typescript contracts/openapi/ontology-law-api.yaml --output apps/workbench/src/generated/api/schema.d.ts --alphabetize --check",
     "typecheck": "npm run typecheck --workspace apps/workbench",
     "test": "npm run test --workspace apps/workbench",
-    "build": "npm run build --workspace apps/workbench"
+    "build": "npm run build --workspace apps/workbench",
+    "test:e2e:task9": "playwright test --config playwright.config.ts"
   },
   "devDependencies": {
-    "openapi-typescript": "7.13.0"
+    "openapi-typescript": "7.13.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.13.3"
   }
 }
