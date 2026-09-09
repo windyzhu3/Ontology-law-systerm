@@ -37,6 +37,21 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it("invokes the default browser fetch without using the controller as its receiver", async () => {
+  vi.stubGlobal("fetch", async function (this: unknown) {
+    if (this !== undefined && this !== globalThis)
+      throw new TypeError("Illegal invocation");
+    return jsonResponse(context);
+  });
+  const controller = new SessionController(
+    adapter(),
+    new RecoveryStore(sessionStorage),
+  );
+  await controller.initialize();
+  expect(controller.getSnapshot().status).toBe("READY");
+  expect(controller.getSnapshot().context).toEqual(context);
+});
+
 it.each(["initial", "selection"] as const)(
   "bounds the entire %s SELF response and rejects its late body after the original deadline",
   async (phase) => {

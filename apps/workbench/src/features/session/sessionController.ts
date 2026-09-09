@@ -121,7 +121,7 @@ export class SessionController {
   constructor(
     readonly oidc: OidcAdapter,
     readonly recovery: RecoveryStore,
-    private readonly fetcher: typeof fetch = fetch,
+    private readonly fetcher: typeof fetch = (...args) => fetch(...args),
     private readonly now = Date.now,
   ) {}
   getSnapshot = () => this.state;

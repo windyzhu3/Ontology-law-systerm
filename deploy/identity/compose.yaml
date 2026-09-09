@@ -27,7 +27,7 @@ services:
       KC_HTTP_ENABLED: "false"
       KC_HTTPS_CERTIFICATE_FILE: /run/secrets/identity_https_cert
       KC_HTTPS_CERTIFICATE_KEY_FILE: /run/secrets/identity_https_key
-      KC_FEATURES_DISABLED: impersonation,dynamic-scopes
+      KC_FEATURES_DISABLED: impersonation,parameterized-scopes
     ports: ["127.0.0.1:${IDENTITY_HTTPS_PORT:?Set the explicit HTTPS port}:8443"]
     secrets: [identity_db_password, identity_db_ca, identity_https_cert, identity_https_key]
     networks: [identity]
