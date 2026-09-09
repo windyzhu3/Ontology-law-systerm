@@ -258,6 +258,11 @@ def visual_assets() -> list[tuple[str, str]]:
     ] + [(f"VIS-IDENTITY-ADM-{index:02d}", path) for index, path in enumerate(identity, 1)]
 
 
+def approved_identity_visual_supplements() -> list[str]:
+    base = "docs/design/identity-admin-mvp/revisions/2026-09-09-contract-alignment"
+    return [f"{base}/ADM-{index:02d}-review.png" for index in range(1, 5)]
+
+
 class VerifyBaselineTest(unittest.TestCase):
     def write_r1_contract_fixture(self, root: Path) -> None:
         task_header = (
@@ -974,6 +979,8 @@ class VerifyBaselineTest(unittest.TestCase):
             "\n".join(["# Identity visual index", "", *visual_metadata, "", *identity_links, ""]),
         )
         for _, asset in visual_assets():
+            self.write_bytes(root, asset, b"png")
+        for asset in approved_identity_visual_supplements():
             self.write_bytes(root, asset, b"png")
         for command in (
             ["git", "init", "-q"],
@@ -4439,6 +4446,51 @@ class VerifyBaselineTest(unittest.TestCase):
             self.assertEqual(cli_result.returncode, 1)
             self.assertEqual(cli_result.stdout.strip().splitlines(), expected)
             self.assertEqual(cli_result.stderr, "")
+
+    def test_approved_identity_visual_supplements_do_not_change_the_frozen_seven(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            self.assertEqual(verify_repository(root), [])
+
+    def test_identity_visual_contract_rejects_missing_and_extra_frozen_originals(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            original = root / "docs/design/identity-admin-mvp/frozen/ADM-07-audit-records.png"
+            original.unlink()
+            self.assertIn(
+                "Visual asset count mismatch for docs/design/identity-admin-mvp/frozen: expected 7 PNG files, found 6",
+                verify_repository(root),
+            )
+            self.write_bytes(root, "docs/design/identity-admin-mvp/frozen/rogue.png", b"png")
+            findings = verify_repository(root)
+            self.assertNotIn(
+                "Visual asset count mismatch for docs/design/identity-admin-mvp/frozen: expected 7 PNG files, found 6",
+                findings,
+            )
+            self.assertIn(
+                "Unexpected identity admin visual PNG: docs/design/identity-admin-mvp/frozen/rogue.png",
+                findings,
+            )
+
+    def test_identity_visual_contract_rejects_unknown_or_missing_supplements(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.create_valid_repository(root)
+            missing = Path(approved_identity_visual_supplements()[0])
+            (root / missing).unlink()
+            self.write_bytes(
+                root,
+                "docs/design/identity-admin-mvp/revisions/2026-09-09-contract-alignment/rogue.png",
+                b"png",
+            )
+            findings = verify_repository(root)
+            self.assertIn(f"Missing approved identity admin visual PNG: {missing.as_posix()}", findings)
+            self.assertIn(
+                "Unexpected identity admin visual PNG: docs/design/identity-admin-mvp/revisions/2026-09-09-contract-alignment/rogue.png",
+                findings,
+            )
 
 
 if __name__ == "__main__":

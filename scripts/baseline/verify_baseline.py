@@ -158,6 +158,12 @@ EXPECTED_VISUAL_ASSETS = {
     "docs/design/sales-mvp-workcards": 27,
     "docs/design/identity-admin-mvp": 7,
 }
+APPROVED_IDENTITY_VISUAL_SUPPLEMENTS = frozenset(
+    Path(
+        "docs/design/identity-admin-mvp/revisions/2026-09-09-contract-alignment"
+    ) / f"ADM-{index:02d}-review.png"
+    for index in range(1, 5)
+)
 
 CANONICAL_BASELINE = Path("docs/baseline/CURRENT-MVP-BASELINE.md")
 CLOSURE_SPEC = Path("docs/superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md")
@@ -2777,12 +2783,33 @@ def verify_delivery_ledger(root: Path, findings: list[str]) -> list[str] | None:
 
 def verify_visual_asset_counts(root: Path, findings: list[str]) -> None:
     for relative_dir, expected_count in EXPECTED_VISUAL_ASSETS.items():
-        asset_count = sum(1 for _ in (root / relative_dir).rglob("*.png"))
+        if relative_dir == "docs/design/identity-admin-mvp":
+            frozen_dir = root / relative_dir / "frozen"
+            asset_count = sum(1 for _ in frozen_dir.rglob("*.png"))
+            finding_dir = f"{relative_dir}/frozen"
+        else:
+            asset_count = sum(1 for _ in (root / relative_dir).rglob("*.png"))
+            finding_dir = relative_dir
         if asset_count != expected_count:
             findings.append(
-                f"Visual asset count mismatch for {relative_dir}: "
+                f"Visual asset count mismatch for {finding_dir}: "
                 f"expected {expected_count} PNG files, found {asset_count}"
             )
+    identity_dir = Path("docs/design/identity-admin-mvp")
+    expected_originals = {
+        Path("docs") / target.removeprefix("../")
+        for row_id, target in EXPECTED_VISUAL_ROWS.items()
+        if row_id.startswith("VIS-IDENTITY-ADM-")
+    }
+    actual_identity_assets = {
+        path.relative_to(root)
+        for path in (root / identity_dir).rglob("*.png")
+    }
+    expected_identity_assets = expected_originals | APPROVED_IDENTITY_VISUAL_SUPPLEMENTS
+    for path in sorted(APPROVED_IDENTITY_VISUAL_SUPPLEMENTS - actual_identity_assets):
+        findings.append(f"Missing approved identity admin visual PNG: {path.as_posix()}")
+    for path in sorted(actual_identity_assets - expected_identity_assets):
+        findings.append(f"Unexpected identity admin visual PNG: {path.as_posix()}")
 
 
 def _verify_repository_result_unchecked(root: Path) -> VerificationResult:

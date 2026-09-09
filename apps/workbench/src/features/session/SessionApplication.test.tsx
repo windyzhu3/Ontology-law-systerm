@@ -6,7 +6,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { expect, it, beforeEach } from "vitest";
+import { expect, it, beforeEach, afterEach, vi } from "vitest";
 import { SessionApplication } from "./SessionApplication";
 import {
   SessionController,
@@ -26,6 +26,7 @@ import {
 } from "../../test/fixtures";
 const scope = "ask1.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 beforeEach(() => history.replaceState(null, "", "/workbench"));
+afterEach(() => vi.unstubAllGlobals());
 const context: SessionContext = {
   displayName: "合成入口办理人",
   state: "READY",
@@ -227,6 +228,122 @@ it("does not initialize or read private data on an unknown route", () => {
   expect(f.requests).toHaveLength(0);
 });
 
+it("admits an explicitly confirmed direct identity admin without workbench permission", async () => {
+  history.replaceState(null, "", "/admin/identity/principals");
+  const captured: Request[] = [];
+  vi.stubGlobal("fetch", async (request: Request) => {
+    captured.push(request);
+    return new Response(JSON.stringify({
+        items: [
+          {
+            id: taskId,
+            displayName: "陈晓",
+            state: "ACTIVE",
+            etag: `"identity.${"a".repeat(43)}"`,
+          },
+        ],
+        nextCursor: null,
+      }), { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
+  });
+  const f = fixture({
+    context: {
+      ...context,
+      canEnterWorkbench: false,
+      canEnterIdentityAdmin: true,
+    },
+  });
+  render(<SessionApplication controller={f.controller} api={f.api} />);
+  expect(captured).toHaveLength(0);
+  const confirm = await screen.findByRole("button", { name: "确认本次身份" });
+  await waitFor(() => expect(confirm).toBeEnabled());
+  expect(captured).toHaveLength(0);
+  fireEvent.click(confirm);
+  expect(await screen.findByRole("button", { name: "陈晓" })).toBeVisible();
+  expect(captured).toHaveLength(1);
+  expect(captured[0].url).toContain(
+    "/api/v1/admin/identity/principals?limit=20",
+  );
+  expect(captured[0].headers.get("Authorization")).toBe(
+    "Bearer assembly-initial",
+  );
+  expect(captured[0].headers.get("X-Appointment-Id")).toBe(taskId);
+  expect(captured[0].headers.has("X-On-Behalf-Appointment-Id")).toBe(false);
+  expect(screen.queryByText("创建时间")).not.toBeInTheDocument();
+});
+
+it("admits identity administration independently when the same direct actor can also enter workbench", async () => {
+  history.replaceState(null, "", "/admin/identity/organizations");
+  const captured: Request[] = [];
+  vi.stubGlobal("fetch", async (request: Request) => {
+    captured.push(request);
+    return new Response(JSON.stringify({ items: [], nextCursor: null }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  });
+  const f = fixture({ context: { ...context, canEnterWorkbench: true, canEnterIdentityAdmin: true } });
+  render(<SessionApplication controller={f.controller} api={f.api} />);
+  const confirm = await screen.findByRole("button", { name: "确认本次身份" });
+  await waitFor(() => expect(confirm).toBeEnabled());
+  fireEvent.click(confirm);
+  expect(await screen.findByRole("heading", { name: "组织架构" })).toBeVisible();
+  expect(screen.queryByRole("main", { name: "责任工作台" })).not.toBeInTheDocument();
+  await waitFor(() => expect(captured).toHaveLength(1));
+});
+
+it("does not disclose an identity list when the confirmed direct appointment lacks admin qualification", async () => {
+  history.replaceState(null, "", "/admin/identity/appointments");
+  const captured: Request[] = [];
+  vi.stubGlobal("fetch", async (request: Request) => {
+    captured.push(request);
+    return new Response();
+  });
+  const f = fixture({ context: { ...context, canEnterIdentityAdmin: false } });
+  render(<SessionApplication controller={f.controller} api={f.api} />);
+  const confirm = await screen.findByRole("button", { name: "确认本次身份" });
+  await waitFor(() => expect(confirm).toBeEnabled());
+  fireEvent.click(confirm);
+  expect(await screen.findByText("当前任职不能进入身份管理；请确认本人任职具备管理资格。")).toBeVisible();
+  expect(captured).toHaveLength(0);
+  expect(screen.queryByRole("navigation", { name: "身份管理" })).not.toBeInTheDocument();
+});
+
+it("returns a recovered identity command to the originally requested static admin page", async () => {
+  history.replaceState(null, "", "/admin/identity/principals");
+  sessionStorage.setItem(markerKey, JSON.stringify({
+    commandId: selectorId,
+    commandType: "CREATE_IDENTITY_PRINCIPAL",
+    actorScopeKey: scope,
+    recordedAt: new Date().toISOString(),
+  }));
+  const captured: Request[] = [];
+  vi.stubGlobal("fetch", async (request: Request) => {
+    captured.push(request);
+    return new Response(JSON.stringify({ items: [], nextCursor: null }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  });
+  const f = fixture({
+    context: { ...context, canEnterWorkbench: false, canEnterIdentityAdmin: true },
+    respond: async () => jsonResponse({
+      ...receipt(selectorId),
+      resultFact: { factType: "IDENTITY_PRINCIPAL", factRef: "safe-result", revision: 1 },
+    }),
+  });
+  render(<SessionApplication controller={f.controller} api={f.api} />);
+  const confirm = await screen.findByRole("button", { name: "确认本次身份" });
+  await waitFor(() => expect(confirm).toBeEnabled());
+  fireEvent.click(confirm);
+  const query = await screen.findByRole("button", { name: "查询原操作结果" });
+  await waitFor(() => expect(query).toBeEnabled());
+  expect(captured).toHaveLength(0);
+  fireEvent.click(query);
+  fireEvent.click(await screen.findByRole("button", { name: "继续" }));
+  expect(await screen.findByRole("heading", { name: "用户与身份主体" })).toBeVisible();
+  expect(captured).toHaveLength(1);
+});
+
 it("T9-L07 keeps dirty input through real renewal and sends only an explicitly confirmed write with the new token", async () => {
   const data = envelope(5, true);
   data.currentCard!.commandForm.fields.find(
@@ -391,7 +508,7 @@ it("does not grant business entry after Identity-only receipt recovery", async (
   fireEvent.click(await screen.findByRole("button", { name: "继续" }));
   expect(
     await screen.findByText(
-      "当前任职不能进入业务工作台；管理入口尚未开放，请联系律所管理员。",
+      "当前任职不能进入业务工作台；具备管理资格时可使用身份管理地址。",
     ),
   ).toBeVisible();
   expect(f.requests).toHaveLength(1);
