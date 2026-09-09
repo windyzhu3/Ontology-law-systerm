@@ -11,7 +11,7 @@ Task9.5的管理页面、十四项管理写入、工作台状态提示已完成�
 | 已有前端源码 | 本轮基线445项／27文件通过，退出0 | 不代表运行中SPA已更新 |
 | 原本地登录环境 | Keycloak TLS与准确issuer通过；原闭包核验通过 | 不代表新管理界面、业务资格和七卡已实测 |
 | 原bootstrap保护 | 当前生产类核验`VERIFIED_ORIGINAL`；54表及原文件摘要不变 | 旧运行Jar仍含旧核验逻辑，不冒充新构建 |
-| 9.6b制品切换 | 首版及入口清单修复`db9086d`已复审通过；旧集快照完成，停机竞态修复`c9e85b3`待独立复审 | 未执行本轮构建／激活；当前API已停、SPA及Keycloak／数据库保留运行 |
+| 9.6b制品切换 | 停机修复已复审并现场通过；新Jar／SPA构建、暂存、激活成功，API／SPA已运行 | 核验输出读取修复及真实回退证据仍待完成；不是整链验收完成 |
 | 9.6c Worker | 已核实原SERVICE一身份／一任职／零授权；原证书有效，DB角色最小 | Worker尚未启动，不代表等待恢复已通过 |
 | 真实账号与受控管理链 | 已批准本轮本地临时Keycloak管理操作；尚未执行 | 目录只读账号不升级；不会直写HUMAN业务身份 |
 | 七卡、撤权与故障恢复 | 待同构建真实验收 | 既有分层测试不替代全部整链用例 |
@@ -29,7 +29,10 @@ Task9.5的管理页面、十四项管理写入、工作台状态提示已完成�
 - Worker数据库登录为NOINHERIT，仅属于`law_app_worker`，无SUPERUSER／CREATEDB／CREATEROLE／REPLICATION／BYPASSRLS标志；现有SERVICE证书检查时有效，到期为2026-09-16 06:29:24 UTC。
 - `scripts/verify_topology.py`退出0；`scripts/baseline/verify_baseline.py .`退出0，基线一致性PASS，仍保留原7项非致命R2发布门阻断。没有为使检查变绿而提前修改R1／R2交付状态。
 - 首版独立评审发现构建输入清单缺项，`db9086d`统一纳入HTML入口、tsconfig、实际jOOQ源码及构建配置；21项定向测试通过，独立复审关闭阻断。
-- 真实`snapshot-release`退出0，旧Jar／dist／配置／gate已保存。随后`stop-apps`暴露Windows进程竞态：API已成功退出，但后续`Wait-Process`查不到该PID返回1，流程未继续停止SPA。只读已退出PID及新建隐藏测试子进程均重现；`c9e85b3`使用已核对进程句柄等待，24项定向测试通过（含真实停止拒绝和20秒超时），独立复审后才继续真实操作。没有开始构建、切换gate或改动数据库事实。
+- 真实`snapshot-release`退出0，旧Jar／dist／配置／gate已保存。随后`stop-apps`暴露Windows进程竞态：API已成功退出，但后续`Wait-Process`查不到该PID返回1，流程未继续停止SPA。只读已退出PID及新建隐藏测试子进程均重现；`c9e85b3`使用已核对进程句柄等待，24项定向测试通过（含真实停止拒绝和20秒超时），独立复审后才继续真实操作。该故障发生时尚未构建或切换gate。
+- 上述停机故障随后经独立复审并现场关闭。固定源码`b7f4a12`执行真实Maven package与SPA构建，均退出0；新制品`05475ac485914f0cb2b8fe33a11f89df`暂存／激活／启动均退出0。发布状态`COMPLETE / new / schemaMatches=true`，旧集保留。388项源码输入、3个SPA文件及Jar／manifest摘要已固定。
+- 激活后五条TLS页面路径（登录和四个管理导航）全部200并返回HTML。管理员真实Code＋PKCE登录、nonce／issuer／audience检查通过，SELF为READY／管理可进入／工作台不可进入，退出204；未映射账号SELF仍为401，退出204。均退出0，不冒充专用业务资格或七卡通过。
+- 新Jar原闭包核验进程退出0，末行返回`VERIFIED_ORIGINAL`，但本地wrapper将前置jOOQ日志一并当作JSON，导致自身返回错误。`ef2f7e6`补齐严格末行结果校验，定向7＋2项测试通过，待独立复审和现场复验；wrapper正式通过前不关闭此项。
 
 ## 授权与保持不变的边界
 
