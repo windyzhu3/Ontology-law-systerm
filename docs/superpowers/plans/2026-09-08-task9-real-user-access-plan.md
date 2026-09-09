@@ -261,6 +261,8 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 
 **产出接口：** `createIdentityApi(recovery: RecoveryStore, fetcher?: (request: Request) => Promise<Response>, baseUrl?: string)`。返回`recovery`、六个与OpenAPI operationId同名的读取方法（各接收`session, query, signal`）、`write(session, original: IdentityOriginalWrite, signal)`、`receipt(session, key, signal)`。query/body/response以生成的准确类型与具名静态检查为准，不能`any`贯穿或用任意operation/path字符串派发。`IdentityOriginalWrite`是14个静态commandType的判别联合，保存原key、准确目标（创建不虚构目标）、body和适用的If-Match，绝不保存Bearer或当前权限证明。`IdentityApi`为工厂返回类型。内部共享transport只承接既有验证与回执职责，不成为通用命令平台。
 
+**内部字段澄清：** 10个既有资源变更采用`{commandType,key,body,targetId,ifMatch}`，4个创建采用`{commandType,key,body}`；各分支body维持准确生成类型。封闭校验拒绝创建时夹带targetId/ifMatch，变更必须准确UUID目标与强Identity ETag；不接受任意headers包。这只是前端内存原请求的具名字段，不改变HTTP DTO。
+
 - [ ] **Step 1 — 表驱动RED证明实际请求映射。** 逐条以冻结Identity registry为独立期望，覆盖14个commandType对应method/path/body、4创建无If-Match、10修改／生命周期携带原强Identity ETag；六读取验证准确query、分页、no-store和本人header。断言真实`Request`输出，不只检查registry常量。读取包括`listIdentityProviderUsers/getIdentityAdminOptions/listIdentityPrincipals/listOrganizationUnits/listAppointments/listAuthorityGrants`；候选完整用户名0～1／无nextCursor、列表最多50、options按page／optionKind限制，不能从客户端扩充权限集合。
 - [ ] **Step 2 — RED证明共享门和迟到响应。** 一条管理写入结果未知后尝试工作台写入，以及反方向，必须在网络派发前拒绝覆盖；同一原对象／key／body可用更新后的Bearer重放，克隆／改body／改key不能冒充原请求。存储失败或Actor改变前后均不得派发／披露／清除其他身份标记。示例断言遵循以下公共行为，使用真实工厂而非替身方法：
 
