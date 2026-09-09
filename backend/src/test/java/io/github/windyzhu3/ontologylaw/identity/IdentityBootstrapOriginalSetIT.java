@@ -5,13 +5,12 @@ import io.github.windyzhu3.ontologylaw.audit.AuditAppender;
 import io.github.windyzhu3.ontologylaw.execution.IdentityBootstrapRuntime;
 import io.github.windyzhu3.ontologylaw.testing.KeycloakFixture;
 import io.github.windyzhu3.ontologylaw.testing.PostgresIntegrationTest;
+import io.github.windyzhu3.ontologylaw.testing.TenantDatabaseSnapshot;
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -68,7 +67,7 @@ class IdentityBootstrapOriginalSetIT extends PostgresIntegrationTest {
         var scenario = createScenario(0);
         var original = originalIds(scenario.tenant());
         insertLaterRow(scenario.tenant(), original, addition);
-        var before = databaseSnapshot(scenario.tenant());
+        var before = TenantDatabaseSnapshot.capture(database, scenario.tenant());
 
         try (var connection = database.apiConnection()) {
             var verified = scenario.runtime().run(connection, scenario.manifest(), false);
@@ -77,7 +76,7 @@ class IdentityBootstrapOriginalSetIT extends PostgresIntegrationTest {
             assertEquals(Map.of(), verified.plannedDelta());
         }
 
-        assertEquals(before, databaseSnapshot(scenario.tenant()));
+        assertEquals(before, TenantDatabaseSnapshot.capture(database, scenario.tenant()));
     }
 
     @Test
@@ -96,7 +95,7 @@ class IdentityBootstrapOriginalSetIT extends PostgresIntegrationTest {
             insertLaterRow(scenario.tenant(), original, addition);
         }
         awaitCandidateExpiry(scenario.candidateExpiresAt());
-        var before = databaseSnapshot(scenario.tenant());
+        var before = TenantDatabaseSnapshot.capture(database, scenario.tenant());
 
         idp.unavailable(() -> {
             try (var connection = database.apiConnection()) {
@@ -109,7 +108,7 @@ class IdentityBootstrapOriginalSetIT extends PostgresIntegrationTest {
             }
         });
 
-        assertEquals(before, databaseSnapshot(scenario.tenant()));
+        assertEquals(before, TenantDatabaseSnapshot.capture(database, scenario.tenant()));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -125,7 +124,7 @@ class IdentityBootstrapOriginalSetIT extends PostgresIntegrationTest {
         var scenario = createScenario(0);
         var original = originalIds(scenario.tenant());
         corruptOriginal(scenario.tenant(), original, corruption);
-        var before = databaseSnapshot(scenario.tenant());
+        var before = TenantDatabaseSnapshot.capture(database, scenario.tenant());
 
         try (var connection = database.apiConnection()) {
             var failure = assertThrows(SQLException.class,
@@ -133,7 +132,7 @@ class IdentityBootstrapOriginalSetIT extends PostgresIntegrationTest {
             assertEquals("BOOTSTRAP_ORIGINAL_STATE_CONFLICT", failure.getMessage());
         }
 
-        assertEquals(before, databaseSnapshot(scenario.tenant()));
+        assertEquals(before, TenantDatabaseSnapshot.capture(database, scenario.tenant()));
     }
 
     private Scenario createScenario(int candidateAgeSeconds) throws Exception {
@@ -299,35 +298,6 @@ class IdentityBootstrapOriginalSetIT extends PostgresIntegrationTest {
             }
             connection.commit();
         }
-    }
-
-    private Map<String, String> databaseSnapshot(UUID tenant) throws Exception {
-        var snapshot = new LinkedHashMap<String, String>();
-        try (var connection = database.migratorConnection();
-             var tables = connection.prepareStatement(
-                     "select c.table_schema,c.table_name from information_schema.columns c "
-                             + "join information_schema.tables t on t.table_schema=c.table_schema and t.table_name=c.table_name "
-                             + "where c.column_name='tenant_id' and t.table_type='BASE TABLE' "
-                             + "and c.table_schema not in ('pg_catalog','information_schema') "
-                             + "order by c.table_schema,c.table_name");
-             ResultSet rows = tables.executeQuery()) {
-            while (rows.next()) {
-                String schema = rows.getString(1);
-                String table = rows.getString(2);
-                String qualified = '"' + schema.replace("\"", "\"\"") + "\".\""
-                        + table.replace("\"", "\"\"") + '"';
-                try (var statement = connection.prepareStatement(
-                        "select coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text),'[]'::jsonb)::text "
-                                + "from " + qualified + " t where tenant_id=?")) {
-                    statement.setObject(1, tenant);
-                    try (var content = statement.executeQuery()) {
-                        content.next();
-                        snapshot.put(schema + "." + table, content.getString(1));
-                    }
-                }
-            }
-        }
-        return snapshot;
     }
 
     private void awaitCandidateExpiry(Instant expiresAt) throws InterruptedException {

@@ -61,9 +61,21 @@ class IdentityBootstrapIT extends PostgresIntegrationTest {
         // Isolated corruption fixture only: no production grants or trigger definitions are changed.
         try(var c=database.adminConnection()){c.setAutoCommit(false);AuthorizationServiceIT.sql(c,"set local session_replication_role=replica");AuthorizationServiceIT.sql(c,mutation,s.tenant());c.commit();}
         awaitCandidateExpiry(s.candidateExpiresAt());
-        var before=snapshot(s.tenant());idp.unavailable(()->{try(var c=database.apiConnection()){
+        var before=TenantDatabaseSnapshot.capture(database,s.tenant());idp.unavailable(()->{try(var c=database.apiConnection()){
             assertThrows(SQLException.class,()->s.runtime().run(c,s.manifest(),false));assertThrows(SQLException.class,()->s.runtime().verifyOriginal(c,s.manifest()));
-        }catch(SQLException failure){throw new AssertionError("Isolated original-state verification connection unavailable",failure);}});assertEquals(before,snapshot(s.tenant()));
+        }catch(SQLException failure){throw new AssertionError("Isolated original-state verification connection unavailable",failure);}});assertEquals(before,TenantDatabaseSnapshot.capture(database,s.tenant()));
+    }
+    @ParameterizedTest @ValueSource(strings={"SLOT","RECEIPT","AUDIT"})
+    void tenant_content_snapshot_detects_same_row_closure_changes_that_counts_cannot_detect(String table)throws Exception {
+        var s=scenario(false);try(var c=database.apiConnection()){assertEquals("CREATED",s.runtime().run(c,s.manifest(),false).mode());}
+        var countsBefore=snapshot(s.tenant());var contentBefore=TenantDatabaseSnapshot.capture(database,s.tenant());
+        String mutation=switch(table){
+            case "SLOT"->"update execution.command_execution_slot set occupied_at=occupied_at+interval '1 second' where tenant_id=?";
+            case "RECEIPT"->"update execution.command_receipt set completed_at=completed_at+interval '1 second' where tenant_id=?";
+            case "AUDIT"->"update audit.audit_entry set service_role_code='WORKER' where tenant_id=?";
+            default->throw new IllegalArgumentException("Unsupported content snapshot table");};
+        try(var c=database.adminConnection()){c.setAutoCommit(false);AuthorizationServiceIT.sql(c,"set local session_replication_role=replica");AuthorizationServiceIT.sql(c,mutation,s.tenant());c.commit();}
+        assertEquals(countsBefore,snapshot(s.tenant()));assertNotEquals(contentBefore,TenantDatabaseSnapshot.capture(database,s.tenant()));
     }
     @ParameterizedTest @ValueSource(strings={"EXPIRED","PARTIAL","CHANGED_MANIFEST","NEW_COMMAND","CHANGED_PRINCIPAL","REVOKED_GRANT"})
     void invalid_or_incomplete_original_attempt_never_initializes_repairs_or_adds_permissions(String defect)throws Exception {
