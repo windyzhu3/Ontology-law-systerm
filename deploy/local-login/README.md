@@ -6,6 +6,8 @@ Prerequisites: Docker Desktop; Python; the existing `pwsh`; locked Node24.20.0/n
 
 The ignored runtime is `.superpowers/sdd/2026-09-08-task9-real-user-access-plan/local-login-runtime/`. Before every operation the runner verifies its Windows ACL is protected and allows only the current user and SYSTEM, and verifies Git ignores it. Provision that ACL before creating any secret. See [CERTIFICATES.md](CERTIFICATES.md) for the separately approved certificate/trust procedure. `prepare` requires the listed certificate contracts; it does not change Windows trust.
 
+Only first-time `prepare` can create a secret bundle, and only while the runtime contains the certificate directory and no other artifacts. If deployment metadata, configuration, logs or any other initialization artifact survives without the complete original bundle, preparation fails before writes. Later stages load existing keys and never generate replacements. `stop` remains available without keys so a damaged local environment can still be stopped safely.
+
 ## First deployment
 
 Run each command separately and check its exit code. These are individual operator stages, not a command to run unattended through the bootstrap checkpoint.

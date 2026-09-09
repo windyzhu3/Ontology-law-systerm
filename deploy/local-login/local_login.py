@@ -36,14 +36,23 @@ SECRET_NAMES = ('identity-db', 'business-db', 'migrator', 'api-db', 'worker-db',
 def secret_bundle(runtime):
     folder = runtime / 'secrets'
     paths = [folder / (name + '.txt') for name in SECRET_NAMES]
-    if folder.exists():
-        if not all(path.is_file() and path.stat().st_size > 0 for path in paths):
-            raise RuntimeError('partial secret bundle; preserve state and investigate')
-        return {name: path.read_text(encoding='utf-8') for name, path in zip(SECRET_NAMES, paths)}
+    if not folder.is_dir():
+        raise RuntimeError('missing secret bundle; preserve state and investigate')
+    if not all(path.is_file() and path.stat().st_size > 0 for path in paths):
+        raise RuntimeError('partial secret bundle; preserve state and investigate')
+    return {name: path.read_text(encoding='utf-8') for name, path in zip(SECRET_NAMES, paths)}
+
+
+def create_secret_bundle(runtime):
+    # Only the certificate provisioning directory may precede first preparation.
+    # Any other surviving artifact means missing keys are partial existing state.
+    if any(entry.name != 'certs' or not entry.is_dir() for entry in runtime.iterdir()):
+        raise RuntimeError('partial initialized runtime; refuse replacement secrets')
+    folder = runtime / 'secrets'
     folder.mkdir()
     result = {name: base64.b64encode(secrets.token_bytes(32)).decode() for name in SECRET_NAMES}
-    for name, path in zip(SECRET_NAMES, paths):
-        path.write_text(result[name], encoding='utf-8')
+    for name in SECRET_NAMES:
+        (folder / (name + '.txt')).write_text(result[name], encoding='utf-8')
     return result
 
 
@@ -107,7 +116,7 @@ def initialize():
     for name in ('ca.pem', 'server.crt', 'server.key', 'server.pfx', 'pfx-password.txt', 'database.crt', 'database.key'):
         if not (RUNTIME / 'certs' / name).is_file():
             raise RuntimeError('required certificate file missing: ' + name)
-    values = secret_bundle(RUNTIME)
+    values = secret_bundle(RUNTIME) if (RUNTIME / 'secrets').exists() else create_secret_bundle(RUNTIME)
     save('local-r1-realm.json', realm(values))
     save('browser-credentials.json', {kind: {'username': 'synthetic-' + kind, 'password': values[kind + '-password']}
                                       for kind in ('founder', 'unmapped')})
@@ -485,6 +494,8 @@ def resume():
 if __name__ == '__main__':
     try:
         require_protected_runtime()
+        if sys.argv[1] not in ('prepare', 'stop'):
+            secret_bundle(RUNTIME)
         {'prepare': initialize, 'infrastructure': infrastructure, 'health': health, 'migrate': migrate,
          'bootstrap-dry-run': lambda: bootstrap('dry-run'), 'bootstrap-execute': lambda: bootstrap('execute'),
          'bootstrap-verify': lambda: bootstrap('verify'), 'keycloak-create': start_keycloak,

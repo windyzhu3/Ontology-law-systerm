@@ -4,8 +4,11 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 export function route(raw) {
+  if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//') || /[\s#]/.test(raw)) return 'missing';
   if (/%2e|%2f|%5c|\.\.|\\/i.test(raw.split('?')[0])) return 'missing';
-  const pathname = new URL(raw, 'https://localhost:19444').pathname;
+  let pathname;
+  try {pathname = new URL(raw, 'https://localhost:19444').pathname;}
+  catch {return 'missing';}
   if (pathname.startsWith('/api/')) return 'api';
   if (['/', '/login', '/auth/callback', '/workbench'].includes(pathname)) return 'spa';
   if (/^\/assets\/[A-Za-z0-9_.-]+$/.test(pathname)) return 'asset';

@@ -12,3 +12,12 @@ test('SPA fallback never captures API or unknown routes', async () => {
   assert.equal(route('/unrecognized'), 'missing');
   assert.equal(route('/assets/../private.txt'), 'missing');
 });
+
+test('malformed and non-origin-relative targets are rejected without throwing', async () => {
+  const {route} = await import('../server.mjs');
+  for (const target of ['//[', '//localhost/login', 'https://localhost:19444/login', 'login', '', '/login#fragment', '/login\n']) {
+    assert.equal(route(target), 'missing', target);
+  }
+  assert.equal(route('/auth/callback?iss=https%3A%2F%2Flocalhost%3A19443%2Frealms%2Flocal-r1'), 'spa');
+  assert.equal(route('/api/v1/session/context'), 'api');
+});
