@@ -235,6 +235,8 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 
 ## Task 9.5: 管理页面与完整状态提示
 
+**执行分段（2026-09-09）：** 9.6a前置已关闭，开始执行已批准9.5，不扩展产品设计。先以9.5a交付六类管理读取、十四条管理写入与9.4共享会话／恢复的非视觉接线，再交付冻结ADM-01～04页面及工作台状态、最后进行本阶段联合浏览器验收。下列9.5整体复选框只能在相应页面与集成证据齐备后关闭；API适配器通过不等于页面完成。
+
 **Files:**
 
 - Create: `apps/workbench/src/features/identity/IdentityAdminLayout.tsx`、`PrincipalPage.tsx`、`OrganizationPage.tsx`、`AppointmentPage.tsx`、`AuthorityGrantPage.tsx`、`identityApi.ts` 及相应测试。
@@ -248,6 +250,33 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 - [ ] 分离 session/read/draft/command 状态轴，保留唯一业务主按钮；提交成功后刷新失败只可重读，不提示重复提交。
 - [ ] 按 360/768/1440 在真实浏览器检查状态、焦点、弹层、权限屏与 composer，无遮挡或横向溢出；登录/任职页采用已获确认的设计。
 - [ ] 运行管理与工作台 DOM 回归、typecheck/build，保存冻结图与实际页面联合比较证据，独立评审后提交。
+
+## Task 9.5a: 管理API与共享会话／恢复接线
+
+**范围：** 这是9.5既有`identityApi.ts`与十四管理写入接线的可独立审阅交付，不建设页面、导航、样式或新后端能力。沿用设计§3～5、§7和冻结Identity合同。保留一个SPA、一份OpenAPI、四字段恢复标记和当前语义／物理版本；不加入SERVICE管理、ADM-05～07、R2、依赖升级、登录回退或任意路径命令。
+
+**Files:** 新建`apps/workbench/src/features/identity/identityApi.ts`、`identityContract.ts`及对应`.test.ts`；按需要把`apps/workbench/src/lib/api.ts`已有会话验证／原回执判定公共部分提取到`lib/sessionTransport.ts`并添加相应测试。只做本轮共用接线所需提取，不重写9.4会话状态机或业务卡协议。现有`features/session/recoveryMarker.ts`、`recoveryOutcome.ts`、`sessionTransport.test.ts`与业务测试仅作直接覆盖所需修改；冻结OpenAPI／生成文件／依赖锁文件／后端／UI／部署不改。Root拥有本计划与进度证据。
+
+**消费接口：** `WorkbenchSession`、同一个`SessionController.recovery: RecoveryStore`、`RecoveryStore.reserveWrite/clear/read`、`matchesReceipt`、`provenWriteOutcome`及OpenAPI1.4.0生成类型。`createWorkbenchApi`既有调用接口和七卡／草稿语义保持兼容。不能为管理模式新建一套Storage key、WeakMap原请求系统、Receipt endpoint或令牌缓存。
+
+**产出接口：** `createIdentityApi(recovery: RecoveryStore, fetcher?: (request: Request) => Promise<Response>, baseUrl?: string)`。返回`recovery`、六个与OpenAPI operationId同名的读取方法（各接收`session, query, signal`）、`write(session, original: IdentityOriginalWrite, signal)`、`receipt(session, key, signal)`。query/body/response以生成的准确类型与具名静态检查为准，不能`any`贯穿或用任意operation/path字符串派发。`IdentityOriginalWrite`是14个静态commandType的判别联合，保存原key、准确目标（创建不虚构目标）、body和适用的If-Match，绝不保存Bearer或当前权限证明。`IdentityApi`为工厂返回类型。内部共享transport只承接既有验证与回执职责，不成为通用命令平台。
+
+- [ ] **Step 1 — 表驱动RED证明实际请求映射。** 逐条以冻结Identity registry为独立期望，覆盖14个commandType对应method/path/body、4创建无If-Match、10修改／生命周期携带原强Identity ETag；六读取验证准确query、分页、no-store和本人header。断言真实`Request`输出，不只检查registry常量。读取包括`listIdentityProviderUsers/getIdentityAdminOptions/listIdentityPrincipals/listOrganizationUnits/listAppointments/listAuthorityGrants`；候选完整用户名0～1／无nextCursor、列表最多50、options按page／optionKind限制，不能从客户端扩充权限集合。
+- [ ] **Step 2 — RED证明共享门和迟到响应。** 一条管理写入结果未知后尝试工作台写入，以及反方向，必须在网络派发前拒绝覆盖；同一原对象／key／body可用更新后的Bearer重放，克隆／改body／改key不能冒充原请求。存储失败或Actor改变前后均不得派发／披露／清除其他身份标记。示例断言遵循以下公共行为，使用真实工厂而非替身方法：
+
+```typescript
+const identity = createIdentityApi(sharedRecovery, captureRequest);
+const workbench = createWorkbenchApi(captureRequest, location.origin, sharedRecovery);
+await expect(identity.write(session, originalIdentityRequest, signal)).rejects.toThrow();
+expect(sharedRecovery.read()?.commandId).toBe(originalIdentityRequest.key);
+const sentBefore = capturedRequests.length;
+await expect(workbench.write(session, originalTaskRequest, signal)).rejects.toThrow();
+expect(capturedRequests).toHaveLength(sentBefore);
+```
+
+- [ ] **Step 3 — 最小实现与GREEN。** 先保留实际RED再实现typed factory、静态路由、窄响应检查和共用transport。管理入口拒绝非null代办选择，不去掉header降级成本人；不依赖`canEnterWorkbench`授予管理资格，服务端仍逐请求验证管理授权。每请求取得当前token，前后复验epoch／isCurrent／AbortSignal；公共业务仍支持原合法代办，且同身份token轮转不丢原请求。
+- [ ] **Step 4 — 完整回执／错误／读取回归。** 14路径分别验证成功／NO_CHANGE适用项、错误Fact类型／commandId、未知结果、404回执、损坏正文、取消、401/403、并发迟到响应、re-auth token轮转。只按已有完整终态或明确未提交错误规则清标记；GET失败、技术失败、HTTP状态本身不证明未提交，不生成新key；完整刷新仅按标记查原回执，不能凭新表单重建旧写。管理读取拒绝畸形／越界／SERVICE投影／非法enum等正文，不能把失败伪造成空列表；Identity读取没有304成功分支。错误文案为本地安全静态说明，不直接展示原始错误、标识或凭据。生命周期／自锁／最后管理员／依赖／stale等按冻结安全code和retryPolicy保留可供后续表单处理的语义，不改变其重试规则。
+- [ ] **Step 5 — 复验与独立评审。** 聚焦测试后在稳定源码运行完整前端tests/typecheck/build和openapi:check；记录锁定Node24.20.0/npm11.9.0、实际用例与退出码，Root运行基线／拓扑。构建显式使用此计划忽略目录中的隔离输出：`npm run build --workspace apps/workbench -- --outDir ../../.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task95a-dist`；不覆盖本地登录服务正在使用的`apps/workbench/dist`，不使用`--emptyOutDir`清除其他目录。独立评审包含六读取＋十四写入逐路径与共享门回归；只提交本地本单元文件，不推送、不改在线制品／配置／数据。未实际完成页面前不得关闭9.5或声称管理页面前后端已经打通。
 
 ## Task 9.6a: 原 bootstrap 集合核验修正（9.5 前置窄修复）
 
