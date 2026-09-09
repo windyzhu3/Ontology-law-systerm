@@ -113,3 +113,40 @@ LOGIN-01 visual/interaction result: passed (bounded component preview only)
 CHOICE-01 visual/interaction result: passed (bounded component preview only)
 
 CHOICE独立评审补充：初评无Critical／Important，1项Minor为重新选择办理方式或代办候选后旧成功提示残留。Root以真实预览先确认本人再选未选定的代办复现；`95b9673`三个草稿处理处清message后同路径status为空。新增3例先RED，最终相关44项及typecheck通过；无CSS/布局变更，默认截图仍有效。预览自身回调提示也明确改为“验收历史”，不冒充当前组件状态；该夹具不入生产。最终控制台仍为空，视口保持已恢复。
+
+## Task9.4 RECOVERY-01增量QA — 2026-09-09
+
+本节对应用户本轮选择的第2稿，仅恢复页面及既有会话／回执接点。视觉源为`docs/design/session-access/frozen/RECOVERY-01-operation-check.png`（1487×1058，SHA-256 `175ad846b8cb6acb8fe34029418abb52b38276227bd7ba8256709387137db910`）。实际截图在`.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task94-recovery-captures/`，忽略预览加载真实RecoveryPage、SessionProvider、SessionController和HTTP适配层；外部OIDC、context、Receipt与current响应为合成夹具，不连接身份服务，不使用真实线索或业务数据。
+
+首轮对比：将原图及`desktop-01.png`在同次输入中联合展示；CSS视口1487×1058，但DOM scrollHeight1060，多2px引入滚动条、内容宽1472并使截图归一化，不能把密度差当字体尺寸问题。P2发现为默认态不必要滚动条及主按钮偏下（notice top475.72/h100、primary top603.72；源约470/h96及594/h68），已交原实施者小范围调整，禁止隐藏overflow绕过。
+
+五项初核：既有中文系统字体栈和44px标题、24px操作及身份层级保留；左44%品牌及右分区顺序符合；暖白、薄荷、石墨、翡翠绿tokens及6px圆角保留；仅用户要求的Logo／律所名称占位与既有Phosphor信息图标，无额外图片资产；默认静态中文匹配，动态身份取context，未知不说失败。全幅主要文字清晰可辨，无需裁剪／缩放局部图来改变密度。字体栅格与系统字宽细差为P3，不替换批准字体。
+
+初轮交互：未知查询按钮执行时禁用，GET404保留未知且没有重放动作；放弃必须二次确认，取消后焦点回到“放弃本地线索”，确认只清合成本地线索。成功回执后current503显示独立“原操作结果已确认，当前责任暂时无法读取”，重试只有CURRENT GET，成功后“继续”；401清除姓名、任职和操作名，保留重新登录／管理员说明。手机长身份全文换行、按钮高56px／次操作44px、End可读页脚，无横向溢出。
+
+预览夹具校正：初版错误按复数receipts判断路径，并遗漏零卡chatComposer禁用字段，导致合成响应被真实校验拒绝；已按冻结单数`/receipt`及准确零卡envelope修正并重新走通上述成功／只读重试。此为忽略夹具缺陷，不改业务合同或放宽验证。
+
+最终复拍：notice高度收为96px、operation底距收6px后，`desktop-final.png`与原图在同次输入再次联合比较。CSS／实际像素均1487×1058，scrollHeight1058，无默认滚动条；内容x736.22、宽684.18，notice top469.72／高96，primary top593.72／高68，与源约735／685、470／96、594／68吻合。初轮P2关闭，无剩余P0/P1/P2。字号／字重在冻结中文系统栈下保持层级，栅格原稿细微字宽及信息图标笔画差异记P3，不另换视觉体系。
+
+| 最终证据 | CSS视口 | 实际截图像素 | DOM |
+|---|---|---|---|
+| desktop-final.png | 1487×1058 | 1487×1058 | 宽1487，scrollHeight1058 |
+| desktop-1440-final.png | 1440×900 | 1425×891 | 内容／scrollWidth1425，scrollHeight1050 |
+| tablet-768-final.png | 768×1024 | 753×1004 | 内容／scrollWidth753，scrollHeight1028 |
+| mobile-long-final.png | 360×800 | 345×767 | 内容／scrollWidth345，scrollHeight1340，长名完整换行 |
+| mobile-bottom-final.png | 360×800 | 345×767 | 放弃操作键盘焦点可见，页脚底778.82在800内 |
+
+实际文件像素由System.Drawing读取。小视口垂直滚动条触发截图归一化，未裁切或拉伸；一次紧邻视口切换的陈旧平板帧已用稳定视口重新采集，不据其改变布局。手机／平板的自然纵向滚动不遮住永久控件。最终console error/warn为`[]`。
+
+新增边界抽检：过期合成标记禁止查询，可在同页“只删除本地线索，不撤销原操作”二次确认后放弃，只有SELF GET、无Receipt或业务写；继续文案明确原操作仍需核对。测试另覆盖删除实际生效后存储仍抛错的失败关闭、不同Actor迟到响应及可见性切换期间解除单飞锁；测试证据见阶段记录，不以截图替代。
+
+- [x] 同状态同视口原图／实现联合比较，并关闭首轮P2。
+- [x] 字体、布局、颜色、占位／图标和中文内容五项核对。
+- [x] 四尺寸、长名称、焦点、确认／取消及安全状态抽检。
+- [x] 只读回执／重试请求、console与实际截图尺寸核对。
+
+此结论仅适用于恢复组件及合成边界预览；生产main/config装配、完整Task9.4独立评审及9.6真实身份整链仍非本视觉结论。
+
+独立评审补充：`5a8a9fe`仅修改hook及测试，修复已确认回执后的current GET被隐藏中止时无法手动重读。真实RED后最终相关42项／typecheck通过；同一评审者复审1/1关闭、无新增阻塞项。组件/CSS未变，上述视觉截图仍对应当前视觉字节；新生命周期边界由DOM/HTTP回归验证，不冒充浏览器协议链。默认本地预览保留tab2、临时视口已恢复。
+
+final result: passed
