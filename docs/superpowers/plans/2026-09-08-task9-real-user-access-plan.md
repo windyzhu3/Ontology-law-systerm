@@ -620,3 +620,19 @@ String location = fact == null ? null : "/api/v1/commands/" + e.commandId() + "/
 - [ ] 控制者通过现有已评审制品发布流程更新本地API／SPA／Worker同包，保留AUTO及原MANUAL配置、原SERVICE绑定与已存在全部身份／原引导事实、密钥和回退包。固定新的业务buildSha与环境摘要后执行9.6e真实建档；不能继续将04bd695旧二进制说成包含本修复，也不能由测试劫持响应头伪装修好。
 
 **9.6e制品绑定后续（测试侧，不扩大本单元生产文件）：** 新业务制品沿既有`controlled-local-release`流程继承当前来源配置，不重复添加AUTO。控制者实际核验新制品后，由原9.6e实现者仅更新其fixture中的准确PIN与该已存在发布格式的严格manifest／provenance对应校验，并补离线反例、类型检查和独立复审；不兼容任意kind、不放宽进程／秘密保护／已知坏版本门禁。实际buildSha使用业务构建提交，不使用稍后测试提交。
+
+## Task 9.6g: 已批准的身份确认页管理入口补齐
+
+2026-09-10用户已同意短设计：在现有“办理身份确认”页增加仅对有管理资格者显示的“进入身份管理”按钮，沿用冻结样式、单页切换并确认身份，不新增侧栏或持久化token。本节是原9.6执行补充，不重新设计页面或扩张业务范围。
+
+**Files:** 仅允许修改`apps/workbench/src/features/session/SessionApplication.tsx`、`AppointmentChooser.tsx`及两者已有测试；如确有需要，仅在`apps/workbench/src/styles/choice.css`增加局部间距；测试侧仅`e2e/fixtures/identity-setup.ts`和`e2e/tests/task9-harness.spec.ts`。不改OIDC适配器、固定回跳、存储、API、数据库、角色、业务授权、依赖或其他页面。超出上述文件须先报告。
+
+- [ ] TDD：首先用真实SessionApplication／Chooser组件路径复现正常登录后没有可操作管理入口的缺陷，记录行为RED，再最小实现。测试可以在既有组件边界提供合成会话／API，但正向进入管理必须点击可见UI，不能用history事件、evaluate、伪造admin admission或页面重载代替入口。
+- [ ] 增加具名次级按钮“进入身份管理”，复用既有样式、Logo和律所名称占位，保留响应式与键盘焦点。仅当前有效本人任职具备实际SELF管理资格时可用；本地选择未建立、代办模式、SELECTING／失效／切换确认／忙碌不可利用旧资格。激活时重查controller lifetime、epoch、当前选中身份和资格，避免过期闭包。
+- [ ] 单页内切换至`/admin/identity/principals`，清除旧入场确认并要求用户显式“确认本次身份”后才读取管理页面。管理模式意图在原页面给出可见提示，普通用户不出现功能性管理入口。原业务确认、管理直达防护、退出保持；先误点业务确认导致无资格后，也能按新入口重新确认，不被Chooser旧confirmed状态卡住。
+- [ ] 恢复标记／存储错误／撤权／controller更换／epoch变化仍走原恢复和身份保护；新入口不得清除四字段恢复标记、跳过恢复或扩大写入资格。覆盖普通用户、代办、无任职、不可用会话、重复确认、旧确认失效、待恢复与资格变化的受影响行为回归。
+- [ ] 修正真实E2E的administrator流程：真实登录后点击上述按钮再确认，不再fullpage goto丢失内存token，不注入history／token或劫持生产响应。未映射账号准确断言既有部署的SELF401及LoginEntry实际提示“请重新登录以核对当前会话。”，不宽泛接受任意401／403或改产品拒绝合同。相关屏幕／状态等待有界，错屏应及时失败，不等待600秒全局期限。不改journal、发布PIN、恢复门禁或安全记录器。
+- [ ] 迭代只跑受影响测试；提交前完整前端测试一次、`npm run typecheck`、离线Playwright harness与独立strict E2E tsc各一次，记录实际命令／输出／退出码与警告。Agent不运行build/package、不访问已有local-login-runtime、不执行真实测试／Docker／数据库／账户操作，不推送。独立spec＋quality评审通过后才由Root受控构建／部署、更新精确测试PIN并验证真实流程。
+- [ ] 保留失败run `a59d863c-716a-4399-9a5f-95a0e5c12a83`及所有证据。代码通过不是实际验收通过；新构建不能冒充原环境续跑。Root先明确核对原run零命令／零阶段／无未知提交，再以可恢复留档处理原失败run后采用新run；不静默删除或覆盖日志。U01～U03由用户本人执行，仍为NOT_EXECUTED。
+
+**Tools:** worktree `C:/Users/Jacob/.cache/codex-worktrees/ontology-law-r1-business`；Node `C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe`，npm `C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/npm-11.9.0/node_modules/npm/bin/npm-cli.js`，Python `D:/soft/python3/python.exe`。禁止使用默认Documents工作区修改文件。报告写同计划SDD目录`task-9.6g-report.md`，包含RED／GREEN、文件、命令结果、自评和局限；不用完整Task9通过措辞。
