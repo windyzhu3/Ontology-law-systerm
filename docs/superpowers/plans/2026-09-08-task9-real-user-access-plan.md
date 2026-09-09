@@ -618,3 +618,5 @@ String location = fact == null ? null : "/api/v1/commands/" + e.commandId() + "/
 - [ ] 修正现有`IdentityAdminHttpIT.factId`不再从Location尾部提取Fact UUID。仅在隔离测试自身的数据库，以response.body.commandId与准确测试Tenant读取原Slot→Receipt的result_fact_id，核对receiptId／事实类型／revision与对应实际Receipt投影；不得将不透明`factRef`当UUID、按显示名取第一条或通过新增生产GET接口方便测试。该只读辅助不插入目标身份事实，现有十四真实HTTP命令路径保持。
 - [ ] GREEN：运行完整`IdentityAdminHttpIT`一次覆盖十四命令、准确头、重放、错误和CAS；运行后端单元`mvnw.cmd -B -f backend/pom.xml test`及既有前端`identityApi.test.ts`受影响合同回归，记录实际数量／退出码与原工具警告，不冒充完整Task9／全部IT。自评、提交这两份文件，由控制者独立spec／quality评审；无推送、无真实runtime操作。
 - [ ] 控制者通过现有已评审制品发布流程更新本地API／SPA／Worker同包，保留AUTO及原MANUAL配置、原SERVICE绑定与已存在全部身份／原引导事实、密钥和回退包。固定新的业务buildSha与环境摘要后执行9.6e真实建档；不能继续将04bd695旧二进制说成包含本修复，也不能由测试劫持响应头伪装修好。
+
+**9.6e制品绑定后续（测试侧，不扩大本单元生产文件）：** 新业务制品沿既有`controlled-local-release`流程继承当前来源配置，不重复添加AUTO。控制者实际核验新制品后，由原9.6e实现者仅更新其fixture中的准确PIN与该已存在发布格式的严格manifest／provenance对应校验，并补离线反例、类型检查和独立复审；不兼容任意kind、不放宽进程／秘密保护／已知坏版本门禁。实际buildSha使用业务构建提交，不使用稍后测试提交。
