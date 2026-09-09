@@ -325,6 +325,7 @@ function ChoiceForm({
                 setMode("own");
                 setDelegated("");
                 setConfirmed(false);
+                setMessage("");
               }}
             />
             本人办理
@@ -339,6 +340,7 @@ function ChoiceForm({
                 setMode("delegated");
                 setDelegated("");
                 setConfirmed(false);
+                setMessage("");
               }}
             />
             合法代办
@@ -362,6 +364,7 @@ function ChoiceForm({
                   ) {
                     setDelegated(e.target.value);
                     setConfirmed(false);
+                    setMessage("");
                   }
                 }}
               >

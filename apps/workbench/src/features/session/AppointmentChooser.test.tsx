@@ -95,6 +95,63 @@ async function show(initial = ready) {
   return f;
 }
 
+it.each(["to-delegated", "to-own", "delegated-candidate"] as const)(
+  "clears stale confirmation feedback after %s draft changes",
+  async (change) => {
+    const nextDelegated = "019c7000-0000-7000-8000-000000000004";
+    const choices = {
+      ...ready,
+      delegatedAppointmentChoices: [
+        ...ready.delegatedAppointmentChoices,
+        { id: nextDelegated, label: "另一合法代办任职" },
+      ],
+    };
+    const f = fixture(choices, async (request) => {
+      const selected = request.headers.get("X-On-Behalf-Appointment-Id");
+      return jsonResponse({
+        ...choices,
+        selectedOnBehalfAppointmentId: selected,
+        actorScopeKey: selected ? dkey : key,
+      });
+    });
+    let confirmations = 0;
+    render(
+      <AppointmentChooser
+        controller={f.controller}
+        onConfirmed={() => confirmations++}
+      />,
+    );
+    await screen.findByLabelText("本人任职");
+    if (change !== "to-delegated") {
+      fireEvent.click(screen.getByRole("radio", { name: "合法代办" }));
+      fireEvent.change(screen.getByLabelText("被代办任职"), {
+        target: { value: delegated },
+      });
+    }
+    fireEvent.click(confirm());
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("本次身份已确认。"),
+    );
+    expect(confirmations).toBe(1);
+    const requestsBeforeChange = f.requests.length;
+    if (change === "delegated-candidate")
+      fireEvent.change(screen.getByLabelText("被代办任职"), {
+        target: { value: nextDelegated },
+      });
+    else
+      fireEvent.click(
+        screen.getByRole("radio", {
+          name: change === "to-own" ? "本人办理" : "合法代办",
+        }),
+      );
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    expect(confirmations).toBe(1);
+    expect(f.requests).toHaveLength(requestsBeforeChange);
+    if (change === "to-delegated") expect(confirm()).toBeDisabled();
+    else expect(confirm()).toBeEnabled();
+  },
+);
+
 it("requires explicit own selection before current delegated candidates and never defaults even a single delegation", async () => {
   const f = fixture(multi);
   const confirmed: SessionContext[] = [];
