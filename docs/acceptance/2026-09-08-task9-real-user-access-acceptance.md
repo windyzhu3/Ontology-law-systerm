@@ -8,6 +8,8 @@ Task9.4生产入口`774a301`及正文超时修复`958e190`已完成，L01／L06�
 
 设计：[真实用户接入与状态设计](../superpowers/specs/2026-09-08-task9-real-user-access-design.md)。计划：[Task9 扩展实施计划](../superpowers/plans/2026-09-08-task9-real-user-access-plan.md)。
 
+Task9.5a非视觉管理适配器已完成：六读取、十四写入复用现有会话／恢复；实现`f2891d4`、修复`0c5b2b0`，独立评审3项Important全部关闭，最终336项前端回归、类型／隔离构建及实际基线／拓扑通过。详见[管理前端阶段进度](../progress/2026-09-09-task9-identity-frontend-integration.md)。这只补充C02～03／L10～12／I组的transport层证据，不关闭混合验收项；ADM-01～04页面、工作台完整状态、真实管理建档→登录→责任卡链与人工UAT仍未完成。
+
 阶段证据：[Task9.1 本地验收](../progress/2026-09-08-task9-contract-acceptance.md)。C01 合同及 C02～04 静态部分已验证；C02～04 的运行时权限、错误配置、回执披露仍随后续实现验收，不将这些混合项整体提前判为通过。
 
 代办接入补充：[具体补充设计](../superpowers/specs/2026-09-08-task9-delegated-context-amendment-design.md)已获用户书面确认，T9-D01～08正式加入本矩阵；T9-D01静态项已通过，见[代办合同验收](../progress/2026-09-08-task9-delegated-contract-acceptance.md)。D02～07的9.2后端实现已有[运行时阶段证据](../progress/2026-09-09-task9-identity-runtime-acceptance.md)，D05全部20管理HTTP处理现有9.3阶段证据；D03浏览器、D08会话恢复及最终同构建总验收仍待后续，不替代原C/L/I/W/U验收。

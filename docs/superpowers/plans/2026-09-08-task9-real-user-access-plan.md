@@ -253,6 +253,8 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 
 ## Task 9.5a: 管理API与共享会话／恢复接线
 
+**验收状态（2026-09-09）：已完成本非视觉单元。** 实现`f2891d4`／修复`0c5b2b0`，独立评审3项Important全部关闭，最终336项前端回归、类型／隔离构建及实际基线／拓扑通过；M1读取pathname测试覆盖与M2预期构建提示为非阻断记录。详见[阶段进度](../../progress/2026-09-09-task9-identity-frontend-integration.md)。这不关闭9.5页面／状态或9.6整链／人工UAT；页面字段与分页取舍仍待用户确认。
+
 **范围：** 这是9.5既有`identityApi.ts`与十四管理写入接线的可独立审阅交付，不建设页面、导航、样式或新后端能力。沿用设计§3～5、§7和冻结Identity合同。保留一个SPA、一份OpenAPI、四字段恢复标记和当前语义／物理版本；不加入SERVICE管理、ADM-05～07、R2、依赖升级、登录回退或任意路径命令。
 
 **Files:** 新建`apps/workbench/src/features/identity/identityApi.ts`、`identityContract.ts`及对应`.test.ts`；按需要把`apps/workbench/src/lib/api.ts`已有会话验证／原回执判定公共部分提取到`lib/sessionTransport.ts`并添加相应测试。只做本轮共用接线所需提取，不重写9.4会话状态机或业务卡协议。现有`features/session/recoveryMarker.ts`、`recoveryOutcome.ts`、`sessionTransport.test.ts`与业务测试仅作直接覆盖所需修改；冻结OpenAPI／生成文件／依赖锁文件／后端／UI／部署不改。Root拥有本计划与进度证据。
@@ -263,8 +265,8 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 
 **内部字段澄清：** 10个既有资源变更采用`{commandType,key,body,targetId,ifMatch}`，4个创建采用`{commandType,key,body}`；各分支body维持准确生成类型。封闭校验拒绝创建时夹带targetId/ifMatch，变更必须准确UUID目标与强Identity ETag；不接受任意headers包。这只是前端内存原请求的具名字段，不改变HTTP DTO。
 
-- [ ] **Step 1 — 表驱动RED证明实际请求映射。** 逐条以冻结Identity registry为独立期望，覆盖14个commandType对应method/path/body、4创建无If-Match、10修改／生命周期携带原强Identity ETag；六读取验证准确query、分页、no-store和本人header。断言真实`Request`输出，不只检查registry常量。读取包括`listIdentityProviderUsers/getIdentityAdminOptions/listIdentityPrincipals/listOrganizationUnits/listAppointments/listAuthorityGrants`；候选完整用户名0～1／无nextCursor、列表最多50、options按page／optionKind限制，不能从客户端扩充权限集合。
-- [ ] **Step 2 — RED证明共享门和迟到响应。** 一条管理写入结果未知后尝试工作台写入，以及反方向，必须在网络派发前拒绝覆盖；同一原对象／key／body可用更新后的Bearer重放，克隆／改body／改key不能冒充原请求。存储失败或Actor改变前后均不得派发／披露／清除其他身份标记。示例断言遵循以下公共行为，使用真实工厂而非替身方法：
+- [x] **Step 1 — 表驱动RED证明实际请求映射。** 逐条以冻结Identity registry为独立期望，覆盖14个commandType对应method/path/body、4创建无If-Match、10修改／生命周期携带原强Identity ETag；六读取验证准确query、分页、no-store和本人header。断言真实`Request`输出，不只检查registry常量。读取包括`listIdentityProviderUsers/getIdentityAdminOptions/listIdentityPrincipals/listOrganizationUnits/listAppointments/listAuthorityGrants`；候选完整用户名0～1／无nextCursor、列表最多50、options按page／optionKind限制，不能从客户端扩充权限集合。
+- [x] **Step 2 — RED证明共享门和迟到响应。** 一条管理写入结果未知后尝试工作台写入，以及反方向，必须在网络派发前拒绝覆盖；同一原对象／key／body可用更新后的Bearer重放，克隆／改body／改key不能冒充原请求。存储失败或Actor改变前后均不得派发／披露／清除其他身份标记。示例断言遵循以下公共行为，使用真实工厂而非替身方法：
 
 ```typescript
 const identity = createIdentityApi(sharedRecovery, captureRequest);
@@ -276,9 +278,9 @@ await expect(workbench.write(session, originalTaskRequest, signal)).rejects.toTh
 expect(capturedRequests).toHaveLength(sentBefore);
 ```
 
-- [ ] **Step 3 — 最小实现与GREEN。** 先保留实际RED再实现typed factory、静态路由、窄响应检查和共用transport。管理入口拒绝非null代办选择，不去掉header降级成本人；不依赖`canEnterWorkbench`授予管理资格，服务端仍逐请求验证管理授权。每请求取得当前token，前后复验epoch／isCurrent／AbortSignal；公共业务仍支持原合法代办，且同身份token轮转不丢原请求。
-- [ ] **Step 4 — 完整回执／错误／读取回归。** 14路径分别验证成功／NO_CHANGE适用项、错误Fact类型／commandId、未知结果、404回执、损坏正文、取消、401/403、并发迟到响应、re-auth token轮转。只按已有完整终态或明确未提交错误规则清标记；GET失败、技术失败、HTTP状态本身不证明未提交，不生成新key；完整刷新仅按标记查原回执，不能凭新表单重建旧写。管理读取拒绝畸形／越界／SERVICE投影／非法enum等正文，不能把失败伪造成空列表；Identity读取没有304成功分支。错误文案为本地安全静态说明，不直接展示原始错误、标识或凭据。生命周期／自锁／最后管理员／依赖／stale等按冻结安全code和retryPolicy保留可供后续表单处理的语义，不改变其重试规则。
-- [ ] **Step 5 — 复验与独立评审。** 聚焦测试后在稳定源码运行完整前端tests/typecheck/build和openapi:check；记录锁定Node24.20.0/npm11.9.0、实际用例与退出码，Root运行基线／拓扑。构建显式使用此计划忽略目录中的隔离输出：`npm run build --workspace apps/workbench -- --outDir ../../.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task95a-dist`；不覆盖本地登录服务正在使用的`apps/workbench/dist`，不使用`--emptyOutDir`清除其他目录。独立评审包含六读取＋十四写入逐路径与共享门回归；只提交本地本单元文件，不推送、不改在线制品／配置／数据。未实际完成页面前不得关闭9.5或声称管理页面前后端已经打通。
+- [x] **Step 3 — 最小实现与GREEN。** 先保留实际RED再实现typed factory、静态路由、窄响应检查和共用transport。管理入口拒绝非null代办选择，不去掉header降级成本人；不依赖`canEnterWorkbench`授予管理资格，服务端仍逐请求验证管理授权。每请求取得当前token，前后复验epoch／isCurrent／AbortSignal；公共业务仍支持原合法代办，且同身份token轮转不丢原请求。
+- [x] **Step 4 — 完整回执／错误／读取回归。** 14路径分别验证成功／NO_CHANGE适用项、错误Fact类型／commandId、未知结果、404回执、损坏正文、取消、401/403、并发迟到响应、re-auth token轮转。只按已有完整终态或明确未提交错误规则清标记；GET失败、技术失败、HTTP状态本身不证明未提交，不生成新key；完整刷新仅按标记查原回执，不能凭新表单重建旧写。管理读取拒绝畸形／越界／SERVICE投影／非法enum等正文，不能把失败伪造成空列表；Identity读取没有304成功分支。错误文案为本地安全静态说明，不直接展示原始错误、标识或凭据。生命周期／自锁／最后管理员／依赖／stale等按冻结安全code和retryPolicy保留可供后续表单处理的语义，不改变其重试规则。
+- [x] **Step 5 — 复验与独立评审。** 聚焦测试后在稳定源码运行完整前端tests/typecheck/build和openapi:check；记录锁定Node24.20.0/npm11.9.0、实际用例与退出码，Root运行基线／拓扑。构建显式使用此计划忽略目录中的隔离输出：`npm run build --workspace apps/workbench -- --outDir ../../.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task95a-dist`；不覆盖本地登录服务正在使用的`apps/workbench/dist`，不使用`--emptyOutDir`清除其他目录。独立评审包含六读取＋十四写入逐路径与共享门回归；只提交本地本单元文件，不推送、不改在线制品／配置／数据。未实际完成页面前不得关闭9.5或声称管理页面前后端已经打通。
 
 ## Task 9.6a: 原 bootstrap 集合核验修正（9.5 前置窄修复）
 
