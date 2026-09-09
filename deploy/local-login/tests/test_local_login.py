@@ -16,6 +16,40 @@ class LocalConfigurationTest(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
+    def test_verifier_stdout_requires_one_exact_final_result_after_unstructured_logs(self):
+        module = self.module()
+        self.assertTrue(hasattr(module, 'require_original_verification_output'), 'strict verifier output boundary missing')
+        result = b'{"mode":"VERIFIED_ORIGINAL","plannedDelta":{}}'
+        logs = (b'09:00:00.000 [main] INFO org.jooq.Constants -- \n'
+                b'@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n'
+                b'@@  jOOQ synthetic startup banner  @@\n'
+                b'09:00:00.010 [main] INFO org.jooq.impl.DefaultExecuteContext.logVersionSupport -- '
+                b'Version : Database version is supported by dialect POSTGRES: 18.0\n')
+        for output in (result, logs + result + b'\r\n\r\n'):
+            module.require_original_verification_output(output)
+
+    def test_verifier_stdout_rejects_missing_malformed_ambiguous_or_non_verification_outcomes(self):
+        module = self.module()
+        self.assertTrue(hasattr(module, 'require_original_verification_output'), 'strict verifier output boundary missing')
+        good = b'{"mode":"VERIFIED_ORIGINAL","plannedDelta":{}}'
+        for output in (
+            b'', b'logger only\n', b'{malformed}', good + b'\ntrailing log',
+            good + b'\n' + good, good + good,
+            b'{"mode":"EXECUTED","plannedDelta":{}}\n' + good,
+            b'INFO previous result: {"mode":"EXECUTED"}\n' + good,
+            b'{malformed earlier result\n' + good,
+            b'{"mode":"VERIFIED_ORIGINAL"}',
+            b'{"mode":"DRY_RUN","plannedDelta":{}}',
+            b'{"mode":"VERIFIED_ORIGINAL","plannedDelta":{"principal":0}}',
+            b'{"mode":"VERIFIED_ORIGINAL","plannedDelta":[]}',
+            b'{"mode":"VERIFIED_ORIGINAL","plannedDelta":{},"extra":"diagnostic-sentinel"}',
+            b'{"mode":"FAILED","mode":"VERIFIED_ORIGINAL","plannedDelta":{}}',
+            b'{"mode":"VERIFIED_ORIGINAL","plannedDelta":{"principal":1},"plannedDelta":{}}',
+            b'\xff\n' + good,
+        ):
+            with self.subTest(output=output), self.assertRaisesRegex(RuntimeError, '^original bootstrap verification output unavailable$'):
+                module.require_original_verification_output(output)
+
     def test_secret_bundle_survives_restart_and_rejects_partial_state(self):
         module = self.module()
         with tempfile.TemporaryDirectory() as directory:

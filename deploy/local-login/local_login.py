@@ -489,6 +489,33 @@ def stop_apps():
     print('owned API/SPA stopped; identity and database services retained')
 
 
+def require_original_verification_output(output):
+    """Accept only the launcher's unique final verify result, never a log scan.
+
+    jOOQ may write an unstructured banner/version prefix on stdout. Any earlier
+    object delimiters or outcome fields make that prefix ambiguous and fail
+    closed, even if the last line claims success. Diagnostic text is not echoed.
+    """
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError('duplicate result field')
+            result[key] = value
+        return result
+
+    try:
+        lines = [line.strip() for line in output.decode('utf-8').splitlines() if line.strip()]
+        if not lines or any(any(marker in line for marker in ('{', '}', '"mode"', '"plannedDelta"'))
+                            for line in lines[:-1]):
+            raise ValueError('ambiguous result framing')
+        result = json.loads(lines[-1], object_pairs_hook=unique_object)
+        if result != {'mode': 'VERIFIED_ORIGINAL', 'plannedDelta': {}}:
+            raise ValueError('unexpected verification result')
+    except (UnicodeError, ValueError):
+        raise RuntimeError('original bootstrap verification output unavailable') from None
+
+
 def release_operation(operation, arguments):
     import local_release
     boundary = local_release.RuntimeBoundary(sys.modules[__name__])
@@ -530,8 +557,7 @@ def release_operation(operation, arguments):
                        '-cp', paths['jar'], 'org.springframework.boot.loader.launch.PropertiesLauncher',
                        'verify', operator, RUNTIME / 'original-manifest.json']
             result = run(command, 'bootstrap-verify-current-release')
-            if json.loads(result).get('mode') != 'VERIFIED_ORIGINAL':
-                raise RuntimeError('original bootstrap verification unavailable')
+            require_original_verification_output(result)
             release.paths()
             print('VERIFIED_ORIGINAL with current release expectations; original operator preserved')
         else:

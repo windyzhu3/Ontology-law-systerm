@@ -1,8 +1,9 @@
 """Synthetic file/DB fixtures; Windows stop checks use only new hidden test children."""
 import copy
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout
 import hashlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -309,14 +310,39 @@ class ReleaseTest(unittest.TestCase):
         invocations = []
         def external(args, label):
             invocations.append([str(value) for value in args])
-            return b'{"mode":"VERIFIED_ORIGINAL","plannedDelta":{}}'
+            return (b'09:00:00.000 [main] INFO org.jooq.Constants -- \n'
+                    b'@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n'
+                    b'@@  jOOQ synthetic startup banner  @@\n'
+                    b'09:00:00.010 [main] INFO org.jooq.impl.DefaultExecuteContext.logVersionSupport -- '
+                    b'Version : Database version is supported by dialect POSTGRES: 18.0\n'
+                    b'{"mode":"VERIFIED_ORIGINAL","plannedDelta":{}}\n')
         runner.run = external
-        with patch.dict(sys.modules, {'local_release': self.m, 'release_test_runner': runner}), patch.object(self.m, 'RuntimeBoundary', return_value=self.boundary):
-            runner.release_operation('bootstrap-verify-current-release', [])
+        captured = io.StringIO()
+        with patch.dict(sys.modules, {'local_release': self.m, 'release_test_runner': runner}), patch.object(self.m, 'RuntimeBoundary', return_value=self.boundary), redirect_stdout(captured):
+            try:
+                runner.release_operation('bootstrap-verify-current-release', [])
+            except ValueError:
+                self.fail('successful verifier result after jOOQ startup logs was rejected')
+        self.assertEqual(captured.getvalue(), 'VERIFIED_ORIGINAL with current release expectations; original operator preserved\n')
         self.assertEqual(len(invocations), 1)
         self.assertEqual(invocations[0][-3:], ['verify', str(self.runtime / 'operator-current-release.json'), str(self.runtime / 'original-manifest.json')])
         self.assertEqual(invocations[0][3], str(self.runtime / 'releases' / candidate / 'app.jar'))
         self.assertEqual((self.runtime / 'operator.json').read_bytes(), original)
+
+    def test_current_verify_child_failure_cannot_be_overridden_by_successful_stdout(self):
+        candidate = self.stage()
+        self.release.activate(candidate)
+        spec = importlib.util.spec_from_file_location('release_test_runner', MODULE.with_name('local_login.py'))
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        runner.ROOT, runner.RUNTIME = self.root, self.runtime
+        child = SimpleNamespace(returncode=2, stdout=b'{"mode":"VERIFIED_ORIGINAL","plannedDelta":{}}',
+                                stderr=b'synthetic diagnostic body must not be echoed')
+        captured = io.StringIO()
+        with patch.dict(sys.modules, {'local_release': self.m, 'release_test_runner': runner}), patch.object(self.m, 'RuntimeBoundary', return_value=self.boundary), patch.object(runner.subprocess, 'run', return_value=child), redirect_stdout(captured):
+            with self.assertRaises(RuntimeError):
+                runner.release_operation('bootstrap-verify-current-release', [])
+        self.assertEqual(captured.getvalue(), 'bootstrap-verify-current-release: exit 2\n')
 
     def test_original_wrapper_cannot_overwrite_operator_after_snapshot(self):
         self.snapshot()
