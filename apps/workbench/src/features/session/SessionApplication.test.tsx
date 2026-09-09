@@ -291,6 +291,77 @@ it("admits identity administration independently when the same direct actor can 
   await waitFor(() => expect(captured).toHaveLength(1));
 });
 
+it("keeps a confirmed delegated actor and denies identity administration without a direct fallback", async () => {
+  history.replaceState(null, "", "/admin/identity/principals");
+  const delegatedScope = "ask1.bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+  const captured: Request[] = [];
+  vi.stubGlobal("fetch", async (request: Request) => {
+    captured.push(request);
+    return new Response(JSON.stringify({
+      items: [
+        {
+          id: selectorId,
+          displayName: "不得披露的管理员",
+          state: "ACTIVE",
+          etag: `"identity.${"b".repeat(43)}"`,
+        },
+      ],
+      nextCursor: null,
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  });
+  const f = fixture({
+    context: (init) => {
+      const headers = new Headers(init.headers);
+      const delegated = headers.get("X-On-Behalf-Appointment-Id");
+      return {
+        ...context,
+        selectedAppointmentId: headers.get("X-Appointment-Id") ?? taskId,
+        selectedOnBehalfAppointmentId: delegated,
+        delegatedAppointmentChoices: [
+          { id: selectorId, label: "合法代办任职" },
+        ],
+        actorScopeKey: delegated ? delegatedScope : scope,
+        canEnterWorkbench: false,
+        canEnterIdentityAdmin: delegated === null,
+      };
+    },
+  });
+
+  render(<SessionApplication controller={f.controller} api={f.api} />);
+  const delegated = await screen.findByRole("radio", { name: "合法代办" });
+  expect(f.controller.getSnapshot().context?.canEnterIdentityAdmin).toBe(true);
+  fireEvent.click(delegated);
+  fireEvent.change(screen.getByLabelText("被代办任职"), {
+    target: { value: selectorId },
+  });
+  const confirm = screen.getByRole("button", { name: "确认本次身份" });
+  await waitFor(() => expect(confirm).toBeEnabled());
+  fireEvent.click(confirm);
+
+  expect(
+    await screen.findByText(
+      "当前任职不能进入身份管理；请确认本人任职具备管理资格。",
+    ),
+  ).toBeVisible();
+  expect(captured).toHaveLength(0);
+  expect(
+    screen.queryByRole("navigation", { name: "身份管理" }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText("不得披露的管理员")).not.toBeInTheDocument();
+  expect(f.controller.getSnapshot().context?.selectedOnBehalfAppointmentId).toBe(
+    selectorId,
+  );
+  expect(f.controller.getSnapshot().context?.actorScopeKey).toBe(delegatedScope);
+  expect(f.controller.getSnapshot().context?.canEnterIdentityAdmin).toBe(false);
+  expect(f.self).toHaveLength(2);
+  const selectedRequest = new Headers(f.self[f.self.length - 1]?.headers);
+  expect(selectedRequest.get("X-Appointment-Id")).toBe(taskId);
+  expect(selectedRequest.get("X-On-Behalf-Appointment-Id")).toBe(selectorId);
+});
+
 it("does not disclose an identity list when the confirmed direct appointment lacks admin qualification", async () => {
   history.replaceState(null, "", "/admin/identity/appointments");
   const captured: Request[] = [];
