@@ -192,6 +192,8 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 
 ## Task 9.4: SPA 登录、会话与恢复
 
+**当前执行（2026-09-09）：** BASE`c4aed14`，非视觉会话／恢复检查点`534e2ec`，最终锁定工具链145项前端测试、typecheck/build、生成漂移及实际基线／拓扑通过。新增登录／本人及代办选择画面按设计§7先确认再实施；production main接线与完整9.4独立评审仍未执行，原75项早期基线的npm版本纠正记录保留。详见[Task9.4阶段记录](../../progress/2026-09-09-task9-session-acceptance.md)。下列整项未完成，不能因非视觉测试通过勾选；9.5～9.6不提前实施。
+
 **Files:**
 
 - Create: `apps/workbench/src/features/session/SessionProvider.tsx`、`LoginPage.tsx`、`AppointmentChooser.tsx`、`sessionController.ts`、`recoveryMarker.ts` 及同名测试。
@@ -262,4 +264,4 @@ git diff --check
 
 使用仓库锁定工具链；Windows 使用 `mvnw.cmd` 或 Git Bash wrapper，不误用系统全局旧 Node/npm。每一环记录实际退出码，不把最后一个命令成功覆盖前序失败。
 
-本次执行单元Task9.3已完成，下一单元Task9.4。仅使用隔离合成测试资源验证受控Identity管理后端，没有管理页面、实际人员开户或生产授权变更。本文不是任何真实账号／权限写入的执行凭据；Task9.4～9.6、新增画面视觉确认及人工UAT仍有各自门禁。
+Task9.3后端已完成；当前执行Task9.4，非视觉会话／恢复逻辑与新页面视觉确认分别跟踪，生产登录入口尚未接线。本轮没有管理页面、实际人员开户或生产授权变更。本文不是任何真实账号／权限写入的执行凭据；Task9.4～9.6、新增画面视觉确认及人工UAT仍有各自门禁。
