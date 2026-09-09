@@ -623,10 +623,23 @@ class RuntimeBoundary:
             if process is None:
                 continue
             quote = lambda value: "'" + value.replace("'", "''") + "'"
-            script = (f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={process['pid']}'; if($null -eq $p){{exit 0}}; "
+            script = (f"$ErrorActionPreference='Stop'; $p=Get-CimInstance Win32_Process -Filter 'ProcessId={process['pid']}'; if($null -eq $p){{exit 0}}; "
                       "if($p.ExecutablePath -ne " + quote(process['executable']) + " -or $p.CommandLine -cne " + quote(process['commandLine']) +
-                      " -or ($p.CreationDate | ConvertTo-Json -Compress) -ne " + quote(json.dumps(process['created'])) + "){exit 3}; "
-                      f"Stop-Process -Id {process['pid']} -ErrorAction Stop; Wait-Process -Id {process['pid']} -Timeout 20 -ErrorAction SilentlyContinue")
+                      " -or ($p.CreationDate | ConvertTo-Json -Compress) -ne " + quote(json.dumps(process['created'])) + "){exit 3}; ")
+            # Pin the original process handle before termination. Waiting on its
+            # object succeeds even when it has exited before the wait begins;
+            # looking up the PID again can fail or find an unrelated reuse.
+            script += ("$owned=$null; try { try { "
+                       f"$owned=[Diagnostics.Process]::GetProcessById({process['pid']}); $null=$owned.Handle "
+                       "} catch { "
+                       f"if($null -eq (Get-CimInstance Win32_Process -Filter 'ProcessId={process['pid']}')){{exit 0}}; throw "
+                       "}; if($owned.HasExited){exit 0}; "
+                       "if($owned.StartTime.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.ffffffZ') -cne "
+                       "$p.CreationDate.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.ffffffZ')){exit 3}; "
+                       "try { Stop-Process -InputObject $owned -ErrorAction Stop } "
+                       "catch { if(-not $owned.HasExited){throw} }; "
+                       "if(-not $owned.WaitForExit(20000)){exit 4}; exit 0 "
+                       "} finally { if($null -ne $owned){$owned.Dispose()} }")
             result = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', script], capture_output=True)
             if result.returncode:
                 raise RuntimeError('owned process stop failed; inspect without name-based killing')

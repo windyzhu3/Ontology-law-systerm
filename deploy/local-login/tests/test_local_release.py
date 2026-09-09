@@ -1,8 +1,10 @@
-"""Real temporary file state; only database, process and ACL boundaries are fake."""
+"""Synthetic file/DB fixtures; Windows stop checks use only new hidden test children."""
 import copy
+from contextlib import contextmanager
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 import subprocess
@@ -371,6 +373,68 @@ class ReleaseTest(unittest.TestCase):
         for field, value in [('args', ['-jar', 'C:/private/app.jar.evil']), ('executable', 'C:/other/java.exe'), ('created', 'reused')]:
             with self.subTest(field=field), self.assertRaises(RuntimeError):
                 self.m.owned_process(expected, {**actual, field: value})
+
+    @contextmanager
+    def hidden_stop_children(self, count=1):
+        children = []
+        try:
+            for _ in range(count):
+                children.append(subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(90)'],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW))
+            runner = SimpleNamespace(RUNTIME=self.runtime, require_protected_runtime=lambda: None)
+            boundary = self.m.RuntimeBoundary(runner)
+            # Substitute only the registry/ACL boundary. CIM reads, exact script
+            # identity checks, termination and bounded waiting are real Windows I/O
+            # against the newly created children, never the login environment.
+            boundary.processes = lambda: [boundary.process(child.pid) for child in children]
+            yield boundary, children
+        finally:
+            for child in children:
+                if child.poll() is None: child.kill()
+                child.wait(timeout=5)
+
+    def stop_with_real_pwsh(self, boundary, preamble):
+        real_run = subprocess.run
+        def execute(args, **kwargs):
+            return real_run([*args[:-1], preamble + args[-1]],
+                            creationflags=subprocess.CREATE_NO_WINDOW, **kwargs)
+        with patch.object(self.m.subprocess, 'run', side_effect=execute):
+            boundary.stop()
+
+    @unittest.skipUnless(os.name == 'nt', 'requires Windows process/CIM adapter')
+    def test_stop_succeeds_for_both_owned_children_when_exit_precedes_wait(self):
+        # Delay only after the real cmdlet terminates our child, deterministically
+        # reproducing the vanished-PID gap before the production wait executes.
+        after_stop_delay = """function Stop-Process {
+          [CmdletBinding()] param([int]$Id,[System.Diagnostics.Process]$InputObject)
+          if($PSBoundParameters.ContainsKey('InputObject')) {
+            Microsoft.PowerShell.Management\\Stop-Process -InputObject $InputObject -ErrorAction Stop
+          } else { Microsoft.PowerShell.Management\\Stop-Process -Id $Id -ErrorAction Stop }
+          Start-Sleep -Milliseconds 150
+        }; """
+        with self.hidden_stop_children(2) as (boundary, children):
+            try:
+                self.stop_with_real_pwsh(boundary, after_stop_delay)
+            except RuntimeError:
+                self.assertIsNotNone(children[0].poll(), 'first child was not actually terminated')
+                self.fail('successful termination before wait was reported as stop failure')
+            self.assertTrue(all(child.poll() is not None for child in children))
+
+    @unittest.skipUnless(os.name == 'nt', 'requires Windows process/CIM adapter')
+    def test_stop_preserves_real_powershell_failure_when_owned_child_remains_alive(self):
+        denied_stop = "function Stop-Process { throw 'synthetic stop denied' }; "
+        with self.hidden_stop_children() as (boundary, children):
+            with self.assertRaisesRegex(RuntimeError, 'owned process stop failed'):
+                self.stop_with_real_pwsh(boundary, denied_stop)
+            self.assertIsNone(children[0].poll())
+
+    @unittest.skipUnless(os.name == 'nt', 'requires Windows process/CIM adapter')
+    def test_stop_timeout_remains_failure_when_owned_child_does_not_exit(self):
+        ignored_stop = "function Stop-Process { }; "
+        with self.hidden_stop_children() as (boundary, children):
+            with self.assertRaisesRegex(RuntimeError, 'owned process stop failed'):
+                self.stop_with_real_pwsh(boundary, ignored_stop)
+            self.assertIsNone(children[0].poll())
 
 
 if __name__ == '__main__':
