@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
 import { Scales } from "@phosphor-icons/react/Scales";
 import { CheckCircle } from "@phosphor-icons/react/CheckCircle";
 import { ArrowClockwise } from "@phosphor-icons/react/ArrowClockwise";
@@ -16,9 +16,13 @@ import "./styles/workbench.css";
 export function App({
   session,
   api,
+  sessionActions,
+  sessionNotice,
 }: {
   session?: WorkbenchSession | null;
   api?: WorkbenchApi;
+  sessionActions?: ReactNode;
+  sessionNotice?: string | null;
 }) {
   const transport = useMemo(() => api ?? createWorkbenchApi(), [api]);
   const work = useCurrentCard(session, transport);
@@ -38,7 +42,8 @@ export function App({
           <Scales size={30} aria-hidden="true" />
           <span>律所工作助手</span>
         </div>
-        {session?.displayName && <span>{session.displayName}</span>}
+        {sessionActions ??
+          (session?.displayName && <span>{session.displayName}</span>)}
       </header>
       <main
         className="workbench"
@@ -47,6 +52,11 @@ export function App({
           logicalFocus.current = event.target.id || null;
         }}
       >
+        {sessionNotice && (
+          <p className="feedback" role="status">
+            {sessionNotice}
+          </p>
+        )}
         {!allowedRoute ? (
           <section className="empty-state">
             <h1>此入口暂不可用</h1>

@@ -18,6 +18,22 @@ export function SessionProvider({
   controller: SessionController;
   children: ReactNode;
 }) {
+  const inherited = useContext(SessionContext);
+  return inherited === controller ? (
+    children
+  ) : (
+    <OwnedSessionProvider controller={controller}>
+      {children}
+    </OwnedSessionProvider>
+  );
+}
+function OwnedSessionProvider({
+  children,
+  controller,
+}: {
+  controller: SessionController;
+  children: ReactNode;
+}) {
   const [setupController, setSetupController] =
     useState<SessionController | null>(null);
   useEffect(() => {

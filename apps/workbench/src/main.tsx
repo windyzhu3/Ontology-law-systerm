@@ -1,6 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { App } from "./App";
+import { SessionApplication } from "./features/session/SessionApplication";
+import { createSessionRuntime } from "./features/session/sessionConfiguration";
+
+const runtime = createSessionRuntime(import.meta.env);
 
 const rootElement = document.getElementById("root");
 if (rootElement === null) {
@@ -9,6 +12,6 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <SessionApplication {...runtime} />
   </StrictMode>,
 );

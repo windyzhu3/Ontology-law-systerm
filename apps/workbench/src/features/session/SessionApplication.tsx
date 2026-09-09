@@ -1,0 +1,210 @@
+import { LoginPage } from "./LoginPage";
+import type { SessionRuntime } from "./sessionConfiguration";
+import { useEffect, useMemo, useState } from "react";
+import {
+  SessionProvider,
+  useSessionState,
+  useSessionSetupReady,
+  useWorkbenchSession,
+} from "./SessionProvider";
+import { LoginEntry } from "./LoginEntry";
+import { AppointmentChooser } from "./AppointmentChooser";
+import { RecoveryPage } from "./RecoveryPage";
+import { App } from "../../App";
+import { createWorkbenchApi } from "../../lib/api";
+import type { SessionContext, SessionController } from "./sessionController";
+export function SessionApplication({
+  controller,
+  api,
+  configurationError,
+}: SessionRuntime) {
+  const [path, setPath] = useState(location.pathname);
+  useEffect(() => {
+    const changed = () => setPath(location.pathname);
+    window.addEventListener("popstate", changed);
+    return () => window.removeEventListener("popstate", changed);
+  }, []);
+  const transport = useMemo(
+    () =>
+      api ??
+      (controller
+        ? createWorkbenchApi(undefined, location.origin, controller.recovery)
+        : undefined),
+    [api, controller],
+  );
+  if (!["/", "/login", "/auth/callback", "/workbench"].includes(path))
+    return <LoginPage message="此入口暂不可用，请通过工作台入口继续。" />;
+  if (!controller || !transport)
+    return <LoginPage message={configurationError} />;
+  return (
+    <SessionProvider controller={controller}>
+      <SessionRoutes
+        controller={controller}
+        api={transport}
+        path={path}
+        navigate={(next) => {
+          history.replaceState(null, "", next);
+          setPath(next);
+        }}
+      />
+    </SessionProvider>
+  );
+}
+type Admission = {
+  controller: SessionController;
+  epoch: number;
+  scope: string | null;
+  stage: "workbench" | "recovery" | "unqualified" | "choosing";
+};
+function SessionRoutes({
+  controller,
+  api,
+  path,
+  navigate,
+}: {
+  controller: SessionController;
+  api: NonNullable<SessionRuntime["api"]>;
+  path: string;
+  navigate: (path: "/login" | "/workbench") => void;
+}) {
+  const state = useSessionState(),
+    setup = useSessionSetupReady(),
+    workbench = useWorkbenchSession();
+  const [admission, setAdmission] = useState<Admission | null>(null);
+  const context = state.context;
+  const current =
+    admission?.controller === controller &&
+    admission.epoch === state.identityEpoch &&
+    admission.scope === context?.actorScopeKey;
+  const stage = current ? admission.stage : "choosing";
+  useEffect(() => {
+    if (!setup || state.status === "INITIALIZING") return;
+    if (state.status === "READY" || state.status === "SELECTING") {
+      if (path !== "/workbench") navigate("/workbench");
+    } else if (path !== "/login") navigate("/login");
+  }, [setup, state.status, path]);
+  function selectStage(next: Admission["stage"], expected?: SessionContext) {
+    controller.checkLifetime();
+    const latest = controller.getSnapshot(),
+      selected = latest.context;
+    if (
+      setup &&
+      next === "choosing" &&
+      latest.status === "SELECTING" &&
+      selected
+    ) {
+      setAdmission({
+        controller,
+        epoch: latest.identityEpoch,
+        scope: selected.actorScopeKey,
+        stage: next,
+      });
+      return;
+    }
+    if (
+      !setup ||
+      latest.status !== "READY" ||
+      latest.switchConfirmation ||
+      !selected?.actorScopeKey ||
+      (expected && expected !== selected)
+    )
+      return;
+    setAdmission({
+      controller,
+      epoch: latest.identityEpoch,
+      scope: selected.actorScopeKey,
+      stage: next,
+    });
+  }
+  function confirmed(selected: SessionContext) {
+    let pending = true;
+    try {
+      pending = !!api.recovery.read();
+    } catch {
+      /* Recovery page owns explicit invalid-clue cleanup. */
+    }
+    selectStage(
+      pending
+        ? "recovery"
+        : selected.canEnterWorkbench
+          ? "workbench"
+          : "unqualified",
+      selected,
+    );
+  }
+  if (!setup || !["READY", "SELECTING"].includes(state.status))
+    return <LoginEntry controller={controller} />;
+  // Admission is an entry boundary, not a subscription to live App writes.
+  // Keeping this branch first preserves its in-memory OriginalWrite and editor.
+  if (stage === "workbench" && workbench && context) {
+    const own = context.appointmentChoices.find(
+      (c) => c.id === context.selectedAppointmentId,
+    )?.label;
+    const delegated = context.delegatedAppointmentChoices.find(
+      (c) => c.id === context.selectedOnBehalfAppointmentId,
+    )?.label;
+    return (
+      <App
+        session={workbench}
+        api={api}
+        sessionActions={
+          <div className="session-actions">
+            <span>
+              {context.displayName} · {own}
+              {delegated ? `（代办：${delegated}）` : ""}
+            </span>
+            <button onClick={() => selectStage("choosing")}>切换任职</button>
+            <button onClick={() => void controller.logout()}>退出</button>
+          </div>
+        }
+        sessionNotice={
+          state.warning
+            ? "会话即将到期，请及时核对当前操作；到期后需重新登录。"
+            : null
+        }
+      />
+    );
+  }
+  let invalidStorage = false;
+  try {
+    api.recovery.read();
+  } catch {
+    invalidStorage = true;
+  }
+  if ((stage === "recovery" || invalidStorage) && context)
+    return (
+      <RecoveryPage
+        controller={controller}
+        api={api}
+        onChooseIdentity={() => selectStage("choosing")}
+        onReady={() => {
+          if (controller.getSnapshot().identityEpoch !== state.identityEpoch)
+            return;
+          try {
+            if (api.recovery.read()) return;
+          } catch {
+            return;
+          }
+          selectStage(
+            stage === "recovery"
+              ? context.canEnterWorkbench
+                ? "workbench"
+                : "unqualified"
+              : "choosing",
+            context,
+          );
+        }}
+      />
+    );
+  return (
+    <AppointmentChooser
+      controller={controller}
+      onConfirmed={confirmed}
+      entryMessage={
+        stage === "unqualified"
+          ? "当前任职不能进入业务工作台；管理入口尚未开放，请联系律所管理员。"
+          : undefined
+      }
+    />
+  );
+}

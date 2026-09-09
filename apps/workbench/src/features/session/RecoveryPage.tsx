@@ -116,9 +116,21 @@ function RecoveryContent({
     actor = useActorSession(),
     state = useSessionState(),
     setup = useSessionSetupReady();
+  const currentSelection = () => {
+    const latest = controller.getSnapshot();
+    return (
+      setup &&
+      state.status === "SELECTING" &&
+      state.context !== null &&
+      latest.status === "SELECTING" &&
+      latest.context === state.context &&
+      latest.identityEpoch === state.identityEpoch
+    );
+  };
   const work = useCurrentCard(actor, api, {
     recoveryOnly: true,
     readAfterRecovery: state.context?.canEnterWorkbench === true,
+    canAbandonInvalidClue: currentSelection,
   });
   const [risk, setRisk] = useState<{
     marker: RecoveryMarker | null;
@@ -142,7 +154,7 @@ function RecoveryContent({
   const riskVisible =
     !!risk &&
     risk.controller === controller &&
-    risk.epoch === actor?.identityEpoch &&
+    risk.epoch === state.identityEpoch &&
     (sameMarker(risk.marker, marker) || (!risk.marker && storageFailed));
   useEffect(() => {
     if (riskVisible) cancel.current?.focus();
@@ -151,7 +163,7 @@ function RecoveryContent({
     setRisk(null);
     setLocalError("");
     readySent.current = false;
-  }, [controller, actor?.identityEpoch, actor?.actorScopeKey]);
+  }, [controller, state.identityEpoch, actor?.actorScopeKey]);
   const unavailable = !actor;
   const mismatch = !!actor && !!stored && !marker;
   const commandType =
@@ -205,7 +217,7 @@ function RecoveryContent({
   function finish() {
     if (
       !setup ||
-      !actor?.isCurrent() ||
+      !(actor?.isCurrent() || (work.recoveryAbandoned && currentSelection())) ||
       readySent.current ||
       work.busy ||
       work.loading ||
@@ -285,7 +297,9 @@ function RecoveryContent({
             继续
           </button>
         )
-      ) : actor && (work.recoveryAbandoned || !stored) && !storageFailed ? (
+      ) : (actor || (work.recoveryAbandoned && currentSelection())) &&
+        (work.recoveryAbandoned || !stored) &&
+        !storageFailed ? (
         <button className="recovery-primary" onClick={finish}>
           继续
         </button>
@@ -315,18 +329,18 @@ function RecoveryContent({
             work.error ||
             (work.busy ? "正在核对原操作结果，请稍候。" : "")}
       </p>
-      {actor && (marker || storageFailed) && (
+      {(actor || currentSelection()) && (marker || storageFailed) && (
         <section className="recovery-abandon">
           <button
             ref={abandon}
             type="button"
             disabled={!setup}
             onClick={() => {
-              if (actor.isCurrent())
+              if (actor?.isCurrent() || currentSelection())
                 setRisk({
                   marker: storageFailed ? null : marker,
                   controller,
-                  epoch: actor.identityEpoch,
+                  epoch: state.identityEpoch,
                 });
             }}
           >
@@ -341,7 +355,11 @@ function RecoveryContent({
                 <button
                   type="button"
                   onClick={() => {
-                    if (risk && work.abandonRecovery(risk.marker, true))
+                    if (
+                      risk &&
+                      risk.epoch === controller.getSnapshot().identityEpoch &&
+                      work.abandonRecovery(risk.marker, true)
+                    )
                       setRisk(null);
                   }}
                 >

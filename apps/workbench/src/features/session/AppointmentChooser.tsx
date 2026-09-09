@@ -13,10 +13,12 @@ import "../../styles/choice.css";
 export interface AppointmentChooserProps {
   controller: SessionController | null;
   onConfirmed?: (context: SessionContext) => void;
+  entryMessage?: string;
 }
 export function AppointmentChooser({
   controller,
   onConfirmed,
+  entryMessage,
 }: AppointmentChooserProps) {
   if (!controller)
     return (
@@ -28,7 +30,7 @@ export function AppointmentChooser({
     );
   return (
     <SessionProvider controller={controller}>
-      <ChoiceForm onConfirmed={onConfirmed} />
+      <ChoiceForm onConfirmed={onConfirmed} entryMessage={entryMessage} />
     </SessionProvider>
   );
 }
@@ -55,7 +57,8 @@ function ChoiceLayout({ children }: { children: React.ReactNode }) {
 }
 function ChoiceForm({
   onConfirmed,
-}: Pick<AppointmentChooserProps, "onConfirmed">) {
+  entryMessage,
+}: Pick<AppointmentChooserProps, "onConfirmed" | "entryMessage">) {
   const controller = useSessionController(),
     state = useSessionState(),
     setup = useSessionSetupReady();
@@ -445,7 +448,7 @@ function ChoiceForm({
           确认本次身份
         </button>
         <p role="status" className="choice-status" aria-live="polite">
-          {status}
+          {entryMessage ?? status}
         </p>
         {!context &&
           ["UNAVAILABLE", "EXPIRED", "DENIED"].includes(state.status) && (

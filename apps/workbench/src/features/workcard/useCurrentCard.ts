@@ -54,7 +54,11 @@ const ambiguous =
 export function useCurrentCard(
   session: WorkbenchSession | null | undefined,
   api: WorkbenchApi,
-  options: { recoveryOnly?: boolean; readAfterRecovery?: boolean } = {},
+  options: {
+    recoveryOnly?: boolean;
+    readAfterRecovery?: boolean;
+    canAbandonInvalidClue?: () => boolean;
+  } = {},
 ) {
   const recoveryOnly = options.recoveryOnly === true;
   const [state, setState] = useState<State>(initial);
@@ -432,9 +436,10 @@ export function useCurrentCard(
   ): boolean => {
     if (
       !confirmed ||
-      !session ||
-      !valid(session) ||
-      (expected && expected.actorScopeKey !== session.actorScopeKey)
+      !alive.current ||
+      (!(session && valid(session)) &&
+        !(expected === null && options.canAbandonInvalidClue?.())) ||
+      (expected && expected.actorScopeKey !== session?.actorScopeKey)
     )
       return false;
     generation.current++;
@@ -461,6 +466,7 @@ export function useCurrentCard(
           /* Explicit consent can remove an unreadable clue, never a replacement valid marker. */
         }
         if (current) throw new Error();
+        if (!session && !options.canAbandonInvalidClue?.()) throw new Error();
         api.recovery.abandon(true);
       }
       if (api.recovery.read()) throw new Error();

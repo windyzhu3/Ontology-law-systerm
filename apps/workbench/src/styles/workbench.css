@@ -56,6 +56,32 @@ p {
   font-weight: 600;
   letter-spacing: 0.03em;
 }
+.app-header:has(.session-actions) {
+  height: auto;
+  min-height: 74px;
+  flex-wrap: wrap;
+  padding-block: 12px;
+}
+.session-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+.session-actions > span {
+  max-width: 420px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .session-actions {
+    justify-content: flex-start;
+  }
+  .session-actions > span {
+    flex-basis: 100%;
+  }
+}
 .brand svg,
 .today-summary > svg {
   color: var(--emerald);

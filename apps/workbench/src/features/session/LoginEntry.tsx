@@ -23,7 +23,7 @@ export function LoginEntry({
 }
 function SessionLoginAction() {
   const controller = useSessionController();
-  const { status } = useSessionState();
+  const { status, message } = useSessionState();
   const setupReady = useSessionSetupReady();
   const canLogin =
     setupReady &&
@@ -42,7 +42,7 @@ function SessionLoginAction() {
             ? "请重新登录以核对当前会话。"
             : status === "READY" || status === "SELECTING"
               ? "已完成身份验证，请等待会话流程继续。"
-              : undefined
+              : (message ?? undefined)
       }
     />
   );

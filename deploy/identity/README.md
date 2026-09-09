@@ -29,6 +29,23 @@ Task9.2 增补：已提供生产配置装配、离线入口和隔离真实 IdP/�
 - introspection endpoint 及目录 endpoint 绑定该 realm；超时 2 秒，禁止重定向到其他主机，不缓存“active=true”权限结果、不 fail-open。证书校验不可关闭。
 - 后端 introspection confidential client 与只读目录 service client 使用分离凭据；目录客户端的 realm-management 角色 allowlist 仅 `query-users` 和 `view-users`，不授予 manage-users、realm-admin 或跨 realm 管理权。角色与实际请求在 Task9.2 实测，不以能读取任意 realm 作为成功；若上游需要额外权限，停止并修订合同，不能直接赋予 realm-admin。
 
+## Task9.4 SPA 构建时公开配置
+
+生产入口由 `apps/workbench/src/main.tsx` 创建唯一会话运行时并装配已确认的登录、任职选择、回执恢复和工作台。以下四个变量由受控部署构建提供，均为公开信任配置而非秘密；没有默认值、示例账号、测试认证回退或运行时配置表单。
+
+| 构建变量 | 必须由部署确定的值 |
+|---|---|
+| `VITE_OIDC_ISSUER` | 固定 Keycloak realm 的准确 HTTPS issuer，路径为 `/realms/` 加准确 realm 名；不得由 URL、Token 或浏览器存储选择 |
+| `VITE_OIDC_CLIENT_ID` | 已按本文件配置 Code + PKCE S256 的 SPA public client ID；不是 confidential client secret |
+| `VITE_OIDC_AUDIENCE` | 固定 API audience，与后端受信配置一致 |
+| `VITE_APP_ORIGIN` | 与浏览器当前 Origin 完全一致的准确部署 Origin，无路径、查询、片段或末尾斜杠 |
+
+回跳地址只能由固定 Origin 派生为 `/auth/callback`，退出回跳只能为 `/login`；在 Keycloak 精确登记这些地址和 Web Origin，不能填通配符或开放 returnTo。生产必须使用 HTTPS；只有隔离开发允许明确 localhost/loopback HTTP SPA Origin，issuer 仍要求 HTTPS，不能借此关闭证书检查或复用生产凭据。变量在 Vite 构建时写入公开前端制品，变更后须受控重建，不在这些变量中放任何秘密。
+
+静态托管须将 `/`、`/login`、`/auth/callback`、`/workbench` 的 SPA 导航交给同一入口制品；不得将 `/api/` 请求改写为 HTML。未知入口不显示业务数据。缺项、非法配置或浏览器 sessionStorage getter 失败时安全显示拒绝状态，不发起 SDK 初始化、SELF 或业务卡请求，也不回退内存恢复存储。正常存储中的损坏/过期线索只能经明确风险确认删除；不能因重建制品而自动删除或重发。
+
+当前没有实际部署的固定 Origin/realm/client/audience 值。本节和受控前端测试不表示 Keycloak/API/SPA 真实配置链、生产 TLS、真实用户权限或 Task9.6/UAT 已验收；这些值须由部署负责人提供并在独立验收中验证。
+
 ## 会话和凭据策略
 
 项目参数为 access token 300 秒、SSO/client idle 1800 秒、absolute max 28800 秒、提前 60 秒提示、开启 refresh token rotation。前端依据真实交互控制续期，后台等待轮询不能无限延长交互会话；Keycloak idle 实现窗口、续期竞争和旧 token 撤销须实测。API 远程活动性检查与当前业务撤权重验是独立边界。
