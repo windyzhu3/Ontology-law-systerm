@@ -216,6 +216,33 @@ it.each([
     ).toBe(false);
   },
 );
+it("enforces Identity rename-only NO_CHANGE without narrowing business recovery", () => {
+  const marker = (commandType: string) => ({
+    commandId: taskId,
+    commandType,
+    actorScopeKey: scope,
+    recordedAt: new Date().toISOString(),
+  });
+  const noChange = (factType: string) => ({
+    ...receipt(taskId),
+    outcome: "NO_CHANGE",
+    resultFact: { factType, factRef: "opaque", revision: 0 },
+  });
+  const rejected = {
+    commandId: taskId,
+    receiptId: taskId,
+    outcome: "REJECTED",
+    completedAt: "2026-09-05T00:00:00Z",
+    rejectionCode: "IDENTITY_BINDING_CONFLICT",
+  };
+
+  expect(matchesReceipt(noChange("IDENTITY_PRINCIPAL"), marker("CREATE_IDENTITY_PRINCIPAL"))).toBe(false);
+  expect(matchesReceipt(noChange("APPOINTMENT"), marker("SUSPEND_APPOINTMENT"))).toBe(false);
+  expect(matchesReceipt(noChange("IDENTITY_PRINCIPAL"), marker("RENAME_IDENTITY_PRINCIPAL"))).toBe(true);
+  expect(matchesReceipt(noChange("ORGANIZATION_UNIT"), marker("RENAME_ORGANIZATION_UNIT"))).toBe(true);
+  expect(matchesReceipt(noChange("LEAD"), marker("CAPTURE_LEAD"))).toBe(true);
+  expect(matchesReceipt(rejected, marker("CREATE_IDENTITY_PRINCIPAL"))).toBe(true);
+});
 it("does not replay a reconstructed body after another transport loses the original", async () => {
   const requests: Request[] = [];
   const first = createWorkbenchApi(async (r) => {

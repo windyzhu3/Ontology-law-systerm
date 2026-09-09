@@ -1,6 +1,7 @@
 import { expect, expectTypeOf, it } from "vitest";
 
 import type { components } from "../../generated/api/schema";
+import type { IdentityApi } from "./identityApi";
 import {
   validIdentityQuery,
   validIdentityRead,
@@ -9,6 +10,11 @@ import {
 
 type S = components["schemas"];
 type CommandType = IdentityOriginalWrite["commandType"];
+type IdentitySuccessReceipt =
+  | S["IdentityPrincipalCommandReceiptV1"]
+  | S["OrganizationUnitCommandReceiptV1"]
+  | S["AppointmentCommandReceiptV1"]
+  | S["AuthorityGrantCommandReceiptV1"];
 
 const key = "019c7000-0000-7000-8000-000000000001";
 const targetId = "019c7000-0000-7000-8000-000000000002";
@@ -35,6 +41,26 @@ it("keeps the fourteen command discriminants and generated bodies exact", () => 
     .toEqualTypeOf<S["CreateAppointmentV1"]>();
   expectTypeOf<Extract<IdentityOriginalWrite, { commandType: "REVOKE_AUTHORITY_GRANT" }>["body"]>()
     .toEqualTypeOf<S["RevokeAuthorityGrantV1"]>();
+});
+
+it("keeps every public Identity response narrowed to its generated body", () => {
+  type Write = Awaited<ReturnType<IdentityApi["write"]>>;
+  type ProviderUsers = Awaited<ReturnType<IdentityApi["listIdentityProviderUsers"]>>;
+  type Options = Awaited<ReturnType<IdentityApi["getIdentityAdminOptions"]>>;
+  type Principals = Awaited<ReturnType<IdentityApi["listIdentityPrincipals"]>>;
+  type Organizations = Awaited<ReturnType<IdentityApi["listOrganizationUnits"]>>;
+  type Appointments = Awaited<ReturnType<IdentityApi["listAppointments"]>>;
+  type Grants = Awaited<ReturnType<IdentityApi["listAuthorityGrants"]>>;
+  type Receipt = Awaited<ReturnType<IdentityApi["receipt"]>>;
+
+  expectTypeOf<Write["data"]>().toEqualTypeOf<IdentitySuccessReceipt>();
+  expectTypeOf<ProviderUsers["data"]>().toEqualTypeOf<S["ProviderUserPageV1"]>();
+  expectTypeOf<Options["data"]>().toEqualTypeOf<S["IdentityAdminOptionsV1"]>();
+  expectTypeOf<Principals["data"]>().toEqualTypeOf<S["IdentityPrincipalPageV1"]>();
+  expectTypeOf<Organizations["data"]>().toEqualTypeOf<S["OrganizationUnitPageV1"]>();
+  expectTypeOf<Appointments["data"]>().toEqualTypeOf<S["AppointmentPageV1"]>();
+  expectTypeOf<Grants["data"]>().toEqualTypeOf<S["AuthorityGrantPageV1"]>();
+  expectTypeOf<Receipt["data"]>().toEqualTypeOf<S["CommandReceipt"]>();
 });
 
 it("does not put a target or If-Match on creates and requires both on updates", () => {

@@ -44,6 +44,15 @@ export type IdentityReadOperation =
   | "listAppointments"
   | "listAuthorityGrants";
 
+type IdentityReadData = {
+  listIdentityProviderUsers: S["ProviderUserPageV1"];
+  getIdentityAdminOptions: S["IdentityAdminOptionsV1"];
+  listIdentityPrincipals: S["IdentityPrincipalPageV1"];
+  listOrganizationUnits: S["OrganizationUnitPageV1"];
+  listAppointments: S["AppointmentPageV1"];
+  listAuthorityGrants: S["AuthorityGrantPageV1"];
+};
+
 const identityTag = /^"identity\.[A-Za-z0-9_-]{43}"$/;
 const uuid = (value: unknown): value is string =>
   typeof value === "string" &&
@@ -258,11 +267,11 @@ const authorityGrant = (value: unknown) =>
   oneOf(value.state, ["ACTIVE", "REVOKED"]) &&
   identityTag.test(String(value.etag));
 
-export function validIdentityRead(
-  operation: IdentityReadOperation,
+export function validIdentityRead<Operation extends IdentityReadOperation>(
+  operation: Operation,
   value: unknown,
   query: Record<string, unknown>,
-): boolean {
+): value is IdentityReadData[Operation] {
   if (operation === "listIdentityProviderUsers")
     return page(value, providerUser, 1) && isObject(value) && value.nextCursor === null;
   if (operation === "listIdentityPrincipals") return page(value, principal);

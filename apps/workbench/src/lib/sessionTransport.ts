@@ -1,4 +1,5 @@
 import type { components } from "../generated/api/schema";
+import type { Middleware } from "openapi-fetch";
 import {
   publicCommandFacts,
   type RecoveryMarker,
@@ -70,7 +71,13 @@ export function createSessionTransport(allowOnBehalf: boolean) {
     assertCurrent(session, signal);
     if (!allowOnBehalf && session.selectedOnBehalfAppointmentId !== null)
       throw new Error("身份管理不接受代办身份，请切换为本人任职后重试。");
-    const token = await session.getValidAccessToken();
+    let token: string;
+    try {
+      token = await session.getValidAccessToken();
+    } catch {
+      assertCurrent(session, signal);
+      throw new Error(safeProblemMessage(503));
+    }
     assertCurrent(session, signal);
     return {
       Authorization: `Bearer ${token}`,
@@ -111,7 +118,27 @@ export function createSessionTransport(allowOnBehalf: boolean) {
     };
   };
 
-  return { assertCurrent, auth, checked };
+  const request = async <T>(
+    session: WorkbenchSession,
+    signal: AbortSignal,
+    dispatch: (middleware: Middleware) => Promise<T>,
+  ): Promise<T> => {
+    const middleware: Middleware = {
+      onResponse({ response }) {
+        assertCurrent(session, signal);
+        if (response.status === 401 || response.status === 403)
+          session.invalidate(response.status);
+      },
+    };
+    try {
+      return await dispatch(middleware);
+    } catch {
+      assertCurrent(session, signal);
+      throw new Error(safeProblemMessage(503));
+    }
+  };
+
+  return { assertCurrent, auth, checked, request };
 }
 
 export function matchesReceipt(
@@ -125,6 +152,24 @@ export function matchesReceipt(
     return false;
   const fact =
     publicCommandFacts[marker.commandType as keyof typeof publicCommandFacts];
-  if (value.outcome !== "REJECTED") return value.resultFact.factType === fact;
+  if (value.outcome !== "REJECTED") {
+    if (value.resultFact.factType !== fact) return false;
+    const identity = [
+      "IDENTITY_PRINCIPAL",
+      "ORGANIZATION_UNIT",
+      "APPOINTMENT",
+      "AUTHORITY_GRANT",
+    ].includes(fact);
+    if (
+      identity &&
+      value.outcome === "NO_CHANGE" &&
+      ![
+        "RENAME_IDENTITY_PRINCIPAL",
+        "RENAME_ORGANIZATION_UNIT",
+      ].includes(marker.commandType)
+    )
+      return false;
+    return true;
+  }
   return allowedCommandError(marker.commandType, value.rejectionCode);
 }

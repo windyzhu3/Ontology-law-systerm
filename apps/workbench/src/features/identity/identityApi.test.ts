@@ -833,10 +833,14 @@ describe("identity writes", () => {
 });
 
 describe("identity receipt recovery", () => {
-  const seed = (recovery: RecoveryStore, actorScopeKey = scope) =>
+  const seed = (
+    recovery: RecoveryStore,
+    actorScopeKey = scope,
+    commandType = "CREATE_IDENTITY_PRINCIPAL",
+  ) =>
     recovery.reserve({
       commandId,
-      commandType: "CREATE_IDENTITY_PRINCIPAL",
+      commandType,
       actorScopeKey,
       recordedAt: new Date().toISOString(),
     });
@@ -907,6 +911,187 @@ describe("identity receipt recovery", () => {
     await expect(
       api.receipt(session, commandId, new AbortController().signal),
     ).rejects.toThrow();
+    expect(recovery.read()?.commandId).toBe(commandId);
+  });
+
+  it("requires exactly 200 before accepting a recovered receipt", async () => {
+    const recovery = new RecoveryStore(sessionStorage);
+    seed(recovery);
+    const api = createIdentityApi(
+      recovery,
+      async () => json(terminal("IDENTITY_PRINCIPAL"), 201),
+      "https://api.example.test",
+    );
+    await expect(
+      api.receipt(session, commandId, new AbortController().signal),
+    ).rejects.toThrow("身份管理回执暂时不可用");
+    expect(recovery.read()?.commandId).toBe(commandId);
+  });
+
+  it.each([
+    ["CREATE_IDENTITY_PRINCIPAL", "IDENTITY_PRINCIPAL"],
+    ["SUSPEND_APPOINTMENT", "APPOINTMENT"],
+  ])("rejects impossible recovered NO_CHANGE for %s and retains the clue", async (commandType, factType) => {
+    const recovery = new RecoveryStore(sessionStorage);
+    seed(recovery, scope, commandType);
+    const api = createIdentityApi(
+      recovery,
+      async () => json(terminal(factType, "NO_CHANGE")),
+      "https://api.example.test",
+    );
+    await expect(
+      api.receipt(session, commandId, new AbortController().signal),
+    ).rejects.toThrow("身份管理回执暂时不可用");
+    expect(recovery.read()?.commandId).toBe(commandId);
+  });
+
+  it.each([
+    ["RENAME_IDENTITY_PRINCIPAL", "IDENTITY_PRINCIPAL"],
+    ["RENAME_ORGANIZATION_UNIT", "ORGANIZATION_UNIT"],
+  ])("accepts recovered NO_CHANGE for %s", async (commandType, factType) => {
+    const recovery = new RecoveryStore(sessionStorage);
+    seed(recovery, scope, commandType);
+    const api = createIdentityApi(
+      recovery,
+      async () => json(terminal(factType, "NO_CHANGE")),
+      "https://api.example.test",
+    );
+    expect(
+      (await api.receipt(session, commandId, new AbortController().signal)).data.outcome,
+    ).toBe("NO_CHANGE");
+    expect(recovery.read()).toBeNull();
+  });
+});
+
+describe("identity request safety boundary", () => {
+  const failingBody = (status: number) =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(new Error("PRIVATE_BODY_STREAM_FAILURE"));
+        },
+      }),
+      {
+        status,
+        headers: { "content-type": "application/json" },
+      },
+    );
+
+  it("converts malformed successful JSON to a static local error", async () => {
+    const api = createIdentityApi(
+      new RecoveryStore(sessionStorage),
+      async () =>
+        new Response("PRIVATE_RESPONSE_BODY", {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            "cache-control": "no-store",
+          },
+        }),
+      "https://api.example.test",
+    );
+    const error = await api
+      .listIdentityProviderUsers(
+        session,
+        readCases[0].query,
+        new AbortController().signal,
+      )
+      .catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("服务暂时不可用，请稍后重试。");
+    expect((error as Error).message).not.toContain("PRIVATE_RESPONSE_BODY");
+  });
+
+  it.each([401, 403])(
+    "invalidates the current session on %s before a failing error body is read",
+    async (status) => {
+      const invalidate = vi.fn();
+      const currentSession = { ...session, invalidate };
+      const recovery = new RecoveryStore(sessionStorage);
+      const api = createIdentityApi(
+        recovery,
+        async () => failingBody(status),
+        "https://api.example.test",
+      );
+      const error = await api
+        .write(currentSession, writes[0].original, new AbortController().signal)
+        .catch((reason: unknown) => reason);
+      expect(invalidate).toHaveBeenCalledWith(status);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe("服务暂时不可用，请稍后重试。");
+      expect((error as Error).message).not.toContain("PRIVATE_BODY_STREAM_FAILURE");
+      expect(recovery.read()?.commandId).toBe(commandId);
+    },
+  );
+
+  it("converts a rejected network request to a static error and retains the marker", async () => {
+    const recovery = new RecoveryStore(sessionStorage);
+    const api = createIdentityApi(
+      recovery,
+      async () => {
+        throw new Error("PRIVATE_NETWORK_FAILURE");
+      },
+      "https://api.example.test",
+    );
+    const error = await api
+      .write(session, writes[0].original, new AbortController().signal)
+      .catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("服务暂时不可用，请稍后重试。");
+    expect((error as Error).message).not.toContain("PRIVATE_NETWORK_FAILURE");
+    expect(recovery.read()?.commandId).toBe(commandId);
+  });
+
+  it("does not invalidate a newer actor when an old 401 arrives late", async () => {
+    let resolve!: (response: Response) => void;
+    const response = new Promise<Response>((done) => (resolve = done));
+    let current = true;
+    const invalidate = vi.fn();
+    const oldSession = { ...session, isCurrent: () => current, invalidate };
+    const requests: Request[] = [];
+    const api = createIdentityApi(
+      new RecoveryStore(sessionStorage),
+      async (request) => {
+        requests.push(request);
+        return response;
+      },
+      "https://api.example.test",
+    );
+    const pending = api.listIdentityProviderUsers(
+      oldSession,
+      readCases[0].query,
+      new AbortController().signal,
+    );
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+    current = false;
+    resolve(failingBody(401));
+    await expect(pending).rejects.toThrow("会话已变化，请重新核对");
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+});
+
+describe("identity write success boundary", () => {
+  it("rejects REJECTED delivered on a successful write response and retains the clue", async () => {
+    const recovery = new RecoveryStore(sessionStorage);
+    const rejected = {
+      commandId,
+      receiptId: targetId,
+      outcome: "REJECTED",
+      completedAt: "2026-09-09T01:00:00Z",
+      rejectionCode: "IDENTITY_BINDING_CONFLICT",
+    };
+    const api = createIdentityApi(
+      recovery,
+      async () =>
+        json(rejected, 201, {
+          ETag: identityETag,
+          Location: `/api/v1/commands/${commandId}/receipt`,
+        }),
+      "https://api.example.test",
+    );
+    await expect(
+      api.write(session, writes[0].original, new AbortController().signal),
+    ).rejects.toThrow("身份管理响应不可用");
     expect(recovery.read()?.commandId).toBe(commandId);
   });
 });
