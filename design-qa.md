@@ -85,3 +85,31 @@ final result: passed
 LOGIN-01 visual/interaction result: passed (bounded component preview only)
 
 源码评审补充：首评发现初始化前短暂可激活的问题，已在`4ebc485`补provider就绪门禁和首次／替换commit回归，修复定向26项及typecheck通过。LoginPage和CSS未改，上述视觉证据仍对应当前页面字节；该门禁修复不以纯视觉预览代替真实生命周期测试，独立复审另见阶段记录。
+
+## Task9.4 CHOICE-01增量QA — 2026-09-09
+
+本节仅验收用户本轮选择的第1稿：本人任职／合法代办选择。原图`docs/design/session-access/frozen/CHOICE-01-appointment-entry.png`为1487×1058，SHA-256`56ec4f7826c618f4a005ee9b6952a63ca6e81506c024f496daba9e8a6abec2a4`；未编辑原图，LOGIN原图哈希亦未变。按image-to-code/design-qa流程使用同视口、同默认状态将原图与实际组件截图在同次输入中联合比较，既有字体和颜色优先，不采纳通用模板的海军蓝／新字体方案。
+
+实际预览加载生产AppointmentChooser、SessionProvider和SessionController，OIDC及精确自身context HTTP外部边界使用合成数据；存储为独立Map，不操作用户浏览器真实线索。预览不连接身份服务，不修改生产main、配置、路由或业务数据，不代表真实登录领卡。
+
+| 最终截图（本地执行目录下task94-choice-captures） | CSS视口 | 实际像素 | 观察 |
+|---|---|---|---|
+| choice-desktop-final.png | 1487×1058 | 1487×1058 | 与冻结稿联合比较；无横向或纵向溢出 |
+| choice-desktop-1440-final.png | 1440×900 | 1425×891 | 主确认可见，帮助／页脚可纵向滚动，无横向溢出 |
+| choice-tablet-768-final.png | 768×1024 | 753×1004 | 两栏、无合法代办说明，选中名称补充可读 |
+| choice-mobile-long-final.png | 360×800 | 345×767 | 单栏，任职全文两行显示，无横向溢出 |
+| choice-mobile-bottom-final.png | 360×800 | 345×767 | 键盘焦点可见，End后页脚底771.88小于800 |
+
+实际文件像素由System.Drawing读取。除原尺寸默认态外，垂直滚动条导致截图归一化，不能把上述像素当作CSS视口，未拉伸截图或据错误密度改样式。手机DOM内容宽345／scrollWidth345，scrollHeight1207；1440内容宽1425／scrollWidth1425，scrollHeight1053；平板内容宽753／scrollWidth753，scrollHeight1099。窄屏纵向滚动是内容适配，不是永久遮挡。
+
+五项核对：①中文系统字栈、44px右标题、24px选择值及主按钮层级一致；栅格稿与本机字宽有P3细差，不换字体。②44/56分栏及108px品牌占位沿用LOGIN，表单x736.22／宽679.72、选择框top328.99／高64、确认top751.78／高68贴合源稿x735／宽680、top329及752。③暖白／薄荷／石墨／翡翠绿、6px圆角及弱边界保留。④用户要求的Logo／律所名称占位不替换为虚构品牌；信息图标采用Phosphor，select/radio采用原生控件，因此箭头／圆点与栅格稿有P3差异。⑤姓名和任职来自当前context，样例只在验收夹具；更换当前同一任职禁用是行为约束，不伪造可操作外观。没有导航、目录、权限编辑或业务提交入口。
+
+发现及修复：初版默认态scrollHeight1075多17px，引入滚动条且主按钮约下移21px；仅收紧CHOICE垂直间距后为1058且关键坐标贴合。手机长select截断而不能核对全文，修复为同表单可换行全文（桌面短名不重复）。风险出现／取消时焦点丢失，修复后实际焦点分别为“取消切换”／“确认本次身份”，Enter可继续。后两项均有真实断言RED→GREEN。
+
+浏览器交互抽检：多本人不默认第一项，确立本人后才启用办理方式；合法代办即使仅一个候选也必须显式选择，未选禁确认；原代办身份可重新选回且保留线索。跨scope最终确认先显示“只删除本地线索，不撤销原操作”，取消保留提示，明确放弃合成线索后才返回已确认。无任职／无代办都有说明与禁用；退出清除当前身份显示、不声称全局注销完成。单选label高50px，动作按钮至少44px；手机确认焦点轮廓可见。最终浏览器error/warn读取为`[]`，临时视口已恢复，tab2保留本地预览。
+
+上述浏览器检查只证明选择组件及同页状态。存储失败、候选过期、卸载／控制器替换／logout后迟到响应与不发业务或回执请求由真实controller集成测试证明，不能靠预览提示当作HTTP验收。完整恢复页、生产main/config装配、全Task9.4独立评审及真实Keycloak/API/SPA整链仍是后续门禁。
+
+CHOICE-01 visual/interaction result: passed (bounded component preview only)
+
+CHOICE独立评审补充：初评无Critical／Important，1项Minor为重新选择办理方式或代办候选后旧成功提示残留。Root以真实预览先确认本人再选未选定的代办复现；`95b9673`三个草稿处理处清message后同路径status为空。新增3例先RED，最终相关44项及typecheck通过；无CSS/布局变更，默认截图仍有效。预览自身回调提示也明确改为“验收历史”，不冒充当前组件状态；该夹具不入生产。最终控制台仍为空，视口保持已恢复。
