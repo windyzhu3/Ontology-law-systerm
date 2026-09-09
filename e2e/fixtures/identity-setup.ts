@@ -278,16 +278,21 @@ export class IdentitySetup {
   }
   async dynamic() { for (const alias of ALIASES) await this.qualification(alias, alias === 'intake' || alias === 'supervisor'); this.environment.assertUnchanged(); }
   async stage(id: CaseId) {
-    let success = false; const at = new Date().toISOString();
+    let completing = false; const at = new Date().toISOString();
+    const reportPath = join(runtime, `task9-${this.runId}-${id}-${randomUUID()}.json`);
     try {
       this.journal.requirePrevious(id); this.environment.assertUnchanged();
       const actions = [() => this.entry(), () => this.unmapped(), () => this.bind(), () => this.noAppointment(), () => this.appointments(), () => this.grants(), () => this.dynamic()];
-      await actions[CASES.indexOf(id)](); this.environment.assertUnchanged(); this.journal.finishStage(id); success = true;
-    } catch { throw new Error(safeFailureCode(id)); }
-    finally {
-      protect(); const reportPath = join(runtime, `task9-${this.runId}-${id}-${randomUUID()}.json`);
-      writeFileSync(reportPath, JSON.stringify({ runId: this.runId, buildSha: this.environment.buildSha, environmentDigest: this.environment.environmentDigest, apiIdentity: this.environment.apiIdentity, executedAt: at, caseIdentity: id, status: success ? 'PASSED_SUBSCENARIO' : 'FAILED', exitCode: success ? 0 : 1, reportPath, http: this.http, U01: 'NOT_EXECUTED', U02: 'NOT_EXECUTED', U03: 'NOT_EXECUTED' }), { flag: 'wx', mode: 0o600 });
-      this.http = []; protect();
+      await actions[CASES.indexOf(id)](); this.environment.assertUnchanged();
+      const http = this.http; this.http = []; completing = true;
+      this.journal.finishStage(id, { runId: this.runId, buildSha: this.environment.buildSha, environmentDigest: this.environment.environmentDigest, apiIdentity: this.environment.apiIdentity, executedAt: at, caseIdentity: id, status: 'ACTIONS_VERIFIED', exitCode: null, reportPath, http, U01: 'NOT_EXECUTED', U02: 'NOT_EXECUTED', U03: 'NOT_EXECUTED' });
+    } catch {
+      if (!completing) {
+        protect();
+        writeFileSync(reportPath, JSON.stringify({ runId: this.runId, buildSha: this.environment.buildSha, environmentDigest: this.environment.environmentDigest, apiIdentity: this.environment.apiIdentity, executedAt: at, caseIdentity: id, status: 'FAILED', exitCode: 1, reportPath, http: this.http, U01: 'NOT_EXECUTED', U02: 'NOT_EXECUTED', U03: 'NOT_EXECUTED' }), { flag: 'wx', mode: 0o600 });
+        this.http = []; protect();
+      }
+      throw new Error(safeFailureCode(id));
     }
   }
 }

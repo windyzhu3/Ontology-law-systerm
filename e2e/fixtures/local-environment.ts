@@ -58,12 +58,13 @@ export const runtime = join(root, '.superpowers/sdd/2026-09-08-task9-real-user-a
 
 // Only the controller executes this bridge. Existing public adapters perform all ACL,
 // Git-ignore, release-byte and exact process ownership checks. No SQL is invoked.
-const bridge = String.raw`
+export const LOCAL_RUNTIME_BRIDGE = String.raw`
 import sys,json,hashlib
 from pathlib import Path
 sys.path.insert(0,str(Path(sys.argv[1])/'deploy/local-login'))
 import local_login as runner
-from local_release import RuntimeBoundary,LocalRelease,read_json,regular,encoded,digest
+from local_release import RuntimeBoundary,LocalRelease,read_json,regular,encoded,digest,app_commands,owned_process
+from local_worker import worker_command
 boundary=RuntimeBoundary(runner)
 boundary.protect()
 if sys.argv[2]=='protect':
@@ -73,7 +74,17 @@ current=release.current();record=release.load(current['id']);package=release.pac
 processes=boundary.processes()
 assert len(processes)==3 and all(p is not None for p in processes)
 saved=read_json(regular(runner.RUNTIME/'processes.json'))
-assert isinstance(saved['api'],dict) and 'created' in saved['api']
+assert set(saved)=={'api','spa','worker'}
+commands={**app_commands(runner,package),'worker':worker_command(runner,package)}
+assert len({p['pid'] for p in processes})==3
+for name,command in commands.items():
+    registered=saved[name]
+    assert isinstance(registered,dict) and registered.get('created') is not None
+    assert registered['executable']==command[0] and registered['args']==command[1:]
+    actual=next((p for p in processes if p['pid']==registered['pid']),None)
+    assert actual is not None
+    owned_process(registered,actual)
+    assert actual['executable']==command[0] and actual['args']==command[1:]
 deployment=read_json(regular(package/'deployment.json'))
 assert current['gate']['operating_mode']=='ACTIVE' and current['gate']['schema_contract_version']=='52-plus-2-v1.2'
 assert deployment['releaseDigest']==current['gate']['active_release_digest'] and deployment['manifestHash']==current['gate']['active_manifest_hash']
@@ -87,7 +98,7 @@ assert digest(regular(package/'app.jar').read_bytes())==record['provenance']['ja
 result={'origin':runner.ORIGIN,'issuer':runner.ISSUER,'buildSha':record['provenance']['sourceCommit'],
  'releaseId':current['id'],'jarSha256':record['provenance']['jarSha256'],
  'manifestHash':current['gate']['active_manifest_hash'],'revision':current['gate']['revision'],
- 'apiIdentity':digest(encoded(saved['api'])),'releaseIdentity':digest(encoded(current))}
+ 'apiIdentity':digest(encoded(saved['api'])),'processIdentity':digest(encoded(saved)),'releaseIdentity':digest(encoded(current))}
 if sys.argv[2]=='load':
     original=read_json(regular(runner.RUNTIME/'original-manifest.json'))
     operator=read_json(regular(runner.RUNTIME/'operator.json'))
@@ -109,7 +120,7 @@ print(json.dumps(result))
 function invoke(mode: 'protect' | 'snapshot' | 'load'): any {
   requireLocalAcceptance(process.env.TASK9_LOCAL_ACCEPTANCE);
   noLinks(root); noLinks(runtime);
-  const result = spawnSync('D:/soft/python3/python.exe', ['-B', '-c', bridge, root, mode], { encoding: 'utf8', windowsHide: true, timeout: 60_000, maxBuffer: 2 * 1024 * 1024 });
+  const result = spawnSync('D:/soft/python3/python.exe', ['-B', '-c', LOCAL_RUNTIME_BRIDGE, root, mode], { encoding: 'utf8', windowsHide: true, timeout: 60_000, maxBuffer: 2 * 1024 * 1024 });
   // Never expose child stderr/stdout on failure (including Python local variables).
   check(!result.error && result.status === 0);
   try { return JSON.parse(result.stdout); } catch { throw new Error('T9_BOUNDARY'); }
@@ -134,7 +145,7 @@ export function loadLocalEnvironment() {
   const tools = toolchain();
   const snapshot = invoke('snapshot'); validateEnvironment({ ...snapshot, ...tools });
   const loaded = invoke('load'); validateEnvironment({ ...loaded, ...tools });
-  check(snapshot.apiIdentity === loaded.apiIdentity && snapshot.releaseIdentity === loaded.releaseIdentity);
+  check(snapshot.apiIdentity === loaded.apiIdentity && snapshot.processIdentity === loaded.processIdentity && snapshot.releaseIdentity === loaded.releaseIdentity);
   validateAccounts(loaded.original, loaded.credentials, loaded.operation);
   const environmentDigest = sha(JSON.stringify({ ...snapshot, ...tools }));
   return {

@@ -1,15 +1,16 @@
 import { test, expect } from '@playwright/test';
-import { requireLocalAcceptance, validateEnvironment, validateAccounts } from '../fixtures/local-environment';
+import { requireLocalAcceptance, validateEnvironment, validateAccounts, LOCAL_RUNTIME_BRIDGE } from '../fixtures/local-environment';
 import { safeFailureCode } from '../reporters/safe-reporter';
-import { OperationJournal } from '../fixtures/operation-journal';
-import { mkdtempSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
+import { OperationJournal, type PhaseEvidence } from '../fixtures/operation-journal';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
 import { noLinks } from '../fixtures/local-environment';
 import { dispatchObserved, matchFact, requireReceiptLocationBuild } from '../fixtures/identity-setup';
 import SafeReporter from '../reporters/safe-reporter';
 import { createIdentityApi } from '../../apps/workbench/src/features/identity/identityApi';
 import { RecoveryStore } from '../../apps/workbench/src/features/session/recoveryMarker';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 test('offline explicit-local gate', () => {
   expect(() => requireLocalAcceptance(undefined)).toThrow();
@@ -146,4 +147,99 @@ test('offline reporter discards raw credentials and preserves failed exit', () =
 test('offline known Location drift binary cannot authorize a real write', () => {
   expect(() => requireReceiptLocationBuild('04bd695f7a8f656a5ed8fb96c5168e44a91bab8d')).toThrow();
   expect(() => requireReceiptLocationBuild('synthetic-invalid')).toThrow();
+});
+
+test('offline actual Python bridge rejects each controlled historical process before evidence in load and snapshot', () => {
+  const synthetic = mkdtempSync(join(tmpdir(), 'task9-process-synthetic-'));
+  const probe = String.raw`
+import sys,types,copy
+from pathlib import Path
+sys.path.insert(0,str(Path(sys.argv[1])/'deploy/local-login'))
+import local_release as release_module
+from local_worker import worker_command
+runner=types.ModuleType('local_login')
+runner.ROOT=Path(sys.argv[3]);runner.RUNTIME=runner.ROOT/'synthetic-runtime';runner.TOOLS=runner.ROOT/'tools';runner.JAVA=runner.TOOLS/'java.exe'
+sys.modules['local_login']=runner
+package=runner.RUNTIME/'releases'/'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+historical=runner.RUNTIME/'releases'/'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+commands={**release_module.app_commands(runner,package),'worker':worker_command(runner,package)}
+old={**release_module.app_commands(runner,historical),'worker':worker_command(runner,historical)}
+saved={name:{'pid':i+1,'executable':command[0],'args':command[1:],'created':'synthetic-start-'+name} for i,(name,command) in enumerate(commands.items())}
+changed=sys.argv[4]
+if changed in old:
+    saved[changed]['executable']=old[changed][0];saved[changed]['args']=old[changed][1:]
+actual=copy.deepcopy(saved)
+if changed=='api-created':actual['api']['created']='different-synthetic-start'
+if changed=='api-pid':actual['api']['pid']=99
+if changed=='spa-actual':actual['spa']['args']=old['spa'][1:]
+class Boundary:
+    def __init__(self,runner):pass
+    def protect(self):pass
+    def processes(self):return list(actual.values())
+    def process(self,pid):return next(p for p in actual.values() if p['pid']==pid)
+class Release:
+    def __init__(self,*args):pass
+    def current(self):return {'id':'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'}
+    def load(self,id):return {}
+    def package(self,id):return package
+class EvidenceBoundary(Exception):pass
+def read(path):
+    if path.name=='processes.json':return saved
+    raise EvidenceBoundary()
+release_module.RuntimeBoundary=Boundary;release_module.LocalRelease=Release;release_module.read_json=read;release_module.regular=lambda p:p
+try:
+    exec(compile(sys.stdin.read(),'<actual-task9-bridge>','exec'))
+except EvidenceBoundary:
+    print('EVIDENCE_REACHED')
+except Exception:
+    print('REJECTED_BEFORE_EVIDENCE');sys.exit(2)
+`;
+  for (const mode of ['load', 'snapshot']) for (const changed of ['none', 'api', 'spa', 'worker', 'api-created', 'api-pid', 'spa-actual']) {
+    const result = spawnSync('D:/soft/python3/python.exe', ['-B', '-c', probe, resolve(__dirname, '../..'), mode, synthetic, changed], { input: LOCAL_RUNTIME_BRIDGE, encoding: 'utf8', windowsHide: true });
+    expect(result.status).toBe(changed === 'none' ? 0 : 2);
+    expect(result.stdout.trim()).toBe(changed === 'none' ? 'EVIDENCE_REACHED' : 'REJECTED_BEFORE_EVIDENCE');
+  }
+});
+
+function phaseEvidence(folder: string): PhaseEvidence {
+  return { ...identity, apiIdentity: 'c'.repeat(64), executedAt: '2026-09-10T01:00:00.000Z', caseIdentity: 'T9-L01-entry', status: 'ACTIONS_VERIFIED', exitCode: null,
+    reportPath: join(folder, `task9-${identity.runId}-T9-L01-entry-00000000-0000-4000-8000-000000000088.json`), http: [{ path: '/api/v1/session/context', status: 200 }], U01: 'NOT_EXECUTED', U02: 'NOT_EXECUTED', U03: 'NOT_EXECUTED' };
+}
+test('offline completion write and final protection failures cannot authorize successor after reopening', async () => {
+  for (const failure of ['before-report', 'after-report-write', 'after-report-protect']) {
+    const folder = mkdtempSync(join(tmpdir(), 'task9-phase-synthetic-')), path = join(folder, 'journal.json'), evidence = phaseEvidence(folder);
+    let protectedFailure = false;
+    const journal = new OperationJournal(path, identity, () => { if (protectedFailure) throw new Error('synthetic-protection-denied'); });
+    expect(() => journal.finishStage('T9-L01-entry', evidence, { writeEvidence(file, bytes) {
+      if (failure === 'before-report') throw new Error('synthetic-write-denied');
+      writeFileSync(file, bytes, { flag: 'wx' });
+      if (failure === 'after-report-write') throw new Error('synthetic-flush-unknown');
+      protectedFailure = true;
+    } })).toThrow();
+    expect(existsSync(path + '.completion.pending')).toBe(true);
+    expect(() => journal.begin(command)).toThrow();
+    let sent = false;
+    await expect((async () => {
+      const continued = new OperationJournal(path, identity, () => {});
+      continued.requirePrevious('T9-L03-unmapped');
+      await dispatchObserved(continued, command, async () => { sent = true; });
+    })()).rejects.toThrow();
+    expect(sent).toBe(false);
+    if (existsSync(evidence.reportPath)) expect(JSON.parse(readFileSync(evidence.reportPath, 'utf8')).status).toBe('ACTIONS_VERIFIED');
+  }
+});
+
+test('offline completed phase requires intact prepared evidence on continuation', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'task9-phase-synthetic-')), path = join(folder, 'journal.json'), evidence = phaseEvidence(folder);
+  const journal = new OperationJournal(path, identity, () => {});
+  journal.finishStage('T9-L01-entry', evidence);
+  expect(existsSync(path + '.completion.pending')).toBe(false);
+  expect(JSON.parse(readFileSync(evidence.reportPath, 'utf8')).status).toBe('ACTIONS_VERIFIED');
+  expect(JSON.parse(readFileSync(path, 'utf8')).stages[0]).toMatchObject({ caseIdentity: 'T9-L01-entry', status: 'PASSED_SUBSCENARIO', exitCode: 0, reportPath: evidence.reportPath });
+  const continued = new OperationJournal(path, identity, () => {});
+  expect(() => continued.requirePrevious('T9-L03-unmapped')).not.toThrow();
+  writeFileSync(evidence.reportPath, '{}');
+  expect(() => continued.requirePrevious('T9-L03-unmapped')).toThrow();
+  expect(() => continued.begin(command)).toThrow();
+  expect(() => new OperationJournal(path, identity, () => {})).toThrow();
 });
