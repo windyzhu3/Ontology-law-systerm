@@ -145,3 +145,49 @@ never adopt unexplained rows or rerun service-fixture. No production defect or
 substitute scheduler was implemented. READY remains insufficient for W09/seven-card
 real-business acceptance. The MANUAL-source/routing-gap concern is separate
 controller work and no AUTO source was added here.
+
+## Fix round 1/5 — I1 named tenant exclusion protocol
+
+Reviewed the complete `task-9.6c-review-01.md` and the unchanged production
+`JooqR1BusinessFence.java` and `JooqAuthorizationService.java` lock implementations.
+I1 was confirmed: the initial infrastructure transaction had table locks but did
+not participate in the existing business/Identity advisory-lock protocol.
+
+The only implementation change is in `WorkerBoundary.apply_grants`: after the
+existing exact canonical original-tenant/plan validation, start an explicit
+READ COMMITTED transaction, set the existing 5-second lock and 30-second statement
+timeouts, acquire the existing exclusive transaction advisory locks in business
+then identity order, and only then acquire the existing table locks and perform
+the exact original-fact comparison/write. Keys use UTF-8 namespace plus canonical
+tenant UUID, SHA-256, first eight bytes, signed big-endian int64, matching the two
+production implementations. `PERFORM` in a local SQL DO block preserves the
+existing fixed acknowledgment output. Both delta 3 and exact delta 0 retries join
+the same exclusion protocol. No namespace, command UUID/envelope, HTTP operation,
+receipt, product code or additional data writer was introduced.
+
+The emitted-SQL boundary test uses independently computed .NET SHA256/BitConverter
+vectors for synthetic tenant `00000000-0000-0000-0000-000000000001`:
+business key `3054790668159973240`, identity key `-6113651264468117507`. It checks
+both exact exclusive keys, their order, explicit isolation, timeout ordering,
+table locks before comparison and comparison before INSERT. Its delta 0 branch
+also requires no INSERT. A second test rejects noncanonical, changed and malformed
+tenant values before any external SQL call. Existing grant-plan, fixed-shape and
+lost-commit-response retry tests remain in the covering suite.
+
+Commands ran from `C:/Users/Jacob/.cache/codex-worktrees/ontology-law-r1-business`:
+
+- RED: `D:/soft/python3/python.exe -m unittest discover -s deploy/local-login/tests -p test_local_worker.py -k grant_transaction_joins_exact` — exit 1, one test with two failing subtests (delta 3 and delta 0); actual advisory-lock list `[]` instead of the two exact keys. An earlier run of the same test also failed both subtests at the missing explicit READ COMMITTED assertion; the assertions were reordered to expose I1 directly before changing implementation.
+- GREEN: `D:/soft/python3/python.exe -m unittest discover -s deploy/local-login/tests -p test_local_worker.py -k grant` — exit 0, 9 tests OK, 0.123 seconds.
+- Covering GREEN: `D:/soft/python3/python.exe -m unittest discover -s deploy/local-login/tests -p test_local_worker.py` — exit 0, 24 tests OK, 8.672 seconds.
+- `git diff --check` — exit 0.
+
+Self-review: canonical tenant validation still precedes the SQL boundary; both
+locks are exclusive and transaction-scoped; signed conversion handles the
+negative identity vector; bounded waiting is configured before acquiring either
+lock; original comparison, fixed three-row insert, exact retry behavior and
+uncertain-response handling are unchanged. Only local_worker.py, its tests and
+this report changed in this fix round. No runtime/private-file/DB/service/build
+access or push occurred. M1 stays deferred and no launch marker is auto-cleared.
+Actual grant/start remains held for the controller's scoped re-review and the
+previously documented live deployment gate; these tests do not claim real SQL
+contention or deployment proof.

@@ -352,9 +352,18 @@ class WorkerBoundary:
 
     def apply_grants(self, plan, current, query):
         delta = grant_delta(plan, current)
+        tenant = plan['identity']['tenantId']  # grant_delta validated the exact canonical original tenant.
+        fences = [int.from_bytes(bytes.fromhex(digest((prefix + tenant).encode('utf-8')))[:8],
+                                 byteorder='big', signed=True)
+                  for prefix in ('R1_BUSINESS_TENANT_LOCK_V1:', 'R1_IDENTITY_TENANT_LOCK_V1:')]
+        # Join the existing business -> identity mutation protocol before table
+        # locks. Table locks additionally cover snapshot phantoms, not that fence.
+        # PERFORM avoids adding result rows to the fixed transaction acknowledgement.
+        acquire = 'DO $worker_fences$ BEGIN ' + ''.join(
+            'PERFORM pg_advisory_xact_lock(' + str(key) + '); ' for key in fences) + 'END $worker_fences$; '
         # Whole local identity tables are locked briefly to cover insertion phantoms as
         # well as exact original row updates. No application or receipt row is written.
-        statement = ("BEGIN; SET LOCAL TIME ZONE 'UTC'; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='30s'; "
+        statement = ("BEGIN ISOLATION LEVEL READ COMMITTED; SET LOCAL TIME ZONE 'UTC'; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='30s'; " + acquire +
             "LOCK TABLE identity.tenant,identity.principal,identity.organization_unit,identity.appointment,identity.authority_grant,"
             "audit.audit_entry,execution.command_execution_slot,execution.command_receipt IN SHARE ROW EXCLUSIVE MODE; "
             "DO $worker$ DECLARE affected integer; BEGIN " + OWNER_SQL +

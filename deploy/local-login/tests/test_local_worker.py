@@ -3,6 +3,7 @@ import copy
 from datetime import datetime, timezone
 import importlib.util
 import json
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -131,6 +132,47 @@ class WorkerTest(unittest.TestCase):
         self.assertNotIn('INSERT INTO execution.', requests[0])
         boundary.release_boundary.sql = lambda sql: '0'
         with self.assertRaises(RuntimeError): boundary.apply_grants(plan, fixture(), 'SELECT NULL::jsonb')
+
+    def test_grant_transaction_joins_exact_business_then_identity_fences_before_table_locks(self):
+        # Independent .NET SHA256/BitConverter vectors for canonical tenant ...0001.
+        # A different namespace/tenant, unsigned conversion, swapped order, shared
+        # lock, missing timeout, or default isolation must fail this boundary test.
+        boundary = self.m.WorkerBoundary(SimpleNamespace(RUNTIME=self.runtime), SimpleNamespace())
+        plan = self.m.grant_plan(self.identity, fixture(), self.now)
+        for delta in (3, 0):
+            current = fixture()
+            if delta == 0: current['grants'] = copy.deepcopy(plan['grants'])
+            statements = []
+            boundary.release_boundary.sql = lambda sql: statements.append(sql) or 'LOCAL_WORKER_GRANTS_' + str(delta)
+            self.assertEqual(boundary.apply_grants(plan, current, 'SELECT NULL::jsonb'), delta)
+            sql = statements[0]
+            with self.subTest(delta=delta):
+                locks = list(re.finditer(r'(pg_advisory_xact_lock(?:_shared)?)\((-?\d+)\)', sql))
+                self.assertEqual([(m[1], m[2]) for m in locks], [
+                    ('pg_advisory_xact_lock', '3054790668159973240'),
+                    ('pg_advisory_xact_lock', '-6113651264468117507')])
+                self.assertTrue(sql.startswith('BEGIN ISOLATION LEVEL READ COMMITTED;'))
+                self.assertLess(sql.index("SET LOCAL lock_timeout='5s'"), locks[0].start())
+                self.assertLess(sql.index("SET LOCAL statement_timeout='30s'"), locks[0].start())
+                self.assertLess(locks[1].end(), sql.index('LOCK TABLE identity.tenant'))
+                self.assertLess(sql.index('LOCK TABLE identity.tenant'), sql.index('IS DISTINCT FROM'))
+                if delta == 3:
+                    self.assertLess(sql.index('IS DISTINCT FROM'), sql.index('INSERT INTO identity.authority_grant'))
+                else:
+                    self.assertNotIn('INSERT INTO', sql)
+                self.assertNotIn('INSERT INTO execution.', sql)
+
+    def test_grant_fences_never_accept_noncanonical_or_changed_existing_tenant(self):
+        boundary = self.m.WorkerBoundary(SimpleNamespace(RUNTIME=self.runtime), SimpleNamespace())
+        plan = self.m.grant_plan(self.identity, fixture(), self.now)
+        statements = []
+        boundary.release_boundary.sql = lambda sql: statements.append(sql) or 'LOCAL_WORKER_GRANTS_3'
+        for tenant in ('00000000000000000000000000000001', P, "' OR true --"):
+            changed = copy.deepcopy(plan)
+            changed['identity']['tenantId'] = tenant
+            with self.subTest(tenant=tenant), self.assertRaises(RuntimeError):
+                boundary.apply_grants(changed, fixture(), 'SELECT NULL::jsonb')
+        self.assertEqual(statements, [], 'invalid tenant must fail before any external SQL call')
 
     def test_registered_worker_command_uses_jar_only_and_no_web_or_api_config(self):
         self.assertTrue(hasattr(self.m, 'worker_command'), 'Worker command missing')
