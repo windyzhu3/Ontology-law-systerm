@@ -4,7 +4,9 @@ import {
   type OriginalWrite,
   type WorkbenchApi,
   type WorkbenchSession,
+  matchesReceipt,
 } from "../../lib/api";
+import type { RecoveryMarker } from "../session/recoveryMarker";
 import {
   candidate,
   etag,
@@ -27,6 +29,8 @@ interface State {
   message: string | null;
   pending: OriginalWrite | null;
   needsRefresh: boolean;
+  recoveryMarker: RecoveryMarker | null;
+  recoveryBlocked: boolean;
 }
 const initial: State = {
   envelope: null,
@@ -36,6 +40,8 @@ const initial: State = {
   message: null,
   pending: null,
   needsRefresh: false,
+  recoveryMarker: null,
+  recoveryBlocked: false,
 };
 const ambiguous =
   "尚未确认保存结果。请查询原回执，或使用原请求重试；请勿重复发起。";
@@ -65,8 +71,8 @@ export function useCurrentCard(
   }, []);
   // Session replacement invalidates old asynchronous callbacks before the next effect.
   const sessionChanged =
-    identity.current?.sessionKey !== session?.sessionKey ||
-    identity.current?.accessToken !== session?.accessToken;
+    identity.current?.identityEpoch !== session?.identityEpoch ||
+    identity.current?.actorScopeKey !== session?.actorScopeKey;
   if (sessionChanged) {
     identity.current = session;
     generation.current++;
@@ -81,8 +87,9 @@ export function useCurrentCard(
   }
   const valid = (captured: WorkbenchSession) =>
     alive.current &&
-    identity.current?.sessionKey === captured.sessionKey &&
-    identity.current?.accessToken === captured.accessToken;
+    captured.isCurrent() &&
+    identity.current?.identityEpoch === captured.identityEpoch &&
+    identity.current?.actorScopeKey === captured.actorScopeKey;
   const clearPrivate = () => {
     generation.current++;
     wbTag.current = null;
@@ -148,7 +155,7 @@ export function useCurrentCard(
         needsRefresh: true,
       });
     }
-  }, [session?.sessionKey, session?.accessToken, api, update]);
+  }, [session?.identityEpoch, session?.actorScopeKey, api, update]);
 
   const acceptReceipt = async (
     receipt: PublicReceipt,
@@ -159,6 +166,8 @@ export function useCurrentCard(
       completedTask.current = original.taskId;
     update({
       pending: null,
+      recoveryMarker: null,
+      recoveryBlocked: false,
       message:
         receipt.outcome === "REJECTED"
           ? "本次请求未被接受，请刷新后核对。"
@@ -234,11 +243,7 @@ export function useCurrentCard(
         error.code === "COMMAND_PAYLOAD_CONFLICT"
       )
         update({ error: "原请求存在冲突，请查询原回执核对；请勿重新发起。" });
-      else if (
-        error instanceof TransportError &&
-        error.status < 500 &&
-        error.status !== 429
-      ) {
+      else if (error instanceof TransportError && error.provenOutcome) {
         if (error.status === 400 || error.status === 428)
           correction.current = {
             key: original.key,
@@ -247,7 +252,13 @@ export function useCurrentCard(
           };
         else correction.current = null;
         update({ pending: null, error: error.message, needsRefresh: true });
-      } else update({ error: ambiguous });
+      } else
+        update({
+          error:
+            error instanceof Error && error.message.includes("恢复存储")
+              ? error.message
+              : ambiguous,
+        });
     } finally {
       if (valid(captured)) {
         locked.current = false;
@@ -334,7 +345,11 @@ export function useCurrentCard(
   };
   const recover = async () => {
     const original = stateRef.current.pending;
-    if (!session || !original || locked.current || denied.current) return;
+    const marker = stateRef.current.recoveryMarker;
+    if (!session || (!original && !marker) || locked.current || denied.current)
+      return;
+    if (marker && marker.actorScopeKey !== session.actorScopeKey) return;
+    const key = original?.key ?? marker!.commandId;
     const captured = session;
     locked.current = true;
     const controller = new AbortController();
@@ -342,11 +357,29 @@ export function useCurrentCard(
     update({ busy: true });
     let found = false;
     try {
-      const r = await api.receipt(captured, original.key, controller.signal);
+      const r = await api.receipt(captured, key, controller.signal);
       if (!valid(captured)) return;
-      if (!validReceipt(r.data, original.key) || !matchesFact(r.data, original))
+      if (
+        !validReceipt(r.data, key) ||
+        (original
+          ? !matchesFact(r.data, original)
+          : !matchesReceipt(r.data, marker!))
+      )
         throw new Error("Invalid receipt");
-      await acceptReceipt(r.data, original);
+      if (original) await acceptReceipt(r.data, original);
+      else {
+        update({
+          recoveryMarker: null,
+          recoveryBlocked: false,
+          pending: null,
+          error: null,
+          message:
+            r.data.outcome === "REJECTED"
+              ? "本次请求未被接受，请刷新后核对。"
+              : "原操作结果已确认，正在刷新当前责任。",
+        });
+        wbTag.current = null;
+      }
       found = true;
     } catch (error) {
       if (!valid(captured)) return;
@@ -380,6 +413,22 @@ export function useCurrentCard(
   useEffect(() => {
     alive.current = true;
     update(initial);
+    try {
+      const marker = api.recovery.read();
+      update({
+        recoveryMarker:
+          marker?.actorScopeKey === session?.actorScopeKey ? marker : null,
+        recoveryBlocked: !!marker,
+        error: marker
+          ? "结果尚未确认，不能自动重发。请先选择原任职并核对原回执。"
+          : null,
+      });
+    } catch {
+      update({
+        recoveryBlocked: true,
+        error: "浏览器恢复存储不可用或线索已失效，结果尚未确认，不能自动重发。",
+      });
+    }
     wbTag.current = null;
     denied.current = false;
     void refreshRef.current();
@@ -415,7 +464,7 @@ export function useCurrentCard(
       window.removeEventListener("focus", focus);
       document.removeEventListener("visibilitychange", visibility);
     };
-  }, [session?.sessionKey, session?.accessToken, api, update]);
+  }, [session?.identityEpoch, session?.actorScopeKey, api, update]);
   return {
     ...(sessionChanged ? initial : state),
     refresh,
@@ -427,16 +476,11 @@ export function useCurrentCard(
 }
 
 function matchesFact(receipt: PublicReceipt, original: OriginalWrite) {
-  if (receipt.outcome === "REJECTED") return true;
-  const fact =
-    original.kind === "draft"
-      ? "ACTION_DRAFT"
-      : original.action === "RECORD_CONTACT_RESULT"
-        ? "LEAD_CONTACT_RESULT"
-        : original.action === "ASSIGN_LEAD"
-          ? "LEAD_ASSIGNMENT"
-          : original.action === "COMPLETE_LEAD_INGRESS"
-            ? "LEAD"
-            : "DECISION_RECORD";
-  return receipt.resultFact.factType === fact;
+  return matchesReceipt(receipt, {
+    commandId: original.key,
+    commandType:
+      original.kind === "draft" ? "SAVE_ACTION_DRAFT" : original.action,
+    actorScopeKey: "",
+    recordedAt: "",
+  });
 }

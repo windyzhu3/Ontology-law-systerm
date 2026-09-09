@@ -18,7 +18,8 @@ import {
   selectorId,
 } from "./test/fixtures";
 
-const session = { accessToken: "test-only", sessionKey: "actor-one" };
+import { testSession } from "./test/fixtures";
+const session = testSession();
 function mount(index = 5, draft = false) {
   const fetcher = vi.fn(async () => jsonResponse(envelope(index, draft)));
   render(<App session={session} api={createWorkbenchApi(fetcher)} />);

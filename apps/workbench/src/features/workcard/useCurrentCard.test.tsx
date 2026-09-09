@@ -10,7 +10,8 @@ import {
   receipt,
   tags,
 } from "../../test/fixtures";
-const session = { sessionKey: "actor-one", accessToken: "test-only" };
+import { testSession } from "../../test/fixtures";
+const session = testSession();
 afterEach(() => vi.useRealTimers());
 describe("workcard concurrency and recovery", () => {
   it("ignores an older GET arriving after a newer GET", async () => {
@@ -22,6 +23,7 @@ describe("workcard concurrency and recovery", () => {
         : jsonResponse({ ...envelope(), todaySummary: "最新摘要" }),
     );
     const { result } = renderHook(() => useCurrentCard(session, api));
+    await waitFor(() => expect(n).toBe(1));
     await act(async () => {
       await result.current.refresh();
     });

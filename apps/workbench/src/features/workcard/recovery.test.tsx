@@ -9,7 +9,8 @@ import {
   receipt,
   selectorId,
 } from "../../test/fixtures";
-const session = { sessionKey: "actor", accessToken: "test-only" };
+import { testSession, problemResponse } from "../../test/fixtures";
+const session = testSession();
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -32,10 +33,8 @@ it.each(retryTransitions)(
     const api = createWorkbenchApi(async (request) => {
       if (request.method !== "POST") return jsonResponse(data);
       writes.push(request);
-      if (writes.length === 1)
-        return jsonResponse({ code: firstCode }, firstStatus);
-      if (writes.length === 2)
-        return jsonResponse({ code: nextCode }, nextStatus);
+      if (writes.length === 1) return problemResponse(firstCode, firstStatus);
+      if (writes.length === 2) return problemResponse(nextCode, nextStatus);
       return jsonResponse(
         receipt(
           request.headers.get("Idempotency-Key")!,
@@ -74,8 +73,8 @@ it("replaces the Draft correction key after a later stale rejection", async () =
     if (request.method !== "PUT") return jsonResponse(envelope());
     writes.push(request);
     return writes.length === 1
-      ? jsonResponse({ code: "VALIDATION_FAILED" }, 400)
-      : jsonResponse({ code: "STALE_DRAFT" }, 412);
+      ? problemResponse("VALIDATION_FAILED", 400)
+      : problemResponse("STALE_DRAFT", 412);
   });
   const { result } = renderHook(() => useCurrentCard(session, api));
   await waitFor(() => expect(result.current.envelope).not.toBeNull());
@@ -170,7 +169,7 @@ it("retains the same key after server validation refusal and an explicit correct
   const api = createWorkbenchApi(async (r) => {
     if (r.method === "PUT") {
       writes.push(r);
-      return jsonResponse({ code: "VALIDATION_FAILED" }, 400);
+      return problemResponse("VALIDATION_FAILED", 400);
     }
     return jsonResponse(envelope());
   });
@@ -251,7 +250,7 @@ it("ignores an in-flight old session write after actor replacement", async () =>
     );
   });
   const key = result.current.pending!.key;
-  rerender({ s: { sessionKey: "other", accessToken: "other-test-only" } });
+  rerender({ s: testSession(2) });
   await act(async () => {
     lost.resolve(jsonResponse(receipt(key)));
     await completion;
@@ -336,6 +335,26 @@ it("rejects a successful receipt with a different completion fact as unconfirmed
   await act(async () => {
     await result.current.submit(envelope().currentCard!.commandForm.values);
   });
+  expect(result.current.pending).not.toBeNull();
+  expect(result.current.message).toBeNull();
+});
+it("retains an unknown business operation when a malformed Identity rejection is returned", async () => {
+  const api = createWorkbenchApi(async (request) =>
+    request.method === "POST"
+      ? jsonResponse({
+          commandId: request.headers.get("Idempotency-Key"),
+          receiptId: selectorId,
+          completedAt: "2026-09-08T02:10:00Z",
+          outcome: "REJECTED",
+          rejectionCode: "IDENTITY_LAST_ADMIN",
+        })
+      : jsonResponse(envelope(5, true)),
+  );
+  const { result } = renderHook(() => useCurrentCard(session, api));
+  await waitFor(() => expect(result.current.envelope).not.toBeNull());
+  await act(async () =>
+    result.current.submit(envelope(5, true).currentCard!.actionDraft!.values),
+  );
   expect(result.current.pending).not.toBeNull();
   expect(result.current.message).toBeNull();
 });

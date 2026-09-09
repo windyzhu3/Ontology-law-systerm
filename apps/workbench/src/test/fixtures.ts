@@ -1,4 +1,16 @@
 import type { components } from "../generated/api/schema";
+import type { WorkbenchSession } from "../lib/api";
+export function testSession(epoch = 1): WorkbenchSession {
+  return {
+    identityEpoch: epoch,
+    actorScopeKey: `ask1.${(epoch === 1 ? "a" : "b").repeat(43)}`,
+    selectedAppointmentId: "019c7000-0000-7000-8000-000000000001",
+    selectedOnBehalfAppointmentId: null,
+    getValidAccessToken: async () => "test-only",
+    isCurrent: () => true,
+    invalidate() {},
+  };
+}
 
 type S = components["schemas"];
 export const taskId = "019c7000-0000-7000-8000-000000000001";
@@ -259,6 +271,58 @@ export const jsonResponse = (
     status,
     headers: { "Content-Type": "application/json", ETag: etag },
   });
+export function problemResponse(code: string, status: number) {
+  const kind = code.includes("TASK")
+    ? "TASK"
+    : code.includes("SUBJECT") || code === "INGRESS_COMPLETION_ALREADY_RECORDED"
+      ? "SUBJECT"
+      : code.includes("DRAFT")
+        ? "DRAFT"
+        : null;
+  const retryPolicy =
+    status === 400 || status === 428
+      ? "SAME_KEY_AFTER_FIX"
+      : status === 412 || code === "DRAFT_DIGEST_MISMATCH"
+        ? "NEW_KEY_AFTER_REFRESH"
+        : status === 422
+          ? "NEW_KEY_AFTER_ADMIN_FIX"
+          : status === 401
+            ? "SAME_KEY_AFTER_REAUTH"
+            : status >= 429
+              ? "SAME_KEY_AFTER_BACKOFF"
+              : "NO";
+  return jsonResponse(
+    {
+      type: `https://example.test/problems/${code.toLowerCase()}`,
+      title: "测试请求未完成",
+      detail: "请核对后重试。",
+      instance: "/problems/fixture",
+      status,
+      code,
+      retryPolicy,
+      ...(code === "VALIDATION_FAILED"
+        ? {
+            fieldErrors: [
+              {
+                pointer: "/body",
+                code: "INVALID_FORMAT",
+                detail: "请核对格式。",
+              },
+            ],
+          }
+        : {}),
+      ...(kind && (status === 412 || status === 428 || status === 409)
+        ? {
+            currentETag: {
+              resourceKind: kind,
+              value: `"${kind.toLowerCase()}.${digest}"`,
+            },
+          }
+        : {}),
+    },
+    status,
+  );
+}
 export function receipt(
   commandId: string,
   factType = "LEAD_CONTACT_RESULT",

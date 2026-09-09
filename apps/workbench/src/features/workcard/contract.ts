@@ -504,6 +504,13 @@ export function validReceipt(v: unknown, key: string): v is PublicReceipt {
         "STALE_SUBJECT",
         "SUPERVISOR_UNRESOLVED",
         "SOURCE_INTAKE_OWNER_UNRESOLVED",
+        "IDENTITY_BINDING_CONFLICT",
+        "IDENTITY_STATE_CONFLICT",
+        "IDENTITY_SELF_LOCKOUT",
+        "IDENTITY_LAST_ADMIN",
+        "IDENTITY_ORGANIZATION_DEPENDENCY",
+        "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "STALE_IDENTITY",
       ].includes(String(v.rejectionCode))
     );
   if (
@@ -532,6 +539,10 @@ export function validReceipt(v: unknown, key: string): v is PublicReceipt {
       "DECISION_RECORD",
       "LEAD_ASSIGNMENT",
       "LEAD_CONTACT_RESULT",
+      "IDENTITY_PRINCIPAL",
+      "ORGANIZATION_UNIT",
+      "APPOINTMENT",
+      "AUTHORITY_GRANT",
     ].includes(String(f.factType)) &&
     safeText(f.factRef, 512) &&
     (["DECISION_RECORD", "LEAD_CONTACT_RESULT"].includes(String(f.factType))

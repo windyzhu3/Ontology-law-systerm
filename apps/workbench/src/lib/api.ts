@@ -1,11 +1,33 @@
 import createClient from "openapi-fetch";
 
 import type { paths, components } from "../generated/api/schema";
+import {
+  RecoveryStore,
+  type RecoveryMarker,
+  publicCommandFacts,
+} from "../features/session/recoveryMarker";
+import {
+  isObject,
+  validReceipt,
+  validDraft,
+  validPreconditions,
+  sameValues,
+  etag,
+} from "../features/workcard/contract";
+import {
+  provenWriteOutcome,
+  allowedCommandError,
+} from "../features/session/recoveryOutcome";
 
 export const apiClient = createClient<paths>();
 export interface WorkbenchSession {
-  readonly sessionKey: string;
-  readonly accessToken: string;
+  readonly identityEpoch: number;
+  readonly actorScopeKey: string;
+  readonly selectedAppointmentId: string;
+  readonly selectedOnBehalfAppointmentId: string | null;
+  getValidAccessToken(): Promise<string>;
+  isCurrent(): boolean;
+  invalidate(status: number): void;
   readonly displayName?: string;
 }
 type S = components["schemas"];
@@ -43,6 +65,7 @@ export class TransportError extends Error {
   constructor(
     readonly status: number,
     readonly code?: string,
+    readonly provenOutcome = false,
   ) {
     super(safeProblemMessage(status, code));
   }
@@ -82,24 +105,50 @@ function unwrap<T>(r: { response: Response; data?: T; error?: unknown }) {
 export function createWorkbenchApi(
   fetcher?: (request: Request) => Promise<Response>,
   baseUrl = window.location.origin,
+  recovery = new RecoveryStore(window.sessionStorage),
 ) {
   const client = createClient<paths>({
     baseUrl,
     ...(fetcher ? { fetch: fetcher } : {}),
   });
-  const auth = (s: WorkbenchSession) => ({
-    Authorization: `Bearer ${s.accessToken}`,
-  });
+  const assertCurrent = (s: WorkbenchSession, signal: AbortSignal) => {
+    if (!s.isCurrent() || signal.aborted)
+      throw new Error("会话已变化，请重新核对。");
+  };
+  const auth = async (s: WorkbenchSession, signal: AbortSignal) => {
+    assertCurrent(s, signal);
+    const token = await s.getValidAccessToken();
+    assertCurrent(s, signal);
+    return {
+      Authorization: `Bearer ${token}`,
+      "X-Appointment-Id": s.selectedAppointmentId,
+      ...(s.selectedOnBehalfAppointmentId
+        ? { "X-On-Behalf-Appointment-Id": s.selectedOnBehalfAppointmentId }
+        : {}),
+    };
+  };
+  const checked = <T>(
+    s: WorkbenchSession,
+    signal: AbortSignal,
+    r: { response: Response; data?: T; error?: unknown },
+  ) => {
+    assertCurrent(s, signal);
+    if ([401, 403].includes(r.response.status)) s.invalidate(r.response.status);
+    return unwrap(r);
+  };
   return {
+    recovery,
     async current(
       session: WorkbenchSession,
       tag: string | null,
       signal: AbortSignal,
     ) {
-      return unwrap(
+      return checked(
+        session,
+        signal,
         await client.GET("/api/v1/workcards/current", {
           headers: {
-            ...auth(session),
+            ...(await auth(session, signal)),
             ...(tag ? { "If-None-Match": tag } : {}),
           },
           signal,
@@ -112,49 +161,121 @@ export function createWorkbenchApi(
       original: OriginalWrite,
       signal: AbortSignal,
     ) {
+      if (
+        Object.keys(original.headers).some(
+          (k) => !["If-Match", "If-None-Match"].includes(k),
+        )
+      )
+        throw new Error("原请求前置条件不可用。");
       const headers = {
-        ...auth(session),
+        ...(await auth(session, signal)),
         ...original.headers,
         "Idempotency-Key": original.key,
       };
+      const marker = recovery.reserveWrite(
+        original.key,
+        original.kind === "draft" ? "SAVE_ACTION_DRAFT" : original.action,
+        session.actorScopeKey,
+        original,
+      );
       const params = {
         path: { taskId: original.taskId },
         header: { "Idempotency-Key": original.key },
       };
-      if (original.kind === "draft")
-        return unwrap(
-          await client.PUT("/api/v1/tasks/{taskId}/draft", {
-            params,
-            headers,
-            body: original.body,
-            signal,
-          }),
+      const r =
+        original.kind === "draft"
+          ? await client.PUT("/api/v1/tasks/{taskId}/draft", {
+              params,
+              headers,
+              body: original.body,
+              signal,
+            })
+          : await client.POST(commandPaths[original.action], {
+              params: {
+                ...params,
+                header: {
+                  ...params.header,
+                  "If-Match": original.headers["If-Match"],
+                },
+              },
+              headers,
+              body: original.body,
+              signal,
+            });
+      assertCurrent(session, signal);
+      if (
+        !r.response.ok &&
+        provenWriteOutcome(r.error, r.response.status, marker)
+      ) {
+        recovery.clear(marker);
+        throw new TransportError(
+          r.response.status,
+          (r.error as { code: string }).code,
+          true,
         );
-      return unwrap(
-        await client.POST(commandPaths[original.action], {
-          params: {
-            ...params,
-            header: {
-              ...params.header,
-              "If-Match": original.headers["If-Match"],
-            },
-          },
-          headers,
-          body: original.body,
-          signal,
-        }),
+      }
+      const data: unknown = r.data;
+      const terminal =
+        original.kind === "draft" && isObject(data) ? data.receipt : data;
+      if (r.response.ok && matchesReceipt(terminal, marker)) {
+        if (
+          original.kind !== "draft" ||
+          (isObject(data) &&
+            Object.keys(data).sort().join() === "draft,preconditions,receipt" &&
+            validDraft(data.draft, original.body.actionCode) &&
+            validPreconditions(data.preconditions) &&
+            etag(r.response.headers.get("ETag"), "draft") &&
+            data.preconditions.draftETag === r.response.headers.get("ETag") &&
+            sameValues(data.draft.values, original.body.values) &&
+            terminal.outcome !== "REJECTED" &&
+            "revision" in terminal.resultFact &&
+            terminal.resultFact.revision === data.draft.draftRevision)
+        )
+          recovery.clear(marker);
+      }
+      return checked(
+        session,
+        signal,
+        r as {
+          response: Response;
+          data?: S["ActionDraftWriteResult"] | S["CommandReceipt"];
+          error?: unknown;
+        },
       );
     },
     async receipt(session: WorkbenchSession, key: string, signal: AbortSignal) {
-      return unwrap(
-        await client.GET("/api/v1/commands/{commandId}/receipt", {
-          params: { path: { commandId: key } },
-          headers: auth(session),
-          cache: "no-store",
-          signal,
-        }),
-      );
+      const marker = recovery.read();
+      if (
+        !marker ||
+        marker.commandId !== key ||
+        marker.actorScopeKey !== session.actorScopeKey
+      )
+        throw new Error("结果尚未确认，不能自动重发。");
+      const r = await client.GET("/api/v1/commands/{commandId}/receipt", {
+        params: { path: { commandId: key } },
+        headers: await auth(session, signal),
+        cache: "no-store",
+        signal,
+      });
+      assertCurrent(session, signal);
+      if (r.response.status === 200 && matchesReceipt(r.data, marker))
+        recovery.clear(marker);
+      return checked(session, signal, r);
     },
   };
 }
 export type WorkbenchApi = ReturnType<typeof createWorkbenchApi>;
+export function matchesReceipt(
+  value: unknown,
+  marker: RecoveryMarker,
+): value is S["CommandReceipt"] {
+  if (
+    !Object.hasOwn(publicCommandFacts, marker.commandType) ||
+    !validReceipt(value, marker.commandId)
+  )
+    return false;
+  const fact =
+    publicCommandFacts[marker.commandType as keyof typeof publicCommandFacts];
+  if (value.outcome !== "REJECTED") return value.resultFact.factType === fact;
+  return allowedCommandError(marker.commandType, value.rejectionCode);
+}

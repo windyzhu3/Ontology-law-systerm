@@ -85,7 +85,7 @@ export function App({
                 {work.message}
               </p>
             )}
-            {work.pending && (
+            {(work.pending || work.recoveryMarker) && (
               <div className="recovery-actions">
                 <button
                   disabled={work.busy}
@@ -93,9 +93,14 @@ export function App({
                 >
                   查询原回执
                 </button>
-                <button disabled={work.busy} onClick={() => void work.replay()}>
-                  使用原请求重试
-                </button>
+                {work.pending && (
+                  <button
+                    disabled={work.busy}
+                    onClick={() => void work.replay()}
+                  >
+                    使用原请求重试
+                  </button>
+                )}
               </div>
             )}
             {envelope?.currentCard ? (
@@ -104,7 +109,9 @@ export function App({
                 card={envelope.currentCard}
                 composer={envelope.chatComposer}
                 busy={work.busy}
-                blocked={!!work.pending || work.needsRefresh}
+                blocked={
+                  !!work.pending || work.recoveryBlocked || work.needsRefresh
+                }
                 save={work.save}
                 submit={work.submit}
               />
