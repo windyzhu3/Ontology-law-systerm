@@ -4,6 +4,8 @@
 
 本地检查点已通过独立评审及修复后复审：实现`3f92d0e`，防护修复`5e1be4b`；两项评审问题全部关闭，无新增问题。下述bootstrap扩展后验证限制明确保留为后续门槛。
 
+后续更新：该bootstrap限制已按用户批准的9.6a窄修复关闭，见[原集合核验修正记录](2026-09-09-task9-bootstrap-original-set-verification.md)。下文保留首次失败的历史事实；修复后用保留的原清单／密钥核验通过且零变化，不重建数据或激活新在线制品。
+
 ## 部署范围
 
 - 登录入口：`https://localhost:19444/login`；真实Keycloak issuer：`https://localhost:19443/realms/local-r1`。
