@@ -21,6 +21,14 @@ public class ProblemDetailsAdvice {
             entry("APPOINTMENT_INACTIVE",403,"NO","当前任职不可用于此操作",null),
             entry("NOT_FOUND",404,"NO","资源不存在或不可见",null),
             entry("COMMAND_PAYLOAD_CONFLICT",409,"NO","幂等键已绑定其他请求",null),
+            entry("IDENTITY_BINDING_CONFLICT",409,"NO","身份绑定已存在",null),
+            entry("IDENTITY_STATE_CONFLICT",409,"NEW_KEY_AFTER_REFRESH","身份事实状态不允许此操作",null),
+            entry("IDENTITY_SELF_LOCKOUT",409,"NO","不能通过此操作锁定自己的管理资格",null),
+            entry("IDENTITY_LAST_ADMIN",409,"NO","不能移除最后可用管理员",null),
+            entry("IDENTITY_ORGANIZATION_DEPENDENCY",409,"NEW_KEY_AFTER_ADMIN_FIX","存在尚未处理的身份依赖",null),
+            entry("IDENTITY_RESPONSIBILITY_DEPENDENCY",409,"NEW_KEY_AFTER_ADMIN_FIX","该任职仍承担开放或等待责任",null),
+            entry("STALE_IDENTITY",412,"NEW_KEY_AFTER_REFRESH","身份事实版本已变化",null),
+            entry("IDENTITY_PRECONDITION_REQUIRED",428,"SAME_KEY_AFTER_FIX","缺少身份事实前置条件",null),
             entry("STALE_OUTBOX_CLAIM",409,"NO","投影领取 revision、owner、token 或 lease 已失效",null),
             entry("TASK_NOT_OPEN",409,"NO","Task 当前不可执行","TASK"),
             entry("TASK_ALREADY_COMPLETED",409,"NO","Task 已完成","TASK"),
@@ -41,6 +49,12 @@ public class ProblemDetailsAdvice {
     static String tagKind(String code){var entry=CODES.get(code);return entry==null?null:entry.kind();}
     @ExceptionHandler(R1HttpFailure.class)
     ResponseEntity<Map<String,Object>> failure(R1HttpFailure failure,HttpServletRequest request){return response(failure,request);}
+    @ExceptionHandler(IdentityHttpFailure.class)
+    ResponseEntity<Map<String,Object>> identityFailure(IdentityHttpFailure failure,HttpServletRequest request){
+        var response=response(new R1HttpFailure(failure.code,failure.receipt),request);var body=new TreeMap<>(Objects.requireNonNull(response.getBody()));
+        if(failure.code.equals(body.get("code"))&&Set.of("STALE_IDENTITY","IDENTITY_PRECONDITION_REQUIRED").contains(failure.code)&&failure.etag!=null)body.put("currentETag",failure.etag);
+        return ResponseEntity.status(response.getStatusCode()).headers(response.getHeaders()).body(body);
+    }
     @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,org.springframework.web.bind.MethodArgumentNotValidException.class,jakarta.validation.ConstraintViolationException.class,org.springframework.web.method.annotation.HandlerMethodValidationException.class,org.springframework.web.bind.MissingServletRequestParameterException.class,org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,org.springframework.web.bind.MissingRequestHeaderException.class})
     ResponseEntity<Map<String,Object>> invalid(Exception failure,HttpServletRequest request){
         String pointer="/";

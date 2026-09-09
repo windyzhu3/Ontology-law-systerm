@@ -9,6 +9,19 @@ import org.jooq.impl.DSL;
 import static io.github.windyzhu3.ontologylaw.audit.internal.persistence.jooq.Tables.AUDIT_ENTRY;
 
 public final class JooqAuditAppender implements AuditAppender {
+    public void append(Connection c,IdentityEntry e)throws SQLException {
+        var values=io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.object(io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.parse(e.summary()));
+        io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.fields(values,"result","authorizationEvidence","receiptRecovery");
+        var result=io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.object(values.get("result"));
+        io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.fields(result,"outcome","resultFact","rejectionCode");
+        var metadata=new io.github.windyzhu3.ontologylaw.audit.ReceiptRecoveryMetadata(e.commandType(),values.get("receiptRecovery"));
+        if(!e.outcome().equals(result.get("outcome"))||!metadata.tenantId().equals(e.authorization().request().actor().tenantId()))throw io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.invalid();
+        write(c,e.id(),e.commandId(),e.commandType(),e.correlationId(),e.commandType(),e.outcome(),e.authorization(),e.authorization().request().subject(),"R1_IDENTITY_COMMAND_AUDIT_V1",1,e.summary(),e.digest());
+    }
+    public void append(Connection c,IdentityDisclosureEntry e)throws SQLException {
+        String action=e.operationId().replaceAll("([a-z])([A-Z])","$1_$2").toUpperCase(java.util.Locale.ROOT);
+        write(c,e.id(),null,null,e.correlationId(),action,"SUCCEEDED",e.authorization(),e.authorization().request().subject(),"R1_IDENTITY_DISCLOSURE_V1",1,e.summary(),e.digest());
+    }
     private final String executionNodeCode;
     public JooqAuditAppender(String executionNodeCode) {
         if(executionNodeCode==null || !executionNodeCode.matches("[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}"))throw new IllegalArgumentException("Trusted deployment node code required");

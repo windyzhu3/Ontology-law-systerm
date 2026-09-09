@@ -14,6 +14,7 @@ final class R1ReceiptAuthorizationPolicy {
     private final R1AuthorityReader authorities=R1AuthorityReader.databaseBacked();
     R1ReceiptAuthorizationPolicy(R1AuthorizationFacts facts){this.facts=Objects.requireNonNull(facts);}
     AuthorizationSnapshot authorize(Connection c,Actor actor,Original original,Instant now)throws SQLException {
+        if(original.recovery().identity()){try{return IdentityCommandRuntime.authorizeOriginal(c,actor,original).authorization();}catch(IdentityCommands.Failure denied){throw new CommandReceiptReadRuntime.Failure(403,"NOT_AUTHORIZED");}}
         var recovery=original.recovery();var checks=new ArrayList<AuthorizationSnapshot>();Request request;
         if("CAPTURE_LEAD".equals(original.commandType())) {
             var source=facts.capture(c,actor.tenantId(),recovery.sourceAccountCode(),recovery.sourceRecordKeyDigest());

@@ -19,7 +19,12 @@ public class R1RequestBodyValidation extends RequestBodyAdviceAdapter {
     public HttpInputMessage beforeBodyRead(HttpInputMessage input,MethodParameter parameter,Type type,Class<? extends HttpMessageConverter<?>> converter)throws IOException {
         byte[] bytes=input.getBody().readNBytes(1_048_577);if(bytes.length>1_048_576)throw R1HttpFailure.validation("/","OUT_OF_RANGE");
         JsonNode tree;try{tree=PARSER.readTree(bytes);}catch(RuntimeException malformed){throw R1HttpFailure.validation("/","INVALID_FORMAT");}
-        if(tree==null||!tree.isObject())throw R1HttpFailure.validation("/","INVALID_FORMAT");validate(tree,"",0);
+        if(tree==null||!tree.isObject())throw R1HttpFailure.validation("/","INVALID_FORMAT");
+        boolean identity=parameter.getContainingClass()==IdentityAdminController.class;
+        if(identity){var fields=new java.util.HashMap<String,Object>();for(var property:tree.properties())fields.put(property.getKey(),property.getValue().isNull()?null:property.getValue().isString()?property.getValue().asString():property.getValue());
+            String method=parameter.getMethod().getName();String command=method.replaceAll("([a-z])([A-Z])","$1_$2").toUpperCase(java.util.Locale.ROOT);
+            try{tree=PARSER.valueToTree(io.github.windyzhu3.ontologylaw.identity.IdentityCommands.validate(io.github.windyzhu3.ontologylaw.identity.IdentityCommands.handler(command),fields));}catch(io.github.windyzhu3.ontologylaw.identity.IdentityCommands.Failure invalid){throw R1HttpFailure.validation("/","INVALID_FORMAT");}
+        }else validate(tree,"",0);
         normalizeSafeText(tree,parameter.getMethod().getName());byte[] normalized=PARSER.writeValueAsBytes(tree);
         return new HttpInputMessage(){public HttpHeaders getHeaders(){return input.getHeaders();}public InputStream getBody(){return new ByteArrayInputStream(normalized);}};
     }

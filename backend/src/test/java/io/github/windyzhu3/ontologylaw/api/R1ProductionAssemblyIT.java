@@ -19,6 +19,23 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class R1ProductionAssemblyIT extends R1ProductionFixture {
     @TempDir Path directory;
+    @Test void production_https_identity_receipt_recovery_rechecks_current_authority_and_keeps_original_result()throws Exception {
+        setupContact();var deployment=deployment(directory);var grant=java.util.UUID.randomUUID();
+        mutate("insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values (?,?,?,?,?,'IDENTITY_ORGANIZATION_MANAGE',clock_timestamp()-interval '1 hour','ACTIVE',clock_timestamp())",seed.tenant(),grant,seed.appointment(),seed.appointment(),seed.org());
+        try(var context=new SpringApplicationBuilder(OntologyLawApplication.class).properties(deployment.api()).run();var client=HttpClient.newBuilder().sslContext(deployment.tls().client(null,deployment.clientTrust())).build()) {
+            String base="https://localhost:"+context.getEnvironment().getRequiredProperty("local.server.port")+"/api/v1/",token=bearer(),key=java.util.UUID.randomUUID().toString();
+            String body=mapper.writeValueAsString(java.util.Map.of("parentOrganizationId",seed.org().toString(),"code","HTTPS_RECOVERY","displayName","HTTPS recovery"));
+            var created=client.send(HttpRequest.newBuilder(URI.create(base+"admin/identity/organizations")).header("Authorization","Bearer "+token).header("Idempotency-Key",key).header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body)).build(),HttpResponse.BodyHandlers.ofString());assertEquals(201,created.statusCode(),created.body());
+            var request=HttpRequest.newBuilder(URI.create(base+"commands/"+key+"/receipt")).header("Authorization","Bearer "+token).GET().build();var recovered=client.send(request,HttpResponse.BodyHandlers.ofString());assertEquals(200,recovered.statusCode(),recovered.body());assertEquals(mapper.readTree(created.body()),mapper.readTree(recovered.body()));assertEquals("no-store",recovered.headers().firstValue("Cache-Control").orElseThrow());
+            mutate("update identity.authority_grant set state='REVOKED',revoked_at=clock_timestamp(),revocation_reason_code='FIXTURE',revision=revision+1 where tenant_id=? and authority_grant_id=?",seed.tenant(),grant);assertEquals(403,client.send(request,HttpResponse.BodyHandlers.ofString()).statusCode());
+        }
+    }
+    @Test void identity_admin_owner_services_are_assembled_from_trusted_production_configuration()throws Exception {
+        setupContact();var deployment=deployment(directory);
+        try(var context=new SpringApplicationBuilder(OntologyLawApplication.class).properties(deployment.api()).run()){
+            assertNotNull(context.getBeanProvider(IdentityAdminController.Services.class).getIfAvailable(),"Production must assemble the controlled Identity service");
+        }
+    }
     @Test void active_semantic_assembly_accepts_dynamic_human_realm_without_per_person_registration()throws Exception {
         setupContact();var deployment=deployment(directory);var environment=new org.springframework.mock.env.MockEnvironment();environment.getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("testDeployment",deployment.api()));
         assertDoesNotThrow(()->R1ApiDeployment.from(environment));

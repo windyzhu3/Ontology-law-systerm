@@ -13,6 +13,7 @@ final class R1HttpOperations {
     private static final Set<String> READ=codes(COMMON,"NOT_FOUND VALIDATION_FAILED");
     private R1HttpOperations(){}
     static Operation find(String method,String path){
+        if(path.startsWith("/api/v1/admin/identity/"))return identity(method,path);
         if(method.equals("GET")&&path.equals("/api/v1/session/context"))return new Operation(null,codes(COMMON,"VALIDATION_FAILED"));
         if(method.equals("GET")&&(path.equals("/api/v1/workcards/current")||path.matches("/api/v1/commands/[^/]+/receipt")))return new Operation(null,READ);
         if(method.equals("GET")&&(path.equals("/internal/v1/projections/r1/readiness")||path.equals("/internal/v1/tasks/due")))return new Operation(null,codes(COMMON,"VALIDATION_FAILED"));
@@ -30,5 +31,15 @@ final class R1HttpOperations {
         if(type==Type.COMPLETE_LEAD_INGRESS)errors.add("INGRESS_COMPLETION_ALREADY_RECORDED");
         if(type==Type.RECORD_ROUTING_DISPOSITION)errors.add("SOURCE_INTAKE_OWNER_UNRESOLVED");
         return new Operation(type,Set.copyOf(errors));
+    }
+    private static Operation identity(String method,String path) {
+        String resource=path.substring("/api/v1/admin/identity/".length());
+        if(method.equals("GET")&&Set.of("provider-users","options","principals","organizations","appointments","authority-grants").contains(resource))return new Operation(null,codes(COMMON,"VALIDATION_FAILED APPOINTMENT_INACTIVE NOT_FOUND"));
+        String[] pieces=resource.split("/");String noun=switch(pieces[0]){case "principals"->"IDENTITY_PRINCIPAL";case "organizations"->"ORGANIZATION_UNIT";case "appointments"->"APPOINTMENT";case "authority-grants"->"AUTHORITY_GRANT";default->null;};if(noun==null)return null;
+        String command=null;
+        if(pieces.length==1&&method.equals("POST"))command="CREATE_"+noun;
+        else if(pieces.length==3){String action=switch(pieces[2]){case "display-name"->method.equals("PATCH")?"RENAME":null;case "suspend","resume","disable","close","end","revoke"->method.equals("POST")?pieces[2].toUpperCase(Locale.ROOT):null;default->null;};if(action!=null)command=action+"_"+noun;}
+        if(command==null||!io.github.windyzhu3.ontologylaw.identity.IdentityCommands.registered(command))return null;
+        return new Operation(Type.valueOf(command),codes(COMMON,WRITE,"APPOINTMENT_INACTIVE NOT_FOUND IDENTITY_BINDING_CONFLICT IDENTITY_STATE_CONFLICT IDENTITY_SELF_LOCKOUT IDENTITY_LAST_ADMIN IDENTITY_ORGANIZATION_DEPENDENCY IDENTITY_RESPONSIBILITY_DEPENDENCY STALE_IDENTITY IDENTITY_PRECONDITION_REQUIRED"));
     }
 }

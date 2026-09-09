@@ -7,6 +7,10 @@ public interface IdentityProviderDirectory {
         public String toString(){return "VerifiedDirectoryAccount[restricted]";}
     }
     Account exact(String accountIdentifier);
+    /** Exact username online lookup; absence/non-HUMAN/disabled is empty, outage is never absence. */
+    default Account candidate(String username){return exact(username);}
+    /** Online final recheck, retaining bounded HUMAN proof separately from offline bootstrap. */
+    default Account candidateEnabled(String subject){return enabled(subject);}
     Account enabled(String exactSubject);
     String issuer();
 }

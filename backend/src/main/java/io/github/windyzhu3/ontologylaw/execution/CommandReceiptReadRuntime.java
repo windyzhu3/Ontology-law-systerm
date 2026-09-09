@@ -35,7 +35,8 @@ public final class CommandReceiptReadRuntime {
                 var receipt=receipts.read(c,actor.tenantId(),command);
                 if(receipt==null||!receipt.commandType().equals(original.commandType())||!receipt.outcome().status().name().equals(original.outcome())
                         ||!MessageDigest.isEqual(receipt.scopeDigest(),original.recovery().scopeDigest()))throw new CommandReceiptAuthorizationReader.InvalidMetadata();
-                String envelope="CAPTURE_LEAD".equals(receipt.commandType())?(actor.principalKind()==PrincipalKind.SERVICE?"SERVICE_ACTOR":"INTERNAL_ADMIN"):"INTERNAL_TASK";
+                if(original.recovery().identity())IdentityCommandRuntime.validateOriginal(receipt,original);
+                String envelope=original.recovery().identity()?"INTERNAL_ADMIN":"CAPTURE_LEAD".equals(receipt.commandType())?(actor.principalKind()==PrincipalKind.SERVICE?"SERVICE_ACTOR":"INTERNAL_ADMIN"):"INTERNAL_TASK";
                 if(!envelope.equals(receipt.envelope()))throw new CommandReceiptAuthorizationReader.InvalidMetadata();
                 policy.authorize(c,actor,original,SensitiveReadClock.now(c));
                 if(!identities.active(c,actor))throw new Failure(403,"NOT_AUTHORIZED");

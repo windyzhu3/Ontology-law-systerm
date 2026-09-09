@@ -25,6 +25,20 @@ public final class KeycloakDirectoryReader implements IdentityProviderDirectory 
     public KeycloakDirectoryReader(Trust trust){this(trust,false);}
     public static KeycloakDirectoryReader isolatedLoopback(Trust trust){return new KeycloakDirectoryReader(trust,true);}
     public String issuer(){return trust.issuer();}
+    public Account candidate(String identifier){
+        if(identifier==null||identifier.isBlank()||identifier.length()>200)throw new io.github.windyzhu3.ontologylaw.identity.IdentityCommands.Failure("VALIDATION_FAILED");
+        // Exact username endpoint establishes identity; normal search independently excludes SERVICE.
+        var matches=read("/users?max=2&exact=true&username="+encoded(identifier));
+        if(!matches.isArray()||matches.size()>1)throw unavailable();if(matches.isEmpty())return null;
+        var candidate=matches.get(0);if(!identifier.equals(candidate.path("username").asString())||!candidate.path("enabled").isBoolean())return null;
+        if(!candidate.path("enabled").asBoolean()||candidate.hasNonNull("serviceAccountClientId"))return null;
+        var exact=account(candidate);
+        // Quotes and '*' are provider search operators, never user-controlled proof syntax.
+        if(identifier.indexOf('"')>=0||identifier.indexOf('*')>=0)return null;
+        var proof=read("/users?max=50&search="+encoded("\""+identifier+"\""));if(!proof.isArray()||proof.size()>50)throw unavailable();
+        for(var human:proof)if(exact.subject().equals(human.path("id").asString())&&identifier.equals(human.path("username").asString())&&human.path("enabled").isBoolean()&&human.path("enabled").asBoolean()&&!human.hasNonNull("serviceAccountClientId"))return exact;
+        if(proof.size()==50)throw unavailable();return null;
+    }
     public Account exact(String identifier){
         if(identifier==null||identifier.isBlank()||identifier.length()>200)throw invalid();
         // Keycloak 26.7.3 username/exact includes service accounts and omits their client link.
@@ -38,6 +52,13 @@ public final class KeycloakDirectoryReader implements IdentityProviderDirectory 
         if(subject==null||!subject.matches("[A-Za-z0-9_-]{1,2048}"))throw invalid();
         var account=read("/users/"+encoded(subject));if(!subject.equals(account.path("id").asString())||!account.path("enabled").isBoolean()||!account.path("enabled").asBoolean())throw invalid();
         var human=exact(account.path("username").asString());if(!subject.equals(human.subject()))throw invalid();return human;
+    }
+    public Account candidateEnabled(String subject){
+        if(subject==null||!subject.matches("[A-Za-z0-9_-]{1,2048}"))throw invalid();
+        var current=read("/users/"+encoded(subject));
+        if(!subject.equals(current.path("id").asString())||!current.path("enabled").isBoolean()||!current.path("enabled").asBoolean())throw invalid();
+        var human=candidate(current.path("username").asString());
+        if(human==null||!subject.equals(human.subject()))throw invalid();return human;
     }
     private Account account(tools.jackson.databind.JsonNode node){if(!node.path("id").isString())throw unavailable();if(node.hasNonNull("serviceAccountClientId"))throw invalid();return new Account(node.path("id").asString());}
     private tools.jackson.databind.JsonNode read(String suffix) {

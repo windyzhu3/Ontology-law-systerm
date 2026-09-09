@@ -27,6 +27,8 @@ public final class KeycloakFixture implements AutoCloseable {
     private GenericContainer<?> keycloak;
     private final TlsFixture tls;private TlsFixture.Key identityTrust;private javax.net.ssl.SSLContext tlsContext;
     private byte[] databaseCertificate;
+    private List<Map<String,Object>> additionalUsers=List.of();
+    public KeycloakFixture withUsers(List<Map<String,Object>> users){if(keycloak!=null)throw new IllegalStateException();additionalUsers=List.copyOf(users);return this;}
     public KeycloakFixture(){tls=null;}
     public KeycloakFixture(TlsFixture tls){this.tls=Objects.requireNonNull(tls);}
     public java.nio.file.Path identityTrustPath(){return identityTrust.path();}
@@ -95,6 +97,7 @@ public final class KeycloakFixture implements AutoCloseable {
         var shortLived=new LinkedHashMap<>(spa);shortLived.put("clientId","task92-expiry-spa");shortLived.put("attributes",Map.of("pkce.code.challenge.method","S256","access.token.lifespan","2"));
         realm.put("clients",List.of(spa,shortLived,confidential(AUDIENCE,introspectionSecret,false),confidential("task92-directory",directorySecret,true)));
         realm.put("users",List.of(Map.of("username",username,"enabled",true,"emailVerified",true,"firstName","Synthetic","lastName","Fixture","email","synthetic@example.invalid","credentials",List.of(Map.of("type","password","value",password,"temporary",false))),Map.of("username","synthetic-disabled","enabled",false),Map.of("username","service-account-task92-directory","enabled",true,"serviceAccountClientId","task92-directory","clientRoles",Map.of("realm-management",List.of("query-users","view-users")))));
+        if(!additionalUsers.isEmpty()){@SuppressWarnings("unchecked") var users=new ArrayList<>((List<Map<String,Object>>)realm.get("users"));users.addAll(additionalUsers);realm.put("users",users);}
         return realm;
     }
     private static Map<String,Object> confidential(String id,String secret,boolean service) {return Map.of("clientId",id,"secret",secret,"publicClient",false,"standardFlowEnabled",false,"directAccessGrantsEnabled",false,"serviceAccountsEnabled",service);}

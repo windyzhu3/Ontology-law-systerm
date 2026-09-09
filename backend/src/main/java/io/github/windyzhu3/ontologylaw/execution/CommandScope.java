@@ -19,6 +19,10 @@ public final class CommandScope {
     public Map<String,Object> fields(){return fields;}
     public UUID taskId(){return taskId;}
     public byte[] digest(){return CanonicalJson.digest(canonical);}
+    public static CommandScope identity(CommandEnvelope e,Map<String,Object> target){
+        if(!e.type().identity()||e.actor().onBehalfAppointmentId()!=null)throw new IllegalArgumentException("Not a direct Identity command");
+        return new CommandScope(e.actor().tenantId(),e.type(),Map.of("profile","R1_IDENTITY_COMMAND_SCOPE_V1","tenantId",e.actor().tenantId().toString(),"commandType",e.type().name(),"principalId",e.actor().principalId().toString(),"appointmentId",e.actor().appointmentId().toString(),"target",target));
+    }
     public static CommandScope capture(UUID tenant,String sourceAccountCode,String sourceRecordKeyDigest){
         if(sourceAccountCode==null || sourceAccountCode.isEmpty() || sourceAccountCode.length()>128)throw new IllegalArgumentException("Invalid source account code");
         new Subject("lead.lead",tenant,null,sourceRecordKeyDigest);

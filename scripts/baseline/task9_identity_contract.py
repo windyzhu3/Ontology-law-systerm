@@ -60,7 +60,7 @@ ADR = 'docs/adr/ADR-0015-task9-delegated-context.md'
 # Closed reviewed transport successor, including exact schemas, conditions,
 # DTO/response bindings and metadata; independent inventory checks below give
 # actionable diagnostics and count actual security declarations.
-OPENAPI_SHA256 = '2b7a1177d802886e0aaa6277b003c114ef6a0e2800795cce081304d8d71ba1e7'
+OPENAPI_SHA256 = '988d8676e0955956d32ef4a33ee65756acb0d6ab221ec023e1be3eeb4650b251'
 
 def canonical_hash(document):
     return hashlib.sha256(json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()

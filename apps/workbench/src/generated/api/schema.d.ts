@@ -270,7 +270,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** list Identity Provider Users */
+        /**
+         * list Identity Provider Users
+         * @description Exact complete username lookup in the fixed realm only. Returns zero or one enabled HUMAN account and nextCursor null; no fuzzy/name/email or wildcard/special lookup. Existing limit bounds remain; any supplied cursor is invalid because no subsequent page is issued.
+         */
         get: operations["listIdentityProviderUsers"];
         put?: never;
         post?: never;
@@ -2294,6 +2297,7 @@ export interface components {
         IdentityIfMatch: components["schemas"]["IdentityETag"];
         IdentityLimit: number;
         IdentityOptionKind: components["schemas"]["IdentityOptionKindV1"];
+        /** @description Complete exact username; never fuzzy, name, email, wildcard or special lookup syntax. */
         IdentitySearch: string;
         /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
         OnBehalfAppointmentSelection: components["schemas"]["Uuid"];
@@ -3134,6 +3138,7 @@ export interface operations {
             query: {
                 cursor?: components["parameters"]["IdentityCursor"];
                 limit?: components["parameters"]["IdentityLimit"];
+                /** @description Complete exact username; never fuzzy, name, email, wildcard or special lookup syntax. */
                 search: components["parameters"]["IdentitySearch"];
             };
             header?: {

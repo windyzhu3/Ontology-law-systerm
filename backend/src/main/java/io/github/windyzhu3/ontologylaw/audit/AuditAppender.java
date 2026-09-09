@@ -7,6 +7,19 @@ import java.util.*;
 
 /** Append-only owner port. Writes on the caller's active AUDIT capability connection. */
 public interface AuditAppender {
+    record IdentityEntry(UUID id,UUID commandId,String commandType,UUID correlationId,String outcome,AuthorizationSnapshot authorization,String summary) {
+        public IdentityEntry {
+            if(!io.github.windyzhu3.ontologylaw.identity.IdentityCommands.registered(commandType)||!authorization.allowed()||authorization.request().actor().onBehalfAppointmentId()!=null||summary.getBytes(java.nio.charset.StandardCharsets.UTF_8).length>8192)throw new IllegalArgumentException("Invalid Identity audit");
+        }
+        public byte[] digest(){return io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.digest(summary);}
+    }
+    default void append(Connection c,IdentityEntry entry)throws SQLException{throw new SQLException("Identity audit unsupported","0A000");}
+    record IdentityDisclosureEntry(UUID id,UUID correlationId,String operationId,AuthorizationSnapshot authorization,int resultCount,List<Subject> sources) {
+        public IdentityDisclosureEntry{sources=List.copyOf(sources);if(!authorization.allowed()||authorization.request().actor().onBehalfAppointmentId()!=null||resultCount<0||resultCount>50||sources.size()>50||new HashSet<>(sources).size()!=sources.size()||sources.stream().anyMatch(s->s.revision()==null||!Set.of("identity.principal","identity.organization_unit","identity.appointment","identity.authority_grant").contains(s.type())))throw new IllegalArgumentException("Invalid Identity disclosure");}
+        public String summary(){return io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.encode(Map.of("profile","R1_IDENTITY_DISCLOSURE_V1","version",1,"operationId",operationId,"responseMode","BODY","resultCount",resultCount,"disclosedSources",sources.stream().map(s->Map.of("type",s.type(),"id",s.id().toString(),"revision",s.revision())).toList()));}
+        public byte[] digest(){return io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.digest(summary());}
+    }
+    default void append(Connection c,IdentityDisclosureEntry entry)throws SQLException{throw new SQLException("Identity disclosure unsupported","0A000");}
     record BootstrapEntry(UUID id,UUID commandId,UUID correlationId,String manifestDigest,String operatorAssertion,
             io.github.windyzhu3.ontologylaw.identity.IdentityBootstrapService.Facts facts) {
         public BootstrapEntry{Objects.requireNonNull(id);Objects.requireNonNull(commandId);Objects.requireNonNull(correlationId);Objects.requireNonNull(facts);if(manifestDigest==null||!manifestDigest.matches("[0-9a-f]{64}")||operatorAssertion==null||operatorAssertion.isBlank())throw new IllegalArgumentException("Invalid bootstrap audit");}

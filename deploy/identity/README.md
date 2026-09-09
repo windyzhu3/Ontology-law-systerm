@@ -65,6 +65,12 @@ API/Worker 均使用 `MVP-2026-09-08.3`，物理 schema/release/manifest 校验�
 
 ## 独立离线 bootstrap 入口
 
+在线受控管理另外要求每个 `ols.api.human-trusts` 项提供 `directory-client-id` 和受控绝对 `directory-secret-path`。客户端及 secret 必须与 introspection 分离，仍只使用固定 realm 的只读 `query-users`、`view-users`，不创建账号或修改凭据。在线只接受完整用户名精确查询，返回零或一个有效 HUMAN，无后续 cursor；精确账号读取最多 2 条，独立 HUMAN 证明最多 50 条。证明已饱和且不包含目标时失败关闭为依赖不可用，不把不确定误报成空结果，也不继续遍历目录。
+
+`ols.api.identity-administration` 必须配置 `active-candidate-key-id`、`candidate-keys`（key ID → 规范 Base64 非零 32-byte key）、`etag-key`、`cursor-key`。这是部署秘密配置，不得从 HTTP 提供或输出到日志。三种在线目的与所有既有 Tenant/业务 cursor 密钥不同；在线 candidate key 也必须由运维与离线 bootstrap key 分离配置，应用不读取离线 key。在线 candidate 最长 5 分钟，绑定完整实际 Actor、固定 provider/issuer 和经过验证的账号。候选 AES-GCM 密文与分页 cursor 不暴露原始 subject；本地列表仍按 createdAt/UUID 有界翻页并绑定当前权限。
+
+这些 key 必须持久化，不能每次启动随机生成。轮换 candidate key 时保留原 key ID 的解密材料，以便识别已提交原命令；部署只改变 active key，不覆盖旧 ID 的材料。ETag/cursor 轮换使旧资源标签/分页失效，需受控安排重新读取；不能据此重建原 Slot/Receipt/Audit。在线权限、scope、原 Actor 或不可变创建绑定不满足时，即使知道 commandId 也不披露原回执。
+
 `io.github.windyzhu3.ontologylaw.api.IdentityBootstrapCommand` 是同一 Java 制品内的独立 main，不启动 Spring、HTTP 或 Worker。通过发布包的 runtime classpath 启动该 main；不将它注册成 API Bean，不开 bootstrap HTTP 路由。参数只接受模式和受控文件绝对路径：
 
 已打包 Jar 的入口（接下列参数；命令行不放凭据值）：

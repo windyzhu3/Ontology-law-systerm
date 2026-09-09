@@ -98,6 +98,7 @@ paths:
       ],
       "operationId": "listIdentityProviderUsers",
       "summary": "list Identity Provider Users",
+      "description": "Exact complete username lookup in the fixed realm only. Returns zero or one enabled HUMAN account and nextCursor null; no fuzzy/name/email or wildcard/special lookup. Existing limit bounds remain; any supplied cursor is invalid because no subsequent page is issued.",
       "security": [
         {
           "publicBearer": []
@@ -3317,6 +3318,7 @@ components:
       "name": "search",
       "in": "query",
       "required": true,
+      "description": "Complete exact username; never fuzzy, name, email, wildcard or special lookup syntax.",
       "schema": {
         "type": "string",
         "minLength": 1,

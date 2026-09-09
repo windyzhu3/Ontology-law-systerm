@@ -14,8 +14,28 @@ public final class ReceiptRecoveryMetadata {
     private final Subject lead,draft,submission,evidenceBinding;
     private final Long taskRevision;
     private final byte[] scopeDigest;
+    private Map<String,Object> identityScope;
+    private Subject identityTarget,identityAnchor;
 
     public ReceiptRecoveryMetadata(String commandType, Object recovery) {
+        if(io.github.windyzhu3.ontologylaw.identity.IdentityCommands.registered(commandType)) {
+            var root=object(recovery);fields(root,"profile","scope","target","authorizationAnchor");equal(root.get("profile"),"R1_IDENTITY_RECEIPT_RECOVERY_V1");
+            if(encode(root).getBytes(StandardCharsets.UTF_8).length>8192)throw invalid();
+            var scope=object(root.get("scope"));fields(scope,"profile","tenantId","commandType","principalId","appointmentId","target");equal(scope.get("profile"),"R1_IDENTITY_COMMAND_SCOPE_V1");equal(scope.get("commandType"),commandType);
+            tenant=uuid(scope.get("tenantId"));uuid(scope.get("principalId"));uuid(scope.get("appointmentId"));
+            var handler=io.github.windyzhu3.ontologylaw.identity.IdentityCommands.handler(commandType);var target=object(scope.get("target"));
+            if(handler.create())switch(handler.kind()) {
+                case PRINCIPAL->{fields(target,"kind","providerCode","subjectHmac");equal(target.get("kind"),"CREATE_PRINCIPAL");if(!string(target.get("providerCode")).matches("[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}"))throw invalid();hash(target.get("subjectHmac"));}
+                case ORGANIZATION->{fields(target,"kind","parentId","code");equal(target.get("kind"),"CREATE_ORGANIZATION");uuid(target.get("parentId"));if(!string(target.get("code")).matches("[A-Z][A-Z0-9_]{0,63}"))throw invalid();}
+                case APPOINTMENT->{fields(target,"kind","principalId","organizationId","roleCode","effectiveFrom","effectiveUntil");equal(target.get("kind"),"CREATE_APPOINTMENT");uuid(target.get("principalId"));uuid(target.get("organizationId"));if(!io.github.windyzhu3.ontologylaw.identity.IdentityCommands.ROLES.contains(target.get("roleCode")))throw invalid();term(target,"effective");}
+                case AUTHORITY_GRANT->{fields(target,"kind","appointmentId","authorityCode","scopeOrganizationId","validFrom","validUntil");equal(target.get("kind"),"CREATE_AUTHORITY_GRANT");uuid(target.get("appointmentId"));uuid(target.get("scopeOrganizationId"));if(!io.github.windyzhu3.ontologylaw.identity.IdentityCommands.GRANTABLE.contains(target.get("authorityCode")))throw invalid();term(target,"valid");}
+            } else {fields(target,"kind","id");equal(target.get("kind"),handler.kind().factType);uuid(target.get("id"));}
+            identityScope=scope;identityTarget=root.get("target")==null?null:selector(root.get("target"),handler.kind().factType,false);
+            if(identityTarget==null&&!handler.create())throw invalid();
+            if(!handler.create()&&!identityTarget.id().equals(uuid(target.get("id"))))throw invalid();
+            identityAnchor=selector(root.get("authorizationAnchor"),"identity.organization_unit",false);
+            this.commandType=commandType;scopeDigest=digest(encode(scope));task=null;account=null;sourceKey=null;action=null;lead=null;draft=null;submission=null;evidenceBinding=null;taskRevision=null;return;
+        }
         var root=object(recovery);fields(root,"profile","scope","binding");equal(root.get("profile"),"R1_COMMAND_RECEIPT_RECOVERY_V1");
         if(encode(root).getBytes(StandardCharsets.UTF_8).length>8192)throw invalid();
         var scope=object(root.get("scope"));var binding=object(root.get("binding"));
@@ -69,6 +89,11 @@ public final class ReceiptRecoveryMetadata {
     private static Long revision(Object value){if(!(value instanceof Byte||value instanceof Short||value instanceof Integer||value instanceof Long))throw invalid();long n=((Number)value).longValue();if(n<0||n>9007199254740991L)throw invalid();return n;}
     private static String hash(Object value){String text=string(value);try{byte[] bytes=Base64.getUrlDecoder().decode(text);if(bytes.length!=32||!Base64.getUrlEncoder().withoutPadding().encodeToString(bytes).equals(text))throw invalid();return text;}catch(IllegalArgumentException bad){throw invalid();}}
     public String commandType(){return commandType;}public UUID tenantId(){return tenant;}public UUID taskId(){return task;}
+    private static void term(Map<String,Object> fields,String prefix){var start=java.time.Instant.parse(string(fields.get(prefix+"From")));if(fields.get(prefix+"Until")!=null&&!java.time.Instant.parse(string(fields.get(prefix+"Until"))).isAfter(start))throw invalid();}
+    public boolean identity(){return identityScope!=null;}
+    public Map<String,Object> identityScope(){return identityScope;}
+    public Subject identityTarget(){return identityTarget;}
+    public Subject identityAnchor(){return identityAnchor;}
     public String sourceAccountCode(){return account;}public String sourceRecordKeyDigest(){return sourceKey;}public String actionCode(){return action;}
     public Subject lead(){return lead;}public Subject draft(){return draft;}public Long taskRevision(){return taskRevision;}
     public Subject submission(){return submission;}public Subject evidenceBinding(){return evidenceBinding;}public byte[] scopeDigest(){return scopeDigest.clone();}

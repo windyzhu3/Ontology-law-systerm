@@ -21,14 +21,15 @@ import org.springframework.core.env.Environment;
 final class R1ApiDeployment {
     record Settings(String semanticBaseline,Database database,String node,String cursorKey,List<Trust> trusts,List<Registration> registrations,
                     List<Certificate> certificates,Map<UUID,TenantKeys> tenantKeys,Map<String,R1SourcePolicyRegistry.SourcePolicy> sources,
-                    List<HumanTrust> humanTrusts,String identityTrustStorePath,String identityTrustStorePasswordPath) {
+                    List<HumanTrust> humanTrusts,String identityTrustStorePath,String identityTrustStorePasswordPath,IdentityAdministration identityAdministration) {
         public String toString(){return "R1ApiSettings[restricted]";}
     }
     record Database(String url,String username,String password,String schemaVersion,String releaseDigest,String manifestHash) {
         public String toString(){return "R1ApiDatabase[restricted]";}
     }
     record Trust(String issuer,String audience,String verificationKeyPath) {}
-    record HumanTrust(String issuer,String audience,String identityProviderCode,UUID tenantId,String introspectionClientId,String introspectionSecretPath) {}
+    record HumanTrust(String issuer,String audience,String identityProviderCode,UUID tenantId,String introspectionClientId,String introspectionSecretPath,String directoryClientId,String directorySecretPath) {}
+    record IdentityAdministration(String activeCandidateKeyId,Map<String,String> candidateKeys,String etagKey,String cursorKey){public String toString(){return "IdentityAdministrationSettings[restricted]";}}
     record Registration(String issuer,String audience,String identityProviderCode,UUID tenantId,UUID principalId,UUID appointmentId,
                         PrincipalKind principalKind,UUID onBehalfPrincipalId,UUID onBehalfAppointmentId,Set<String> sourceAccountCodes) {
         Actor actor(){return new Actor(tenantId,principalId,appointmentId,onBehalfPrincipalId,onBehalfAppointmentId,principalKind);}
@@ -43,7 +44,8 @@ final class R1ApiDeployment {
     final ActorContextResolver actors;
     final R1ApiServices services;
     final SessionContextController.Services session;final HumanCredentialVerifier humans;
-    private R1ApiDeployment(RuntimeDatabase database,ActorContextResolver actors,R1ApiServices services,SessionContextController.Services session,HumanCredentialVerifier humans){this.database=database;this.actors=actors;this.services=services;this.session=session;this.humans=humans;}
+    final IdentityAdminController.Services identities;
+    private R1ApiDeployment(RuntimeDatabase database,ActorContextResolver actors,R1ApiServices services,SessionContextController.Services session,HumanCredentialVerifier humans,IdentityAdminController.Services identities){this.database=database;this.actors=actors;this.services=services;this.session=session;this.humans=humans;this.identities=identities;}
     static R1ApiDeployment from(Environment environment) {
         try {
             var settings=Binder.get(environment).bind("ols.api",Settings.class).orElseThrow(()->new IllegalArgumentException());
@@ -85,7 +87,17 @@ final class R1ApiDeployment {
             var certificates=settings.certificates().stream().map(c->new ActorContextResolver.CertificateRegistration(c.sha256(),c.identityProviderCode(),c.actor())).toList();
             var actors=new ActorContextResolver(database::open,new ExternalSubjectProtection(subjects::get),humans,trusts,registrations,certificates);
             byte[] cursor=key(settings.cursorKey());if(!distinctKeys.add(Base64.getEncoder().encodeToString(cursor)))throw new IllegalArgumentException();
-            return new R1ApiDeployment(database,actors,new R1ApiServices(database,sources,protection,bindings,settings.node(),cursor),new SessionContextController.Services(database::open,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(settings.node()),new ActorScopeProtection(scopes::get)),humans);
+            var admin=Objects.requireNonNull(settings.identityAdministration());var retained=new HashMap<String,byte[]>();
+            for(var entry:Objects.requireNonNull(admin.candidateKeys()).entrySet()){byte[] material=key(entry.getValue());if(!distinctKeys.add(Base64.getEncoder().encodeToString(material)))throw new IllegalArgumentException();retained.put(entry.getKey(),material);}
+            byte[] tagKey=key(admin.etagKey()),adminCursorKey=key(admin.cursorKey());for(byte[] material:List.of(tagKey,adminCursorKey))if(!distinctKeys.add(Base64.getEncoder().encodeToString(material)))throw new IllegalArgumentException();
+            var adminResources=new IdentityResourceProtection(tagKey,adminCursorKey);var adminCandidates=new IdentityCandidateProtection(admin.activeCandidateKeyId(),retained);var adminServices=new HashMap<UUID,IdentityAdminController.Services>();
+            for(var trust:settings.humanTrusts()){
+                if(trust.directoryClientId()==null||trust.directoryClientId().equals(trust.introspectionClientId()))throw new IllegalArgumentException();
+                String directorySecret=IdentityDeploymentFiles.secret(trust.directorySecretPath());if(directorySecret.equals(IdentityDeploymentFiles.secret(trust.introspectionSecretPath())))throw new IllegalArgumentException();
+                var directory=new io.github.windyzhu3.ontologylaw.api.security.KeycloakDirectoryReader(new io.github.windyzhu3.ontologylaw.api.security.KeycloakDirectoryReader.Trust(trust.issuer(),trust.directoryClientId(),directorySecret),IdentityDeploymentFiles.tls(settings.identityTrustStorePath(),settings.identityTrustStorePasswordPath()));
+                if(adminServices.put(trust.tenantId(),new IdentityAdminController.Services(database::open,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(settings.node()),adminResources,adminCandidates,new ExternalSubjectProtection(subjects::get),trust.identityProviderCode(),directory))!=null)throw new IllegalArgumentException();
+            }
+            return new R1ApiDeployment(database,actors,new R1ApiServices(database,sources,protection,bindings,settings.node(),cursor),new SessionContextController.Services(database::open,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(settings.node()),new ActorScopeProtection(scopes::get)),humans,new IdentityAdminController.Services(adminServices));
         }catch(Exception invalid){throw new IllegalStateException("R1_API_CONFIGURATION_UNAVAILABLE");}
     }
     private static RSAPublicKey publicKey(String file)throws Exception {
