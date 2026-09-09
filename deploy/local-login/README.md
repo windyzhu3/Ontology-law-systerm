@@ -332,3 +332,57 @@ Inspect the exact registry/creation times and confirm no unregistered owned
 process survives, then explicitly clear only the reviewed marker. Automatic
 marker deletion, name-based process termination, grant rollback and identity
 replacement are not performed.
+
+## Approved fixed automatic source configuration release (9.6d)
+
+After review and a clean committed operator tool revision, the one named command
+stages the approved local source on the exact current immutable business package:
+
+```powershell
+$operatorCommit = git rev-parse HEAD
+& D:/soft/python3/python.exe deploy/local-login/local_login.py stage-local-auto-source $operatorCommit
+```
+
+It accepts only that exact operator commit, prints the new staged package ID,
+and leaves activation to the existing `stop-apps`, `activate-release <id>`, and
+`start-apps` commands. All registered API, SPA and Worker consumers must stop
+before activation or recovery. After starting, verify the API and Worker use the
+new manifest and run `worker-health` plus the existing original bootstrap and
+login checks. Pending launch markers still require the explicit M1 ownership
+reconciliation described above.
+
+The closed `LOCAL_SYNTHETIC_SOURCE_RELEASE_V1` profile appends exactly:
+
+```properties
+ols.api.sources[LOCAL_SYNTHETIC_AUTO].assignment-mode=AUTOMATIC
+ols.api.sources[LOCAL_SYNTHETIC_AUTO].routing-organization-root-codes[0]=ROOT
+ols.api.sources[LOCAL_SYNTHETIC_AUTO].routing-supervisor-root-code=ROOT
+ols.api.sources[LOCAL_SYNTHETIC_AUTO].source-intake-root-code=ROOT
+ols.api.sources[LOCAL_SYNTHETIC_AUTO].business-timezone=Asia/Shanghai
+```
+
+Original MANUAL source properties and every other property byte are retained,
+except the existing API gate manifest field. SERVICE remains bound only to
+`LOCAL_SYNTHETIC`; this command adds no SERVICE binding or authorization.
+Duplicate, unknown, ambiguous or conflicting configuration and dirty operator
+inputs fail closed. No Jar/SPA/host builds or live target/dist reads occur.
+The manifest records exact parent ID, descriptor and manifest hashes, original
+configuration digest, fixed delta, separate operator commit and inherited
+business binary provenance. Jar, SPA and host hashes remain identical to the
+parent, and the release digest is retained. The new operator commit is not
+evidence of a new application build. Original protected secrets and all prior
+packages remain in place; manifests/configuration must not be printed publicly.
+
+When the source has no facts, `rollback-release` uses the existing Owner CAS
+to return to the saved parent; the fixed delta can then be staged and activated
+again. Any switch or interrupted recovery that could remove the AUTO policy
+checks the saved sides and live configuration after all consumers stop. A
+read-only query through the existing migration Owner, bound to the original
+operator Tenant, checks for **any** `lead.lead` row with
+`source_account_code='LOCAL_SYNTHETIC_AUTO'`. Existing facts block removal before
+journal/pointer writes or CAS, regardless of Task state. Malformed AUTO config,
+tenant mismatch, unknown query result or Owner failure also blocks it. Forward
+business package upgrades preserving the fixed AUTO policy need no such query.
+No Lead/Task facts are created or deleted by this workflow. Lost CAS responses
+retain the original explicit journal recovery requirements; staging is not
+activation, and this unit does not establish seven-card or human UAT acceptance.

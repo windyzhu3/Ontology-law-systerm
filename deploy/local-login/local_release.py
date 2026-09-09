@@ -329,6 +329,8 @@ class LocalRelease:
             raise RuntimeError('rollback requires unchanged schema and original material')
         self.boundary.stopped()
         desired = self.next_state(current, target)
+        from local_source_release import guard_source_removal
+        guard_source_removal(self, [current], desired)
         journal = {'phase': 'CAS_PENDING', 'old': current, 'new': desired, 'schema': old['schema']}
         if self.journal.exists():
             atomic(self.runtime / ('release-journal-' + uuid.uuid4().hex + '.json'), self.journal.read_bytes())
@@ -382,6 +384,11 @@ class LocalRelease:
         if observed['schema'] != journal['schema']:
             raise RuntimeError('schema changed; byte recovery forbidden')
         self.boundary.stopped()
+        from local_source_release import guard_source_removal
+        # Decide and guard every possible installation before changing even the
+        # journal. Include both saved sides when a CAS response was lost.
+        target = journal.get('recovery', old) if direction == 'rollback' else new
+        guard_source_removal(self, [old, new], target)
         if 'recovery' in journal:
             if direction != 'rollback':
                 raise RuntimeError('rollback recovery already selected')
@@ -521,6 +528,37 @@ class RuntimeBoundary:
         if result.returncode:
             raise RuntimeError('baseline host unavailable')
         return result.stdout
+
+    def operator_provenance(self, commit):
+        inputs = ('deploy/local-login/local_source_release.py', 'deploy/local-login/local_release.py',
+                  'deploy/local-login/local_login.py', 'deploy/local-login/local_worker.py')
+        for name in inputs:
+            path = self.runner.ROOT / name
+            regular(path)
+            if any(parent.is_symlink() or getattr(parent, 'is_junction', lambda: False)()
+                   for parent in path.parents if parent != self.runner.ROOT.parent):
+                raise RuntimeError('linked operator input rejected')
+        run = lambda args: subprocess.run(['git', *args], cwd=self.runner.ROOT, capture_output=True)
+        head = run(['rev-parse', 'HEAD'])
+        dirty = run(['diff', '--name-only', 'HEAD', '--', *inputs])
+        untracked = run(['ls-files', '--others', '--', *inputs])
+        if (not re.fullmatch(r'[0-9a-f]{40}', commit) or head.returncode or dirty.returncode or untracked.returncode
+                or head.stdout.decode().strip() != commit or dirty.stdout.strip() or untracked.stdout.strip()):
+            raise RuntimeError('operator commit is not clean at source release tool inputs')
+
+    def source_facts(self, tenant):
+        self.protect()
+        original = read_json(regular(self.runner.RUNTIME / 'operator.json'))
+        if (not isinstance(tenant, str) or str(uuid.UUID(tenant)) != tenant
+                or original.get('tenantId') != tenant):
+            raise RuntimeError('source removal requires exact original Tenant')
+        statement = ("BEGIN READ ONLY; SET LOCAL statement_timeout='30s'; DO $owner$ BEGIN " + OWNER_SQL +
+                     " END $owner$; SELECT EXISTS (SELECT 1 FROM lead.lead WHERE tenant_id=" + literal(tenant) +
+                     "::uuid AND source_account_code='LOCAL_SYNTHETIC_AUTO'); COMMIT;")
+        result = self.sql(statement)
+        if result not in ('t', 'f'):
+            raise RuntimeError('source fact query outcome unavailable')
+        return result == 't'
 
     def sql(self, statement):
         self.protect()

@@ -561,6 +561,11 @@ def release_operation(operation, arguments):
             print('candidate descriptor saved for operator review; no activation')
         elif operation == 'stage-release':
             print('staged release: ' + release.stage(local_release.read_json(RUNTIME / 'candidate-release.json')))
+        elif operation == 'stage-local-auto-source':
+            if len(arguments) != 1:
+                raise RuntimeError('fixed source staging requires only exact operator commit')
+            from local_source_release import stage_local_auto_source
+            print('staged release: ' + stage_local_auto_source(release, arguments[0]))
         elif operation == 'activate-release':
             release.activate(arguments[0])
             print('release bytes and gate activated; apps remain stopped, readiness unverified')
@@ -605,7 +610,7 @@ if __name__ == '__main__':
         require_protected_runtime()
         if sys.argv[1] not in ('prepare', 'stop', 'stop-apps', 'release-status', 'worker-grant', 'worker-prepare', 'worker-start', 'worker-health'):
             secret_bundle(RUNTIME)
-        if sys.argv[1] in ('snapshot-release', 'capture-build-inputs', 'describe-candidate', 'stage-release', 'activate-release',
+        if sys.argv[1] in ('snapshot-release', 'capture-build-inputs', 'describe-candidate', 'stage-release', 'stage-local-auto-source', 'activate-release',
                           'rollback-release', 'release-status', 'recover-release', 'bootstrap-verify-current-release'):
             release_operation(sys.argv[1], sys.argv[2:])
             sys.exit(0)
