@@ -284,6 +284,70 @@ expect(capturedRequests).toHaveLength(sentBefore);
 - [x] **Step 4 — 完整回执／错误／读取回归。** 14路径分别验证成功／NO_CHANGE适用项、错误Fact类型／commandId、未知结果、404回执、损坏正文、取消、401/403、并发迟到响应、re-auth token轮转。只按已有完整终态或明确未提交错误规则清标记；GET失败、技术失败、HTTP状态本身不证明未提交，不生成新key；完整刷新仅按标记查原回执，不能凭新表单重建旧写。管理读取拒绝畸形／越界／SERVICE投影／非法enum等正文，不能把失败伪造成空列表；Identity读取没有304成功分支。错误文案为本地安全静态说明，不直接展示原始错误、标识或凭据。生命周期／自锁／最后管理员／依赖／stale等按冻结安全code和retryPolicy保留可供后续表单处理的语义，不改变其重试规则。
 - [x] **Step 5 — 复验与独立评审。** 聚焦测试后在稳定源码运行完整前端tests/typecheck/build和openapi:check；记录锁定Node24.20.0/npm11.9.0、实际用例与退出码，Root运行基线／拓扑。构建显式使用此计划忽略目录中的隔离输出：`npm run build --workspace apps/workbench -- --outDir ../../.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task95a-dist`；不覆盖本地登录服务正在使用的`apps/workbench/dist`，不使用`--emptyOutDir`清除其他目录。独立评审包含六读取＋十四写入逐路径与共享门回归；只提交本地本单元文件，不推送、不改在线制品／配置／数据。未实际完成页面前不得关闭9.5或声称管理页面前后端已经打通。
 
+## Task 9.5b: 四张管理页面读取与受保护入口
+
+**Scope:** 本单元交付四张真实API列表／详情与分页、读取状态及同SPA管理准入。14写入的表单／二次确认在9.5后续单元接入，不缩减整体9.5验收。用户现已确认新增／改名沿用右侧详情区编辑、危险操作沿用同风格二次确认框并显示影响及原因选项；不重新设计四张主页面。保留当前读取单元的独立评审边界，不能把只读阶段说成完整管理功能。主操作位置保留但未接线动作禁用并明确说明“当前仅开放查询，写入功能尚未接入”，不伪造成功或继续显示待用户确认。
+
+**Files:** Create `features/identity/IdentityAdminLayout.tsx`, `PrincipalPage.tsx`, `OrganizationPage.tsx`, `AppointmentPage.tsx`, `AuthorityGrantPage.tsx`, `IdentityAdminApplication.tsx`, `identityRoutes.ts`, `identityLabels.ts`, `useIdentityList.ts`, `styles/identity-admin.css` 及对应测试（均在apps/workbench/src下）；必要的共用列表状态／分页小组件可置于同目录，禁止通用管理框架。Modify `features/session/SessionApplication.tsx`及测试，仅为管理静态route和同会话准入；不改会话控制器／已有业务卡行为。
+
+**Interfaces:** 消费9.5a `IdentityApi`的四个具名列表与现有 `useActorSession()`。生产 `createIdentityApi(controller.recovery, undefined, location.origin)`，共用同一恢复对象。新增静态route只有 `/admin/identity/principals`, `/admin/identity/organizations`, `/admin/identity/appointments`, `/admin/identity/authority-grants`；不开放任意通配路径或URL身份选择。
+
+- [ ] **Step 1 — 准入RED/GREEN。** 测试实际SessionApplication：管理地址在本人任职明确确认之前不派发管理GET；READY且canEnterIdentityAdmin=true、DIRECT且非空准确Actor才可进，不依赖canEnterWorkbench；代办不可自动删header回退本人，无资格不披露列表。普通workbench不出现管理侧栏。注销／epoch变化清旧列表和选择；初次未决恢复使用同RecoveryPage，不绕过原标记处理。
+- [ ] **Step 2 — 四列表RED/GREEN。** 表驱动四静态路由，真实组件+createIdentityApi+受控fetch捕获Request；验证HTTP pathname、limit=20、cursor、准确Bearer和本人header，不能只mock组件返回固定数组。断言真实响应的中文名称／状态／详情，禁止显示UUID/ETag及旧稿已删除字段。例：
+```ts
+expect(captured[0].url).toContain('/api/v1/admin/identity/principals?limit=20');
+expect(await screen.findByRole('button', {name: '陈晓'})).toBeVisible();
+expect(screen.queryByText('创建时间')).not.toBeInTheDocument();
+```
+实现各具名页面，生成DTO类型不降为any，映射固定角色／权限中文标签；角色／权限只读披露不等于在线可建／可授予。
+- [ ] **Step 3 — 有界分页／组织RED/GREEN。** 下一页仅服务端nextCursor，上一页仅本次已访问游标；不自动拉完整目录、不总页数、不隐藏过滤当前页充当搜索。页变更清旧selection，刷新仅保留仍出现在新响应的准确id。未知计数不假0。组织仅当前获权已加载关系，未加载父节点显示“上级组织未加载”，不称根；无孩子不称不存在。防cycle／缺父异常投影导致无限递归或遗漏显示，禁止二次目录扩权。
+- [ ] **Step 4 — 读取状态RED/GREEN。** 有界加载／空列表／失败区别，安全静态错误及重读；401/403及身份改变立即清敏感结果；GET失败不能假空，不把原始网络错误或DTO内部id放文案。取消与迟到响应不得覆盖新页/新身份，同身份token更新不重置当前页或选择。详情主操作/生命周期未接线时明确禁用，不用按钮点击伪造写成功。
+- [ ] **Step 5 — 同源接线与回归。** 现有固定回跳不变；管理地址只作内存中的页面意图，不增加sessionStorage/localStorage/OIDC字段。完整IdP跳转后不承诺自动回到原管理子页，可按原静态地址重新进入；无任职或无资格不猜选。清楚提示已具备管理资格时可使用管理地址，不把它说成尚未开放。生产入口不加入夹具／mock／测试身份回退。
+- [ ] **Step 6 — 验证与评审。** 固定Node24.20.0/npm11.9.0，定向RED/GREEN后完整前端一次、typecheck、隔离build、openapi:check；Root实际baseline/topology。构建outDir为 `../../.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task95b-dist`，绝不覆盖当前apps/workbench/dist，不使用--emptyOutDir。实际浏览器360/768/1440及原1487视口核对读取页面与冻结布局，视觉夹具仅用于UI测试不能冒充真实登录／后端E2E。独立spec+quality评审。无部署／数据变更／推送；四页面写入、工作台完整状态和9.6仍需后续证据。
+
+
+## Task 9.5c: 详情区表单与十四条管理写入
+
+**Scope:** 用户已明确批准新增／改名使用原右侧详情区、保留左侧列表，危险操作同风格二次确认并显示影响与原因；恢复继续遵守既定确认和原因要求。依赖9.5b独立评审通过，实施全部十四条既定管理写入，不重新出四张主页面、不新增接口／生命周期／权限。此单元是管理页面功能接线，不能替代9.6真实IdP与数据库整链或人工UAT。
+
+**Files:** Create `apps/workbench/src/features/identity/useIdentityCommand.ts`, `IdentityCreateForm.tsx`, `IdentityRenameForm.tsx`, `IdentityActionConfirmation.tsx`, `useIdentityOptions.ts`及相应测试；Modify同目录四个既有Page、`IdentityAdminApplication.tsx`、必要的`useIdentityList.ts`刷新接口及`styles/identity-admin.css`。每个文件仅承担具名职责，可拆出同目录强类型字段组件而不建立通用表单／命令平台。仅在直接集成所需时调整`SessionApplication.tsx`与测试；不改会话控制器、合同／生成文件、后端、依赖或运行配置。Root拥有计划／验收／QA证据。
+
+**Interfaces:** 消费9.5b实际导出的页面／路由／刷新接口、`IdentityApi`、`IdentityOriginalWrite`、`WorkbenchSession`和同一个`controller.recovery`。`useIdentityCommand(session, api)`只保存本次页面内的编辑与原请求，不新建Storage或第二个恢复协议。对不确定原请求的发送必须再次传同一个`IdentityOriginalWrite`对象；创建只含commandType/key/body，更新额外准确targetId/ifMatch。工厂现有`write`返回具名终态，`receipt`使用原回执端点；`TransportError`的`provenOutcome`和冻结`retryPolicy`决定后续动作，不能靠HTTP状态或错误文案猜未提交。
+
+- [ ] **Step 1 — 十四路径DOM RED。** 通过真实页面控件、真实`createIdentityApi`与受控fetch捕获Request；四创建、两改名、八生命周期分别验证准确path/method/body、UUID key、更新If-Match、当前本人header/Bearer。测试取消二次确认不POST、快速重复点击只发送一次、提交前确认目标中文名和影响、列表换选中后不能把旧ETag用于新目标。至少一项先保存明确断言失败输出，再实现；不能只测试请求构造函数来替代按钮接线。
+
+```ts
+await user.click(screen.getByRole('button', { name: '暂停用户' }));
+expect(writes).toHaveLength(0);
+await user.selectOptions(screen.getByLabelText('操作原因'), 'ADMINISTRATIVE_ACTION');
+await user.click(screen.getByRole('button', { name: '确认暂停' }));
+expect(writes).toHaveLength(1);
+expect(await writes[0].clone().json()).toEqual({ reasonCode: 'ADMINISTRATIVE_ACTION' });
+expect(writes[0].headers.get('If-Match')).toBe(selectedRow.etag);
+```
+
+测试操作使用仓库已装Testing Library的`fireEvent`或现有user工具，不为上述示意增加依赖。
+
+- [ ] **Step 2 — 受控候选RED/GREEN。** 新增用户先输入完整用户名并显式精确查询`listIdentityProviderUsers`，仅0/1候选，无cursor／模糊搜索；选准确providerUserSelector且不显示原selector/subject，输入本地显示名。查询变更立即清旧候选；无结果、加载失败、过期候选不能假成功或手填subject。组织创建通过`getIdentityAdminOptions({page:'ORGANIZATIONS',optionKind:'ORGANIZATION',limit:20})`选择准确父项。任职分别用APPOINTMENTS/PRINCIPAL和APPOINTMENTS/ORGANIZATION；授权分别用AUTHORITY_GRANTS/APPOINTMENT和AUTHORITY_GRANTS/ORGANIZATION。各候选独立有界游标、只展示获权标签、不自动遍历全目录；重名仍按准确id选择。option/page或Actor切换清旧结果，旧请求迟到不能替换新候选。代码只能来自正确页面的服务端roleCodes/grantableAuthorityCodes，并与冻结三角色／八业务码相交；IDENTITY_ADMIN和四管理码仅列表披露，不能提交。
+
+- [ ] **Step 3 — 详情编辑RED/GREEN。** 用户创建只发送providerUserSelector/displayName；组织只发送parentOrganizationId/code/displayName；任职只发送principalId/organizationId/roleCode/effectiveFrom/effectiveUntil；授权只发送appointmentId/authorityCode/scopeOrganizationId/validFrom/validUntil。结束时间可空且序列化为null；日期输入明确显示本机时区并转换为UTC instant，结束必须晚于开始；服务端仍验证任职包含授权窗口及范围，不从不含任期的选项DTO臆造前置证明。名称trim后1～200安全文本，组织code满足`[A-Z][A-Z0-9_]{0,63}`，不得改已建code/parent/role/任期。改名只发送displayName。字段错误关联输入，取消返回原详情无写入；dirty离开／换页／换目标须明确舍弃确认。新增入口进入编辑后只保留一个视觉主提交按钮，原创建按钮不能与提交竞争。
+
+- [ ] **Step 4 — 生命周期RED/GREEN。** ACTIVE主体可暂停／禁用，SUSPENDED可恢复／禁用，DISABLED无恢复；ACTIVE组织可关闭，CLOSED无恢复；ACTIVE任职可暂停／结束，SUSPENDED可恢复／结束，ENDED无恢复；未撤销授权仅可撤销。原因选项只`ADMINISTRATIVE_ACTION`（行政调整）与`SECURITY_RESPONSE`（安全处置），需主动选择，不新增自由文本reason。确认说明暂停影响所有相关任职资格、禁用／关闭／结束／撤销不可恢复，以及依赖检查由服务端裁定，不承诺自动转派或结束责任。最后管理员、自锁、未结束任职、有效子组织／任职及OPEN/WAITING责任等拒绝用具名安全说明；不绕过或在线修复。对话框可键盘进入、Tab不逃逸、Escape取消未提交确认，关闭后焦点返回原触发按钮；提交中不可通过取消制造已撤销假象。
+
+- [ ] **Step 5 — 原请求与键策略RED/GREEN。** 提交中双击／切页不能再派发新写；网络／技术失败保留原对象、key、body、If-Match与共享标记，显示“结果尚未确认”，提供原请求重试和原回执查询。回执查询复用已有有界规则（最多3次自动且可见性门控；可仅提供显式手动查询，不引入新的自动轮询器）；404或查询失败不证明未提交。SAME_KEY_AFTER_FIX仅在完整明确未提交响应后允许修正并保持key；NEW_KEY_AFTER_REFRESH必须重新读取／核对后新key；NEW_KEY_AFTER_ADMIN_FIX先解释需管理员处理再重新核对，不能自动补事实；NO不显示重试写入；SAME_KEY_AFTER_REAUTH和SAME_KEY_AFTER_BACKOFF不改原key。页面未保存任何payload到Storage，刷新／离开丢失原对象后只能共享RecoveryPage按标记查询，不能重建原请求或自动新key。
+
+```ts
+const before = writes[0];
+await user.click(screen.getByRole('button', { name: '重试原请求' }));
+expect(writes[1].headers.get('Idempotency-Key')).toBe(before.headers.get('Idempotency-Key'));
+expect(await writes[1].clone().text()).toBe(await before.clone().text());
+expect(api.recovery.read()?.commandId).toBe(before.headers.get('Idempotency-Key'));
+```
+
+- [ ] **Step 6 — 结果与会话RED/GREEN。** 完整已确认成功／NO_CHANGE与REJECTED分开；只有两改名允许NO_CHANGE。成功后刷新失败显示“结果已记录，列表刷新失败”，只能重读不得重复写。重新读取服务端记录，不本地乐观伪造revision／授权；翻页刷新不保证新建记录在当前页出现。401/403或epoch变化清敏感表单／候选／列表，取消迟到反馈但不清其他Actor标记；同Actor token rotation保留dirty、原请求、分页和选择，重试携带新Bearer。跨管理／业务写共享未决门，恢复页不得绕过原查询与授权。测试保存失败、标记损坏、重登无正文、stale后ETag与key更新、终态刷新失败只GET。
+
+- [ ] **Step 7 — 验证与本地提交。** 稳定源码一次完整前端测试及typecheck/openapi:check，构建隔离outDir `../../.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task95c-dist`，不覆盖线上dist、不使用--emptyOutDir。保存RED/GREEN实际命令／退出码，独立spec+quality评审覆盖十四按钮与共享恢复；Root实际baseline/topology，浏览器360/768/1440及1487冻结稿对照，检查编辑／确认焦点、错误、取消、提交反馈与响应式。受控fetch夹具仅UI集成证据，不冒充实际IdP／API整链；不推送、不部署或变更真实账号／授权。9.5工作台状态及9.6全链仍按对应门验收。
+
 ## Task 9.6a: 原 bootstrap 集合核验修正（9.5 前置窄修复）
 
 **批准范围（2026-09-09）：** 用户确认只核验原始事实和原凭据闭包，不冻结整个租户；严格遵循设计 §5.3 和 Identity 合同 Offline bootstrap 的同日澄清。本单元是本地登录检查发现问题的后续修正，不表示整个9.6完成，也不扩展9.5。
