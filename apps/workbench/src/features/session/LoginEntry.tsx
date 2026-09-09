@@ -4,6 +4,7 @@ import {
   SessionProvider,
   useSessionController,
   useSessionState,
+  useSessionSetupReady,
 } from "./SessionProvider";
 
 // The caller owns routing and supplies an already validated, fixed OIDC configuration.
@@ -23,15 +24,17 @@ export function LoginEntry({
 function SessionLoginAction() {
   const controller = useSessionController();
   const { status } = useSessionState();
+  const setupReady = useSessionSetupReady();
   const canLogin =
-    status === "SIGNED_OUT" ||
-    status === "UNAVAILABLE" ||
-    status === "EXPIRED" ||
-    status === "DENIED";
+    setupReady &&
+    (status === "SIGNED_OUT" ||
+      status === "UNAVAILABLE" ||
+      status === "EXPIRED" ||
+      status === "DENIED");
   return (
     <LoginPage
       onLogin={canLogin ? () => controller.login() : undefined}
-      pending={status === "INITIALIZING"}
+      pending={!setupReady || status === "INITIALIZING"}
       message={
         status === "UNAVAILABLE"
           ? "登录服务暂不可用，请稍后重试。"

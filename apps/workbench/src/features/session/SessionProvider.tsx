@@ -3,12 +3,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
 import type { WorkbenchSession } from "../../lib/api";
 import type { SessionController } from "./sessionController";
 const SessionContext = createContext<SessionController | null>(null);
+const SessionSetupContext = createContext(false);
 export function SessionProvider({
   children,
   controller,
@@ -16,17 +18,25 @@ export function SessionProvider({
   controller: SessionController;
   children: ReactNode;
 }) {
+  const [setupController, setSetupController] =
+    useState<SessionController | null>(null);
   useEffect(() => {
     const detach = controller.attachBrowser();
     if (controller.getSnapshot().status === "SIGNED_OUT")
       void controller.initialize();
+    setSetupController(controller);
     return detach;
   }, [controller]);
   return (
     <SessionContext.Provider value={controller}>
-      {children}
+      <SessionSetupContext.Provider value={setupController === controller}>
+        {children}
+      </SessionSetupContext.Provider>
     </SessionContext.Provider>
   );
+}
+export function useSessionSetupReady() {
+  return useContext(SessionSetupContext);
 }
 export function useSessionController() {
   const controller = useContext(SessionContext);

@@ -6,6 +6,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { expect, it } from "vitest";
+import { useLayoutEffect } from "react";
 import { LoginEntry } from "./LoginEntry";
 import { SessionController, type OidcAdapter } from "./sessionController";
 import { RecoveryStore } from "./recoveryMarker";
@@ -29,6 +30,94 @@ function setup(login: () => Promise<void>, initialize = async () => false) {
     },
   );
 }
+
+it("refuses activation in the first commit before provider passive setup", async () => {
+  let loginCalls = 0;
+  let initializeCalls = 0;
+  let disabledAtFirstCommit: boolean | undefined;
+  let complete!: (ready: boolean) => void;
+  const controller = setup(
+    async () => {
+      loginCalls++;
+    },
+    () => {
+      initializeCalls++;
+      return new Promise<boolean>((resolve) => {
+        complete = resolve;
+      });
+    },
+  );
+  function ObserveFirstCommit() {
+    useLayoutEffect(() => {
+      const button = screen.getByRole<HTMLButtonElement>("button", {
+        name: "登录工作台",
+      });
+      disabledAtFirstCommit = button.disabled;
+      button.click();
+    }, []);
+    return <LoginEntry controller={controller} />;
+  }
+  render(<ObserveFirstCommit />);
+  expect({ disabledAtFirstCommit, loginCalls, initializeCalls }).toEqual({
+    disabledAtFirstCommit: true,
+    loginCalls: 0,
+    initializeCalls: 1,
+  });
+  expect(screen.getByRole("button", { name: "登录工作台" })).toBeDisabled();
+  await act(async () => complete(false));
+  expect(screen.getByRole("button", { name: "登录工作台" })).toBeEnabled();
+  fireEvent.click(screen.getByRole("button", { name: "登录工作台" }));
+  expect(loginCalls).toBe(1);
+});
+
+it("does not inherit setup admission when the caller replaces the controller", async () => {
+  const first = setup(async () => {});
+  let loginCalls = 0;
+  let initializeCalls = 0;
+  let complete!: (ready: boolean) => void;
+  const replacement = setup(
+    async () => {
+      loginCalls++;
+    },
+    () => {
+      initializeCalls++;
+      return new Promise<boolean>((resolve) => {
+        complete = resolve;
+      });
+    },
+  );
+  let disabledOnReplacement: boolean | undefined;
+  function ObserveReplacement({
+    controller,
+  }: {
+    controller: SessionController;
+  }) {
+    useLayoutEffect(() => {
+      if (controller !== replacement) return;
+      const button = screen.getByRole<HTMLButtonElement>("button", {
+        name: "登录工作台",
+      });
+      disabledOnReplacement = button.disabled;
+      button.click();
+    }, [controller]);
+    return <LoginEntry controller={controller} />;
+  }
+  const view = render(<ObserveReplacement controller={first} />);
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "登录工作台" })).toBeEnabled(),
+  );
+  view.rerender(<ObserveReplacement controller={replacement} />);
+  expect({ disabledOnReplacement, loginCalls, initializeCalls }).toEqual({
+    disabledOnReplacement: true,
+    loginCalls: 0,
+    initializeCalls: 1,
+  });
+  await act(async () => complete(false));
+  const button = screen.getByRole("button", { name: "登录工作台" });
+  expect(button).toBeEnabled();
+  fireEvent.click(button);
+  expect(loginCalls).toBe(1);
+});
 
 it("routes an explicit activation through the real provider/controller and permits retry after safe failure", async () => {
   let calls = 0;
