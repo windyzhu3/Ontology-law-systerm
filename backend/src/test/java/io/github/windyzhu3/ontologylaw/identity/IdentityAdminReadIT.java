@@ -10,6 +10,78 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class IdentityAdminReadIT extends IdentityAdminFixture {
+    @Test void sibling_scope_grant_read_tag_next_write_and_stale_replay_use_the_same_combined_access()throws Exception {
+        UUID local=organization(),scope=organization(),app=appointment(principal(),local);
+        mutate("update identity.authority_grant set state='REVOKED',revoked_at=clock_timestamp(),revocation_reason_code='FIXTURE',revision=revision+1 where tenant_id=? and grantee_appointment_id=? and authority_code='IDENTITY_AUTHORITY_MANAGE' and state='ACTIVE'",seed.tenant(),seed.appointment());
+        addGrant("IDENTITY_AUTHORITY_MANAGE",local);addGrant("IDENTITY_AUTHORITY_MANAGE",scope);
+        // The caller covers both sibling nodes. No rule requires granted scope to contain the grantee.
+        UUID grant=grant(app,scope),key=UUID.randomUUID();String old=listedGrantTag(grant);
+        assertEquals(tag("REVOKE_AUTHORITY_GRANT",grant),old);
+        success(execute("RENAME_ORGANIZATION_UNIT",scope,tag("RENAME_ORGANIZATION_UNIT",scope),Map.of("displayName","Scope revision changed")));
+        String current=listedGrantTag(grant);assertNotEquals(old,current);assertEquals(tag("REVOKE_AUTHORITY_GRANT",grant),current);
+        var reason=Map.<String,Object>of("reasonCode","ADMINISTRATIVE_ACTION");
+        var stale=execute(key,"REVOKE_AUTHORITY_GRANT",grant,old,reason);rejected("STALE_IDENTITY",stale);assertEquals(current,stale.currentETag());
+        var before=counts();String original=storedReceipt(key);var replay=execute(key,"REVOKE_AUTHORITY_GRANT",grant,old,reason);
+        assertTrue(replay.replay());assertEquals(current,replay.currentETag());assertEquals(before,counts());assertEquals(original,storedReceipt(key));
+        var revoked=execute("REVOKE_AUTHORITY_GRANT",grant,current,reason);success(revoked);assertEquals(listedGrantTag(grant),revoked.etag());
+    }
+    String listedGrantTag(UUID grant)throws Exception {
+        return (String)items(read("listAuthorityGrants",null,null,50,null)).stream().filter(i->grant.toString().equals(i.get("id"))).findFirst().orElseThrow().get("etag");
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"PRINCIPAL","APPOINTMENT_ORGANIZATION","GRANT_SCOPE","GRANTEE_APPOINTMENT"})
+    void create_recovery_rechecks_each_frozen_related_object_deny_for_get_and_replay(String denied)throws Exception {
+        UUID org=organization(),person=principal(),key=UUID.randomUUID();
+        boolean grant=denied.startsWith("GRANT");
+        UUID app=grant?appointment(person,org):null;
+        UUID grantScope=grant?organization():null;
+        String command=grant?"CREATE_AUTHORITY_GRANT":"CREATE_APPOINTMENT";
+        Map<String,Object> payload=grant
+            ?body("appointmentId",app.toString(),"scopeOrganizationId",grantScope.toString(),"authorityCode","SALES_CONTACT_OWNER","validFrom",Instant.now().toString(),"validUntil",null)
+            :body("principalId",person.toString(),"organizationId",org.toString(),"roleCode","CONTACT_OPERATOR","effectiveFrom",Instant.now().toString(),"effectiveUntil",null);
+        var created=execute(key,command,null,null,payload);success(created);
+        assertEquals("SUCCEEDED",receipt(actor,key).get("outcome"));
+        String type=denied.equals("PRINCIPAL")?"identity.principal":denied.equals("GRANTEE_APPOINTMENT")?"identity.appointment":"identity.organization_unit";
+        UUID target=denied.equals("PRINCIPAL")?person:denied.equals("GRANTEE_APPOINTMENT")?app:denied.equals("GRANT_SCOPE")?grantScope:org;
+        deny(grant?"IDENTITY_AUTHORITY_MANAGE":"IDENTITY_APPOINTMENT_MANAGE",type,target);
+        var before=counts();String oldReceipt=storedReceipt(key);
+        assertAll(
+            ()->assertEquals(403,assertThrows(CommandReceiptReadRuntime.Failure.class,()->receipt(actor,key)).status()),
+            ()->assertEquals("NOT_AUTHORIZED",assertThrows(IdentityCommands.Failure.class,()->execute(key,command,null,null,payload)).code()),
+            ()->assertEquals(before,counts()),
+            ()->assertEquals(oldReceipt,storedReceipt(key)));
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"LOCAL_ONLY","SCOPE_DENY","SCOPE_CLOSED"})
+    void existing_grant_scope_controls_listing_tag_revoke_and_original_recovery(String restriction)throws Exception {
+        UUID local=organization(),scope=restriction.equals("LOCAL_ONLY")?seed.org():organization();
+        UUID app=appointment(principal(),local),active=grant(app,scope),revoked=grant(app,scope),key=UUID.randomUUID();
+        String activeTag=tag("REVOKE_AUTHORITY_GRANT",active),revokedTag=tag("REVOKE_AUTHORITY_GRANT",revoked);
+        var reason=Map.<String,Object>of("reasonCode","ADMINISTRATIVE_ACTION");
+        success(execute(key,"REVOKE_AUTHORITY_GRANT",revoked,revokedTag,reason));
+        if(restriction.equals("LOCAL_ONLY")) {
+            mutate("update identity.authority_grant set state='REVOKED',revoked_at=clock_timestamp(),revocation_reason_code='FIXTURE',revision=revision+1 where tenant_id=? and grantee_appointment_id=? and state='ACTIVE'",seed.tenant(),seed.appointment());
+            addGrant("IDENTITY_AUTHORITY_MANAGE",local);
+        }
+        else if(restriction.equals("SCOPE_DENY"))deny("IDENTITY_AUTHORITY_MANAGE","identity.organization_unit",scope);
+        else success(change("CLOSE_ORGANIZATION_UNIT",scope));
+        var listed=items(read("listAuthorityGrants",null,null,50,null));
+        var before=counts();String oldReceipt=storedReceipt(key);
+        assertAll(
+            ()->assertFalse(listed.stream().anyMatch(i->Set.of(active.toString(),revoked.toString()).contains(i.get("id"))),"Grant scope must be authorized independently of grantee organization"),
+            ()->assertEquals("NOT_AUTHORIZED",assertThrows(IdentityCommands.Failure.class,()->tag("REVOKE_AUTHORITY_GRANT",active)).code()),
+            ()->assertEquals("NOT_AUTHORIZED",assertThrows(IdentityCommands.Failure.class,()->execute("REVOKE_AUTHORITY_GRANT",active,activeTag,reason)).code()),
+            ()->assertEquals(403,assertThrows(CommandReceiptReadRuntime.Failure.class,()->receipt(actor,key)).status()),
+            ()->assertEquals("NOT_AUTHORIZED",assertThrows(IdentityCommands.Failure.class,()->execute(key,"REVOKE_AUTHORITY_GRANT",revoked,revokedTag,reason)).code()),
+            ()->assertEquals(before,counts()),
+            ()->assertEquals(oldReceipt,storedReceipt(key)));
+    }
+    void deny(String authority,String type,UUID id)throws Exception {
+        mutate("insert into identity.object_access_grant (tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,access_code,effect_code,valid_from,state,created_at,object_subject_type,object_subject_id,object_subject_revision) values (?,?,?,?,?,'DENY',clock_timestamp()-interval '1 hour','ACTIVE',clock_timestamp(),?,?,0)",seed.tenant(),UUID.randomUUID(),seed.principal(),seed.appointment(),authority,type,id);
+    }
+    String storedReceipt(UUID command)throws Exception {
+        return scalar("select row_to_json(r)::text from execution.command_receipt r join execution.command_execution_slot s using(tenant_id,command_execution_slot_id) where r.tenant_id=? and s.command_id=?",seed.tenant(),command);
+    }
     @Test void object_allow_does_not_replace_direct_management_authority()throws Exception {
         revoke();mutate("insert into identity.object_access_grant (tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,access_code,effect_code,valid_from,state,created_at,object_subject_type,object_subject_id,object_subject_revision) values (?,?,?,?,'IDENTITY_ORGANIZATION_MANAGE','ALLOW',clock_timestamp()-interval '1 hour','ACTIVE',clock_timestamp(),'identity.organization_unit',?,0)",seed.tenant(),UUID.randomUUID(),seed.principal(),seed.appointment(),seed.org());var before=counts();assertThrows(IdentityCommands.Failure.class,()->read("listOrganizationUnits",null,null,20,null));assertEquals(before,counts());
     }

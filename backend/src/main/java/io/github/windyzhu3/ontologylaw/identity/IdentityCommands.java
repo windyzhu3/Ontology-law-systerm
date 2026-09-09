@@ -69,6 +69,7 @@ public final class IdentityCommands {
         Context resolve(Connection c,Actor actor,Handler handler,UUID id,Map<String,Object> body,ProviderBinding provider)throws SQLException;
         Mutation mutate(Connection c,Actor actor,Handler handler,Context context,Map<String,Object> body,ProviderBinding provider,boolean openResponsibilities)throws SQLException;
         boolean recoveryMatches(Connection c,UUID tenant,Handler handler,Map<String,Object> attempted,Resource target)throws SQLException;
+        Access authorizeCommand(Connection c,Actor actor,Handler handler,Resource anchor,Resource target,Map<String,Object> attempted)throws SQLException;
     }
     public static Port databaseBacked(){return new io.github.windyzhu3.ontologylaw.identity.internal.persistence.JooqIdentityRepository();}
 }

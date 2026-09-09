@@ -51,7 +51,7 @@ public final class IdentityAdminReadRuntime {
             for(var source:sources) {
                 var current=reader.find(c,actor.tenantId(),Kind.of(source.type()),source.id());
                 if(current==null||!current.fact().equals(source))throw new Failure("NOT_AUTHORIZED");
-                reader.resourceAccess(c,actor,code,current);
+                finalAccess=IdentityAdminReader.combine(finalAccess,reader.resourceAccess(c,actor,code,current));
                 if(options&&kind==Kind.APPOINTMENT) {
                     var now=SensitiveReadClock.now(c);var from=java.time.Instant.parse((String)current.values().get("effectiveFrom"));Object until=current.values().get("effectiveUntil");
                     if(now.isBefore(from)||until!=null&&!now.isBefore(java.time.Instant.parse((String)until)))throw new Failure("NOT_AUTHORIZED");

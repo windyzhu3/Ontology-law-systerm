@@ -63,6 +63,9 @@ public final class IdentityCommandRuntime {
             if(!handler.create()&&match==null)throw new Precondition(resources.tag(envelope.actor(),context.target().fact(),context.access().digest()));
             if(candidate!=null){candidate.requireFresh(SensitiveReadClock.now(c));if(!candidate.subject().equals(directory.candidateEnabled(candidate.subject()).subject()))throw new Failure("VALIDATION_FAILED");candidate.requireFresh(SensitiveReadClock.now(c));}
             var scope=CommandScope.identity(envelope,context.scopeTarget());
+            // The receipt reader's inner join cannot establish that a permanent Slot is absent.
+            // Under the tenant command UUID lock, any orphan/ambiguous Slot must fail closed.
+            if(store.existingOrValidateNew(envelope,scope,payload,ignored->null)!=null)throw new SQLException("Inconsistent command receipt visibility","23000");
             setLocalRole(c,Capability.COMMAND);UUID slot=store.occupy(envelope,scope,payload);Savepoint domain=c.setSavepoint();
             Mutation mutation=null;String rejected=null,currentTag=null;
             try {
@@ -113,6 +116,6 @@ public final class IdentityCommandRuntime {
             if(!bound)throw new Failure("NOT_AUTHORIZED");
         }
         if(handler.create()&&handler.kind()==Kind.ORGANIZATION&&!anchor.fact().id().toString().equals(attempted.get("parentId")))throw new Failure("NOT_AUTHORIZED");
-        return reader.authorize(c,actor,handler.authority(),anchor,target);
+        return reader.authorizeCommand(c,actor,handler,anchor,target,attempted);
     }
 }

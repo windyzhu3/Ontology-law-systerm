@@ -28,6 +28,9 @@ public final class KeycloakFixture implements AutoCloseable {
     private final TlsFixture tls;private TlsFixture.Key identityTrust;private javax.net.ssl.SSLContext tlsContext;
     private byte[] databaseCertificate;
     private List<Map<String,Object>> additionalUsers=List.of();
+    private boolean duplicateEmails;
+    /** Explicit synthetic-only variant; the production realm policy is unchanged. */
+    public KeycloakFixture withDuplicateEmails(){if(keycloak!=null)throw new IllegalStateException();duplicateEmails=true;return this;}
     public KeycloakFixture withUsers(List<Map<String,Object>> users){if(keycloak!=null)throw new IllegalStateException();additionalUsers=List.copyOf(users);return this;}
     public KeycloakFixture(){tls=null;}
     public KeycloakFixture(TlsFixture tls){this.tls=Objects.requireNonNull(tls);}
@@ -94,6 +97,7 @@ public final class KeycloakFixture implements AutoCloseable {
         // Import the actual secret-free realm policy; only addresses, synthetic clients/users and explicit local TLS mode differ.
         var realm=new LinkedHashMap<String,Object>(JSON.readValue(java.nio.file.Files.readString(PostgresIntegrationTest.repositoryRoot().resolve("deploy/identity/realm-template.json")),new tools.jackson.core.type.TypeReference<Map<String,Object>>(){}));
         realm.put("realm",REALM);realm.put("sslRequired",tls==null?"none":"all");
+        if(duplicateEmails)realm.put("duplicateEmailsAllowed",true);
         var shortLived=new LinkedHashMap<>(spa);shortLived.put("clientId","task92-expiry-spa");shortLived.put("attributes",Map.of("pkce.code.challenge.method","S256","access.token.lifespan","2"));
         realm.put("clients",List.of(spa,shortLived,confidential(AUDIENCE,introspectionSecret,false),confidential("task92-directory",directorySecret,true)));
         realm.put("users",List.of(Map.of("username",username,"enabled",true,"emailVerified",true,"firstName","Synthetic","lastName","Fixture","email","synthetic@example.invalid","credentials",List.of(Map.of("type","password","value",password,"temporary",false))),Map.of("username","synthetic-disabled","enabled",false),Map.of("username","service-account-task92-directory","enabled",true,"serviceAccountClientId","task92-directory","clientRoles",Map.of("realm-management",List.of("query-users","view-users")))));

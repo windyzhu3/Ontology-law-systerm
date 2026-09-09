@@ -32,9 +32,11 @@ class IdentityAdminHttpIT extends PostgresIntegrationTest {
         users.add(Map.of("username","aaa-collision","enabled",true,"firstName","Shared name"));
         users.add(Map.of("username","bbb-collision","enabled",true,"firstName","aaa-collision"));
         users.add(Map.of("username","ccc-shared","enabled",true,"firstName","Shared name"));
+        users.add(Map.of("username","email-one","enabled",true,"email","shared@example.invalid","firstName","Email twins"));
+        users.add(Map.of("username","email-two","enabled",true,"email","shared@example.invalid","firstName","Email twins"));
         users.add(Map.of("username","zz-overflow","enabled",true));
         for(int i=0;i<51;i++)users.add(Map.of("username",String.format("proof-%02d",i),"enabled",true,"firstName","zz-overflow"));
-        idp=new KeycloakFixture().withUsers(users).start();
+        idp=new KeycloakFixture().withUsers(users).withDuplicateEmails().start();
         login=idp.login();
         directory=KeycloakDirectoryReader.isolatedLoopback(new KeycloakDirectoryReader.Trust(idp.issuer(),"task92-directory",idp.directorySecret));
         var subjects=new ExternalSubjectProtection(t->subjectKey);
@@ -62,6 +64,44 @@ class IdentityAdminHttpIT extends PostgresIntegrationTest {
         assertTrue(response.headers().firstValue("ETag").orElseThrow().matches("\"identity\\.[A-Za-z0-9_-]{43}\""));
         assertEquals(before+1,count("audit.audit_entry"));assertEquals(slots+1,count("execution.command_execution_slot"));assertEquals(receipts+1,count("execution.command_receipt"));
         for(String table:List.of("responsibility.task_occurrence","responsibility.action_draft","execution.domain_event","execution.domain_event_outbox"))assertEquals(0,count(table));
+    }
+    @Test void orphan_permanent_slot_with_same_key_and_different_scope_fails_closed_over_http()throws Exception {
+        UUID command=UUID.randomUUID();
+        try(var c=database.adminConnection()) {
+            io.github.windyzhu3.ontologylaw.identity.AuthorizationServiceIT.sql(c,"insert into execution.command_execution_slot (tenant_id,command_execution_slot_id,command_id,envelope_type,command_type,command_scope_digest,payload_digest,occupied_at) values (?,?,?,'INTERNAL_ADMIN','CREATE_ORGANIZATION_UNIT',?,?,clock_timestamp())",tenant,UUID.randomUUID(),command,key(),key());
+        }
+        var before=List.of(count("identity.organization_unit"),count("execution.command_execution_slot"),count("execution.command_receipt"),count("audit.audit_entry"));
+        var response=request("POST","organizations",Map.of("parentOrganizationId",root.toString(),"code","ORPHAN_SLOT","displayName","Must not create"),Map.of("Idempotency-Key",command.toString()));
+        assertEquals(503,response.statusCode(),response.body());
+        assertEquals("SERVICE_UNAVAILABLE",json(response.body()).path("code").asString());
+        assertEquals(before,List.of(count("identity.organization_unit"),count("execution.command_execution_slot"),count("execution.command_receipt"),count("audit.audit_entry")));
+    }
+    @Test void known_denied_grantee_is_forbidden_with_closed_http_problem_and_no_command_delta()throws Exception {
+        UUID grantee=validBusinessDelegation();
+        try(var c=database.adminConnection()) {
+            io.github.windyzhu3.ontologylaw.identity.AuthorizationServiceIT.sql(c,"insert into identity.object_access_grant (tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,access_code,effect_code,valid_from,state,created_at,object_subject_type,object_subject_id,object_subject_revision) select ?,?,principal_id,?,'IDENTITY_AUTHORITY_MANAGE','DENY',clock_timestamp()-interval '1 hour','ACTIVE',clock_timestamp(),'identity.appointment',?,0 from identity.appointment where tenant_id=? and appointment_id=?",tenant,UUID.randomUUID(),ownAppointment,grantee,tenant,ownAppointment);
+        }
+        var body=new LinkedHashMap<String,Object>();body.put("appointmentId",grantee.toString());body.put("scopeOrganizationId",root.toString());body.put("authorityCode","SALES_CONTACT_OWNER");body.put("validFrom",Instant.now().toString());body.put("validUntil",null);
+        var before=List.of(count("identity.authority_grant"),count("execution.command_execution_slot"),count("execution.command_receipt"),count("audit.audit_entry"));
+        var response=request("POST","authority-grants",body,Map.of("Idempotency-Key",UUID.randomUUID().toString()));
+        assertEquals(403,response.statusCode(),response.body());assertEquals("NOT_AUTHORIZED",json(response.body()).path("code").asString());
+        assertTrue(response.headers().firstValue("ETag").isEmpty());assertFalse(response.body().contains("receiptRef"));
+        assertEquals(before,List.of(count("identity.authority_grant"),count("execution.command_execution_slot"),count("execution.command_receipt"),count("audit.audit_entry")));
+    }
+    @Test void different_usernames_with_shared_email_remain_distinct_exact_candidates()throws Exception {
+        var protection=new IdentityCandidateProtection("online-test",Map.of("online-test",candidateKey));
+        UUID principal;try(var c=database.migratorConnection();var p=c.prepareStatement("select principal_id from identity.appointment where tenant_id=? and appointment_id=?")){p.setObject(1,tenant);p.setObject(2,ownAppointment);try(var r=p.executeQuery()){r.next();principal=r.getObject(1,UUID.class);}}
+        var actor=new AuthorizationService.Actor(tenant,principal,ownAppointment,null,null);
+        var subjects=new HashSet<String>();
+        for(String username:List.of("email-one","email-two")) {
+            var response=request("GET","provider-users?search="+username,null,Map.of());assertEquals(200,response.statusCode(),response.body());
+            var page=json(response.body());assertEquals(1,page.path("items").size());assertTrue(page.path("nextCursor").isNull());
+            String subject=protection.verify(page.path("items").get(0).path("selector").asString(),actor,"TASK92",idp.issuer()).subject();
+            assertEquals(directory.candidate(username).subject(),subject);assertTrue(subjects.add(subject));
+        }
+        for(String search:List.of("shared%40example.invalid","Email%20twins")) {
+            var response=request("GET","provider-users?search="+search,null,Map.of());assertEquals(200,response.statusCode(),response.body());assertEquals(0,json(response.body()).path("items").size());
+        }
     }
     @Test void exact_provider_search_is_audited_and_never_issues_another_page() throws Exception {
         var response=request("GET","provider-users?search="+idp.username,null,Map.of());

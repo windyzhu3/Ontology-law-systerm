@@ -85,6 +85,32 @@ public final class JooqIdentityRepository implements IdentityCommands.Port {
         for(var row:roots){var org=find(c,actor.tenantId(),Kind.ORGANIZATION,row.get(0,UUID.class));try{var access=authorize(c,actor,code,org,null);scopes.add(org.fact().id());evidence.append(HexFormat.of().formatHex(access.digest()));if(first==null)first=access;}catch(Failure denied){if(!"NOT_AUTHORIZED".equals(denied.code()))throw denied;}}
         require(first!=null,"NOT_AUTHORIZED");return new Access(first.authorization(),digest(evidence.toString()),scopes);
     }
+    @Override public Access authorizeResource(Connection c,Actor actor,String authority,Resource anchor,Resource target)throws SQLException {
+        var access=authorize(c,actor,authority,anchor,target);
+        if(target!=null&&Kind.of(target.fact().type())==Kind.AUTHORITY_GRANT) {
+            @SuppressWarnings("unchecked") var scope=(Map<String,Object>)target.values().get("scopeOrganization");
+            var organization=find(c,actor.tenantId(),Kind.ORGANIZATION,UUID.fromString((String)scope.get("id")));
+            access=IdentityAdminReader.combine(access,authorize(c,actor,authority,organization,null));
+        }
+        return access;
+    }
+    public Access authorizeCommand(Connection c,Actor actor,Handler h,Resource anchor,Resource target,Map<String,Object> attempted)throws SQLException {
+        var access=authorizeResource(c,actor,h.authority(),anchor,target);
+        if(h.create()&&h.kind()==Kind.APPOINTMENT) {
+            var principal=find(c,actor.tenantId(),Kind.PRINCIPAL,uuid(attempted,"principalId"));
+            var organization=find(c,actor.tenantId(),Kind.ORGANIZATION,uuid(attempted,"organizationId"));
+            require(principal!=null&&organization!=null,"NOT_FOUND");
+            access=IdentityAdminReader.combine(access,authorize(c,actor,h.authority(),anchor,principal));
+            access=IdentityAdminReader.combine(access,authorize(c,actor,h.authority(),organization,null));
+        } else if(h.create()&&h.kind()==Kind.AUTHORITY_GRANT) {
+            var appointment=find(c,actor.tenantId(),Kind.APPOINTMENT,uuid(attempted,"appointmentId"));
+            var organization=find(c,actor.tenantId(),Kind.ORGANIZATION,uuid(attempted,"scopeOrganizationId"));
+            require(appointment!=null&&organization!=null,"NOT_FOUND");
+            access=IdentityAdminReader.combine(access,authorize(c,actor,h.authority(),anchor,appointment));
+            access=IdentityAdminReader.combine(access,authorize(c,actor,h.authority(),organization,null));
+        }
+        return access;
+    }
     public Page list(Connection c,Actor actor,Kind kind,Access access,boolean candidates,Position after,int limit)throws SQLException {
         require(limit>=1&&limit<=50,"VALIDATION_FAILED");String alias="r",column=idColumn(kind);
         String joins=switch(kind){case PRINCIPAL,ORGANIZATION->"";case APPOINTMENT->" join identity.principal p on p.tenant_id=r.tenant_id and p.principal_id=r.principal_id";case AUTHORITY_GRANT->" join identity.appointment a on a.tenant_id=r.tenant_id and a.appointment_id=r.grantee_appointment_id join identity.principal p on p.tenant_id=a.tenant_id and p.principal_id=a.principal_id";};
@@ -141,15 +167,14 @@ public final class JooqIdentityRepository implements IdentityCommands.Port {
         else if(h.create()&&h.kind()==Kind.ORGANIZATION)anchor=find(c,actor.tenantId(),Kind.ORGANIZATION,uuid(body,"parentOrganizationId"));
         else if(h.create()){var app=find(c,actor.tenantId(),Kind.APPOINTMENT,uuid(body,"appointmentId"));require(app!=null,"NOT_FOUND");anchor=find(c,actor.tenantId(),Kind.ORGANIZATION,app.organization());}
         else anchor=find(c,actor.tenantId(),Kind.ORGANIZATION,resourceAccess(c,actor,h.authority(),target).authorization().request().subject().id());
-        require(anchor!=null,"NOT_FOUND");var access=authorize(c,actor,h.authority(),anchor,target);
+        require(anchor!=null,"NOT_FOUND");
         if(h.create())switch(h.kind()) {
             case PRINCIPAL -> {require(provider!=null,"VALIDATION_FAILED");scope.put("kind","CREATE_PRINCIPAL");scope.put("providerCode",provider.provider());scope.put("subjectHmac",Base64.getUrlEncoder().withoutPadding().encodeToString(provider.subjectHmac()));}
             case ORGANIZATION -> {scope.put("kind","CREATE_ORGANIZATION");scope.put("parentId",body.get("parentOrganizationId"));scope.put("code",body.get("code"));}
-            case APPOINTMENT -> {scope.put("kind","CREATE_APPOINTMENT");for(String field:List.of("principalId","organizationId","roleCode","effectiveFrom","effectiveUntil"))scope.put(field,body.get(field));
-                var principal=find(c,actor.tenantId(),Kind.PRINCIPAL,uuid(body,"principalId"));var org=find(c,actor.tenantId(),Kind.ORGANIZATION,uuid(body,"organizationId"));require(principal!=null&&org!=null,"NOT_FOUND");authorize(c,actor,h.authority(),anchor,principal);authorize(c,actor,h.authority(),org,null);}
-            case AUTHORITY_GRANT -> {scope.put("kind","CREATE_AUTHORITY_GRANT");for(String field:List.of("appointmentId","authorityCode","scopeOrganizationId","validFrom","validUntil"))scope.put(field,body.get(field));
-                var org=find(c,actor.tenantId(),Kind.ORGANIZATION,uuid(body,"scopeOrganizationId"));require(org!=null,"NOT_FOUND");authorize(c,actor,h.authority(),org,null);}
+            case APPOINTMENT -> {scope.put("kind","CREATE_APPOINTMENT");for(String field:List.of("principalId","organizationId","roleCode","effectiveFrom","effectiveUntil"))scope.put(field,body.get(field));}
+            case AUTHORITY_GRANT -> {scope.put("kind","CREATE_AUTHORITY_GRANT");for(String field:List.of("appointmentId","authorityCode","scopeOrganizationId","validFrom","validUntil"))scope.put(field,body.get(field));}
         } else {scope.put("kind",h.kind().factType);scope.put("id",id.toString());}
+        var access=authorizeCommand(c,actor,h,anchor,target,scope);
         return new Context(target,anchor,access,scope);
     }
     public Mutation mutate(Connection c,Actor actor,Handler h,Context context,Map<String,Object> body,ProviderBinding provider,boolean openResponsibilities)throws SQLException {

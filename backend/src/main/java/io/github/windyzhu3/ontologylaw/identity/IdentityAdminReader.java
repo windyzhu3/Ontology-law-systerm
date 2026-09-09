@@ -27,14 +27,30 @@ public interface IdentityAdminReader {
     Resource root(Connection c,UUID tenant)throws SQLException;
     Resource find(Connection c,UUID tenant,Kind kind,UUID id)throws SQLException;
     Access authorize(Connection c,Actor actor,String authority,Resource anchor,Resource target)throws SQLException;
+    /** Current fact authorization with its mandatory immutable related scope, retaining the chosen anchor. */
+    default Access authorizeResource(Connection c,Actor actor,String authority,Resource anchor,Resource target)throws SQLException {
+        return authorize(c,actor,authority,anchor,target);
+    }
     default Access resourceAccess(Connection c,Actor actor,String authority,Resource target)throws SQLException {
         Kind kind=Kind.of(target.fact().type());
         if(kind==Kind.ORGANIZATION&&target.values().get("parentOrganizationId")!=null) {
             var parent=find(c,actor.tenantId(),Kind.ORGANIZATION,UUID.fromString((String)target.values().get("parentOrganizationId")));
-            try{return authorize(c,actor,authority,parent,target);}catch(IdentityCommands.Failure denied){if(!"NOT_AUTHORIZED".equals(denied.code()))throw denied;}
+            try{return authorizeResource(c,actor,authority,parent,target);}catch(IdentityCommands.Failure denied){if(!"NOT_AUTHORIZED".equals(denied.code()))throw denied;}
         }
         var anchor=kind==Kind.PRINCIPAL?root(c,actor.tenantId()):find(c,actor.tenantId(),Kind.ORGANIZATION,target.organization());
-        return authorize(c,actor,authority,anchor,target);
+        return authorizeResource(c,actor,authority,anchor,target);
+    }
+    /** Add required evidence without replacing the original anchor or making a wider authorization choice. */
+    static Access combine(Access primary,Access related) {
+        var first=primary.authorization();
+        String dependencies=HexFormat.of().formatHex(primary.digest())+":"+HexFormat.of().formatHex(related.digest());
+        String evidence=first.evidence()+"\n"+related.authorization().evidence();
+        try {
+            var sha=java.security.MessageDigest.getInstance("SHA-256");
+            byte[] digest=sha.digest(dependencies.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            var snapshot=new AuthorizationSnapshot(first.request(),first.checkedAt(),true,null,first.authorityFact(),evidence,sha.digest(evidence.getBytes(java.nio.charset.StandardCharsets.UTF_8)),dependencies);
+            return new Access(snapshot,digest,primary.scopes());
+        } catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
     }
     Access listAccess(Connection c,Actor actor,String authority,boolean rootRequired)throws SQLException;
     Page list(Connection c,Actor actor,Kind kind,Access access,boolean candidates,Position after,int limit)throws SQLException;
