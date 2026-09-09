@@ -1,6 +1,6 @@
 import { LoginPage } from "./LoginPage";
 import type { SessionRuntime } from "./sessionConfiguration";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   SessionProvider,
   useActorSession,
@@ -15,7 +15,7 @@ import { App } from "../../App";
 import { createWorkbenchApi } from "../../lib/api";
 import type { SessionContext, SessionController } from "./sessionController";
 import { createIdentityApi, type IdentityApi } from "../identity/identityApi";
-import { IdentityAdminApplication } from "../identity/IdentityAdminApplication";
+import { IdentityAdminApplication, type IdentityLeaveGuard } from "../identity/IdentityAdminApplication";
 import { isIdentityAdminRoute, type IdentityAdminRoute } from "../identity/identityRoutes";
 export function SessionApplication({
   controller,
@@ -24,8 +24,18 @@ export function SessionApplication({
   configurationError,
 }: SessionRuntime & { identityApi?: IdentityApi }) {
   const [path, setPath] = useState(location.pathname);
+  const leaveGuard = useRef<IdentityLeaveGuard | null>(null);
+  const currentPath = useRef(path); currentPath.current = path;
+  const registerLeaveGuard = useCallback((guard: IdentityLeaveGuard | null) => { leaveGuard.current = guard; }, []);
+  const guardedLeave = useCallback((next: () => void) => { if (leaveGuard.current) leaveGuard.current(next); else next(); }, []);
   useEffect(() => {
-    const changed = () => setPath(location.pathname);
+    const changed = () => {
+      const target = location.pathname;
+      if (leaveGuard.current && isIdentityAdminRoute(currentPath.current)) {
+        history.replaceState(null, "", currentPath.current);
+        leaveGuard.current(() => { history.replaceState(null, "", target); setPath(target); });
+      } else setPath(target);
+    };
     window.addEventListener("popstate", changed);
     return () => window.removeEventListener("popstate", changed);
   }, []);
@@ -52,6 +62,8 @@ export function SessionApplication({
         api={transport}
         identityApi={identityTransport!}
         path={path}
+        registerLeaveGuard={registerLeaveGuard}
+        guardedLeave={guardedLeave}
         navigate={(next) => {
           history.replaceState(null, "", next);
           setPath(next);
@@ -72,12 +84,16 @@ function SessionRoutes({
   identityApi,
   path,
   navigate,
+  registerLeaveGuard,
+  guardedLeave,
 }: {
   controller: SessionController;
   api: NonNullable<SessionRuntime["api"]>;
   identityApi: IdentityApi;
   path: string;
   navigate: (path: "/login" | "/workbench" | IdentityAdminRoute) => void;
+  registerLeaveGuard: (guard: IdentityLeaveGuard | null) => void;
+  guardedLeave: IdentityLeaveGuard;
 }) {
   const state = useSessionState(),
     setup = useSessionSetupReady(),
@@ -166,7 +182,9 @@ function SessionRoutes({
         api={identityApi}
         path={path}
         onNavigate={navigate}
-        sessionActions={<div className="session-actions"><span>{context.displayName} · {own} / 管理模式</span><button onClick={() => selectStage("choosing")}>切换任职</button><button onClick={() => void controller.logout()}>退出</button></div>}
+        registerLeaveGuard={registerLeaveGuard}
+        sessionActions={<div className="session-actions"><span>{context.displayName} · {own} / 管理模式</span><button onClick={() => guardedLeave(() => selectStage("choosing"))}>切换任职</button><button onClick={() => guardedLeave(() => void controller.logout())}>退出</button></div>}
+        onRecover={() => selectStage("recovery")}
       />
     );
   }

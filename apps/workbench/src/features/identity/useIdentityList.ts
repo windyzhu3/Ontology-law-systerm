@@ -29,6 +29,7 @@ export function useIdentityList<T extends { id: string }>(
   const requestSequence = useRef(0);
   const selectionRef = useRef<string | null>(null);
   const autoSelectRef = useRef(true);
+  const reloadWaiters = useRef<Array<(ok: boolean) => void>>([]);
   selectionRef.current = selectedId;
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export function useIdentityList<T extends { id: string }>(
   useEffect(() => {
     if (!session || navigation.identityKey !== identityKey) return;
     const controller = new AbortController();
+    const waiters = reloadWaiters.current.splice(0);
     const request = ++requestSequence.current;
     setLoading(true);
     setError(null);
@@ -71,6 +73,7 @@ export function useIdentityList<T extends { id: string }>(
           setSelectedId(null);
         }
         setLoading(false);
+        waiters.forEach((resolve) => resolve(true));
       },
       () => {
         if (controller.signal.aborted || request !== requestSequence.current) return;
@@ -79,9 +82,10 @@ export function useIdentityList<T extends { id: string }>(
         setSelectedId(null);
         setError("身份管理数据暂时不可用，请重读后再试。");
         setLoading(false);
+        waiters.forEach((resolve) => resolve(false));
       },
     );
-    return () => controller.abort();
+    return () => { controller.abort(); waiters.forEach((resolve) => resolve(false)); };
   }, [cursor, identityKey, load, navigation.identityKey, navigation.refresh, session]);
 
   const next = useCallback(() => {
@@ -104,7 +108,10 @@ export function useIdentityList<T extends { id: string }>(
   }, [navigation.index]);
   const reload = useCallback(() => {
     autoSelectRef.current = false;
-    setNavigation((current) => ({ ...current, refresh: current.refresh + 1 }));
+    return new Promise<boolean>((resolve) => {
+      reloadWaiters.current.push(resolve);
+      setNavigation((current) => ({ ...current, refresh: current.refresh + 1 }));
+    });
   }, []);
 
   return {

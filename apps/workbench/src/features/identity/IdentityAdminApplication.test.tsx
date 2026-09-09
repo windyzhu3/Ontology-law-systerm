@@ -60,7 +60,7 @@ it.each(cases)("renders the real bounded read for %s without identifiers or remo
   expect(document.body.textContent).not.toContain(identityETag);
   expect(screen.queryByText("创建时间")).not.toBeInTheDocument();
   expect(screen.queryByText("授予人")).not.toBeInTheDocument();
-  expect(screen.getAllByText("当前仅开放查询，写入功能尚未接入").length).toBeGreaterThan(0);
+  expect(screen.getByText("仅展示当前页已加载且获权的记录")).toBeVisible();
   if (path === "/admin/identity/appointments" || path === "/admin/identity/authority-grants")
     expect(screen.getByLabelText(`${path === "/admin/identity/appointments" ? "任职管理" : "直接授权"}列表`).textContent).not.toContain("09:00");
 });

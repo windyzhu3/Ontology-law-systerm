@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { expect, it, beforeEach, afterEach, vi } from "vitest";
 import { SessionApplication } from "./SessionApplication";
+import { fixture as identityFixture } from "../identity/identityWriteFixtures";
 import {
   SessionController,
   type SessionContext,
@@ -25,6 +26,40 @@ import {
   tags,
 } from "../../test/fixtures";
 const scope = "ask1.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+it.each(["switch", "popstate", "logout"] as const)("guards a dirty identity editor before explicit %s but immediately clears on expiry", async action => {
+  history.replaceState(null, "", "/admin/identity/principals");
+  const f = fixture({ context: { ...context, canEnterIdentityAdmin: true } });
+  const identity = identityFixture("/admin/identity/principals", { recovery: f.controller.recovery });
+  render(<SessionApplication controller={f.controller} api={f.api} identityApi={identity.api} />);
+  const confirm = await screen.findByRole("button", { name: "确认本次身份" }); await waitFor(() => expect(confirm).toBeEnabled()); fireEvent.click(confirm);
+  fireEvent.click(await screen.findByRole("button", { name: "修改名称" })); fireEvent.change(screen.getByLabelText("显示名称"), { target: { value: "私密待保存" } });
+  if (action === "popstate") act(() => { history.replaceState(null, "", "/admin/identity/organizations"); window.dispatchEvent(new PopStateEvent("popstate")); });
+  else fireEvent.click(screen.getByRole("button", { name: action === "switch" ? "切换任职" : "退出" }));
+  expect(screen.getByRole("dialog", { name: "舍弃未保存的修改？" })).toBeVisible();
+  expect(identity.writes).toHaveLength(0);
+  act(() => f.controller.invalidate("EXPIRED"));
+  expect(screen.queryByLabelText("显示名称")).not.toBeInTheDocument(); expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("explicitly leaves an unknown identity original for the existing recovery page without rewriting its clue or payload", async () => {
+  history.replaceState(null, "", "/admin/identity/principals");
+  const f = fixture({ context: { ...context, canEnterIdentityAdmin: true }, respond: async () => jsonResponse({}, 404) });
+  const identity = identityFixture("/admin/identity/principals", { recovery: f.controller.recovery, handle: async request => { if (request.method !== "GET") throw new Error("lost response"); } });
+  render(<SessionApplication controller={f.controller} api={f.api} identityApi={identity.api} />);
+  const confirm = await screen.findByRole("button", { name: "确认本次身份" }); await waitFor(() => expect(confirm).toBeEnabled()); fireEvent.click(confirm);
+  fireEvent.click(await screen.findByRole("button", { name: "修改名称" })); fireEvent.change(screen.getByLabelText("显示名称"), { target: { value: "私密改名" } }); fireEvent.click(screen.getByRole("button", { name: "保存名称" }));
+  const recover = await screen.findByRole("button", { name: "前往恢复入口" });
+  const marker = sessionStorage.getItem(markerKey); fireEvent.click(recover);
+  expect(screen.getByRole("dialog", { name: "离开本页并核对恢复线索？" })).toHaveTextContent("原请求正文");
+  fireEvent.click(screen.getByRole("button", { name: "留在本页" })); expect(screen.getByLabelText("显示名称")).toHaveValue("私密改名");
+  fireEvent.click(recover); fireEvent.click(screen.getByRole("button", { name: "确认前往恢复" }));
+  expect(screen.queryByLabelText("显示名称")).not.toBeInTheDocument();
+  await screen.findByRole("heading", { name: "核对原操作结果" });
+  expect(await screen.findByText("当前仅能查询原回执。")).toBeVisible();
+  expect(sessionStorage.getItem(markerKey)).toBe(marker); expect(identity.writes).toHaveLength(1);
+  expect(f.requests.every(r => r.method === "GET")).toBe(true);
+});
 beforeEach(() => history.replaceState(null, "", "/workbench"));
 afterEach(() => vi.unstubAllGlobals());
 const context: SessionContext = {

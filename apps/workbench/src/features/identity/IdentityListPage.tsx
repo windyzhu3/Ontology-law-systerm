@@ -19,6 +19,9 @@ export function IdentityListPage({
   organization = false,
   wideDetail = false,
   authorityDetail = false,
+  onCreate,
+  editing = false,
+  feedback,
 }: {
   title: string;
   description: string;
@@ -37,6 +40,9 @@ export function IdentityListPage({
   organization?: boolean;
   wideDetail?: boolean;
   authorityDetail?: boolean;
+  onCreate: () => void;
+  editing?: boolean;
+  feedback?: ReactNode;
 }) {
   return (
     <>
@@ -45,14 +51,15 @@ export function IdentityListPage({
           <h1>{title}</h1>
           <p>{description}</p>
         </div>
-        <button className="identity-create" disabled aria-describedby="identity-read-only-note">
+        {!editing && <button className="identity-create" onClick={onCreate}>
           {createLabel}
-        </button>
+        </button>}
       </section>
+      {feedback}
       <div className={`identity-page-grid${organization ? " organization" : ""}${wideDetail ? " wide-detail" : ""}${authorityDetail ? " authority-detail" : ""}`}>
         <section className="identity-list-panel" aria-label={`${title}列表`}>
           <p id="identity-read-only-note" className="identity-read-only-note" role="note">
-            当前仅开放查询，写入功能尚未接入
+            仅展示当前页已加载且获权的记录
           </p>
           {loading && count === null ? (
             <p className="identity-state" role="status">正在读取当前页…</p>
@@ -99,11 +106,10 @@ export function InfoNote({ children, boxed = true }: { children: ReactNode; boxe
   return <p className={`identity-info${boxed ? " boxed" : ""}`}><Info size={19} aria-hidden="true" /> <span>{children}</span></p>;
 }
 
-export function DisabledActions({ children, variant = "stacked" }: { children: ReactNode; variant?: "stacked" | "inline" | "full" }) {
+export function IdentityActions({ children, variant = "stacked" }: { children: ReactNode; variant?: "stacked" | "inline" | "full" }) {
   return (
-    <div className={`identity-disabled-actions ${variant}`} aria-describedby="identity-detail-disabled-note">
+    <div className={`identity-disabled-actions ${variant}`}>
       {children}
-      <p id="identity-detail-disabled-note">当前仅开放查询，写入功能尚未接入</p>
     </div>
   );
 }

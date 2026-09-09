@@ -265,7 +265,7 @@ function RecoveryContent({
             <strong>
               {work.busy
                 ? "正在查询原回执，请稍候。"
-                : "已重新登录，仅能查询原回执。"}
+                : "当前仅能查询原回执。"}
             </strong>
             <p>核对完成前，不能发起新操作。</p>
           </div>
