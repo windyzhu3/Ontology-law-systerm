@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 MODULE = Path(__file__).resolve().parents[1] / 'local_login.py'
 
@@ -48,6 +49,21 @@ class LocalConfigurationTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'missing|partial'):
                 module.secret_bundle(path)
             self.assertFalse((path / 'secrets').exists())
+
+    def test_legacy_resume_checks_jar_drift_then_requires_snapshot_without_building(self):
+        module = self.module()
+        with tempfile.TemporaryDirectory() as directory:
+            module.RUNTIME = Path(directory)
+            module.JAR = module.RUNTIME / 'legacy.jar'
+            module.JAR.write_bytes(b'legacy')
+            module.save('deployment.json', {'releaseDigest': '0' * 64})
+            with patch.object(module.socket, 'socket'), patch.object(module.subprocess, 'run', side_effect=AssertionError('must not build or launch')):
+                with self.assertRaisesRegex(RuntimeError, 'Jar changed'):
+                    module.start_apps()
+                import hashlib
+                module.save('deployment.json', {'releaseDigest': hashlib.sha256(b'legacy').hexdigest()})
+                with self.assertRaisesRegex(RuntimeError, 'snapshot-release'):
+                    module.start_apps()
 
     def test_prepare_and_application_config_preserve_surviving_state_when_whole_bundle_is_missing(self):
         for operation in ('initialize', 'application_config'):

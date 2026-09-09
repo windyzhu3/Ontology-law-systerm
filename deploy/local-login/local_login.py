@@ -134,7 +134,9 @@ def initialize():
 def require_protected_runtime():
     # Windows current-user and SYSTEM only, including inherited write/read permissions.
     quoted = RUNTIME.as_posix().replace("'", "''")
-    script = "$acl=Get-Acl -LiteralPath '" + quoted + "'; $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value; if(-not $acl.AreAccessRulesProtected){exit 2}; foreach($rule in $acl.Access){$id=$rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value; if($id -notin @($sid,'S-1-5-18') -or $rule.AccessControlType -ne 'Allow'){exit 3}}; exit 0"
+    script = "$ErrorActionPreference='Stop'; $base=Get-Item -LiteralPath '" + quoted + "'; $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value; "
+    script += "if(-not (Get-Acl -LiteralPath $base.FullName).AreAccessRulesProtected){exit 2}; "
+    script += "function Check-Tree($item){if($item.Attributes -band [IO.FileAttributes]::ReparsePoint){exit 4}; $acl=Get-Acl -LiteralPath $item.FullName; foreach($rule in $acl.Access){$id=$rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value; if($id -notin @($sid,'S-1-5-18') -or $rule.AccessControlType -ne 'Allow'){exit 3}}; if($item.PSIsContainer){foreach($child in Get-ChildItem -LiteralPath $item.FullName -Force){Check-Tree $child}}}; Check-Tree $base; exit 0"
     result = subprocess.run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', script], capture_output=True)
     ignored = subprocess.run(['git', 'check-ignore', '--quiet', str(RUNTIME)], cwd=ROOT, capture_output=True)
     if result.returncode or ignored.returncode:
@@ -259,6 +261,8 @@ def migrate():
 
 
 def bootstrap_config():
+    if (RUNTIME / 'current-release.json').exists():
+        raise RuntimeError('original operator is frozen; use bootstrap-verify-current-release')
     deployment = json.loads((RUNTIME / 'deployment.json').read_text())
     file = lambda name: str((RUNTIME / name).resolve())
     save('operator.json', {'semanticBaseline': 'MVP-2026-09-08.3', 'tenantId': deployment['tenantId'],
@@ -325,6 +329,8 @@ def service_fixture():
 
 
 def application_config():
+    if (RUNTIME / 'current-release.json').exists():
+        raise RuntimeError('controlled release configuration is immutable; use stage-release')
     deployment = json.loads((RUNTIME / 'deployment.json').read_text())
     fixture = json.loads((RUNTIME / 'service-fixture.json').read_text())
     values = secret_bundle(RUNTIME)
@@ -366,30 +372,39 @@ def application_config():
 
 
 def start_apps():
-    deployment = json.loads((RUNTIME / 'deployment.json').read_text())
-    if hashlib.sha256(JAR.read_bytes()).hexdigest() != deployment['releaseDigest']:
-        raise RuntimeError('Jar changed since local release activation; controlled redeployment required')
+    if not (RUNTIME / 'current-release.json').exists():
+        deployment = json.loads((RUNTIME / 'deployment.json').read_text())
+        if hashlib.sha256(JAR.read_bytes()).hexdigest() != deployment['releaseDigest']:
+            raise RuntimeError('Jar changed since local release activation; controlled redeployment required')
+        raise RuntimeError('snapshot-release required before starting saved local artifacts')
+    import local_release
+    boundary = local_release.RuntimeBoundary(sys.modules[__name__])
+    release = local_release.LocalRelease(ROOT, RUNTIME, boundary)
+    paths = release.paths()
+    boundary.stopped()
     for port in (19444, 19445):
         with socket.socket() as probe:
             probe.bind(('127.0.0.1', port))
-    node = TOOLS / 'node-v24.20.0-win-x64/node.exe'
-    environment = dict(os.environ, VITE_OIDC_ISSUER=ISSUER, VITE_OIDC_CLIENT_ID='local-r1-spa',
-                       VITE_OIDC_AUDIENCE='local-r1-api', VITE_APP_ORIGIN=ORIGIN)
-    environment['PATH'] = str(TOOLS / 'npm-11.9.0/node_modules/.bin') + os.pathsep + str(node.parent) + os.pathsep + environment['PATH']
-    result = subprocess.run([str(node), str(TOOLS / 'npm-11.9.0/node_modules/npm/bin/npm-cli.js'), 'run', 'build'],
-                            cwd=ROOT, env=environment, capture_output=True)
-    (RUNTIME / 'spa-build.stdout').write_bytes(result.stdout); (RUNTIME / 'spa-build.stderr').write_bytes(result.stderr)
-    print('spa-build: exit ' + str(result.returncode))
-    if result.returncode:
-        raise RuntimeError('SPA build failed')
-    processes = {}
-    for name, args in [('api', [JAVA, '-Xmx768m', '-jar', JAR, '--spring.config.additional-location=' + (RUNTIME / 'application.properties').as_uri()]),
-                       ('spa', [node, ROOT / 'deploy/local-login/server.mjs'])]:
+    processes = local_release.read_json(RUNTIME / 'processes.json')
+    commands = local_release.app_commands(sys.modules[__name__], paths['jar'].parent)
+    # A pending start blocks a second start if the process result was lost.
+    marker = RUNTIME / 'apps-start.pending'
+    with marker.open('x', encoding='utf-8') as stream:
+        stream.write('inspect saved process registry before explicitly clearing this marker')
+    for name, args in commands.items():
         with (RUNTIME / (name + '.stdout')).open('wb') as out, (RUNTIME / (name + '.stderr')).open('wb') as errors:
             process = subprocess.Popen([str(arg) for arg in args], cwd=ROOT, stdout=out, stderr=errors,
                                        creationflags=subprocess.CREATE_NO_WINDOW)
-            processes[name] = process.pid
-    save('processes.json', processes)
+            # Record the PID immediately; a partial registry fails closed.
+            processes[name] = {'pid': process.pid, 'executable': args[0], 'args': args[1:]}
+            local_release.atomic(RUNTIME / 'processes.json', processes)
+            actual = boundary.process(process.pid)
+            if actual is None:
+                raise RuntimeError('owned process exited during startup')
+            local_release.owned_process(processes[name], actual)
+            processes[name]['created'] = actual['created']
+            local_release.atomic(RUNTIME / 'processes.json', processes)
+    marker.unlink()
     print('API and SPA processes started; readiness must be checked separately')
 
 
@@ -462,19 +477,67 @@ def protocol_check(kind='founder'):
 
 
 def stop():
-    processes = json.loads((RUNTIME / 'processes.json').read_text())
-    for name, executable, target in [('spa', TOOLS / 'node-v24.20.0-win-x64/node.exe', ROOT / 'deploy/local-login/server.mjs'),
-                                      ('api', JAVA, JAR)]:
-        pid = int(processes[name])
-        # Never kill a reused PID: validate executable and the exact owned artifact path first.
-        target_variants = [str(target), str(target).replace('\\', '/'), 'deploy/local-login/server.mjs' if name == 'spa' else str(target)]
-        script = f"$p=Get-CimInstance Win32_Process -Filter 'ProcessId={pid}'; if($null -eq $p){{exit 0}}; "
-        script += "$expected='" + str(executable).replace("'", "''") + "'; if($p.ExecutablePath -ne $expected){exit 3}; "
-        script += "$targets=" + ','.join("'" + value.replace("'", "''") + "'" for value in target_variants) + "; if(-not ($targets | Where-Object {$p.CommandLine.Contains($_)})){exit 4}; Stop-Process -Id " + str(pid)
-        run(['pwsh', '-NoProfile', '-NonInteractive', '-Command', script], 'stop-' + name)
+    stop_apps()
     for name in ('keycloak', 'business-db', 'identity-db'):
         docker('stop', PREFIX + '-' + name, label='stop-' + name)
     print('local services stopped; all databases, secrets, certificates and original bootstrap preserved')
+
+
+def stop_apps():
+    import local_release
+    local_release.RuntimeBoundary(sys.modules[__name__]).stop()
+    print('owned API/SPA stopped; identity and database services retained')
+
+
+def release_operation(operation, arguments):
+    import local_release
+    boundary = local_release.RuntimeBoundary(sys.modules[__name__])
+    release = local_release.LocalRelease(ROOT, RUNTIME, boundary)
+    boundary.protect()
+    if operation == 'release-status':
+        print(json.dumps(release.status(), sort_keys=True))
+        return
+    lock = RUNTIME / 'release-operation.lock'
+    with lock.open('x', encoding='utf-8') as stream:
+        stream.write(str(os.getpid()))
+    try:
+        if operation == 'snapshot-release':
+            print('saved release: ' + release.snapshot())
+        elif operation == 'capture-build-inputs':
+            release.capture_inputs(arguments[0])
+            print('before-build inputs recorded; execute reviewed builds separately')
+        elif operation == 'describe-candidate':
+            if len(arguments) != 3:
+                raise RuntimeError('exact commit and actual Jar/SPA build exit codes required')
+            request = release.describe(arguments[0], {'jar': int(arguments[1]), 'spa': int(arguments[2])})
+            local_release.atomic(RUNTIME / 'candidate-release.json', request)
+            print('candidate descriptor saved for operator review; no activation')
+        elif operation == 'stage-release':
+            print('staged release: ' + release.stage(local_release.read_json(RUNTIME / 'candidate-release.json')))
+        elif operation == 'activate-release':
+            release.activate(arguments[0])
+            print('release bytes and gate activated; apps remain stopped, readiness unverified')
+        elif operation == 'rollback-release':
+            release.rollback()
+            print('saved bytes and gate restored; apps remain stopped, business facts retained')
+        elif operation == 'recover-release':
+            release.recover(arguments[0])
+            print('explicit release reconciliation complete; apps remain stopped')
+        elif operation == 'bootstrap-verify-current-release':
+            operator = release.derived_operator()
+            paths = release.paths()
+            command = [JAVA, '-Dloader.main=io.github.windyzhu3.ontologylaw.api.IdentityBootstrapCommand',
+                       '-cp', paths['jar'], 'org.springframework.boot.loader.launch.PropertiesLauncher',
+                       'verify', operator, RUNTIME / 'original-manifest.json']
+            result = run(command, 'bootstrap-verify-current-release')
+            if json.loads(result).get('mode') != 'VERIFIED_ORIGINAL':
+                raise RuntimeError('original bootstrap verification unavailable')
+            release.paths()
+            print('VERIFIED_ORIGINAL with current release expectations; original operator preserved')
+        else:
+            raise RuntimeError('unknown release operation')
+    finally:
+        lock.unlink()
 
 
 def resume():
@@ -494,14 +557,27 @@ def resume():
 if __name__ == '__main__':
     try:
         require_protected_runtime()
-        if sys.argv[1] not in ('prepare', 'stop'):
+        if sys.argv[1] not in ('prepare', 'stop', 'stop-apps', 'release-status'):
             secret_bundle(RUNTIME)
+        if sys.argv[1] in ('snapshot-release', 'capture-build-inputs', 'describe-candidate', 'stage-release', 'activate-release',
+                          'rollback-release', 'release-status', 'recover-release', 'bootstrap-verify-current-release'):
+            release_operation(sys.argv[1], sys.argv[2:])
+            sys.exit(0)
+        if sys.argv[1] in ('start-apps', 'stop-apps', 'stop', 'resume'):
+            lock = RUNTIME / 'release-operation.lock'
+            with lock.open('x', encoding='utf-8') as stream:
+                stream.write(str(os.getpid()))
+            try:
+                {'start-apps': start_apps, 'stop-apps': stop_apps, 'stop': stop, 'resume': resume}[sys.argv[1]]()
+            finally:
+                lock.unlink()
+            sys.exit(0)
         {'prepare': initialize, 'infrastructure': infrastructure, 'health': health, 'migrate': migrate,
          'bootstrap-dry-run': lambda: bootstrap('dry-run'), 'bootstrap-execute': lambda: bootstrap('execute'),
          'bootstrap-verify': lambda: bootstrap('verify'), 'keycloak-create': start_keycloak,
          'service-fixture': service_fixture, 'application-config': application_config, 'start-apps': start_apps,
          'protocol-check': protocol_check, 'protocol-check-unmapped': lambda: protocol_check('unmapped'),
-         'stop': stop, 'resume': resume}[sys.argv[1]]()
+         'stop': stop, 'stop-apps': stop_apps, 'resume': resume}[sys.argv[1]]()
     except Exception as error:
         print('local-login operation failed: ' + type(error).__name__ + '; protected diagnostics retained', file=sys.stderr)
         sys.exit(1)
