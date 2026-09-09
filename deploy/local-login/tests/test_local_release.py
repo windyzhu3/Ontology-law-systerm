@@ -400,6 +400,27 @@ class ReleaseTest(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(RuntimeError):
                 self.m.owned_process(expected, {**actual, field: value})
 
+    def test_registered_worker_is_owned_and_blocks_switch_until_it_exits(self):
+        self.snapshot()
+        sys.path.insert(0, str(MODULE.parent))
+        import local_worker
+        self.assertTrue(hasattr(local_worker, 'worker_command'), 'Worker command missing')
+        runner = SimpleNamespace(ROOT=self.root, RUNTIME=self.runtime, JAVA=self.root/'java.exe',
+            TOOLS=self.root/'tools', JAR=self.jar, require_protected_runtime=lambda:None)
+        boundary = self.m.RuntimeBoundary(runner)
+        package = self.release.paths()['jar'].parent
+        commands = {**self.m.app_commands(runner, package), 'worker':local_worker.worker_command(runner, package)}
+        registry = {name: {'pid': index, 'executable': command[0], 'args':command[1:], 'created':'stamp'}
+                    for index,(name,command) in enumerate(commands.items(), 1)}
+        (self.runtime/'processes.json').write_text(json.dumps(registry))
+        boundary.process = lambda pid: registry['worker'] if pid == 3 else None
+        with self.assertRaises(RuntimeError): boundary.stopped()
+        boundary.process = lambda pid: None
+        boundary.stopped()
+        registry['worker']['args'][-1] = '--spring.main.web-application-type=servlet'
+        (self.runtime/'processes.json').write_text(json.dumps(registry))
+        with self.assertRaises(RuntimeError): boundary.stopped()
+
     @contextmanager
     def hidden_stop_children(self, count=1):
         children = []
@@ -461,6 +482,16 @@ class ReleaseTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'owned process stop failed'):
                 self.stop_with_real_pwsh(boundary, ignored_stop)
             self.assertIsNone(children[0].poll())
+
+    @unittest.skipUnless(os.name == 'nt', 'requires Windows process/CIM adapter')
+    def test_m1_pending_worker_launch_retains_marker_after_three_owned_children_are_stopped(self):
+        with self.hidden_stop_children(3) as (boundary, children):
+            marker = self.runtime/'worker-start.pending'
+            marker.write_text('synthetic interrupted launch')
+            with self.assertRaisesRegex(RuntimeError,'interrupted process launch'):
+                boundary.stop()
+            self.assertTrue(all(child.poll() is not None for child in children))
+            self.assertTrue(marker.exists(), 'uncertain launch marker must remain for explicit reconciliation')
 
 
 if __name__ == '__main__':

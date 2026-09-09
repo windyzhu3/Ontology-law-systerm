@@ -579,15 +579,17 @@ class RuntimeBoundary:
 
     def processes(self):
         saved = read_json(self.runner.RUNTIME / 'processes.json')
-        if set(saved) != {'api', 'spa'}:
+        if set(saved) not in ({'api', 'spa'}, {'api', 'spa', 'worker'}):
             raise RuntimeError('unknown process registry; coordinate all owned consumers before switch')
         legacy = {'api': [str(self.runner.JAVA), '-Xmx768m', '-jar', str(self.runner.JAR),
                           '--spring.config.additional-location=' + (self.runner.RUNTIME / 'application.properties').as_uri()],
                   'spa': [str(self.runner.TOOLS / 'node-v24.20.0-win-x64/node.exe'), str(self.runner.ROOT / 'deploy/local-login/server.mjs')]}
         result = []
-        for name in ('api', 'spa'):
+        for name in saved:
             expected = saved[name]
             if type(expected) is int:
+                if name == 'worker':
+                    raise RuntimeError('Worker requires exact controlled process registration')
                 expected = {'pid': expected, 'executable': legacy[name][0], 'args': legacy[name][1:]}
             else:
                 candidates = []
@@ -601,7 +603,11 @@ class RuntimeBoundary:
                 for state in states:
                     package = manager.package(state['id'])
                     manager.load(state['id'])
-                    candidates.append(app_commands(self.runner, package)[name])
+                    if name == 'worker':
+                        from local_worker import worker_command
+                        candidates.append(worker_command(self.runner, package))
+                    else:
+                        candidates.append(app_commands(self.runner, package)[name])
                 if not any(expected['executable'] == command[0] and expected['args'] == command[1:] for command in candidates):
                     raise RuntimeError('process registry does not name a controlled local artifact')
             actual = self.process(expected['pid'])
@@ -612,8 +618,8 @@ class RuntimeBoundary:
     def stopped(self):
         self.protect()
         if any(self.processes()):
-            raise RuntimeError('owned API/SPA must be stopped before byte switching')
-        if (self.runner.RUNTIME / 'apps-start.pending').exists():
+            raise RuntimeError('owned API/SPA and registered Worker must be stopped before byte switching')
+        if any((self.runner.RUNTIME / name).exists() for name in ('apps-start.pending', 'worker-start.pending')):
             raise RuntimeError('interrupted process launch; reconcile marker and exact owned processes')
 
     def stop(self):

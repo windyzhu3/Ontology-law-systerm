@@ -406,6 +406,9 @@ def start_apps():
             local_release.atomic(RUNTIME / 'processes.json', processes)
     marker.unlink()
     print('API and SPA processes started; readiness must be checked separately')
+    if 'worker' in processes:
+        worker_operation('worker-prepare')
+        worker_operation('worker-start')
 
 
 def protocol_check(kind='founder'):
@@ -486,7 +489,24 @@ def stop():
 def stop_apps():
     import local_release
     local_release.RuntimeBoundary(sys.modules[__name__]).stop()
-    print('owned API/SPA stopped; identity and database services retained')
+    print('owned API/SPA and registered Worker stopped; identity and database services retained')
+
+
+def worker_operation(operation):
+    import local_release
+    import local_worker
+    boundary = local_release.RuntimeBoundary(sys.modules[__name__])
+    release = local_release.LocalRelease(ROOT, RUNTIME, boundary)
+    worker = local_worker.LocalWorker(sys.modules[__name__],release,local_worker.WorkerBoundary(sys.modules[__name__],boundary))
+    if operation == 'worker-grant':
+        result = {'state':'VERIFIED','delta':worker.grant(),'basis':'APPROVED_LOCAL_INFRASTRUCTURE'}
+    elif operation == 'worker-prepare':
+        worker.prepare()
+        result = {'state':'PREPARED','readiness':'UNVERIFIED'}
+    elif operation == 'worker-start': result = worker.start()
+    elif operation == 'worker-health': result = worker.health()
+    else: raise RuntimeError('unknown local Worker operation')
+    print(json.dumps(result,sort_keys=True))
 
 
 def require_original_verification_output(output):
@@ -583,18 +603,23 @@ def resume():
 if __name__ == '__main__':
     try:
         require_protected_runtime()
-        if sys.argv[1] not in ('prepare', 'stop', 'stop-apps', 'release-status'):
+        if sys.argv[1] not in ('prepare', 'stop', 'stop-apps', 'release-status', 'worker-grant', 'worker-prepare', 'worker-start', 'worker-health'):
             secret_bundle(RUNTIME)
         if sys.argv[1] in ('snapshot-release', 'capture-build-inputs', 'describe-candidate', 'stage-release', 'activate-release',
                           'rollback-release', 'release-status', 'recover-release', 'bootstrap-verify-current-release'):
             release_operation(sys.argv[1], sys.argv[2:])
             sys.exit(0)
-        if sys.argv[1] in ('start-apps', 'stop-apps', 'stop', 'resume'):
+        if sys.argv[1] in ('start-apps', 'stop-apps', 'stop', 'resume', 'worker-grant', 'worker-prepare', 'worker-start', 'worker-health'):
             lock = RUNTIME / 'release-operation.lock'
             with lock.open('x', encoding='utf-8') as stream:
                 stream.write(str(os.getpid()))
             try:
-                {'start-apps': start_apps, 'stop-apps': stop_apps, 'stop': stop, 'resume': resume}[sys.argv[1]]()
+                if sys.argv[1].startswith('worker-'):
+                    if len(sys.argv) != 2:
+                        raise RuntimeError('local Worker operations do not accept arbitrary identities or grant options')
+                    worker_operation(sys.argv[1])
+                else:
+                    {'start-apps': start_apps, 'stop-apps': stop_apps, 'stop': stop, 'resume': resume}[sys.argv[1]]()
             finally:
                 lock.unlink()
             sys.exit(0)

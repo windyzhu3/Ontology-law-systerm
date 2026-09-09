@@ -183,9 +183,9 @@ must still have their original hashes.
    Activation does not start processes or claim readiness. Check actual TLS,
    API/SPA responses and all four exact admin navigation URLs separately.
    The API consumes the current Jar release digest and manifest hash. Future
-   Worker wiring must use this same `current-release.json`/verified `paths()`
-   contract; the release helper refuses an unknown extra process registry entry,
-   so Worker lifecycle must be integrated before switching while it is present.
+   Worker wiring uses this same `current-release.json`/verified `paths()`
+   contract. The release helper recognizes an exactly registered Worker as a
+   third consumer and refuses all other process registry entries.
 
 The migrator's existing protected secret and CA are mounted read-only into a
 one-shot client using the already locked PostgreSQL image. Only
@@ -254,3 +254,81 @@ survives, then explicitly remove that marker before another start. Never infer
 ownership from a process name or a path substring. No Keycloak/DB stop is needed
 for artifact switching. Operational execution and real-chain acceptance remain
 controller work after review.
+
+## Approved local Worker assembly (9.6c)
+
+These commands assemble the existing production Worker and are for the approved
+isolated local operator only. Run them after current-release activation and
+successful original-bootstrap verification. They accept no identity, authority,
+source, or grantor arguments:
+
+```powershell
+& D:/soft/python3/python.exe deploy/local-login/local_login.py worker-grant
+& D:/soft/python3/python.exe deploy/local-login/local_login.py worker-prepare
+& D:/soft/python3/python.exe deploy/local-login/local_login.py worker-start
+& D:/soft/python3/python.exe deploy/local-login/local_login.py worker-health
+```
+
+`worker-grant` derives the original SERVICE from `service-fixture.json` and the
+original founder/ROOT from the existing bootstrap audit selected by the original
+manifest command. It verifies the original bootstrap using the existing offline
+verifier, retains the complete original facts and fixed grant rows in protected
+`worker/grants.json` before writing, and uses the existing migration Owner TLS
+connection for one locked infrastructure transaction. The only inserted rows
+are `R1_PROJECTION_CONSUME`, `CONTACT_TASK_RECOVER`, and
+`ROUTING_REVIEW_TASK_RECOVER`, granted to the original SERVICE appointment with
+original ROOT scope. The fixed setup grantor is the exact original founder
+appointment. This is the approved local infrastructure setup basis, not an ADM
+HTTP action, HTTP receipt, HUMAN business grant, or expansion of the founder's
+online authority. Original four HUMAN administration grants remain unchanged.
+An exact full retry reports delta 0; partial, additional, altered, or unrecorded
+SERVICE grants fail without adoption or repair. Lost responses retain the plan;
+repeat this same command to reconcile its exact committed rows. Never rerun the
+old `service-fixture` command or replace the original manifest.
+
+`worker-prepare` creates only protected copies: `worker/service.p12` changes
+alias `local-service` to `local_service`; a local JDK adapter checks the private
+key, certificate DER, validity, client EKU and both trust directions. Original
+keystore/certificate/API trust are preserved. Expired or conflicting material
+fails; no identity or certificate is renewed. `worker/trust.p12` copies the
+original API CA trust. The independent properties contain only Worker DB/TLS
+secrets, exact original SERVICE binding, `ols.runtime-role=worker`,
+`MVP-2026-09-08.3`, `LOCAL_LOGIN_WORKER`, `https://localhost:19445`, verify-full
+PostgreSQL with `law_worker_login`, and the same current release/schema/manifest.
+The actual DB login must have only the non-inheriting, non-admin
+`law_app_worker` membership and no elevated/direct application capabilities.
+
+`worker-start` uses the current immutable Jar, 384 MiB heap, an explicit non-web
+assembly and a hidden Windows process. It passes only the Worker properties and
+a restricted environment. Exact PID, executable, Jar/config arguments, creation
+time and launch timestamp are saved in `processes.json`; uncertain existing
+processes or launch markers block a second launch. Previous stdout/stderr are
+retained in protected `worker/previous-*` files before a new attempt. No new
+listener or SPA internal API proxy is added.
+
+`worker-health` reports fixed statuses/counts only. It requires the current
+Worker login/gate, exact live process ownership, this launch's exact
+`WorkerRuntimeHealth` ISOLATED then latest READY status, mTLS read readiness,
+and zero TCP listeners/UDP endpoints owned by the Worker. The production READY
+means the database, projection, contact recovery and routing recovery loops are
+jointly healthy; a later UNAVAILABLE invalidates readiness. Missing recovery
+grants cannot be called READY. Startup alone is not W09 or seven-card business
+acceptance. SQL adapters and real local Worker deployment still require the
+controller's deployment-gate evidence; unit fixtures do not replace it.
+
+After registration, `stop-apps` stops API, SPA and Worker using the same exact
+process checks and bounded handle-based wait. `start-apps`/`resume` regenerate
+Worker release expectations from the selected package and restart the registered
+Worker after API/SPA; run `worker-health` separately after readiness settles.
+Activation, recovery and rollback require all three consumers stopped. A stopped
+Worker retains its registration, certificate, secrets and fixed grants. No stop
+or rollback revokes grants or reverses business facts.
+
+Known M1 lifecycle limitation remains: if `apps-start.pending` or
+`worker-start.pending` survives an interrupted launch, `stop-apps` may stop every
+proven owned process and still fail its final `stopped()` check because the marker
+remains. This is an unresolved launch outcome, not permission for another start.
+Inspect the exact registry/creation times and confirm no unregistered owned
+process survives, then explicitly clear only the reviewed marker. Automatic
+marker deletion, name-based process termination, grant rollback and identity
+replacement are not performed.
