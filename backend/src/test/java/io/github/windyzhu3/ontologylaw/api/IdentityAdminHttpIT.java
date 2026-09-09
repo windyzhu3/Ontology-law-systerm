@@ -65,6 +65,16 @@ class IdentityAdminHttpIT extends PostgresIntegrationTest {
         assertEquals(before+1,count("audit.audit_entry"));assertEquals(slots+1,count("execution.command_execution_slot"));assertEquals(receipts+1,count("execution.command_receipt"));
         for(String table:List.of("responsibility.task_occurrence","responsibility.action_draft","execution.domain_event","execution.domain_event_outbox"))assertEquals(0,count(table));
     }
+    @Test void success_and_replay_keep_original_receipt_location()throws Exception {
+        // Break caught: a successful Identity write redirects Location to its result Fact instead of the original CommandReceipt.
+        String key=UUID.randomUUID().toString();var headers=Map.of("Idempotency-Key",key);var body=Map.of("parentOrganizationId",root.toString(),"code","RECEIPT_LOCATION","displayName","Receipt location");
+        long facts=count("identity.organization_unit"),slots=count("execution.command_execution_slot"),receipts=count("execution.command_receipt"),audits=count("audit.audit_entry");
+        var first=request("POST","organizations",body,headers);assertEquals(201,first.statusCode(),first.body());assertReceiptLocation(first,key);String result=factId(first);
+        assertEquals(List.of(facts+1,slots+1,receipts+1,audits+1),List.of(count("identity.organization_unit"),count("execution.command_execution_slot"),count("execution.command_receipt"),count("audit.audit_entry")));
+        var replay=request("POST","organizations",body,headers);assertEquals(201,replay.statusCode(),replay.body());assertReceiptLocation(replay,key);
+        assertEquals(first.headers().firstValue("Location"),replay.headers().firstValue("Location"));assertEquals(json(first.body()),json(replay.body()));assertEquals(result,factId(replay));
+        assertEquals(List.of(facts+1,slots+1,receipts+1,audits+1),List.of(count("identity.organization_unit"),count("execution.command_execution_slot"),count("execution.command_receipt"),count("audit.audit_entry")));
+    }
     @Test void orphan_permanent_slot_with_same_key_and_different_scope_fails_closed_over_http()throws Exception {
         UUID command=UUID.randomUUID();
         try(var c=database.adminConnection()) {
@@ -171,8 +181,15 @@ class IdentityAdminHttpIT extends PostgresIntegrationTest {
     }
     static Map<String,Object> reason(){return Map.of("reasonCode","ADMINISTRATIVE_ACTION");}
     HttpResponse<String> create(String path,Object body)throws Exception{return write("POST",path,body,null,201);}
-    HttpResponse<String> write(String method,String path,Object body,String tag,int status)throws Exception{var headers=new HashMap<String,String>();headers.put("Idempotency-Key",UUID.randomUUID().toString());if(tag!=null)headers.put("If-Match",tag);var response=request(method,path,body,headers);assertEquals(status,response.statusCode(),path+response.body());return response;}
-    static String factId(HttpResponse<String> r){String path=r.headers().firstValue("Location").orElseThrow();return path.substring(path.lastIndexOf('/')+1);}
+    HttpResponse<String> write(String method,String path,Object body,String tag,int status)throws Exception{var headers=new HashMap<String,String>();headers.put("Idempotency-Key",UUID.randomUUID().toString());if(tag!=null)headers.put("If-Match",tag);var response=request(method,path,body,headers);assertEquals(status,response.statusCode(),path+response.body());assertReceiptLocation(response,headers.get("Idempotency-Key"));return response;}
+    void assertReceiptLocation(HttpResponse<String> response,String commandId){assertEquals("/api/v1/commands/"+commandId+"/receipt",response.headers().firstValue("Location").orElseThrow());assertEquals(commandId,json(response.body()).path("commandId").asString());}
+    String factId(HttpResponse<String> response)throws Exception {
+        var body=json(response.body());UUID command=UUID.fromString(body.path("commandId").asString());
+        try(var c=database.migratorConnection();var p=c.prepareStatement("select r.command_receipt_id,r.result_fact_type,r.result_fact_id,r.result_fact_revision from execution.command_execution_slot s join execution.command_receipt r on r.tenant_id=s.tenant_id and r.command_execution_slot_id=s.command_execution_slot_id where s.tenant_id=? and s.command_id=?")) {
+            p.setObject(1,tenant);p.setObject(2,command);try(var rows=p.executeQuery()){assertTrue(rows.next(),"Missing original receipt");UUID receipt=rows.getObject(1,UUID.class),fact=rows.getObject(3,UUID.class);String type=rows.getString(2);Long revision=rows.getObject(4,Long.class);assertFalse(rows.next(),"Ambiguous original receipt");
+                assertEquals(receipt.toString(),body.path("receiptId").asString());var projection=body.path("resultFact");assertEquals(switch(type){case "identity.principal"->"IDENTITY_PRINCIPAL";case "identity.organization_unit"->"ORGANIZATION_UNIT";case "identity.appointment"->"APPOINTMENT";case "identity.authority_grant"->"AUTHORITY_GRANT";default->throw new AssertionError("Unexpected Identity result Fact type: "+type);},projection.path("factType").asString());assertEquals(revision.longValue(),projection.path("revision").asLong());assertFalse(projection.path("factRef").asString().isBlank());return fact.toString();}
+        }
+    }
     static String etag(HttpResponse<String> r){return r.headers().firstValue("ETag").orElseThrow();}
     String findTag(String collection,String id)throws Exception{var response=request("GET",collection+"?limit=50",null,Map.of());assertEquals(200,response.statusCode(),response.body());for(var item:json(response.body()).path("items"))if(item.path("id").asString().equals(id))return item.path("etag").asString();throw new AssertionError("Missing visible identity");}
     HttpResponse<String> request(String method,String path,Object body,Map<String,String> headers)throws Exception {

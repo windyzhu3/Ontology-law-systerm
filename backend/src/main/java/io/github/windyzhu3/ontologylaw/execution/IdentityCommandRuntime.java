@@ -94,7 +94,7 @@ public final class IdentityCommandRuntime {
             try{access=facts.resourceAccess(c,e.actor(),IdentityCommands.handler(e.type().name()).authority(),current);}catch(Failure denied){if(!"NOT_AUTHORIZED".equals(denied.code()))throw denied;}
         }
         String tag=fact==null?null:resources.tag(e.actor(),fact,access.digest());
-        String location=fact==null?null:"/api/v1/admin/identity/"+switch(Kind.of(fact.type())){case PRINCIPAL->"principals";case ORGANIZATION->"organizations";case APPOINTMENT->"appointments";case AUTHORITY_GRANT->"authority-grants";}+"/"+fact.id();
+        String location=fact==null?null:"/api/v1/commands/"+e.commandId()+"/receipt";
         return new Result(receipt,tag,location,replay,false,stale);
     }
     public static Map<String,Object> selector(Subject fact){return fact==null?null:Map.of("type",fact.type(),"id",fact.id().toString(),"revision",fact.revision());}
