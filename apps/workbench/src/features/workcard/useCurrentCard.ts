@@ -531,6 +531,8 @@ export function useCurrentCard(
       if (document.visibilityState === "hidden") {
         if (!locked.current) generation.current++;
         getController.current?.abort();
+        if (recoveryOnly && !locked.current && stateRef.current.loading)
+          update({ loading: false, needsRefresh: true });
       } else focus();
     };
     window.addEventListener("focus", focus);

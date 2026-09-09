@@ -303,6 +303,51 @@ it("does not strand a pending receipt when the document hides and becomes visibl
   expect(await screen.findByRole("button", { name: "继续" })).toBeEnabled();
 });
 
+it("allows only a manual current-read retry after hiding during confirmed recovery", async () => {
+  const pending = deferred<Response>();
+  let reads = 0;
+  const f = fixture(async (r) => {
+    if (r.url.endsWith("/receipt")) return jsonResponse(receipt(selectorId));
+    return ++reads === 1 ? pending.promise : jsonResponse(envelope());
+  });
+  await mounted(f);
+  fireEvent.click(query());
+  await waitFor(() => expect(f.requests).toHaveLength(2));
+  expect(f.controller.recovery.read()).toBeNull();
+  expect(
+    screen.getByRole("button", { name: "重新读取当前责任" }),
+  ).toBeDisabled();
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    value: "hidden",
+  });
+  fireEvent(document, new Event("visibilitychange"));
+  Object.defineProperty(document, "visibilityState", {
+    configurable: true,
+    value: "visible",
+  });
+  fireEvent(document, new Event("visibilitychange"));
+  fireEvent(window, new Event("focus"));
+  expect(f.requests[1].signal.aborted).toBe(true);
+  expect(f.requests).toHaveLength(2);
+  expect(
+    screen.getByRole("button", { name: "重新读取当前责任" }),
+  ).toBeEnabled();
+  expect(
+    screen.getByText("原操作结果已确认，当前责任暂时无法读取。"),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "查询原操作结果" }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "重新读取当前责任" }));
+  await screen.findByRole("button", { name: "继续" });
+  await act(async () => pending.resolve(jsonResponse({}, 503)));
+  expect(screen.getByRole("button", { name: "继续" })).toBeEnabled();
+  expect(f.requests).toHaveLength(3);
+  expect(f.requests.every((r) => r.method === "GET")).toBe(true);
+  expect(f.requests.filter((r) => r.url.endsWith("/receipt"))).toHaveLength(1);
+});
+
 it.each(["corrupt", "expired"] as const)(
   "can explicitly abandon a %s local clue without querying it",
   async (kind) => {
