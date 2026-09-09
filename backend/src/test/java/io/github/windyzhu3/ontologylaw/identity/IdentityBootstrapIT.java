@@ -31,25 +31,25 @@ class IdentityBootstrapIT extends PostgresIntegrationTest {
             IdentityBootstrapRuntime.Outcome created;try(var c=database.apiConnection()){created=runtime.run(c,manifest,false);assertEquals("CREATED",created.mode());assertNotNull(created.receiptId());}
             assertCounts(tenant);
             try(var c=database.apiConnection()){var replay=runtime.run(c,manifest,false);assertEquals("VERIFIED_ORIGINAL",replay.mode());assertEquals(created.receiptId(),replay.receiptId());}assertCounts(tenant);
-            long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(8);while(Instant.now().isBefore(issued.plusSeconds(300))&&System.nanoTime()<deadline)Thread.sleep(50);assertFalse(Instant.now().isBefore(issued.plusSeconds(300)));
+            awaitCandidateExpiry(issued.plusSeconds(300));
             var restarted=new IdentityBootstrapRuntime(tenant,binding,candidates,new ExternalSubjectProtection(t->subjectKey),directory,AuditAppender.databaseBacked("TASK92_RESTARTED_NODE"));
             idp.unavailable(()->{try(var c=database.apiConnection()){assertEquals(created.receiptId(),restarted.run(c,manifest,false).receiptId());}catch(Exception failure){throw new AssertionError(failure);}});assertCounts(tenant);
         }
     }
-    record Scenario(UUID tenant,IdentityBootstrapService.Manifest manifest,IdentityBootstrapRuntime runtime){}
+    record Scenario(UUID tenant,IdentityBootstrapService.Manifest manifest,IdentityBootstrapRuntime runtime,Instant candidateExpiresAt){}
     Scenario scenario(boolean expired)throws Exception {return scenario(expired?301:0);}
     Scenario scenario(int ageSeconds)throws Exception {
         UUID tenant=UUID.randomUUID();byte[] candidateKey=new byte[32],subjectKey=new byte[32];new java.security.SecureRandom().nextBytes(candidateKey);new java.security.SecureRandom().nextBytes(subjectKey);
         var directory=KeycloakDirectoryReader.isolatedLoopback(new KeycloakDirectoryReader.Trust(idp.issuer(),"task92-directory",idp.directorySecret));
         var candidates=new BootstrapCandidateProtection("offline-v1",Map.of("offline-v1",candidateKey));
         var binding=new BootstrapCandidateProtection.Binding("Approved synthetic test operator","T"+tenant.toString().replace("-",""),"TASK92",idp.issuer());
-        String selector=candidates.issue(binding,idp.username,directory,Instant.now().minusSeconds(ageSeconds));
+        Instant issuedAt=Instant.now().minusSeconds(ageSeconds);String selector=candidates.issue(binding,idp.username,directory,issuedAt);
         var manifest=new IdentityBootstrapService.Manifest("R1_IDENTITY_BOOTSTRAP_V1",UUID.randomUUID(),binding.tenantCode(),"Synthetic tenant","ROOT","Synthetic root",binding.provider(),binding.issuer(),selector,"Synthetic founder",Instant.now().minusSeconds(60),binding.operatorAssertion());
-        return new Scenario(tenant,manifest,new IdentityBootstrapRuntime(tenant,binding,candidates,new ExternalSubjectProtection(t->subjectKey),directory,AuditAppender.databaseBacked("TASK92_BOOTSTRAP_IT")));
+        return new Scenario(tenant,manifest,new IdentityBootstrapRuntime(tenant,binding,candidates,new ExternalSubjectProtection(t->subjectKey),directory,AuditAppender.databaseBacked("TASK92_BOOTSTRAP_IT")),issuedAt.plusSeconds(300));
     }
     @ParameterizedTest @ValueSource(strings={"SLOT_TIME","RECEIPT_TIME","BOTH_TIMES","SERVICE_ROLE","TRACE","CAUSATION"})
     void expired_offline_original_recovery_rejects_each_corrupted_closure_time_or_audit_source_without_repair(String defect)throws Exception {
-        Instant started=Instant.now();var s=scenario(295);try(var c=database.apiConnection()){assertEquals("CREATED",s.runtime().run(c,s.manifest(),false).mode());}
+        var s=scenario(295);try(var c=database.apiConnection()){assertEquals("CREATED",s.runtime().run(c,s.manifest(),false).mode());}
         String mutation=switch(defect){
             case "SLOT_TIME"->"update execution.command_execution_slot set occupied_at=occupied_at+interval '1 second' where tenant_id=?";
             case "RECEIPT_TIME"->"update execution.command_receipt set completed_at=completed_at+interval '1 second' where tenant_id=?";
@@ -60,7 +60,7 @@ class IdentityBootstrapIT extends PostgresIntegrationTest {
             default->throw new IllegalArgumentException("Unsupported isolated corruption case");};
         // Isolated corruption fixture only: no production grants or trigger definitions are changed.
         try(var c=database.adminConnection()){c.setAutoCommit(false);AuthorizationServiceIT.sql(c,"set local session_replication_role=replica");AuthorizationServiceIT.sql(c,mutation,s.tenant());c.commit();}
-        while(Instant.now().isBefore(started.plusSeconds(6)))Thread.sleep(25);
+        awaitCandidateExpiry(s.candidateExpiresAt());
         var before=snapshot(s.tenant());idp.unavailable(()->{try(var c=database.apiConnection()){
             assertThrows(SQLException.class,()->s.runtime().run(c,s.manifest(),false));assertThrows(SQLException.class,()->s.runtime().verifyOriginal(c,s.manifest()));
         }catch(SQLException failure){throw new AssertionError("Isolated original-state verification connection unavailable",failure);}});assertEquals(before,snapshot(s.tenant()));
@@ -91,6 +91,7 @@ class IdentityBootstrapIT extends PostgresIntegrationTest {
         else for(long count:snapshot(s.tenant()))assertEquals(0,count);
     }
     List<Long> snapshot(UUID tenant)throws Exception {var counts=new ArrayList<Long>();for(String table:List.of("identity.tenant","identity.organization_unit","identity.principal","identity.appointment","identity.authority_grant","execution.command_execution_slot","execution.command_receipt","audit.audit_entry"))counts.add(count(table,tenant));return counts;}
+    void awaitCandidateExpiry(Instant expiresAt)throws Exception {long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(10);while(Instant.now().isBefore(expiresAt)&&System.nanoTime()<deadline)Thread.sleep(25);assertFalse(Instant.now().isBefore(expiresAt),"Candidate did not reach its exact expiry");}
     long count(String table,UUID tenant)throws Exception{try(var c=database.migratorConnection();var p=c.prepareStatement("select count(*) from "+table+" where tenant_id=?")){p.setObject(1,tenant);try(var r=p.executeQuery()){r.next();return r.getLong(1);}}}
     void assertCounts(UUID tenant)throws Exception {
         for(String table:List.of("identity.tenant","identity.organization_unit","identity.principal","identity.appointment","execution.command_execution_slot","execution.command_receipt","audit.audit_entry"))assertEquals(1,count(table,tenant),table);
