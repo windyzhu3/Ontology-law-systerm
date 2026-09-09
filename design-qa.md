@@ -57,6 +57,30 @@ BASE01 为 1485×1059；浏览器 DPR 约 1。带滚动条的原生截图输出�
 
 final result: passed
 
+## Task9.4 生产入口装配浏览器抽检（2026-09-09）
+
+本节仅记录生产装配增量；此前三类页面的冻结原图、比较结果和历史证据保留。使用 UI/UX 规则核对焦点、触控尺寸和响应式，不采纳通用搜索推荐的新字体／配色／营销布局，保持批准设计§7和已有工作台样式。
+
+实际生产 main 的 `/workbench` 在没有部署配置时显示已确认 LOGIN 样式及“登录部署配置不可用，请联系律所管理员。”，登录按钮禁用，Logo／律所名称占位保留。用户已明确没有固定 Origin／realm／client／audience；本次不配置或部署身份服务。
+
+另以忽略目录 `assembly-preview.html/tsx` 装载真实 SessionApplication／SessionController／RecoveryStore／WorkbenchApi，只有外部 OIDC 和 HTTP 使用合成响应，无生产 Mock 分支。合成工具条仅存在该验收夹具，不属于页面交付。浏览器观测：
+
+- 明确确认办理身份前只有 SELF，确认后首次 CURRENT GET 携正确本人任职；没有默认业务写入。
+- 在联系说明输入“尚未保存的输入”，合成外部 adapter 换 token 并通过 controller 取新凭据后，文本和候选输入仍在，主提交仍禁用、零 POST。完整保存后单写的新 Bearer 断言由 DOM/HTTP 回归另证，不以截图替代。
+- 初次有效未决线索：确认原身份后进入 RECOVERY，初始不查卡；显式核对只有原 `/commands/{id}/receipt` GET，没有重放或 POST。
+- 损坏线索可到恢复页，禁止查询；二次确认放弃后点击继续，回到显式身份确认，仍未查业务卡。
+- 合成失效立即移除姓名／责任／dirty 内容并转固定 `/login`；IdP 退出失败显示“已退出本页面，统一会话退出尚未确认。”，不宣称统一退出成功。
+- Identity-only 确认后显示无工作台资格和管理入口尚未开放，不读 CURRENT，不显示管理导航，也不冒充零任务。
+- 1440×1000、768×1024、360×800 的 scrollWidth 分别1425、753、345，无横向溢出；顶栏两按钮高44px，手机自然换行。键盘切到退出按钮有绿色2.66667px焦点线，沿用原 composer 布局。console error/warn抽检为空。
+
+截图在 `.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task94-assembly-captures/`：`workbench-1440-dirty.png`、`workbench-768.png`、`workbench-360.png`、`pending-query-only-1440.png`、`logout-failure-1440.png`、`production-missing-config-1440.png`。垂直滚动条触发浏览器截图归一化，不裁切或拉伸。一次开发热重载使夹具固定路径重新加载实际 main，重新加载夹具后完成该项，未当作应用错误；只读 DOM 沙箱不提供 performance 对象，未据其声称网络验收。
+
+补充多任职组合：已验证SELF但尚无Actor，损坏线索仍可在RECOVERY二次确认清理；继续后本人下拉保持“请选择本人任职”，两种确认均禁用，只有一次SELF，无CURRENT／RECEIPT／POST。截图`multiple-invalid-cleared-1440.png`。此路径仅清本地无效线索，不是无Actor业务访问。
+
+System.Drawing实读像素：工作台桌面及待确认回执1425×990、平板753×1004、手机345×767，退出失败及实际缺配置入口1440×1000；CSS视口尺寸如上。抽检未发现需变更冻结视觉的阻塞问题；源码测试、独立评审和真实9.6整链分别记录，不用此结论提前宣布真实用户登录领卡通过。
+
+完整源码评审的SELF正文超时修复`958e190`未改视觉。稳定源码受控浏览器返回200响应头但永不完成正文后，页面退出初始化，固定`/login`显示“登录服务暂不可用，请稍后重试。”且登录按钮可用；只有一次SELF请求，无卡片／回执／POST。截图`self-body-timeout-safe-retry.png`，恢复默认CSS视口1433×898。精确原请求10秒预算与迟到正文隔离由两项真实Response流回归验证；本次浏览器观察不冒充协议服务端故障注入。最终生产构建资产`index-CmAzb8aW.js`重新检查，仍按缺配置安全关闭；最终222项、typecheck/build通过，复审另记。
+
 ## Task9.4 LOGIN-01增量QA — 2026-09-09
 
 本节是`73aeef4`登录组件的独立增量，以上Task9.0证据保留为历史。使用image-to-code/design-qa流程逐项对照用户选择的第3稿；既有冻结风格优先于通用UI建议，未另加品牌、字体或导航。本结果不代表生产登录入口、完整9.4或真实用户验收通过。
