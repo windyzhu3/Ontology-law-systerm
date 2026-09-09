@@ -488,6 +488,8 @@ def test_fixed_source_delta_preserves_every_existing_property(self):
 
 ## Task 9.6e: 真实浏览器受控建档与动态资格链
 
+**类型检查补充（2026-09-10）：** 根依赖不存在Node类型声明，真实测试fixture使用Node内置模块，独立tsc不能完成。允许同一根package／lock额外加入精确开发依赖`@types/node=24.13.3`（npm元数据integrity为`sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==`），其`undici-types`依赖按lock精确解析。此为下文“仅加入Playwright”的最小具名例外；不从机器外部类型目录获取不可复现的编译前提，不加入生产polyfill或改变应用依赖版本。
+
 依赖9.6d完成；这是既定9.6真实管理链的第一个可独立验收单元，不新增产品界面或业务能力。实现者只交付测试代码与合成离线测试，不访问本地私有runtime或实际账号；经独立评审后由控制者执行真实浏览器写入。
 
 **Files:** 新建`playwright.config.ts`、`e2e/fixtures/local-environment.ts`、`e2e/fixtures/operation-journal.ts`、`e2e/fixtures/identity-setup.ts`、`e2e/reporters/safe-reporter.ts`、`e2e/tests/task9-harness.spec.ts`、`e2e/tests/task9-identity-entry.spec.ts`、`e2e/README.md`。修改根`package.json`／`package-lock.json`，仅加入锁定`@playwright/test=1.63.0`及`test:e2e:task9=playwright test --config playwright.config.ts`。现有应用依赖版本不得漂移；不修改生产Java／SPA／本地部署工具。既有本地runner已部署真实Keycloak、独立数据库、API、SPA、Worker，本单元不另建compose服务或第二套身份系统；原9.6的compose交付项在本地路径由该已验收runner承担，CI适配仍由Task10处理，不造空compose文件。
