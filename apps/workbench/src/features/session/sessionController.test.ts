@@ -36,6 +36,87 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
+
+it.each(["initial", "selection"] as const)(
+  "bounds the entire %s SELF response and rejects its late body after the original deadline",
+  async (phase) => {
+    vi.useFakeTimers();
+    const headers = deferred<Response>();
+    let body!: ReadableStreamDefaultController<Uint8Array>;
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          body = controller;
+        },
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+    let stalled = phase === "initial";
+    let requestSignal: AbortSignal | null | undefined;
+    const controller = new SessionController(
+      adapter(),
+      new RecoveryStore(sessionStorage),
+      async (_url, init) => {
+        if (!stalled) return jsonResponse(context);
+        requestSignal = init?.signal;
+        return headers.promise;
+      },
+    );
+    if (phase === "selection") {
+      await controller.initialize();
+      stalled = true;
+    }
+    let settled = false;
+    const operation = (
+      phase === "initial"
+        ? controller.initialize()
+        : controller.selectOnBehalfAppointment(delegated)
+    ).then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(controller.getSnapshot().status).toBe(
+      phase === "initial" ? "INITIALIZING" : "SELECTING",
+    );
+    await vi.advanceTimersByTimeAsync(8_000);
+    headers.resolve(response);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(response.bodyUsed).toBe(true);
+    expect(requestSignal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(2_001);
+    try {
+      expect(controller.getSnapshot().status).toBe("UNAVAILABLE");
+      expect(controller.getSnapshot().context).toBeNull();
+      expect(controller.getSnapshot().message).toBe(
+        "登录服务暂不可用，请重新登录。",
+      );
+      expect(requestSignal?.aborted).toBe(true);
+      expect(settled).toBe(true);
+    } finally {
+      body.enqueue(
+        new TextEncoder().encode(
+          JSON.stringify(
+            phase === "initial"
+              ? context
+              : {
+                  ...context,
+                  selectedOnBehalfAppointmentId: delegated,
+                  actorScopeKey: dkey,
+                },
+          ),
+        ),
+      );
+      body.close();
+      await operation;
+    }
+    expect(controller.getSnapshot().status).toBe("UNAVAILABLE");
+    expect(controller.getSnapshot().context).toBeNull();
+    stalled = false;
+    await controller.initialize();
+    expect(controller.getSnapshot().status).toBe("READY");
+    expect(controller.getSnapshot().context?.actorScopeKey).toBe(key);
+  },
+);
 it("uses authenticated own context and explicit paired delegated selectors", async () => {
   const requests: Request[] = [];
   const controller = new SessionController(

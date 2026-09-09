@@ -218,7 +218,7 @@ export class SessionController {
     if (generation !== this.generation) return;
     const abort = new AbortController();
     try {
-      const response = await bounded(
+      const context = await bounded(
         this.fetcher("/api/v1/session/context", {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -227,11 +227,14 @@ export class SessionController {
           },
           cache: "no-store",
           signal: abort.signal,
+        }).then(async (response) => {
+          if (generation !== this.generation || abort.signal.aborted)
+            throw new Error();
+          if (response.status !== 200)
+            throw new SessionFailure(response.status);
+          return parseContext(await response.json());
         }),
       );
-      if (generation !== this.generation) return;
-      if (response.status !== 200) throw new SessionFailure(response.status);
-      const context = parseContext(await response.json());
       if (generation !== this.generation) return;
       if (
         (own && context.selectedAppointmentId !== own) ||
