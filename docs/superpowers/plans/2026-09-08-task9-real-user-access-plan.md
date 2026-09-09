@@ -249,6 +249,18 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 - [ ] 按 360/768/1440 在真实浏览器检查状态、焦点、弹层、权限屏与 composer，无遮挡或横向溢出；登录/任职页采用已获确认的设计。
 - [ ] 运行管理与工作台 DOM 回归、typecheck/build，保存冻结图与实际页面联合比较证据，独立评审后提交。
 
+## Task 9.6a: 原 bootstrap 集合核验修正（9.5 前置窄修复）
+
+**批准范围（2026-09-09）：** 用户确认只核验原始事实和原凭据闭包，不冻结整个租户；严格遵循设计 §5.3 和 Identity 合同 Offline bootstrap 的同日澄清。本单元是本地登录检查发现问题的后续修正，不表示整个9.6完成，也不扩展9.5。
+
+**Files:** `backend/src/main/java/io/github/windyzhu3/ontologylaw/identity/internal/persistence/JooqIdentityBootstrapService.java`、`backend/src/test/java/io/github/windyzhu3/ontologylaw/identity/IdentityBootstrapIT.java`；必要时可新建同域聚焦集成测试／测试夹具，不重构其他领域。Root 同步合同／设计／计划／验收进度；不修改 OpenAPI、旧迁移、运行权限、候选发行策略或共享锁序。
+
+- [ ] 先写并观察真实 PostgreSQL RED：原初始化后新增 Principal（包含必要 SERVICE）、组织、任职、普通业务 Grant、DelegationGrant、ObjectAccessGrant 和其他命令闭包记录时，原 manifest 核验应返回原 receipt、`VERIFIED_ORIGINAL`、空 plannedDelta，且数据库内容无变化。分别隔离覆盖各类新增记录，防止只修第一处计数。
+- [ ] 最小生产修复：按 trusted Tenant 与原闭包 Facts 的准确 ID 限定原组织／Principal／任职／四 Grant 检查和权限码分组；保留原 Grant ID 与四 management code 的一一对应，保留原 Tenant 和所有字段／时间／版本／生命周期严格一致。原 bootstrap 未建立的委托／对象规则不作租户为空检查。新增记录合法性不由 bootstrap 判定。
+- [ ] 补原始集合缺失、原字段／revision／生命周期被改、原 Grant code 互换等负例；保留 manifest／command／Slot／Receipt／Audit 完整性、错误／回滚与未知提交恢复用例。正／负例须断言无写入而不只看返回码；时间到期用准确 candidate expiry 且显式证明，不用从测试开始固定睡眠冒充到期。
+- [ ] 验证扩展后、候选已过期且 IdP 不可用时仅完整原结果仍能核验；未完成／损坏原结果仍拒绝。真实管理路径建立的合成身份可作为集成证据；底层 SQL 隔离夹具只用于精确 verifier／损坏边界测试，不能冒充9.6真实用户开户E2E。
+- [ ] 运行全部 bootstrap 相关测试和受影响身份／架构回归，记录实际 RED/GREEN 与退出码；独立评审通过后本地提交，不推送。Root 再用保留的本地原 manifest／密钥做只读核验；不得重建租户、换 key、补事实、修改激活发布凭据来掩盖问题。
+
 ## Task 9.6: 真实用户全链路与总验收
 
 ### 本地登录联通先行检查（2026-09-09用户批准）
