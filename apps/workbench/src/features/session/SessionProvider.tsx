@@ -48,6 +48,11 @@ export function useSessionState() {
   return useSyncExternalStore(controller.subscribe, controller.getSnapshot);
 }
 export function useWorkbenchSession(): WorkbenchSession | null {
+  const actor = useActorSession();
+  const state = useSessionState();
+  return state.context?.canEnterWorkbench ? actor : null;
+}
+export function useActorSession(): WorkbenchSession | null {
   const controller = useSessionController();
   const state = useSyncExternalStore(
     controller.subscribe,
@@ -57,8 +62,7 @@ export function useWorkbenchSession(): WorkbenchSession | null {
     const context = state.context;
     if (
       state.status !== "READY" ||
-      !context?.canEnterWorkbench ||
-      !context.actorScopeKey ||
+      !context?.actorScopeKey ||
       !context.selectedAppointmentId
     )
       return null;

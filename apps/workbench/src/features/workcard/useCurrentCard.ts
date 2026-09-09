@@ -31,6 +31,9 @@ interface State {
   needsRefresh: boolean;
   recoveryMarker: RecoveryMarker | null;
   recoveryBlocked: boolean;
+  recoveryConfirmed: boolean;
+  recoveredCommandType: string | null;
+  recoveryAbandoned: boolean;
 }
 const initial: State = {
   envelope: null,
@@ -42,13 +45,18 @@ const initial: State = {
   needsRefresh: false,
   recoveryMarker: null,
   recoveryBlocked: false,
+  recoveryConfirmed: false,
+  recoveredCommandType: null,
+  recoveryAbandoned: false,
 };
 const ambiguous =
   "尚未确认保存结果。请查询原回执，或使用原请求重试；请勿重复发起。";
 export function useCurrentCard(
   session: WorkbenchSession | null | undefined,
   api: WorkbenchApi,
+  options: { recoveryOnly?: boolean; readAfterRecovery?: boolean } = {},
 ) {
+  const recoveryOnly = options.recoveryOnly === true;
   const [state, setState] = useState<State>(initial);
   const stateRef = useRef(state);
   const identity = useRef(session);
@@ -102,6 +110,7 @@ export function useCurrentCard(
 
   const refresh = useCallback(async () => {
     if (!session || denied.current || locked.current) return;
+    if (recoveryOnly && stateRef.current.recoveryBlocked) return;
     const captured = session,
       currentGeneration = ++generation.current;
     getController.current?.abort();
@@ -155,7 +164,13 @@ export function useCurrentCard(
         needsRefresh: true,
       });
     }
-  }, [session?.identityEpoch, session?.actorScopeKey, api, update]);
+  }, [
+    session?.identityEpoch,
+    session?.actorScopeKey,
+    api,
+    update,
+    recoveryOnly,
+  ]);
 
   const acceptReceipt = async (
     receipt: PublicReceipt,
@@ -168,6 +183,9 @@ export function useCurrentCard(
       pending: null,
       recoveryMarker: null,
       recoveryBlocked: false,
+      recoveryConfirmed: true,
+      recoveredCommandType:
+        original.kind === "draft" ? "SAVE_ACTION_DRAFT" : original.action,
       message:
         receipt.outcome === "REJECTED"
           ? "本次请求未被接受，请刷新后核对。"
@@ -351,6 +369,8 @@ export function useCurrentCard(
     if (marker && marker.actorScopeKey !== session.actorScopeKey) return;
     const key = original?.key ?? marker!.commandId;
     const captured = session;
+    const recoveryGeneration = ++generation.current;
+    getController.current?.abort();
     locked.current = true;
     const controller = new AbortController();
     writeController.current = controller;
@@ -358,7 +378,8 @@ export function useCurrentCard(
     let found = false;
     try {
       const r = await api.receipt(captured, key, controller.signal);
-      if (!valid(captured)) return;
+      if (!valid(captured) || recoveryGeneration !== generation.current) return;
+      if (api.recovery.read() !== null) throw new Error("Receipt not settled");
       if (
         !validReceipt(r.data, key) ||
         (original
@@ -371,6 +392,8 @@ export function useCurrentCard(
         update({
           recoveryMarker: null,
           recoveryBlocked: false,
+          recoveryConfirmed: true,
+          recoveredCommandType: marker!.commandType,
           pending: null,
           error: null,
           message:
@@ -382,7 +405,7 @@ export function useCurrentCard(
       }
       found = true;
     } catch (error) {
-      if (!valid(captured)) return;
+      if (!valid(captured) || recoveryGeneration !== generation.current) return;
       if (
         error instanceof TransportError &&
         [401, 403].includes(error.status)
@@ -391,15 +414,69 @@ export function useCurrentCard(
         return;
       }
       update({
-        error:
-          "暂时无法查询原回执，处理结果仍未确认。可稍后查询，或使用原请求重试。",
+        error: original
+          ? "暂时无法查询原回执，处理结果仍未确认。可稍后查询，或使用原请求重试。"
+          : "暂时无法查询原回执，处理结果仍未确认。请稍后再次查询。",
       });
     } finally {
-      if (valid(captured)) {
+      if (valid(captured) && recoveryGeneration === generation.current) {
         locked.current = false;
         update({ busy: false });
-        if (found) await refresh();
+        if (found && options.readAfterRecovery !== false) await refresh();
       }
+    }
+  };
+  const abandonRecovery = (
+    expected: RecoveryMarker | null,
+    confirmed: boolean,
+  ): boolean => {
+    if (
+      !confirmed ||
+      !session ||
+      !valid(session) ||
+      (expected && expected.actorScopeKey !== session.actorScopeKey)
+    )
+      return false;
+    generation.current++;
+    writeController.current?.abort();
+    getController.current?.abort();
+    locked.current = false;
+    try {
+      if (expected) {
+        const current = api.recovery.read();
+        if (
+          !current ||
+          current.commandId !== expected.commandId ||
+          current.commandType !== expected.commandType ||
+          current.actorScopeKey !== expected.actorScopeKey ||
+          current.recordedAt !== expected.recordedAt
+        )
+          throw new Error();
+        api.recovery.clear(expected);
+      } else {
+        let current: RecoveryMarker | null = null;
+        try {
+          current = api.recovery.read();
+        } catch {
+          /* Explicit consent can remove an unreadable clue, never a replacement valid marker. */
+        }
+        if (current) throw new Error();
+        api.recovery.abandon(true);
+      }
+      if (api.recovery.read()) throw new Error();
+      update({
+        ...initial,
+        recoveryAbandoned: true,
+        message: "已放弃本地线索，原操作结果仍需另行核对。",
+      });
+      return true;
+    } catch {
+      update({
+        busy: false,
+        recoveryBlocked: true,
+        error: "本地线索未能删除，操作结果仍未确认。请稍后重试或联系管理员。",
+      });
+      return false;
     }
   };
   const replay = async () => {
@@ -419,9 +496,10 @@ export function useCurrentCard(
         recoveryMarker:
           marker?.actorScopeKey === session?.actorScopeKey ? marker : null,
         recoveryBlocked: !!marker,
-        error: marker
-          ? "结果尚未确认，不能自动重发。请先选择原任职并核对原回执。"
-          : null,
+        error:
+          marker && !recoveryOnly
+            ? "结果尚未确认，不能自动重发。请先选择原任职并核对原回执。"
+            : null,
       });
     } catch {
       update({
@@ -431,11 +509,12 @@ export function useCurrentCard(
     }
     wbTag.current = null;
     denied.current = false;
-    void refreshRef.current();
+    if (!recoveryOnly) void refreshRef.current();
     let waitingAttempts = 0,
       receiptAttempts = 0;
     const tick = setInterval(() => {
       if (document.visibilityState === "hidden" || denied.current) return;
+      if (recoveryOnly) return;
       if (stateRef.current.pending) {
         if (receiptAttempts++ < 3) void recoverRef.current();
       } else if (
@@ -445,11 +524,12 @@ export function useCurrentCard(
         void refreshRef.current();
     }, 30_000);
     const focus = () => {
-      if (document.visibilityState !== "hidden") void refreshRef.current();
+      if (!recoveryOnly && document.visibilityState !== "hidden")
+        void refreshRef.current();
     };
     const visibility = () => {
       if (document.visibilityState === "hidden") {
-        generation.current++;
+        if (!locked.current) generation.current++;
         getController.current?.abort();
       } else focus();
     };
@@ -464,7 +544,13 @@ export function useCurrentCard(
       window.removeEventListener("focus", focus);
       document.removeEventListener("visibilitychange", visibility);
     };
-  }, [session?.identityEpoch, session?.actorScopeKey, api, update]);
+  }, [
+    session?.identityEpoch,
+    session?.actorScopeKey,
+    api,
+    update,
+    recoveryOnly,
+  ]);
   return {
     ...(sessionChanged ? initial : state),
     refresh,
@@ -472,6 +558,7 @@ export function useCurrentCard(
     submit,
     recover,
     replay,
+    abandonRecovery,
   };
 }
 

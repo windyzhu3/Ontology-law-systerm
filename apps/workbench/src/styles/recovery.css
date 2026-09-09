@@ -1,0 +1,214 @@
+.recovery-content {
+  position: relative;
+  min-width: 0;
+  padding: 125px 4.5vw 125px 5.5vw;
+}
+.recovery-page h1 {
+  font-size: 44px;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+.recovery-page .recovery-subtitle {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 26px;
+  line-height: 1.6;
+}
+.recovery-operation {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 28px 0 26px;
+  margin-top: 40px;
+}
+.recovery-operation h2 {
+  font-size: 28px;
+  margin: 0;
+  line-height: 1.5;
+}
+.recovery-identity {
+  display: flex;
+  gap: 56px;
+  margin-top: 22px;
+  font-size: 24px;
+  line-height: 1.6;
+}
+.recovery-identity > span {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.recovery-identity p {
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.recovery-notice {
+  display: flex;
+  gap: 22px;
+  padding: 16px 26px;
+  margin-top: 32px;
+  background: #e9f3ef;
+  border-radius: var(--radius);
+}
+.recovery-notice svg {
+  flex-shrink: 0;
+  color: var(--emerald);
+  margin-top: 4px;
+}
+.recovery-notice strong {
+  color: var(--emerald-hover);
+  font-size: 20px;
+  line-height: 1.6;
+}
+.recovery-notice p {
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1.6;
+}
+.recovery-page button {
+  font: inherit;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--graphite);
+  background: var(--surface);
+  cursor: pointer;
+}
+.recovery-page button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.recovery-page :focus-visible {
+  outline: 3px solid var(--emerald);
+  outline-offset: 3px;
+}
+.recovery-page .choice-account button {
+  color: var(--emerald);
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  font-weight: 600;
+  padding-left: 24px;
+}
+.recovery-page .recovery-primary {
+  display: block;
+  width: 100%;
+  margin-top: 28px;
+  min-height: 68px;
+  background: var(--emerald);
+  color: white;
+  border-color: var(--emerald);
+  font-size: 24px;
+  font-weight: 600;
+}
+.recovery-page .recovery-primary:hover:not(:disabled) {
+  background: var(--emerald-hover);
+}
+.recovery-page .recovery-status {
+  font-size: 16px;
+  color: var(--muted);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.recovery-status:not(:empty) {
+  margin-top: 12px;
+}
+.recovery-abandon {
+  margin-top: 34px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.recovery-page .recovery-abandon > button {
+  color: var(--emerald);
+  font-size: 24px;
+  font-weight: 600;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.recovery-abandon > p {
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1.6;
+}
+.recovery-risk {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--mint);
+}
+.recovery-risk p {
+  line-height: 1.6;
+}
+.recovery-risk > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+.recovery-page .recovery-contact {
+  margin-top: 34px;
+  border-top: 1px solid var(--border);
+  padding-top: 30px;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1.6;
+}
+@media (max-width: 1100px) {
+  .recovery-content {
+    padding: 125px 4vw;
+  }
+  .recovery-page h1 {
+    font-size: 32px;
+  }
+  .recovery-page .recovery-subtitle {
+    font-size: 20px;
+  }
+  .recovery-identity {
+    flex-direction: column;
+    gap: 8px;
+    font-size: 20px;
+  }
+  .recovery-operation h2 {
+    font-size: 24px;
+  }
+  .recovery-notice {
+    padding: 16px;
+    gap: 14px;
+  }
+  .recovery-notice strong,
+  .recovery-notice p,
+  .recovery-abandon > p,
+  .recovery-page .recovery-contact {
+    font-size: 17px;
+  }
+}
+@media (max-width: 640px) {
+  .recovery-content {
+    padding: 90px 28px 28px;
+  }
+  .recovery-page .choice-account {
+    left: 28px;
+    right: 28px;
+    top: 20px;
+    font-size: 16px;
+  }
+  .recovery-page h1 {
+    font-size: 28px;
+  }
+  .recovery-page .recovery-subtitle {
+    font-size: 18px;
+  }
+  .recovery-operation {
+    margin-top: 28px;
+    padding: 22px 0;
+  }
+  .recovery-page .recovery-primary {
+    font-size: 20px;
+    min-height: 56px;
+  }
+  .recovery-page .recovery-abandon > button {
+    font-size: 20px;
+  }
+}
