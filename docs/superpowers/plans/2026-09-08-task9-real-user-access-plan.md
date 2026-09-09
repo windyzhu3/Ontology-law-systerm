@@ -16,7 +16,7 @@
 
 ## Global Constraints
 
-**最新进度（2026-09-09）：** Task9.4源码阶段及本地真实登录先行检查已完成；真实登录/SELF/任职确认/刷新SSO/退出/未映射拒绝已实测。9.6a原bootstrap集合核验修正也已完成：源码e925380、测试补强9a7ea56，99项受影响回归及补强后35项定向回归、原本地清单零变化核验、独立复审通过，见[核验修正记录](../../progress/2026-09-09-task9-bootstrap-original-set-verification.md)。Task9.5a非视觉API适配、9.5b四页读取／受保护入口、9.5c十四写入和9.5d工作台状态全部通过源码阶段验收。9.5c交付`4a6ee77`；9.5d实现`366468b`／修复`da9d289`，首版443项完整回归、修复后93项受影响回归与实际浏览器复验，独立spec／quality复审关闭唯一I1。9.5前端源码阶段现已关闭，完整Task9.6／Task9仍未完成；当前不激活新API／SPA制品、不推送仓库、不建立实际账号／授权。
+**最新进度（2026-09-09）：** Task9.4源码阶段及本地真实登录先行检查已完成；真实登录/SELF/任职确认/刷新SSO/退出/未映射拒绝已实测。9.6a原bootstrap集合核验修正也已完成：源码e925380、测试补强9a7ea56，99项受影响回归及补强后35项定向回归、原本地清单零变化核验、独立复审通过，见[核验修正记录](../../progress/2026-09-09-task9-bootstrap-original-set-verification.md)。Task9.5a非视觉API适配、9.5b四页读取／受保护入口、9.5c十四写入和9.5d工作台状态全部通过源码阶段验收。9.5c交付`4a6ee77`；9.5d实现`366468b`／修复`da9d289`，首版443项完整回归、修复后93项受影响回归与实际浏览器复验，独立spec／quality复审关闭唯一I1。9.5前端源码阶段现已关闭，完整Task9.6／Task9仍未完成；用户现已批准仅在原本地测试环境更新API／SPA、启用Worker并建立专用合成测试账号及最小资格，不推送仓库、不操作生产或真实人员资料。
 
 - 一个响应式业务 SPA、一份业务 OpenAPI、一个模块化单体 Jar，`APP_ROLE=api|worker` 互斥。
 - 业务数据库保持 13 Schema、52 应用表＋2 技术表、当前 `52-plus-2-v1.2`；Keycloak 独立拥有其外部身份存储，拓扑修订须明示这一基础设施依赖。
@@ -399,7 +399,36 @@ expect(screen.getByText('等待 2')).toBeVisible();
 
 阶段证据：新增8项先7个生产冲突／1项原本通过，修复后15项通过；完整受影响99项通过，评审I1测试证据补强有3项RED及35项GREEN、复审关闭。Root修复后两次本地原清单verify退出0，54张表内容和原manifest／密钥／配置／Jar前后不变。M1旧生成器／编译器噪声作为非阻断事项保留；不把此门当作9.5页面或完整9.6通过。
 
+## Task 9.6b: 本地受控制品切换与管理页入口
+
+本单元是已批准Task9.6的本地部署前置，不新增产品功能，不涉及Worker授权或HUMAN建档。遵守设计及`database/schema-contract-52-plus-2/docs/runtime-validation-contract.md` §14。原登录环境运行字节不是最新源码，不能把源码测试当成已部署证据。
+
+**Files:**
+
+- Modify: `deploy/local-login/local_login.py`（只接线必要生命周期／具名操作）、`deploy/local-login/server.mjs`、`deploy/local-login/README.md`。
+- Create: `deploy/local-login/local_release.py`（本地发布描述、摘要、staging／激活／回退、CAS与恢复状态）；允许同目录一个专用发布测试辅助模块，不建立通用部署框架。
+- Create/Modify: `deploy/local-login/tests/test_local_release.py`、`test_local_login.py`、`server.test.mjs`。
+- 不修改业务Java／OpenAPI／数据库迁移／冻结前端页面；源制品及静态元数据仅读取以固定摘要。实际激活由控制者在评审后执行，实施者只用临时目录和假的外部边界运行测试，不访问私有runtime或运行中服务。
+
+- [ ] RED：四条准确管理导航返回SPA；未知路径、编码穿越、API HTML fallback仍拒绝。路径为`/admin/identity/principals`、`/admin/identity/organizations`、`/admin/identity/appointments`、`/admin/identity/authority-grants`。
+- [ ] RED：候选Jar或SPA文件集摘要不符、缺失文件、配置漂移、构建／拷贝失败、错误旧部署状态、原材料漂移、未知PID均在相关写入前失败；激活中断能够识别状态，不能把部分操作当成功；回退只恢复已保存并复核的字节与gate，不回滚业务事实。
+- [ ] 实现具名本地stage／activate／rollback操作。stage消费明确的已构建Jar和dist，不在启动／resume中构建；在运行目录外保存不可变release目录和排序SPA文件摘要。第一次转换须先保存现有Jar、dist、配置和旧gate，绝不在备份前覆盖活动字节。允许停止仅本环境拥有的API／SPA后构建候选，失败用已保存的旧集恢复；不必为了零停机增加平台。
+- [ ] 发布描述固定Jar、SPA、托管server、公开OIDC配置、源commit／工具链和schema-contract-manifest，以及当前OpenAPI／静态信封Resolver／事件路由策略的精确来源摘要。来源位置从既有实现发现，不发明静态合同。旧toolchain-only manifest记录保留为历史，不能声称其证明新整链发布。
+- [ ] deployment_state只由既有迁移Owner受保护凭据以CAS切换，比较完整旧gate并严格断言一行成功；不使用postgres无条件UPDATE、不新增角色／表／迁移。确认现有schema不变才允许本次字节回退。文件替换与DB事务分阶段落受保护日志；冲突／不确定状态安全关闭，提供核对与显式恢复路径，不静默重试新结果或初始化。
+- [ ] API和后续Worker消费同一当前release／manifest；SPA读取已固定dist和server，resume只验证并消费已激活字节。保留原legacy Jar漂移拒绝；新路径不接受漂移／任意不受控目录。停止／重启校验PID对应本环境准确可执行文件和制品，不按名称杀进程，不停止Keycloak／DB来完成制品切换。
+- [ ] 原operator.json／original-manifest／所有原密钥和证书保持字节不变。增加具名`bootstrap-verify-current-release`，用另名ACL受控派生operator，仅修改database当前expected release／manifest，其余逐项相等，调用既有完整原manifest verify；禁止重candidate／dry-run／execute。实际命令不通过旧wrapper重写原operator。
+- [ ] 所有实际文件在原gitignored、当前用户与SYSTEM ACL的runtime目录；每个运维入口先确认边界及保护。密码只由受保护文件传入，stdout/stderr不输出密码、Token、原subject或数据库连接秘密。说明升级、失败核对、回退、停止／恢复命令；不承诺尚未执行的运行结果。
+- [ ] GREEN：针对该单元的Python全部测试和Node托管测试通过，记录真实RED／GREEN、命令和退出码；自评后提交且不推送，独立spec／quality评审。控制者随后保存真实构建、激活、TLS/API/SPA管理直达、原闭包及回退／恢复证据，再关闭本单元的部署门。
+
 ## Task 9.6: 真实用户全链路与总验收
+
+### 当前执行授权（2026-09-09）
+
+用户在Task9.5验收后明确批准：仅在现有本地隔离测试环境更新构建、启用Worker、建立专用合成测试账号及最小任职／权限，推进Task9.6整链。此授权不包含Git推送、生产环境、真实人员开户、真实业务资料、扩大权限、改变冻结设计或容量门槛。人工U01～U03须由指定使用者自行输入凭据并确认结果，自动化不能代签。
+
+执行起点`c3083de`。先核验原bootstrap闭包和运行中资源，再以可核验、可回退的显式本地部署步骤更新同一API／SPA制品；不得借重启重建数据库、替换原manifest或轮换原密钥。保持现有Origin／issuer／端口／TLS、13 Schema及52＋2表，目标HUMAN事实只能经Keycloak与受控管理路径建立，责任只能经实际业务命令产生。现有`resume`拒绝Jar漂移的安全门不删除；受控升级须有明确独立操作和验证。
+
+后续执行按可独立验收单元细分：本地制品／Worker装配，真实管理建档和资格链，七卡与故障／代办恢复整链，最终同构建及人工UAT。此为原9.6内部顺序，不扩展业务功能；每单元先失败测试、最小实现、定向验证、独立评审。下列首次本地登录检查为历史证据，不混作当前整链完成。
 
 ### 本地登录联通先行检查（2026-09-09用户批准）
 
