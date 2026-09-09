@@ -16,7 +16,7 @@
 
 ## Global Constraints
 
-**最新进度（2026-09-09）：** Task9.4源码阶段及本地真实登录先行检查已完成，此前顶部Execution中的“部分实现”是历史快照。真实登录/SELF/任职确认/刷新SSO/退出/未映射拒绝已实测。后续9.6a原bootstrap集合核验修正也已完成：源码e925380、测试补强9a7ea56，99项受影响回归及补强后35项定向回归、原本地清单零变化核验、独立复审通过，见[核验修正记录](../../progress/2026-09-09-task9-bootstrap-original-set-verification.md)。Task9.5尚未开始，完整Task9.6未完成；本次离线复验不激活新API制品、不推送仓库。
+**最新进度（2026-09-09）：** Task9.4源码阶段及本地真实登录先行检查已完成，此前顶部Execution中的“部分实现”是历史快照。真实登录/SELF/任职确认/刷新SSO/退出/未映射拒绝已实测。后续9.6a原bootstrap集合核验修正也已完成：源码e925380、测试补强9a7ea56，99项受影响回归及补强后35项定向回归、原本地清单零变化核验、独立复审通过，见[核验修正记录](../../progress/2026-09-09-task9-bootstrap-original-set-verification.md)。Task9.5a非视觉API适配及9.5b四页读取／受保护入口已验收；当前按已确认交互继续9.5c十四写入，9.5d完整状态待收口。整体9.5和完整Task9.6仍未完成；当前不激活新API／SPA制品、不推送仓库。
 
 - 一个响应式业务 SPA、一份业务 OpenAPI、一个模块化单体 Jar，`APP_ROLE=api|worker` 互斥。
 - 业务数据库保持 13 Schema、52 应用表＋2 技术表、当前 `52-plus-2-v1.2`；Keycloak 独立拥有其外部身份存储，拓扑修订须明示这一基础设施依赖。
@@ -286,11 +286,15 @@ expect(capturedRequests).toHaveLength(sentBefore);
 
 ## Task 9.5b: 四张管理页面读取与受保护入口
 
+**源码阶段已验收（2026-09-09）：** 实现`b7f8524`、必需代办入口补测`687252f`；完整351项／22文件通过，补测后受影响33项／2文件及typecheck通过；独立spec与quality复审批准。实际baseline／topology通过、四页冻结视觉与360/768/1440受控浏览器检查通过，运行中dist哈希不变。M1组织展开按钮`aria-expanded`作为非阻断后续项保留。仅关闭读取／准入，不关闭十四写入、9.5或9.6。见[阶段证据](../../progress/2026-09-09-task9-identity-frontend-integration.md)。
+
 **Scope:** 本单元交付四张真实API列表／详情与分页、读取状态及同SPA管理准入。14写入的表单／二次确认在9.5后续单元接入，不缩减整体9.5验收。用户现已确认新增／改名沿用右侧详情区编辑、危险操作沿用同风格二次确认框并显示影响及原因选项；不重新设计四张主页面。保留当前读取单元的独立评审边界，不能把只读阶段说成完整管理功能。主操作位置保留但未接线动作禁用并明确说明“当前仅开放查询，写入功能尚未接入”，不伪造成功或继续显示待用户确认。
 
 **Files:** Create `features/identity/IdentityAdminLayout.tsx`, `PrincipalPage.tsx`, `OrganizationPage.tsx`, `AppointmentPage.tsx`, `AuthorityGrantPage.tsx`, `IdentityAdminApplication.tsx`, `identityRoutes.ts`, `identityLabels.ts`, `useIdentityList.ts`, `styles/identity-admin.css` 及对应测试（均在apps/workbench/src下）；必要的共用列表状态／分页小组件可置于同目录，禁止通用管理框架。Modify `features/session/SessionApplication.tsx`及测试，仅为管理静态route和同会话准入；不改会话控制器／已有业务卡行为。
 
 **Interfaces:** 消费9.5a `IdentityApi`的四个具名列表与现有 `useActorSession()`。生产 `createIdentityApi(controller.recovery, undefined, location.origin)`，共用同一恢复对象。新增静态route只有 `/admin/identity/principals`, `/admin/identity/organizations`, `/admin/identity/appointments`, `/admin/identity/authority-grants`；不开放任意通配路径或URL身份选择。
+
+**验证前置窄修正（实际检查发现）：** 既有`verify_visual_asset_counts`递归计算整个identity-admin-mvp目录，把已批准的四张内容修订图与原冻结七张混计，实际baseline退出1／topology退出0。允许修改`scripts/baseline/verify_baseline.py`和既有`scripts/baseline/tests/test_verify_baseline.py`，只明确区分原七张集合与`revisions/2026-09-09-contract-alignment/`下四张具名已批准修订图。原冻结数量／路径及其他视觉门保持；不得简单将7改11或忽略整个revisions目录。先RED覆盖已批准补充不污染原计数、原图缺少／多余仍拒绝、未批准额外图仍拒绝，再实际CLI复验；不改图片、交付状态或物理合同。
 
 - [ ] **Step 1 — 准入RED/GREEN。** 测试实际SessionApplication：管理地址在本人任职明确确认之前不派发管理GET；READY且canEnterIdentityAdmin=true、DIRECT且非空准确Actor才可进，不依赖canEnterWorkbench；代办不可自动删header回退本人，无资格不披露列表。普通workbench不出现管理侧栏。注销／epoch变化清旧列表和选择；初次未决恢复使用同RecoveryPage，不绕过原标记处理。
 - [ ] **Step 2 — 四列表RED/GREEN。** 表驱动四静态路由，真实组件+createIdentityApi+受控fetch捕获Request；验证HTTP pathname、limit=20、cursor、准确Bearer和本人header，不能只mock组件返回固定数组。断言真实响应的中文名称／状态／详情，禁止显示UUID/ETag及旧稿已删除字段。例：
@@ -307,6 +311,8 @@ expect(screen.queryByText('创建时间')).not.toBeInTheDocument();
 
 
 ## Task 9.5c: 详情区表单与十四条管理写入
+
+**状态（2026-09-09）：** 依赖9.5b已通过，用户批准的“详情区编辑＋二次确认框”进入实施，不再重复索取同一交互确认。
 
 **Scope:** 用户已明确批准新增／改名使用原右侧详情区、保留左侧列表，危险操作同风格二次确认并显示影响与原因；恢复继续遵守既定确认和原因要求。依赖9.5b独立评审通过，实施全部十四条既定管理写入，不重新出四张主页面、不新增接口／生命周期／权限。此单元是管理页面功能接线，不能替代9.6真实IdP与数据库整链或人工UAT。
 
@@ -347,6 +353,35 @@ expect(api.recovery.read()?.commandId).toBe(before.headers.get('Idempotency-Key'
 - [ ] **Step 6 — 结果与会话RED/GREEN。** 完整已确认成功／NO_CHANGE与REJECTED分开；只有两改名允许NO_CHANGE。成功后刷新失败显示“结果已记录，列表刷新失败”，只能重读不得重复写。重新读取服务端记录，不本地乐观伪造revision／授权；翻页刷新不保证新建记录在当前页出现。401/403或epoch变化清敏感表单／候选／列表，取消迟到反馈但不清其他Actor标记；同Actor token rotation保留dirty、原请求、分页和选择，重试携带新Bearer。跨管理／业务写共享未决门，恢复页不得绕过原查询与授权。测试保存失败、标记损坏、重登无正文、stale后ETag与key更新、终态刷新失败只GET。
 
 - [ ] **Step 7 — 验证与本地提交。** 稳定源码一次完整前端测试及typecheck/openapi:check，构建隔离outDir `../../.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task95c-dist`，不覆盖线上dist、不使用--emptyOutDir。保存RED/GREEN实际命令／退出码，独立spec+quality评审覆盖十四按钮与共享恢复；Root实际baseline/topology，浏览器360/768/1440及1487冻结稿对照，检查编辑／确认焦点、错误、取消、提交反馈与响应式。受控fetch夹具仅UI集成证据，不冒充实际IdP／API整链；不推送、不部署或变更真实账号／授权。9.5工作台状态及9.6全链仍按对应门验收。
+
+## Task 9.5d: 既定工作台状态提示收口
+
+**Scope:** 只补设计§6、§7及T9-W02～W08/W10/W11的前端状态／交互缺口，复用Task9.0七卡及9.4会话／恢复，不重做卡片、菜单、业务协议、登录或管理页面。真实Worker恢复、权限实库与七卡开户整链仍归9.6，不能用DOM夹具替代。
+
+**Files:** Create `apps/workbench/src/features/workcard/WorkbenchStatus.tsx`及`.test.tsx`；Modify `App.tsx`/`.test.tsx`、`features/workcard/useCurrentCard.ts`、`WaitingSummary.tsx`、`CurrentCard.tsx`及直接相关测试、`styles/workbench.css`。只按职责提取状态显示；不得创建全局状态框架、第二个恢复器、客户端计数器或通用错误平台。Root维护QA和验收证据。
+
+**Interfaces:** 保持`App({session,api,sessionActions,sessionNotice})`、`useCurrentCard(session,api,options)`既有公共动作refresh/save/submit/recover/replay/abandonRecovery及RecoveryPage消费者兼容。在hook已存在read/busy/pending/recovery状态基础上补准确状态字段，`WorkbenchStatus`仅消费这些字段而不自行发请求或重推业务结论。状态优先级为身份失效／越权＞未决恢复＞已确认结果但刷新失败＞普通读取错误＞摘要。
+
+- [ ] **Step 1 — 状态表DOM RED。** 受控Request通过真实`createWorkbenchApi`和App分别返回初始慢响应／503、有效currentCard=null且waitingCount=0、仅等待正数、0/1/2后续摘要。断言加载未知不假0，零态“当前暂无可处理责任”与仅等待“当前无可处理责任，另有等待事项”可区分；今日摘要直接来自envelope.todaySummary，不用当前卡数量伪造今日总量，后续只摘要不提供提交按钮。SessionApplication已有无任职／无管理资格情形仍不能落入业务零态。
+
+```ts
+expect(screen.queryByText('等待 0')).not.toBeInTheDocument(); // 请求尚未完成
+resolveCurrent(envelopeWithoutCardWithWaiting(2));
+expect(await screen.findByText('当前无可处理责任，另有等待事项')).toBeVisible();
+expect(screen.getByText('等待 2')).toBeVisible();
+```
+
+上述测试辅助须由本测试的准确Schema fixture明确构造，不新增生产mock入口。
+
+- [ ] **Step 2 — 提交／刷新分离RED/GREEN。** 分别保存候选、业务提交、回执恢复后读取失败；保留Receipt确定性而不让“正在刷新”永久残留。业务成功后明确“结果已记录，当前责任刷新失败”，仅显示重读；成功且刷新成功停止加载说明；REJECTED不得用success配色／已记录成功文案。未知POST仍保留原key/body／恢复标记与原请求重试，GET失败不能生成新key。用实际按钮流断言确认成功后手动刷新只增加GET、不增加POST。保留唯一业务主按钮与已保存候选被修改后的提交禁用。
+
+- [ ] **Step 3 — 轮询额度RED/GREEN。** 使用假时钟驱动30秒周期，准确记录最多6次等待自动读取／3次回执自动查询；额度耗尽显示“自动刷新已暂停，可手动刷新”或对应回执查询暂停说明，不能显示仍实时。token rotation不重置额度，切后台不消耗派发额度，卸载移除timer/listener；真正的新identity epoch才重新开始。不增加独立轮询器、不触发Worker。手动重读仍允许但不能重置自动额度；回执404不清原标记。
+
+- [ ] **Step 4 — 刷新／恢复与焦点RED/GREEN。** 同scope304和语义相同200保留dirty与逻辑焦点；旧GET不能覆盖新读，selector/Task/Draft上下文改变按原规则安全重载。503/429/网络错误若保留旧内容须显式陈旧并停写，清除则不显示假0；401/403/404清敏感内容。400/428修正键与412/digest/422后续键策略不退化。共用RecoveryPage在recoveryOnly或readAfterRecovery=false时不新增业务读取／自动计数，也不把管理拒绝回执说成业务完成。
+
+- [ ] **Step 5 — 最小实现与视觉回归。** 沿用冻结工作台tokens/布局及紧凑会话操作；在既有摘要／反馈区域呈现状态，不加看板或管理导航。live region有状态变化才公告，不每次倒计时刷屏；加载／错误不只依靠颜色。真实浏览器360/768/1440检查composer不遮挡字段／结果提示／主按钮，以及刷新、续期、身份切换后的焦点；与原工作台冻结图联合比较，新增管理样式必须保持作用域隔离。
+
+- [ ] **Step 6 — 验证与评审。** 保存实际RED/GREEN，稳定源码完整前端一次、typecheck/openapi:check及隔离outDir `../../.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task95d-dist`，不覆盖运行中dist。独立spec+quality评审包括RecoveryPage共享消费和七卡／管理回归；Root实际baseline/topology与浏览器证据。只有9.5b/c/d相应门均通过才能关闭9.5前端源码阶段；9.6真实用户整链、人工UAT、Task10/R1容量发布不得晋级。无推送、部署或实际账号／授权变更。
 
 ## Task 9.6a: 原 bootstrap 集合核验修正（9.5 前置窄修复）
 
