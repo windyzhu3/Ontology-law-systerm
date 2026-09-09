@@ -4,7 +4,7 @@
 
 ## 当前制品绑定与执行边界
 
-控制者已提供 9.6f 独立评审、实际构建/升级/协议检查及三进程核对证据。本目录只据该证据更新精确 `PIN`：业务 buildSha `7967b45e814a50cfaf26db4a3c9e74be957cdba9`，package `4d76799837014be8931b1122ec00d867`，revision10；完整 Jar/manifest 摘要保存在 `local-environment.ts`。这是实际业务构建来源，不是后续测试提交。此次测试绑定仍需独立评审，之后由控制者执行真实身份链；本实现者没有运行该链，U01–U03 保持 `NOT_EXECUTED`。
+控制者已提供 9.6g 入口修复的独立评审、实际构建/部署/协议检查及三进程核对证据。本目录只据该证据更新精确 `PIN`：业务 buildSha `6c6c6d90105b6d647fd213afed0c30dd9ff3a594`（包含已评审产品提交 `4db2509`），package `2db735dbaddc435fb585483f5393f40e`，revision11；完整 Jar/manifest 摘要保存在 `local-environment.ts`。这是实际业务构建来源，不是后续测试提交。此次机械绑定不改变已评审入口或精确401驱动逻辑，仍需独立评审，再由控制者用新 UUID 先执行 `T9-L01-entry` 与 `T9-L03-unmapped`；其余阶段不据此宣称完成。旧失败 run 已由控制者按零命令/零阶段留档，不在本次续跑。本实现者没有运行真实身份链，U01–U03 保持 `NOT_EXECUTED`。
 
 替换包只接受精确 kind `controlled-local-release`：解析后的 release-manifest 必须等于 record.provenance，provenance 的规范化摘要必须等于当前 active_manifest_hash，provenance.jarSha256 必须同时等于 active_release_digest 与实际 Jar 字节摘要。未知、legacy、旧 source-release kind 均拒绝。保持 current-release/descriptor/package 字节检查和严格当前三进程命令/PID/创建时间校验，不变更已有 AUTO/MANUAL 来源配置。旧 Location 缺陷 build `04bd695f7a8f656a5ed8fb96c5168e44a91bab8d` 仍在派发前硬性拒绝；冻结 OpenAPI ReceiptLocation 要求保持，禁止接受旧资源 Location 或自动重启 API。
 

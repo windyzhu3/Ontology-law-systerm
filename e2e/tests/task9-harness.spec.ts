@@ -27,11 +27,11 @@ test('offline unmapped SELF contract accepts only the deployed 401 denial', () =
 
 const environment = {
   origin: 'https://localhost:19444', issuer: 'https://localhost:19443/realms/local-r1',
-  buildSha: '7967b45e814a50cfaf26db4a3c9e74be957cdba9',
-  releaseId: '4d76799837014be8931b1122ec00d867',
-  jarSha256: '1e5fda1e83511810d0484d38ec10946392b18b3bfb824e951c912a455d1febe4',
-  manifestHash: '31ac7a32b277f9efd5743a11e1115c41de189d9ca37bf44f9d459a7773958d9f',
-  revision: 10, browserVersion: '153.0.8010.12', browserRevision: '1243',
+  buildSha: '6c6c6d90105b6d647fd213afed0c30dd9ff3a594',
+  releaseId: '2db735dbaddc435fb585483f5393f40e',
+  jarSha256: 'b51bd7dba4648000d1a09ea6ffef4ba3bb4eab17bc922a05935ef5e8619623f7',
+  manifestHash: 'c5f374ee58e4c21b8c2b726cc5e1fe8e35f7fbe2128a2d5900bb8d910e950844',
+  revision: 11, browserVersion: '153.0.8010.12', browserRevision: '1243',
 };
 test('offline rejects wrong origin issuer artifact or browser', () => {
   expect(() => validateEnvironment(environment)).not.toThrow();
