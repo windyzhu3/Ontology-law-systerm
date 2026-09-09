@@ -12,9 +12,9 @@ export const sha = (data: string | Buffer) => createHash('sha256').update(data).
 export function check(value: unknown): asserts value { if (!value) throw new Error('T9_BOUNDARY'); }
 export const exact = (value: object, keys: string[]) => Object.keys(value).sort().join() === [...keys].sort().join();
 export const PIN = {
-  origin: ORIGIN, issuer: ISSUER, buildSha: '04bd695f7a8f656a5ed8fb96c5168e44a91bab8d',
-  releaseId: 'aabce4e3252946e4952cbcb41ff280d1', jarSha256: 'b8af135f74cdafcb8396ee4d55e0526cec359ce65ee801ddd91f058e3bc2513a',
-  manifestHash: '8478c05d4d783f85b7d49340e05ac667edb3ea081915e71c12efa511b5a62a25', revision: 9,
+  origin: ORIGIN, issuer: ISSUER, buildSha: '7967b45e814a50cfaf26db4a3c9e74be957cdba9',
+  releaseId: '4d76799837014be8931b1122ec00d867', jarSha256: '1e5fda1e83511810d0484d38ec10946392b18b3bfb824e951c912a455d1febe4',
+  manifestHash: '31ac7a32b277f9efd5743a11e1115c41de189d9ca37bf44f9d459a7773958d9f', revision: 10,
   browserVersion: '153.0.8010.12', browserRevision: '1243',
 } as const;
 export function requireLocalAcceptance(value: string | undefined): void { check(value === 'APPROVED_SYNTHETIC_ONLY'); }
@@ -90,10 +90,10 @@ assert current['gate']['operating_mode']=='ACTIVE' and current['gate']['schema_c
 assert deployment['releaseDigest']==current['gate']['active_release_digest'] and deployment['manifestHash']==current['gate']['active_manifest_hash']
 assert (runner.RUNTIME/'application.properties').read_bytes()==(package/'application.properties').read_bytes()
 assert read_json(regular(runner.RUNTIME/'deployment.json'))==deployment
-assert record['kind']=='controlled-local-source-release'
-assert read_json(regular(package/'release-manifest.json'))==record['sourceRelease']
-assert digest(encoded(record['sourceRelease']))==current['gate']['active_manifest_hash']
-assert record['sourceRelease']['binaryProvenance']==record['provenance']
+assert record['kind']=='controlled-local-release'
+assert read_json(regular(package/'release-manifest.json'))==record['provenance']
+assert digest(encoded(record['provenance']))==current['gate']['active_manifest_hash']
+assert record['provenance']['jarSha256']==current['gate']['active_release_digest']
 assert digest(regular(package/'app.jar').read_bytes())==record['provenance']['jarSha256']
 result={'origin':runner.ORIGIN,'issuer':runner.ISSUER,'buildSha':record['provenance']['sourceCommit'],
  'releaseId':current['id'],'jarSha256':record['provenance']['jarSha256'],

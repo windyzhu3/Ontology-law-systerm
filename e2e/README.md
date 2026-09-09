@@ -2,9 +2,11 @@
 
 本目录交付测试，不部署服务。当前已验收 local-login runner 承担本地 compose 环境职责；CI 适配仍属 Task10。U01–U03 均为 `NOT_EXECUTED`。离线测试不代表真实浏览器、身份管理或人工验收通过。
 
-## 当前真实运行阻断
+## 当前制品绑定与执行边界
 
-独立源码核对发现：`IdentityCommandRuntime.result` 返回业务资源 Location，而冻结 OpenAPI `ReceiptLocation` 与生产 SPA 要求 `/api/v1/commands/{commandId}/receipt`。9.6f 将独立修复和重建。已知缺陷二进制在派发前被硬性阻止，避免先提交再由SPA报未知。控制者完成评审并明确更新本目录 `PIN` 的已核验二进制来源、release、manifest、revision 后才可实际运行。禁止为通过测试接受旧资源 Location、自动重启 API 或把测试提交冒充应用 buildSha。
+控制者已提供 9.6f 独立评审、实际构建/升级/协议检查及三进程核对证据。本目录只据该证据更新精确 `PIN`：业务 buildSha `7967b45e814a50cfaf26db4a3c9e74be957cdba9`，package `4d76799837014be8931b1122ec00d867`，revision10；完整 Jar/manifest 摘要保存在 `local-environment.ts`。这是实际业务构建来源，不是后续测试提交。此次测试绑定仍需独立评审，之后由控制者执行真实身份链；本实现者没有运行该链，U01–U03 保持 `NOT_EXECUTED`。
+
+替换包只接受精确 kind `controlled-local-release`：解析后的 release-manifest 必须等于 record.provenance，provenance 的规范化摘要必须等于当前 active_manifest_hash，provenance.jarSha256 必须同时等于 active_release_digest 与实际 Jar 字节摘要。未知、legacy、旧 source-release kind 均拒绝。保持 current-release/descriptor/package 字节检查和严格当前三进程命令/PID/创建时间校验，不变更已有 AUTO/MANUAL 来源配置。旧 Location 缺陷 build `04bd695f7a8f656a5ed8fb96c5168e44a91bab8d` 仍在派发前硬性拒绝；冻结 OpenAPI ReceiptLocation 要求保持，禁止接受旧资源 Location 或自动重启 API。
 
 ## 离线命令
 

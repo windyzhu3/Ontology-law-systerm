@@ -21,11 +21,11 @@ test('offline explicit-local gate', () => {
 
 const environment = {
   origin: 'https://localhost:19444', issuer: 'https://localhost:19443/realms/local-r1',
-  buildSha: '04bd695f7a8f656a5ed8fb96c5168e44a91bab8d',
-  releaseId: 'aabce4e3252946e4952cbcb41ff280d1',
-  jarSha256: 'b8af135f74cdafcb8396ee4d55e0526cec359ce65ee801ddd91f058e3bc2513a',
-  manifestHash: '8478c05d4d783f85b7d49340e05ac667edb3ea081915e71c12efa511b5a62a25',
-  revision: 9, browserVersion: '153.0.8010.12', browserRevision: '1243',
+  buildSha: '7967b45e814a50cfaf26db4a3c9e74be957cdba9',
+  releaseId: '4d76799837014be8931b1122ec00d867',
+  jarSha256: '1e5fda1e83511810d0484d38ec10946392b18b3bfb824e951c912a455d1febe4',
+  manifestHash: '31ac7a32b277f9efd5743a11e1115c41de189d9ca37bf44f9d459a7773958d9f',
+  revision: 10, browserVersion: '153.0.8010.12', browserRevision: '1243',
 };
 test('offline rejects wrong origin issuer artifact or browser', () => {
   expect(() => validateEnvironment(environment)).not.toThrow();
@@ -147,6 +147,7 @@ test('offline reporter discards raw credentials and preserves failed exit', () =
 test('offline known Location drift binary cannot authorize a real write', () => {
   expect(() => requireReceiptLocationBuild('04bd695f7a8f656a5ed8fb96c5168e44a91bab8d')).toThrow();
   expect(() => requireReceiptLocationBuild('synthetic-invalid')).toThrow();
+  expect(() => requireReceiptLocationBuild(environment.buildSha)).not.toThrow();
 });
 
 test('offline actual Python bridge rejects each controlled historical process before evidence in load and snapshot', () => {
@@ -242,4 +243,78 @@ test('offline completed phase requires intact prepared evidence on continuation'
   expect(() => continued.requirePrevious('T9-L03-unmapped')).toThrow();
   expect(() => continued.begin(command)).toThrow();
   expect(() => new OperationJournal(path, identity, () => {})).toThrow();
+});
+
+test('offline actual Python bridge binds only coherent replacement manifest before credentials', () => {
+  const synthetic = mkdtempSync(join(tmpdir(), 'task9-release-synthetic-'));
+  const probe = String.raw`
+import sys,types,copy,io,contextlib
+from pathlib import Path
+sys.path.insert(0,str(Path(sys.argv[1])/'deploy/local-login'))
+import local_release as release_module
+from local_worker import worker_command
+runner=types.ModuleType('local_login')
+runner.ROOT=Path(sys.argv[3])/(sys.argv[2]+'-'+sys.argv[4]);runner.RUNTIME=runner.ROOT/'synthetic-runtime'
+runner.TOOLS=runner.ROOT/'tools';runner.JAVA=runner.TOOLS/'java.exe'
+runner.ORIGIN='https://localhost:19444';runner.ISSUER='https://localhost:19443/realms/local-r1'
+sys.modules['local_login']=runner
+package=runner.RUNTIME/'releases'/'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';package.mkdir(parents=True)
+jar=b'synthetic-jar-only';jar_digest=release_module.digest(jar)
+provenance={'sourceCommit':'c'*40,'jarSha256':jar_digest}
+manifest=copy.deepcopy(provenance);kind='controlled-local-release';case=sys.argv[4]
+if case=='unknown-kind':kind='unknown-release'
+if case=='source-kind':kind='controlled-local-source-release'
+if case=='legacy-kind':kind='legacy-byte-snapshot'
+if case=='manifest-provenance':manifest['unmatchedSyntheticField']=True
+manifest_digest=release_module.digest(release_module.encoded(provenance))
+gate={'operating_mode':'ACTIVE','schema_contract_version':'52-plus-2-v1.2','revision':10,
+      'active_manifest_hash':manifest_digest,'active_release_digest':jar_digest}
+if case=='manifest-digest':gate['active_manifest_hash']='d'*64
+if case=='provenance-release-digest':gate['active_release_digest']='e'*64
+deployment={'releaseDigest':gate['active_release_digest'],'manifestHash':gate['active_manifest_hash']}
+for folder in (package,runner.RUNTIME):
+    (folder/'application.properties').write_bytes(b'synthetic-config-only')
+    (folder/'deployment.json').write_bytes(release_module.encoded(deployment))
+(package/'release-manifest.json').write_bytes(release_module.encoded(manifest))
+(package/'app.jar').write_bytes(b'different-synthetic-jar' if case=='jar-bytes' else jar)
+record={'kind':kind,'provenance':provenance}
+current={'id':'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','gate':gate}
+commands={**release_module.app_commands(runner,package),'worker':worker_command(runner,package)}
+saved={name:{'pid':i+1,'executable':command[0],'args':command[1:],'created':'synthetic-start-'+name} for i,(name,command) in enumerate(commands.items())}
+(runner.RUNTIME/'processes.json').write_bytes(release_module.encoded(saved))
+class Boundary:
+    def __init__(self,runner):pass
+    def protect(self):pass
+    def processes(self):return copy.deepcopy(list(saved.values()))
+class Release:
+    def __init__(self,*args):pass
+    def current(self):return current
+    def load(self,id):return record
+    def package(self,id):return package
+class VerifiedBoundary(Exception):pass
+class CredentialAccess(Exception):pass
+regular=release_module.regular
+def guarded_regular(path):
+    if path.name=='original-manifest.json':raise VerifiedBoundary()
+    if path.name in ('browser-credentials.json','task9-browser-credentials.json','task9-test-account-operation.json'):raise CredentialAccess()
+    return regular(path)
+release_module.RuntimeBoundary=Boundary;release_module.LocalRelease=Release;release_module.regular=guarded_regular
+scope={}
+try:
+    with contextlib.redirect_stdout(io.StringIO()):
+        try:exec(compile(sys.stdin.read(),'<actual-task9-release-bridge>','exec'),scope)
+        except VerifiedBoundary:
+            if sys.argv[2]!='load':raise
+    assert scope['result']['buildSha']=='c'*40 and scope['result']['jarSha256']==jar_digest
+    print('VERIFIED_BEFORE_CREDENTIALS')
+except CredentialAccess:
+    print('CREDENTIAL_ACCESS_ATTEMPTED');sys.exit(3)
+except Exception:
+    print('REJECTED_BEFORE_CREDENTIALS');sys.exit(2)
+`;
+  for (const mode of ['snapshot', 'load']) for (const scenario of ['coherent', 'unknown-kind', 'source-kind', 'legacy-kind', 'manifest-provenance', 'manifest-digest', 'provenance-release-digest', 'jar-bytes']) {
+    const result = spawnSync('D:/soft/python3/python.exe', ['-B', '-c', probe, resolve(__dirname, '../..'), mode, synthetic, scenario], { input: LOCAL_RUNTIME_BRIDGE, encoding: 'utf8', windowsHide: true });
+    expect(result.status, `${mode}:${scenario}`).toBe(scenario === 'coherent' ? 0 : 2);
+    expect(result.stdout.trim(), `${mode}:${scenario}`).toBe(scenario === 'coherent' ? 'VERIFIED_BEFORE_CREDENTIALS' : 'REJECTED_BEFORE_CREDENTIALS');
+  }
 });
