@@ -16,6 +16,8 @@
 
 ## Global Constraints
 
+**最新进度（2026-09-09本地登录检查）：** Task9.4源码阶段已完成，此前顶部Execution中的“部分实现”是历史快照。用户现已批准本地隔离部署；真实登录/SELF/任职确认/刷新SSO/退出/未映射拒绝已实测，发现并最小修复原生fetch调用接收者问题。Task9.5尚未开始，完整Task9.6未完成。新增SERVICE后原bootstrap验证器的整租户计数限制仍待后续处理，详见[本地检查记录](../../progress/2026-09-09-task9-local-login-verification.md)。
+
 - 一个响应式业务 SPA、一份业务 OpenAPI、一个模块化单体 Jar，`APP_ROLE=api|worker` 互斥。
 - 业务数据库保持 13 Schema、52 应用表＋2 技术表、当前 `52-plus-2-v1.2`；Keycloak 独立拥有其外部身份存储，拓扑修订须明示这一基础设施依赖。
 - 不修改旧迁移字节，不新增密码表、会话表、动态 RBAC/策略/通用平台表；新能力仅走具名最小前向授权迁移，若需新应用表则停止另议。
@@ -248,6 +250,22 @@ Java 路径统一以 `backend/src/main/java/io/github/windyzhu3/ontologylaw/` �
 - [ ] 运行管理与工作台 DOM 回归、typecheck/build，保存冻结图与实际页面联合比较证据，独立评审后提交。
 
 ## Task 9.6: 真实用户全链路与总验收
+
+### 本地登录联通先行检查（2026-09-09用户批准）
+
+用户要求先在本地部署并验证登录，且明确批准只在Windows当前用户信任本次开发CA。此为既定9.6登录子集的先行检查，不提前实施9.5页面或勾选全部9.6。保持生产SPA、API生产配置装配、真实Keycloak和独立身份／业务PostgreSQL；合成账号不冒充人工UAT。全部端口仅loopback，固定SPA`https://localhost:19444`、issuer`https://localhost:19443/realms/local-r1`、SPA client`local-r1-spa`、API audience/introspection client`local-r1-api`、只读目录client`local-r1-directory`；冲突则停止改端口前记录，不静默换issuer。API内端口19445，准确TLS反代；两个数据库分别独立存储，原表／迁移不改。
+
+- [x] 复核锁定制品与官方安全公告、隔离资源、准确端口；生成短期本地证书并记录当前用户信任指纹／移除方法，不关闭TLS校验。
+- [x] 本地秘密只在忽略且ACL受控目录生成持久文件，重启不轮换HMAC／候选密钥；启动锁定数据库／Keycloak，填充原realm模板，仅合成账号，注册精确回跳和Origin。
+- [x] 启动同一API生产装配及固定构建SPA。生产启动要求ACTIVE租户，故先使用既有离线bootstrap dry-run并核对后初始化本地合成管理员，再用独立未映射账号验证安全拒绝。仅为满足既有启动校验建立最小合成SERVICE任职与来源绑定，不授予SERVICE业务权限，不直接写HUMAN事实，不插入责任卡。没有业务资格时明确提示。
+- [x] 实际浏览器验证登录→Code/PKCE→准确回跳→SELF身份状态、刷新／退出／退出后无旧卡；不在日志／截图输出密码、Token、subject或密钥。
+- [x] 保存本地复现／停止／证书移除说明，独立检查配置和验收证据；七卡业务／管理全链／真实使用者UAT仍待后续。
+
+本地工具允许新增`deploy/local-login/`内具名单用途启动／检查脚本与说明；实际文件／密钥在`.superpowers/sdd/2026-09-08-task9-real-user-access-plan/local-login-runtime/`忽略目录，不能进入Git。若发现生产实现缺陷，先报告并按最小回归修复，不采用测试Bean／Mock SELF／HUMAN registration绕过真实装配。
+
+本地启动补充：宿主Java进程通过`127.0.0.1:19446`访问独立业务数据库，TLS verify-full，先检查端口空闲；身份数据库不发布宿主端口。最小SERVICE基础记录和管理员bootstrap均须先核对脱敏目标清单，再执行到本次隔离数据库；不放宽生产配置必填项。
+
+本轮新增后续核对门：已有bootstrap验证器按整个Tenant计数检查首次快照，新增必要SERVICE后返回`BOOTSTRAP_ORIGINAL_STATE_CONFLICT`，虽原管理员及四授权/回执闭包的具名只读核对仍完整。保留原manifest与密钥，不修补/重建；扩大身份管理或声明恢复验收前须单独明确并验证扩展后的原结果核对规则。此次不修改该既有后端规则。
 
 **Files:**
 
