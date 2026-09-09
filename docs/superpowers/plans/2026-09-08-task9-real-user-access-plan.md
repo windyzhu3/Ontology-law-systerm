@@ -413,6 +413,7 @@ expect(screen.getByText('等待 2')).toBeVisible();
 - [ ] RED：四条准确管理导航返回SPA；未知路径、编码穿越、API HTML fallback仍拒绝。路径为`/admin/identity/principals`、`/admin/identity/organizations`、`/admin/identity/appointments`、`/admin/identity/authority-grants`。
 - [ ] RED：候选Jar或SPA文件集摘要不符、缺失文件、配置漂移、构建／拷贝失败、错误旧部署状态、原材料漂移、未知PID均在相关写入前失败；激活中断能够识别状态，不能把部分操作当成功；回退只恢复已保存并复核的字节与gate，不回滚业务事实。
 - [ ] 实现具名本地stage／activate／rollback操作。stage消费明确的已构建Jar和dist，不在启动／resume中构建；在运行目录外保存不可变release目录和排序SPA文件摘要。第一次转换须先保存现有Jar、dist、配置和旧gate，绝不在备份前覆盖活动字节。允许停止仅本环境拥有的API／SPA后构建候选，失败用已保存的旧集恢复；不必为了零停机增加平台。
+- [ ] 首次legacy快照保留`01213b1`中的原托管server字节作为历史证据。原server硬编码工作树路径，不能伪称复制后可在release目录运行；因此旧Jar／dist／配置／gate的回退通过单独固定摘要的新路径托管器提供，明确称为“业务制品回退”，不声称恢复历史托管器行为。测试确认不混入候选assets，不回写tracked源码或活动dist。
 - [ ] 发布描述固定Jar、SPA、托管server、公开OIDC配置、源commit／工具链和schema-contract-manifest，以及当前OpenAPI／静态信封Resolver／事件路由策略的精确来源摘要。来源位置从既有实现发现，不发明静态合同。旧toolchain-only manifest记录保留为历史，不能声称其证明新整链发布。
 - [ ] deployment_state只由既有迁移Owner受保护凭据以CAS切换，比较完整旧gate并严格断言一行成功；不使用postgres无条件UPDATE、不新增角色／表／迁移。确认现有schema不变才允许本次字节回退。文件替换与DB事务分阶段落受保护日志；冲突／不确定状态安全关闭，提供核对与显式恢复路径，不静默重试新结果或初始化。
 - [ ] API和后续Worker消费同一当前release／manifest；SPA读取已固定dist和server，resume只验证并消费已激活字节。保留原legacy Jar漂移拒绝；新路径不接受漂移／任意不受控目录。停止／重启校验PID对应本环境准确可执行文件和制品，不按名称杀进程，不停止Keycloak／DB来完成制品切换。
@@ -420,11 +421,35 @@ expect(screen.getByText('等待 2')).toBeVisible();
 - [ ] 所有实际文件在原gitignored、当前用户与SYSTEM ACL的runtime目录；每个运维入口先确认边界及保护。密码只由受保护文件传入，stdout/stderr不输出密码、Token、原subject或数据库连接秘密。说明升级、失败核对、回退、停止／恢复命令；不承诺尚未执行的运行结果。
 - [ ] GREEN：针对该单元的Python全部测试和Node托管测试通过，记录真实RED／GREEN、命令和退出码；自评后提交且不推送，独立spec／quality评审。控制者随后保存真实构建、激活、TLS/API/SPA管理直达、原闭包及回退／恢复证据，再关闭本单元的部署门。
 
+## Task 9.6c: 既有Worker的本地最小装配
+
+依赖9.6b发布接口通过独立评审；真实启动只在当前API发布及原bootstrap核验通过后执行。本单元复用生产Worker，不实现新调度器、Job、管理页面或业务权限接口。实施者先纯测试与源码交付，控制者随后执行已批准的本地服务配置／授权／启动。
+
+本地接线说明：全局的api／worker互斥角色由既有生产`ols.runtime-role`（或`OLS_RUNTIME_ROLE`）实现；本地runner须显式设置该已存在的配置，不能只设置源码未读取的`APP_ROLE`并声称已启动Worker。不新增生产角色选择机制。
+
+**Files:**
+
+- Create: `deploy/local-login/local_worker.py`、`deploy/local-login/tests/test_local_worker.py`。
+- Modify: `deploy/local-login/local_login.py`（命令分派与既有生命周期登记）、`deploy/local-login/local_release.py`（只承接已登记Worker的发布停启边界）、`deploy/local-login/README.md`，以及必要的现有本地生命周期测试。
+- 不修改生产Java、身份管理allowlist、数据库迁移、前端或依赖版本。发现生产缺陷先报告准确失败证据，不能用runner绕过。
+
+- [ ] RED：原`local-service` alias不可直接成为Worker binding；副本`local_service`保持同证书DER／私钥与指纹，原keystore字节不变；错alias／证书／有效期／trust拒绝且不重生成身份。配置缺少或错release／manifest、API origin、数据库能力时安全失败。
+- [ ] RED：准确原SERVICE与ROOT前置不成立、既有授权部分／多余／被修改、重复操作形状不一致时拒绝且不写；第一次只建固定三项，完整同原清单重试delta0；HUMAN授予不通过此路径。
+- [ ] 原`service-fixture.json`精确定位Tenant／Principal／Appointment，核对ACTIVE的`LOCAL_R1`、根`ROOT`、`LOCAL_SERVICE`和`SERVICE`任职。证书仍有效时仅在ACL受控目录新副本中修改alias，不改原service.p12／service.crt／API信任／密钥。
+- [ ] 具名本地operator-only授权步骤只在原SERVICE任职建立`R1_PROJECTION_CONSUME`、`CONTACT_TASK_RECOVER`、`ROUTING_REVIEW_TASK_RECOVER`，scope为原ROOT以覆盖固定来源及其下本轮Owner。只保留这三项基础能力，不授HUMAN或加入ADM。使用既有迁移Owner受保护连接，锁定准确原事实并单事务写入。原清单先保存准确ID、授予任职依据、时间与形状，重试核对全字段；不伪造HTTP回执／用户操作，操作证据明确为经批准的本地基础设施事务。不得运行旧service-fixture或插入Task/业务事实。
+- [ ] 生成独立Worker properties：`ols.runtime-role=worker`、`MVP-2026-09-08.3`、node=`LOCAL_LOGIN_WORKER`、API=`https://localhost:19445`，数据库`law_worker_login`仅`law_app_worker`成员，TLS verify-full、当前相同schema／release／manifest及原worker-db secret。绑定原身份、`local_service`、准确证书指纹、绝对受控keystore／truststore。不得把API properties、OIDC目录／introspection／offline密钥或迁移Owner凭据交给Worker。
+- [ ] 使用当前已激活同一Jar启动独立无Web Worker，限制内存并隐藏Windows窗口。登记准确PID／可执行路径／Jar／Worker配置，启动拒绝不确定已有进程；stop／resume／release切换同样准确管理Worker，不能用API的端口或PID代替。Worker不开新监听端口，SPA不得代理internal接口。
+- [ ] 就绪检查基于本次进程启动后既有`WorkerRuntimeHealth`的准确ISOLATED／READY状态及最新失败状态、当前DB gate／角色与mTLS读就绪，不把PID存活或旧日志中的READY当健康。保留三个loop共同健康要求，缺恢复权限不能称ready；无需增加新产品健康接口。运行日志保存在保护目录，只返回固定状态／计数；不泄露候选或业务内容。
+- [ ] 所有失败和中断保留原材料与操作状态；不自动删除授权、重建SERVICE或回滚业务事实。服务停止不会撤销、重造固定授权；有冲突先明确核对。后续真实等待恢复仍由七卡验收证明，启动READY本身不替代W09。
+- [ ] GREEN：本地Worker单测及受影响release／runner／Node回归，保存RED/GREEN与退出码，自评提交，不推送，独立spec／quality评审。真实启动前后核对原bootstrap、原证书／密钥摘要；收集三loop READY、精确无新增监听、停止／恢复同资格证据，才能关闭本单元部署门。
+
 ## Task 9.6: 真实用户全链路与总验收
 
 ### 当前执行授权（2026-09-09）
 
 用户在Task9.5验收后明确批准：仅在现有本地隔离测试环境更新构建、启用Worker、建立专用合成测试账号及最小任职／权限，推进Task9.6整链。此授权不包含Git推送、生产环境、真实人员开户、真实业务资料、扩大权限、改变冻结设计或容量门槛。人工U01～U03须由指定使用者自行输入凭据并确认结果，自动化不能代签。
+
+补充授权：用户随后明确批准仅本轮本地测试短暂停止Keycloak，按官方恢复流程建立临时管理账号，仅创建本轮专用测试账号，完成后立即移除临时管理权限并验证。原realm／数据／密钥保留，目录client继续只有只读能力，不向API或Worker交付管理凭据。实施前固定目标用户名、缺失／已存在／部分成功的核对规则和清理失败处置；临时账号不能变成常驻超级管理员。官方操作约束见[Keycloak管理恢复](https://www.keycloak.org/server/bootstrap-admin-recovery)，恢复命令使用原数据库配置且所有本地Keycloak节点先停止。
 
 执行起点`c3083de`。先核验原bootstrap闭包和运行中资源，再以可核验、可回退的显式本地部署步骤更新同一API／SPA制品；不得借重启重建数据库、替换原manifest或轮换原密钥。保持现有Origin／issuer／端口／TLS、13 Schema及52＋2表，目标HUMAN事实只能经Keycloak与受控管理路径建立，责任只能经实际业务命令产生。现有`resume`拒绝Jar漂移的安全门不删除；受控升级须有明确独立操作和验证。
 
