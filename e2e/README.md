@@ -1,5 +1,23 @@
 # Task 9.6e 受控本地身份链
 
+## Task 9.6k 独立六卡业务入口
+
+`e2e/business.config.ts` 是独立入口，默认只定义并运行 `offline-business`；只有命令行明确选择 `--project approved-local-business` 时才注册真实项目。实现者仅运行离线项目；离线通过不代表真实浏览器、数据库闭包、U01–U03、完整七卡、容量或R1总验收通过。
+
+真实入口只接受当前 release `6411135a52094b6ba16a80df80b025a1`、build `421ca57aed3d2f364fea2af64b12b5c9d6226c7d`、gate12，以及已完成身份 run `74a496f6-494e-417d-9abd-69a85c94f165` 的原 journal SHA256 `44c95f59853fa552d2d7ba933dcb80a4877464fe26dab7c34202d3e1fb0ad9a1`。它逐份核对原七阶段报告并只读取得原 resource IDs；所有业务操作前后重新核对原记录和当前三进程／制品，绝不改写身份 journal。
+
+业务 journal 固定为受保护 runtime 下的 `task9-business-operation.json`。只允许两次合成 capture、一个 `SALES_CONTACT_OWNER` 直接授权、六次候选保存和六次明确提交，共15个首次派发；PENDING、持久化不确定、阶段报告隔离、跨run或跨制品均禁止新key。续跑必须显式设置同一 `TASK9_BUSINESS_CONTINUE_RUN_ID`，只查询原回执并从当前阶段的准确已确认位置继续，不重放完成步骤。
+
+```powershell
+$env:PATH='C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64;C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/npm-11.9.0/node_modules/.bin;' + $env:PATH
+node node_modules/@playwright/test/cli.js test --config e2e/business.config.ts --project offline-business
+node node_modules/@playwright/test/cli.js test --config playwright.config.ts --project offline-harness
+node node_modules/typescript/bin/tsc --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --strict e2e/business.config.ts e2e/fixtures/business-environment.ts e2e/fixtures/business-journal.ts e2e/fixtures/business-session.ts e2e/fixtures/r1-business-setup.ts e2e/tests/task9-business-harness.spec.ts e2e/tests/task9-six-workcards.spec.ts e2e/reporters/business-reporter.ts
+node node_modules/@playwright/test/cli.js test --config e2e/business.config.ts --list --reporter list
+```
+
+控制者真实运行还须仅向该测试进程传入既有受保护 CA，并设置 `TASK9_LOCAL_ACCEPTANCE=APPROVED_SYNTHETIC_ONLY`、`TASK9_BUSINESS_ACCEPTANCE=APPROVED_SIX_CARD_CHAIN` 和新 UUID `TASK9_BUSINESS_RUN_ID`，再显式选择 `approved-local-business`。不得覆盖安全 reporter、关闭TLS、开启调试／trace／video／screenshot／storageState，或使用真实人员资料。本入口的阶段正文只写 `ACTIONS_VERIFIED`；只有控制者另行核对真实退出和 Fact／Receipt／Task／Draft／Event／Outbox／Audit 数据库闭包后才能判定该六卡子集。
+
 本目录交付测试，不部署服务。当前已验收 local-login runner 承担本地 compose 环境职责；CI 适配仍属 Task10。U01–U03 均为 `NOT_EXECUTED`。离线测试不代表真实浏览器、身份管理或人工验收通过。
 
 ## 当前制品绑定与执行边界

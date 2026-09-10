@@ -59,7 +59,7 @@ export const runtime = join(root, '.superpowers/sdd/2026-09-08-task9-real-user-a
 // Only the controller executes this bridge. Existing public adapters perform all ACL,
 // Git-ignore, release-byte and exact process ownership checks. No SQL is invoked.
 export const LOCAL_RUNTIME_BRIDGE = String.raw`
-import sys,json,hashlib
+import sys,json,hashlib,re
 from pathlib import Path
 sys.path.insert(0,str(Path(sys.argv[1])/'deploy/local-login'))
 import local_login as runner
@@ -99,7 +99,7 @@ result={'origin':runner.ORIGIN,'issuer':runner.ISSUER,'buildSha':record['provena
  'releaseId':current['id'],'jarSha256':record['provenance']['jarSha256'],
  'manifestHash':current['gate']['active_manifest_hash'],'revision':current['gate']['revision'],
  'apiIdentity':digest(encoded(saved['api'])),'processIdentity':digest(encoded(saved)),'releaseIdentity':digest(encoded(current))}
-if sys.argv[2]=='load':
+if sys.argv[2] in ('load','business'):
     original=read_json(regular(runner.RUNTIME/'original-manifest.json'))
     operator=read_json(regular(runner.RUNTIME/'operator.json'))
     plan=read_json(regular(runner.RUNTIME/'worker/grants.json'))
@@ -115,9 +115,40 @@ if sys.argv[2]=='load':
     result['original']=read_json(regular(runner.RUNTIME/'browser-credentials.json'))
     result['credentials']=read_json(regular(runner.RUNTIME/'task9-browser-credentials.json'))
     result['operation']=read_json(regular(runner.RUNTIME/'task9-test-account-operation.json'))
+if sys.argv[2]=='business':
+    journal_path=regular(runner.RUNTIME/'task9-identity-operation.json')
+    journal_bytes=journal_path.read_bytes()
+    assert hashlib.sha256(journal_bytes).hexdigest()=='44c95f59853fa552d2d7ba933dcb80a4877464fe26dab7c34202d3e1fb0ad9a1'
+    journal=json.loads(journal_bytes)
+    expected_steps=['principal-intake','principal-supervisor','principal-contact','principal-delegate','organization',
+      'appointment-intake','appointment-supervisor','appointment-contact','appointment-delegate',
+      'grant-intake-0','grant-intake-1','grant-intake-2','grant-intake-3','grant-supervisor-0','grant-supervisor-1','grant-supervisor-2']
+    expected_stages=['T9-L01-entry','T9-L03-unmapped','T9-I02-exact-directory-binding','T9-L04-qualification-stages',
+      'T9-I05-appointment-no-implicit-grant','T9-I06-minimum-business-grants','T9-I13-dynamic-entry']
+    assert journal['identity']['runId']=='74a496f6-494e-417d-9abd-69a85c94f165'
+    assert [entry['step'] for entry in journal['commands']]==expected_steps
+    assert all(entry['status']=='CONFIRMED' and re.fullmatch(r'[0-9a-f-]{36}',entry['commandId']) for entry in journal['commands'])
+    assert [stage['caseIdentity'] for stage in journal['stages']]==expected_stages
+    for stage in journal['stages']:
+        report=regular(Path(stage['reportPath']))
+        assert report.parent.resolve()==runner.RUNTIME.resolve()
+        report_bytes=report.read_bytes()
+        assert hashlib.sha256(report_bytes).hexdigest()==stage['reportSha256']
+        evidence=json.loads(report_bytes)
+        assert evidence['runId']==journal['identity']['runId'] and evidence['caseIdentity']==stage['caseIdentity']
+        assert evidence['status']=='ACTIONS_VERIFIED' and evidence['exitCode'] is None
+    resources={}
+    for entry in journal['commands']:
+        identifier=entry['resourcePath'].rsplit('/',1)[-1]
+        assert re.fullmatch(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',identifier)
+        resources[entry['step']]=identifier
+    result['predecessor']={'runId':journal['identity']['runId'],'journalSha256':hashlib.sha256(journal_bytes).hexdigest(),
+      'commandCount':len(journal['commands']),'stageCount':len(journal['stages']),
+      'pendingCount':sum(1 for entry in journal['commands'] if entry['status']=='PENDING')}
+    result['resources']=resources
 print(json.dumps(result))
 `;
-async function invoke(mode: 'protect' | 'snapshot' | 'load'): Promise<any> {
+export async function invokeLocalRuntime(mode: 'protect' | 'snapshot' | 'load' | 'business'): Promise<any> {
   requireLocalAcceptance(process.env.TASK9_LOCAL_ACCEPTANCE);
   noLinks(root); noLinks(runtime);
   const stdout = await new Promise<string>((resolve, reject) => {
@@ -130,8 +161,11 @@ async function invoke(mode: 'protect' | 'snapshot' | 'load'): Promise<any> {
   });
   try { return JSON.parse(stdout); } catch { throw new Error('T9_BOUNDARY'); }
 }
-export const protect = async () => { await invoke('protect'); };
-function toolchain(): { browserRevision: string; browserVersion: string } {
+// Preserve the original test-isolated launcher binding while exposing the same
+// implementation to the business environment. There is still one bridge.
+const invoke = invokeLocalRuntime;
+export const protect = async () => { await invokeLocalRuntime('protect'); };
+export function toolchain(): { browserRevision: string; browserVersion: string } {
   check(process.version === 'v24.20.0');
   for (const [file, digest] of [
     ['deploy/identity/identity-toolchain.lock.json', '79cee0549c7186406f485b61825f6334496f9c1910b163a2cee65776d8654ca2'],
@@ -148,8 +182,8 @@ export async function loadLocalEnvironment() {
   requireLocalAcceptance(process.env.TASK9_LOCAL_ACCEPTANCE);
   check(!process.env.DEBUG && !process.env.PWDEBUG && !process.env.PW_TEST_DEBUG);
   const tools = toolchain();
-  const snapshot = await invoke('snapshot'); validateEnvironment({ ...snapshot, ...tools });
-  const loaded = await invoke('load'); validateEnvironment({ ...loaded, ...tools });
+  const snapshot = await invokeLocalRuntime('snapshot'); validateEnvironment({ ...snapshot, ...tools });
+  const loaded = await invokeLocalRuntime('load'); validateEnvironment({ ...loaded, ...tools });
   check(snapshot.apiIdentity === loaded.apiIdentity && snapshot.processIdentity === loaded.processIdentity && snapshot.releaseIdentity === loaded.releaseIdentity);
   validateAccounts(loaded.original, loaded.credentials, loaded.operation);
   const environmentDigest = sha(JSON.stringify({ ...snapshot, ...tools }));
@@ -158,7 +192,7 @@ export async function loadLocalEnvironment() {
     bootstrap: loaded.bootstrap as { tenantId: string; rootId: string; founderId: string; appointmentId: string },
     accounts: { ...loaded.original, ...loaded.credentials.accounts } as Record<Alias | 'founder' | 'unmapped', Account>,
     async assertUnchanged() {
-      const now = await invoke('snapshot'); validateEnvironment({ ...now, ...tools });
+      const now = await invokeLocalRuntime('snapshot'); validateEnvironment({ ...now, ...tools });
       check(sha(JSON.stringify({ ...now, ...tools })) === environmentDigest);
     },
     verifyBrowser(actual: string) { check(actual === PIN.browserVersion); },
