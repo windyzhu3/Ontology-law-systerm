@@ -389,6 +389,23 @@ expect(screen.getByText('等待 2')).toBeVisible();
 
 - [x] **Step 6 — 验证与评审。** 保存实际RED/GREEN，稳定源码完整前端一次、typecheck/openapi:check及隔离outDir `../../.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task95d-dist`，不覆盖运行中dist。独立spec+quality评审包括RecoveryPage共享消费和七卡／管理回归；Root实际baseline/topology与浏览器证据。只有9.5b/c/d相应门均通过才能关闭9.5前端源码阶段；9.6真实用户整链、人工UAT、Task10/R1容量发布不得晋级。无推送、部署或实际账号／授权变更。
 
+## Task 9.6j: 已批准的后续发布运行核验分离
+
+用户于2026-09-10同意上一轮最小设计。本段取代下文“后续独立最小澄清待确认”的停点及9.6b在当前已装配Worker环境下无条件使用原始引导核验的要求；不修改原Java `verifyOriginal`、原manifest及首次授权语义。
+
+**Files:** Create `deploy/local-login/local_runtime_verification.py`及`deploy/local-login/tests/test_local_runtime_verification.py`；Modify `deploy/local-login/local_login.py`具名CLI接线、`deploy/local-login/README.md`操作区分；必要的原CLI回归只修改`deploy/local-login/tests/test_local_release.py`。不改Java／SPA／SQL／原Worker验证器／依赖。Root负责计划、设计说明、进度、验收与真实执行。
+
+**Interfaces:** 新函数`verify_current_runtime(runner, release, boundary)`使用现有`LocalRelease.current/paths/stable`、`RuntimeBoundary.process/processes`及`LocalWorker.health`，CLI命令`release-verify-current-runtime`无参数。返回仅固定状态`VERIFIED_CURRENT_RUNTIME`和安全的releaseId／sourceCommit／gateRevision／worker健康摘要；绝不返回`VERIFIED_ORIGINAL`或原秘密。首次创建／原清单恢复仍显式使用现有严格入口。
+
+- [x] 先写消费者RED：真实新函数与真实LocalWorker验证器使用临时文件、合成SQL/证书/进程边界，合法ROOT rename revision1可通过；不得mock掉`runtime_grants_current`来制造成功。共享现有测试夹具，不复制验证算法。原命令仍走严格Java verify并拒绝失败／伪成功输出。
+- [x] 最小实现：在原受保护release-operation.lock内，确认无额外参数、无未决release／apps／worker启动记录、当前受控包及完整gate／schema／原材料一致，准确api／spa／worker三进程存在且命令来自当前包（不是仅允许旧包）。调用原Worker健康路径，复用其同快照原Slot／Receipt／Audit、三固定Grant及ROOT合法rename链、证书、mTLS、三循环和无监听校验；不能调用grant／prepare／start／bootstrap执行或任何修复。结束前再次核对相同release、准确登记与运行进程、材料与gate；任何失败不输出成功。
+- [x] 负例：ROOT变化无证据、证据损坏／其他原事实／原Slot／Receipt／Audit变化、Grant／证书／mTLS／循环失败、schema／包／原材料变化、旧包进程／已停止进程／未知登记／未决标记、检查期间release或process变化均拒绝；通过与拒绝均无业务写入／重启／授权修补。CLI额外参数失败而不是吞掉。测试依赖只替换真实慢外部边界。
+- [x] 最终完整本地工具回归一次及独立规格／质量评审。命令：`D:/soft/python3/python.exe -m unittest discover -s deploy/local-login/tests -p 'test_*.py' -q`；单文件测试需把`deploy/local-login`加入本进程PYTHONPATH。保留RED／GREEN实际输出和退出码，提交仅拥有文件、不推送。
+- [x] Root：先确认当前release`6411135a52094b6ba16a80df80b025a1`／build`421ca57aed3d2f364fea2af64b12b5c9d6226c7d`／gate12与原7阶段16命令无变化；独立评审后对现包运行新核验、protocol-check、protocol-check-unmapped，再复用原自然刷新探针等待250秒，验证真实refresh200后组织GET200且没有业务写入。Python运维入口不进入Jar／SPA制品，不为此重建或重启现包。新验证证据绑定现包与新工具提交；保留上一轮失败证据，不重放原建档。
+- [x] Root：前后54表（允许正常非命令披露审计新增）、原245审计逐行、84IdP静态表、材料及原7/16摘要核对；更新进度，明确只关闭本停点及具名刷新子场景，不关闭七卡、生命周期、撤权／代办／等待恢复、用户本人U01～U03、容量或R1发布。
+
+**本单元验收结果：** `e6f3a7e`最终定向7项／完整90项通过，独立规格与质量Approved，Root最终7项复跑通过；真实当前运行核验5054dc、两项协议f9f581、原自然刷新8ed937、54/245/84保留97d6e6和精确报告／release／进程绑定69a117均退出0。应用仍为421ca57／release6411135a52094b6ba16a80df80b025a1／gate12，本轮未构建或重启；运维工具提交与应用制品来源分别留证。该单元及无nonce自然刷新故障关闭，完整Task9.6、七卡、生命周期与人工UAT未完成。详见本地整链进度顶部。
+
 ## Task 9.6a: 原 bootstrap 集合核验修正（9.5 前置窄修复）
 
 **批准范围（2026-09-09）：** 用户确认只核验原始事实和原凭据闭包，不冻结整个租户；严格遵循设计 §5.3 和 Identity 合同 Offline bootstrap 的同日澄清。本单元是本地登录检查发现问题的后续修正，不表示整个9.6完成，也不扩展9.5。

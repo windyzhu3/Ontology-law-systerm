@@ -129,6 +129,8 @@ Principal 是 Tenant 级身份，不自带所属组织，挂起它会影响所�
 
 ### 5.3 首位管理员与生产引导
 
+2026-09-10用户批准的本地后续发布核验区分：以下严格原始引导语义不变。已装配Worker的原本地环境在合法ROOT改名后，后续发布使用独立具名`release-verify-current-runtime`，复用已审查的原清单／同ROOT改名证据链、现有Worker健康与受控制品／schema／进程／证书核验，只证明当前运行资格。它不返回`VERIFIED_ORIGINAL`，不初始化／修补／改写原事实、权限或清单；原`bootstrap-verify-current-release`仍只证明完整原始集合无变化。无原清单／损坏闭包或其他原字段漂移均失败关闭。此为Task9.6j既有本地发布流程的最小区分，不推广成通用身份演进验证器或新业务权限。
+
 提供关闭 HTTP 的一次性受控引导命令，由部署操作者在受限环境执行，不增加公开 bootstrap endpoint，不把“第一个登录的人”变成管理员。
 
 在受信 Tenant/provider 配置和已经真实存在的 Keycloak 管理员账号基础上，初始化唯一 Tenant、根组织、HUMAN Principal、管理员 Appointment 及四项直接管理 Grant；指定确定的 bootstrap commandId，记录脱敏清单摘要、准确操作者声明和 Audit/Receipt。仅全新目标或同一完整引导的无变化核验可通过；部分存在、相冲突或已初始化后请求追加权限均失败关闭。此 SYSTEM 引导是具名、仅离线的启动信任根例外，不进入在线普通管理权限路径，不推广为任意 SQL 初始化工具。
