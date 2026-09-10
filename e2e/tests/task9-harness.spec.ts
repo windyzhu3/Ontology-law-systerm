@@ -4,22 +4,180 @@ import { safeFailureCode } from '../reporters/safe-reporter';
 import { OperationJournal, type PhaseEvidence } from '../fixtures/operation-journal';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
 import { noLinks } from '../fixtures/local-environment';
-import { dispatchObserved, matchFact, requireReceiptLocationBuild, requireUnmappedSelfStatus } from '../fixtures/identity-setup';
+import { IdentitySetup, dispatchObserved, matchFact, requireReceiptLocationBuild, requireUnmappedSelfStatus } from '../fixtures/identity-setup';
 import SafeReporter from '../reporters/safe-reporter';
 import { createIdentityApi } from '../../apps/workbench/src/features/identity/identityApi';
 import { RecoveryStore } from '../../apps/workbench/src/features/session/recoveryMarker';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { boundaryProbe } from './boundary-probe';
+import { allowReadOnlyRequest, COMPLETE_JOURNAL_SHA, readOnlyOutcome, type ReadOnlyEvidence } from '../fixtures/readonly-session';
 
-test('offline explicit-local gate', () => {
+test('offline readonly entry allows only business reads and exact normal IdP authentication', () => {
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) expect(allowReadOnlyRequest(new URL('https://localhost:19444/api/v1/admin/identity/organizations'), method)).toBe(false);
+  expect(allowReadOnlyRequest(new URL('https://localhost:19444/api/v1/admin/identity/principals'), 'GET')).toBe(true);
+  for (const path of ['/realms/local-r1/protocol/openid-connect/token', '/realms/local-r1/login-actions/authenticate']) expect(allowReadOnlyRequest(new URL('https://localhost:19443' + path), 'POST')).toBe(true);
+  expect(allowReadOnlyRequest(new URL('https://localhost:19443/admin/realms/local-r1/users'), 'POST')).toBe(false);
+  expect(allowReadOnlyRequest(new URL('https://example.invalid/'), 'GET')).toBe(false);
+});
+
+test('offline readonly evidence never promotes refresh HTTP alone or masks boundary failure', () => {
+  const evidence: ReadOnlyEvidence = { refreshObserved: true, refreshStatus: 200, refreshDuringBoundary: true, organizationStatus: 200, principalStatus: 200,
+    adminVisible: true, loginVisible: false, sessionNoticeVisible: false, blockedBusinessWrites: 0, blockedRequests: 0, boundaryCompleted: true,
+    journalBefore: COMPLETE_JOURNAL_SHA, journalAfter: COMPLETE_JOURNAL_SHA, environmentUnchanged: true, failureStep: null };
+  expect(readOnlyOutcome(evidence)).toBe('PASSED_READ_ONLY_SUBSCENARIO');
+  expect(readOnlyOutcome({ ...evidence, refreshObserved: false })).toBe('NOT_TRIGGERED');
+  for (const patch of [{ organizationStatus: 401 }, { principalStatus: null }, { adminVisible: false }, { refreshDuringBoundary: false }, { boundaryCompleted: false },
+    { journalAfter: '0'.repeat(64) }, { environmentUnchanged: false }, { blockedBusinessWrites: 1 }, { loginVisible: true }, { sessionNoticeVisible: true },
+    { refreshObserved: false, failureStep: 'BOUNDARY' }, { refreshObserved: false, failureStep: 'APPROVAL' }]) expect(readOnlyOutcome({ ...evidence, ...patch })).toBe('FAILED');
+});
+
+test('offline delayed Python boundary keeps the route event loop runnable', async () => {
+  const invoke = boundaryProbe('import time,json\ntime.sleep(0.3)\nprint(json.dumps({"synthetic":True}))');
+  let tick = false;
+  const timer = setTimeout(() => { tick = true; }, 30);
+  try {
+    const result = await invoke('snapshot');
+    expect(result).toEqual({ synthetic: true });
+    expect(tick, 'route/timer work must run before the delayed child completes').toBe(true);
+  } finally { clearTimeout(timer); }
+});
+
+test('offline async protection must finish before durable dispatch authorization', async () => {
+  const path = join(mkdtempSync(join(tmpdir(), 'task9-synthetic-')), 'journal.json');
+  let release!: () => void, gated = false, sent = 0;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const journal = await OperationJournal.open(path, identity, async () => { if (gated) await gate; });
+  gated = true;
+  const pending = dispatchObserved(journal, command, async () => { sent++; });
+  try { await new Promise(resolve => setTimeout(resolve, 20)); expect(sent).toBe(0); }
+  finally { release(); await pending; }
+  expect(sent).toBe(1);
+  expect(JSON.parse(readFileSync(path, 'utf8')).commands[0].status).toBe('PENDING');
+});
+
+test('offline armed business route is claimed before header await and duplicates poison dispatch', async () => {
+  let handler!: (route: any) => Promise<void>, release!: () => void, sent = 0, aborted = 0;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const context = { newPage: async () => ({ goto: async () => { throw new Error('synthetic-registration-stop'); } }), route: async (_: string, callback: typeof handler) => { handler = callback; } };
+  const journal = await OperationJournal.open(join(mkdtempSync(join(tmpdir(), 'task9-route-synthetic-')), 'journal.json'), identity, () => {});
+  const setup: any = Object.assign(Object.create(IdentitySetup.prototype), {
+    environment: { assertUnchanged: async () => {}, accounts: { founder: {} }, bootstrap: { appointmentId: '00000000-0000-4000-8000-000000000001' } },
+    browser: { newContext: async () => context }, sessions: [], journal, dispatchFailed: false,
+  });
+  await expect(setup.login('founder')).rejects.toThrow('synthetic-registration-stop');
+  setup.admin = setup.sessions[0];
+  setup.admin.self = { canEnterIdentityAdmin: true, selectedAppointmentId: setup.environment.bootstrap.appointmentId, selectedOnBehalfAppointmentId: null, actorScopeKey: command.actorScopeKey };
+  setup.armed = { step: command.step, path: command.path, body: { displayName: 'synthetic' } };
+  const route = () => ({ request: () => ({ url: () => 'https://localhost:19444' + command.path, method: () => 'POST',
+    allHeaders: async () => { await gate; return { 'x-appointment-id': setup.environment.bootstrap.appointmentId, 'idempotency-key': command.commandId }; }, postDataBuffer: () => Buffer.from('{"displayName":"synthetic"}') }),
+    continue: async () => { sent++; }, abort: async () => { aborted++; } });
+  const first = handler(route());
+  let second: Promise<void> | undefined;
+  try {
+    expect(setup.armed).toBeUndefined();
+    second = handler(route()); await second;
+  } finally { release(); await first; await second; }
+  expect(sent).toBe(0); expect(aborted).toBe(2); expect(setup.dispatchFailed).toBe(true);
+});
+
+test('offline boundary timeout output overflow and invalid output never expose child details', async () => {
+  for (const [index, program] of [
+    'import time;time.sleep(2);print("{}")',
+    'import sys;sys.stdout.write("sensitive-output"*1000)',
+    'import sys;sys.stderr.write("sensitive-error"*1000)',
+    'raise Exception("sensitive-exception")',
+    'print("sensitive-invalid-json")',
+  ].entries()) {
+    const invoke = boundaryProbe(program, index === 0 ? 100 : 2_000, 128);
+    let failure: any;
+    try { await invoke('snapshot'); } catch (error) { failure = error; }
+    expect(failure?.message).toBe('T9_BOUNDARY');
+  }
+});
+
+test('offline duplicate route during journal protection preserves original pending without sending', async () => {
+  let handler!: (route: any) => Promise<void>, release!: () => void, entered!: () => void, gated = false, sent = 0, aborted = 0;
+  const gate = new Promise<void>(resolve => { release = resolve; }), protecting = new Promise<void>(resolve => { entered = resolve; });
+  const path = join(mkdtempSync(join(tmpdir(), 'task9-route-pending-synthetic-')), 'journal.json');
+  const journal = await OperationJournal.open(path, identity, async () => { if (gated) { entered(); await gate; } });
+  const context = { newPage: async () => ({ goto: async () => { throw new Error('synthetic-registration-stop'); } }), route: async (_: string, callback: typeof handler) => { handler = callback; } };
+  const setup: any = Object.assign(Object.create(IdentitySetup.prototype), {
+    environment: { assertUnchanged: async () => {}, accounts: { founder: {} }, bootstrap: { appointmentId: '00000000-0000-4000-8000-000000000001' } },
+    browser: { newContext: async () => context }, sessions: [], journal, dispatchFailed: false,
+  });
+  await expect(setup.login('founder')).rejects.toThrow('synthetic-registration-stop');
+  setup.admin = setup.sessions[0];
+  setup.admin.self = { canEnterIdentityAdmin: true, selectedAppointmentId: setup.environment.bootstrap.appointmentId, selectedOnBehalfAppointmentId: null, actorScopeKey: command.actorScopeKey };
+  setup.armed = { step: command.step, path: command.path, body: { displayName: 'synthetic' } };
+  const route = () => ({ request: () => ({ url: () => 'https://localhost:19444' + command.path, method: () => 'POST',
+    allHeaders: async () => ({ 'x-appointment-id': setup.environment.bootstrap.appointmentId, 'idempotency-key': command.commandId }), postDataBuffer: () => Buffer.from('{"displayName":"synthetic"}') }),
+    continue: async () => { sent++; }, abort: async () => { aborted++; } });
+  gated = true; const first = handler(route());
+  try { await protecting; await handler(route()); } finally { release(); await first; }
+  expect(sent).toBe(0); expect(aborted).toBe(2); expect(setup.dispatchFailed).toBe(true);
+  expect(JSON.parse(readFileSync(path, 'utf8')).commands[0]).toMatchObject({ commandId: command.commandId, status: 'PENDING' });
+  await expect(journal.begin({ ...command, commandId: '00000000-0000-4000-8000-000000000093' })).rejects.toThrow();
+});
+
+test('offline competing journal mutation cannot overwrite in-flight original state', async () => {
+  const path = join(mkdtempSync(join(tmpdir(), 'task9-race-synthetic-')), 'journal.json');
+  let release!: () => void, gated = false;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const journal = await OperationJournal.open(path, identity, async () => { if (gated) await gate; });
+  gated = true;
+  const original = { ...command }, first = journal.begin(original);
+  original.bodySha256 = 'f'.repeat(64);
+  try {
+    await expect(journal.begin({ ...command, step: 'principal-supervisor', commandId: '00000000-0000-4000-8000-000000000093' })).rejects.toThrow();
+    await expect(journal.finishStage('T9-L01-entry', phaseEvidence(join(path, '..')))).rejects.toThrow();
+    expect(() => journal.requirePrevious('T9-L01-entry')).toThrow();
+  } finally { release(); await first; }
+  const saved = JSON.parse(readFileSync(path, 'utf8'));
+  expect(saved.commands).toHaveLength(1); expect(saved.commands[0]).toMatchObject(command);
+});
+
+test('offline async late protection failure preserves pending intent and blocks reopened dispatch', async () => {
+  for (const failAt of [2, 3]) {
+    const path = join(mkdtempSync(join(tmpdir(), 'task9-protect-synthetic-')), 'journal.json');
+    let armed = false, calls = 0, sent = 0;
+    const journal = await OperationJournal.open(path, identity, async () => {
+      if (armed && ++calls === failAt) { await new Promise(resolve => setTimeout(resolve, 5)); throw new Error('synthetic-protection'); }
+    });
+    armed = true;
+    await expect(dispatchObserved(journal, command, async () => { sent++; })).rejects.toThrow();
+    expect(sent).toBe(0); expect(existsSync(path + '.pending')).toBe(true);
+    expect(JSON.parse(readFileSync(path + '.pending', 'utf8')).commands[0]).toMatchObject(command);
+    await expect(OperationJournal.open(path, identity, () => {})).rejects.toThrow();
+    await expect(journal.begin({ ...command, commandId: '00000000-0000-4000-8000-000000000093' })).rejects.toThrow();
+  }
+});
+
+test('offline stale journal instance cannot publish over a completed competing phase', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'task9-stale-synthetic-')), path = join(folder, 'journal.json');
+  let release!: () => void, gated = false;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const first = await OperationJournal.open(path, identity, async () => { if (gated) await gate; });
+  const other = await OperationJournal.open(path, identity, () => {});
+  gated = true;
+  const write = first.begin(command), rejected = expect(write).rejects.toThrow();
+  await other.finishStage('T9-L01-entry', phaseEvidence(folder));
+  release(); await rejected;
+  expect(JSON.parse(readFileSync(path, 'utf8')).stages).toHaveLength(1);
+  expect(JSON.parse(readFileSync(path, 'utf8')).commands).toHaveLength(0);
+  expect(existsSync(path + '.pending')).toBe(true);
+  await expect(OperationJournal.open(path, identity, () => {})).rejects.toThrow();
+});
+
+test('offline explicit-local gate', async () => {
   expect(() => requireLocalAcceptance(undefined)).toThrow();
   expect(() => requireLocalAcceptance('APPROVED_SYNTHETIC_ONLY')).not.toThrow();
   expect(() => requireLocalAcceptance('production')).toThrow();
   expect(safeFailureCode('password=do-not-log')).not.toContain('do-not-log');
 });
 
-test('offline unmapped SELF contract accepts only the deployed 401 denial', () => {
+test('offline unmapped SELF contract accepts only the deployed 401 denial', async () => {
   expect(() => requireUnmappedSelfStatus(401)).not.toThrow();
   for (const status of [200, 400, 403, 500])
     expect(() => requireUnmappedSelfStatus(status)).toThrow();
@@ -33,7 +191,7 @@ const environment = {
   manifestHash: 'c5f374ee58e4c21b8c2b726cc5e1fe8e35f7fbe2128a2d5900bb8d910e950844',
   revision: 11, browserVersion: '153.0.8010.12', browserRevision: '1243',
 };
-test('offline rejects wrong origin issuer artifact or browser', () => {
+test('offline rejects wrong origin issuer artifact or browser', async () => {
   expect(() => validateEnvironment(environment)).not.toThrow();
   for (const key of Object.keys(environment)) {
     expect(() => validateEnvironment({ ...environment, [key]: 'wrong-synthetic-value' })).toThrow();
@@ -50,7 +208,7 @@ function accounts() {
     temporaryClientDeleted: true, temporaryCredentialRejected: true, temporaryTokenRejected: true, originalUsersUnchanged: true, realmPublicKeysUnchanged: true, directoryReadOnlyUnchanged: true, temporaryClientUserAndRolesAbsent: true, temporaryRecoveryContainerRemoved: true };
   return { original, credentials: { runId: operation.runId, accounts: entries }, operation };
 }
-test('offline rejects unfinished operation and replaced provider identity', () => {
+test('offline rejects unfinished operation and replaced provider identity', async () => {
   const f = accounts();
   expect(() => validateAccounts(f.original, f.credentials, f.operation)).not.toThrow();
   f.credentials.accounts.intake.providerUserId = '00000000-0000-4000-8000-000000000096';
@@ -61,43 +219,44 @@ test('offline rejects unfinished operation and replaced provider identity', () =
 
 const identity = { runId: '00000000-0000-4000-8000-000000000091', environmentDigest: 'a'.repeat(64), buildSha: environment.buildSha };
 const command = { step: 'principal-intake', commandId: '00000000-0000-4000-8000-000000000092', method: 'POST', path: '/api/v1/admin/identity/principals', bodySha256: 'b'.repeat(64), actorScopeKey: 'ask1.' + 'a'.repeat(43) };
-test('offline pending write blocks another key and survives reopening', () => {
+test('offline pending write blocks another key and survives reopening', async () => {
   const path = join(mkdtempSync(join(tmpdir(), 'task9-synthetic-')), 'journal.json');
-  const journal = new OperationJournal(path, identity, () => {});
-  journal.begin(command);
-  expect(() => journal.begin({ ...command, commandId: '00000000-0000-4000-8000-000000000093' })).toThrow();
-  expect(() => new OperationJournal(path, { ...identity, runId: '00000000-0000-4000-8000-000000000094' }, () => {})).toThrow();
-  const reopened = new OperationJournal(path, identity, () => {});
-  expect(() => reopened.begin(command)).toThrow();
+  const journal = await OperationJournal.open(path, identity, () => {});
+  await journal.begin(command);
+  await expect(journal.begin({ ...command, commandId: '00000000-0000-4000-8000-000000000093' })).rejects.toThrow();
+  await expect(OperationJournal.open(path, { ...identity, runId: '00000000-0000-4000-8000-000000000094' }, () => {})).rejects.toThrow();
+  const reopened = await OperationJournal.open(path, identity, () => {});
+  await expect(reopened.begin(command)).rejects.toThrow();
   expect(readFileSync(path, 'utf8')).not.toContain('providerUserSelector');
 });
-test('offline protection or persistence failure prevents dispatch authorization', () => {
+test('offline protection or persistence failure prevents dispatch authorization', async () => {
   const path = join(mkdtempSync(join(tmpdir(), 'task9-synthetic-')), 'journal.json');
-  expect(() => new OperationJournal(path, identity, () => { throw new Error('synthetic-boundary-denied'); })).toThrow();
-  const journal = new OperationJournal(path, identity, () => {});
+  await expect(OperationJournal.open(path, identity, () => { throw new Error('synthetic-boundary-denied'); })).rejects.toThrow();
+  const journal = await OperationJournal.open(path, identity, () => {});
   writeFileSync(path, '{}');
-  expect(() => journal.begin(command)).toThrow();
+  await expect(journal.begin(command)).rejects.toThrow();
 });
-test('offline journal rejects secrets and uncontrolled mutation paths', () => {
+test('offline journal rejects secrets and uncontrolled mutation paths', async () => {
   for (const bad of [{ ...command, password: 'never-store' }, { ...command, path: '/api/v1/tasks' }, { ...command, actorScopeKey: 'password=never-store' }]) {
     const path = join(mkdtempSync(join(tmpdir(), 'task9-synthetic-')), 'journal.json');
-    const journal = new OperationJournal(path, identity, () => {});
-    expect(() => journal.begin(bad)).toThrow();
+    const journal = await OperationJournal.open(path, identity, () => {});
+    await expect(journal.begin(bad)).rejects.toThrow();
   }
 });
 
-test('offline confirms only matching opaque receipt and exact resource reference', () => {
+test('offline confirms only matching opaque receipt and exact resource reference', async () => {
   const path = join(mkdtempSync(join(tmpdir(), 'task9-synthetic-')), 'journal.json');
-  const journal = new OperationJournal(path, identity, () => {}); journal.begin(command);
+  const journal = await OperationJournal.open(path, identity, () => {}); await journal.begin(command);
   const receipt = { commandId: command.commandId, receiptId: '00000000-0000-4000-8000-000000000095', completedAt: '2026-09-10T01:00:00Z', outcome: 'SUCCEEDED', resultFact: { factType: 'IDENTITY_PRINCIPAL', factRef: 'a'.repeat(43), revision: 0 } };
   const resource = command.path + '/00000000-0000-4000-8000-000000000090';
-  expect(() => journal.complete(command.commandId, 201, { ...receipt, commandId: '00000000-0000-4000-8000-000000000096' }, resource)).toThrow();
+  await expect(journal.complete(command.commandId, 201, { ...receipt, commandId: '00000000-0000-4000-8000-000000000096' }, resource)).rejects.toThrow();
   expect(journal.pending()?.commandId).toBe(command.commandId);
-  expect(() => journal.complete(command.commandId, 201, receipt, resource)).not.toThrow();
-  expect(journal.confirmed('principal-intake')?.resultFact?.factRef).toBe('a'.repeat(43));
+  const reconciled = await OperationJournal.open(path, identity, () => {});
+  await expect(reconciled.complete(command.commandId, 201, receipt, resource)).resolves.toBeDefined();
+  expect(reconciled.confirmed('principal-intake')?.resultFact?.factRef).toBe('a'.repeat(43));
 });
 
-test('offline linked directory is rejected without reading its files', () => {
+test('offline linked directory is rejected without reading its files', async () => {
   const base = mkdtempSync(join(tmpdir(), 'task9-synthetic-'));
   const link = base + '-junction'; symlinkSync(base, link, 'junction');
   expect(() => noLinks(link)).toThrow();
@@ -105,7 +264,7 @@ test('offline linked directory is rejected without reading its files', () => {
 
 test('offline dispatch observes a durable original key and stops on failed journaling', async () => {
   const path = join(mkdtempSync(join(tmpdir(), 'task9-synthetic-')), 'journal.json');
-  const journal = new OperationJournal(path, identity, () => {});
+  const journal = await OperationJournal.open(path, identity, async () => {});
   let sent = 0;
   await dispatchObserved(journal, command, async () => { expect(JSON.parse(readFileSync(path, 'utf8')).commands[0]?.commandId).toBe(command.commandId); sent++; });
   expect(sent).toBe(1);
@@ -127,7 +286,7 @@ test('offline frozen ReceiptLocation rejects legacy resource Location without lo
   }
 });
 
-test('offline receipt matches exact actor-scoped fact ID, never a display name', () => {
+test('offline receipt matches exact actor-scoped fact ID, never a display name', async () => {
   const actor = { appointmentId: '00000000-0000-4000-8000-000000000001', founderId: '00000000-0000-4000-8000-000000000002', tenantId: '00000000-0000-4000-8000-000000000003', rootId: '00000000-0000-4000-8000-000000000005' };
   const fact = { factType: 'IDENTITY_PRINCIPAL', factRef: '41V4O1g4d31tHMzv5eqlLVXqb-rOxOsQ7kiHMoiiT6k' };
   const wrong = { id: '00000000-0000-4000-8000-000000000006', displayName: '本地合成受理' };
@@ -137,7 +296,7 @@ test('offline receipt matches exact actor-scoped fact ID, never a display name',
   expect(() => matchFact({ ...actor, appointmentId: wrong.id }, fact, [right])).toThrow();
 });
 
-test('offline reporter discards raw credentials and preserves failed exit', () => {
+test('offline reporter discards raw credentials and preserves failed exit', async () => {
   const output: string[] = [], write = process.stdout.write;
   process.stdout.write = ((chunk: any) => { output.push(String(chunk)); return true; }) as typeof write;
   try {
@@ -150,13 +309,13 @@ test('offline reporter discards raw credentials and preserves failed exit', () =
   expect(output.join('')).toContain('status=failed exit=1');
 });
 
-test('offline known Location drift binary cannot authorize a real write', () => {
+test('offline known Location drift binary cannot authorize a real write', async () => {
   expect(() => requireReceiptLocationBuild('04bd695f7a8f656a5ed8fb96c5168e44a91bab8d')).toThrow();
   expect(() => requireReceiptLocationBuild('synthetic-invalid')).toThrow();
   expect(() => requireReceiptLocationBuild(environment.buildSha)).not.toThrow();
 });
 
-test('offline actual Python bridge rejects each controlled historical process before evidence in load and snapshot', () => {
+test('offline actual Python bridge rejects each controlled historical process before evidence in load and snapshot', async () => {
   const synthetic = mkdtempSync(join(tmpdir(), 'task9-process-synthetic-'));
   const probe = String.raw`
 import sys,types,copy
@@ -216,18 +375,18 @@ test('offline completion write and final protection failures cannot authorize su
   for (const failure of ['before-report', 'after-report-write', 'after-report-protect']) {
     const folder = mkdtempSync(join(tmpdir(), 'task9-phase-synthetic-')), path = join(folder, 'journal.json'), evidence = phaseEvidence(folder);
     let protectedFailure = false;
-    const journal = new OperationJournal(path, identity, () => { if (protectedFailure) throw new Error('synthetic-protection-denied'); });
-    expect(() => journal.finishStage('T9-L01-entry', evidence, { writeEvidence(file, bytes) {
+    const journal = await OperationJournal.open(path, identity, async () => { if (protectedFailure) throw new Error('synthetic-protection-denied'); });
+    await expect(journal.finishStage('T9-L01-entry', evidence, { writeEvidence(file, bytes) {
       if (failure === 'before-report') throw new Error('synthetic-write-denied');
       writeFileSync(file, bytes, { flag: 'wx' });
       if (failure === 'after-report-write') throw new Error('synthetic-flush-unknown');
       protectedFailure = true;
-    } })).toThrow();
+    } })).rejects.toThrow();
     expect(existsSync(path + '.completion.pending')).toBe(true);
-    expect(() => journal.begin(command)).toThrow();
+    await expect(journal.begin(command)).rejects.toThrow();
     let sent = false;
     await expect((async () => {
-      const continued = new OperationJournal(path, identity, () => {});
+      const continued = await OperationJournal.open(path, identity, () => {});
       continued.requirePrevious('T9-L03-unmapped');
       await dispatchObserved(continued, command, async () => { sent = true; });
     })()).rejects.toThrow();
@@ -236,22 +395,22 @@ test('offline completion write and final protection failures cannot authorize su
   }
 });
 
-test('offline completed phase requires intact prepared evidence on continuation', () => {
+test('offline completed phase requires intact prepared evidence on continuation', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'task9-phase-synthetic-')), path = join(folder, 'journal.json'), evidence = phaseEvidence(folder);
-  const journal = new OperationJournal(path, identity, () => {});
-  journal.finishStage('T9-L01-entry', evidence);
+  const journal = await OperationJournal.open(path, identity, () => {});
+  await journal.finishStage('T9-L01-entry', evidence);
   expect(existsSync(path + '.completion.pending')).toBe(false);
   expect(JSON.parse(readFileSync(evidence.reportPath, 'utf8')).status).toBe('ACTIONS_VERIFIED');
   expect(JSON.parse(readFileSync(path, 'utf8')).stages[0]).toMatchObject({ caseIdentity: 'T9-L01-entry', status: 'PASSED_SUBSCENARIO', exitCode: 0, reportPath: evidence.reportPath });
-  const continued = new OperationJournal(path, identity, () => {});
+  const continued = await OperationJournal.open(path, identity, () => {});
   expect(() => continued.requirePrevious('T9-L03-unmapped')).not.toThrow();
   writeFileSync(evidence.reportPath, '{}');
   expect(() => continued.requirePrevious('T9-L03-unmapped')).toThrow();
-  expect(() => continued.begin(command)).toThrow();
-  expect(() => new OperationJournal(path, identity, () => {})).toThrow();
+  await expect(continued.begin(command)).rejects.toThrow();
+  await expect(OperationJournal.open(path, identity, () => {})).rejects.toThrow();
 });
 
-test('offline actual Python bridge binds only coherent replacement manifest before credentials', () => {
+test('offline actual Python bridge binds only coherent replacement manifest before credentials', async () => {
   const synthetic = mkdtempSync(join(tmpdir(), 'task9-release-synthetic-'));
   const probe = String.raw`
 import sys,types,copy,io,contextlib

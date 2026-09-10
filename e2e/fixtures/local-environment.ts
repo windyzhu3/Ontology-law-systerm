@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -117,15 +117,20 @@ if sys.argv[2]=='load':
     result['operation']=read_json(regular(runner.RUNTIME/'task9-test-account-operation.json'))
 print(json.dumps(result))
 `;
-function invoke(mode: 'protect' | 'snapshot' | 'load'): any {
+async function invoke(mode: 'protect' | 'snapshot' | 'load'): Promise<any> {
   requireLocalAcceptance(process.env.TASK9_LOCAL_ACCEPTANCE);
   noLinks(root); noLinks(runtime);
-  const result = spawnSync('D:/soft/python3/python.exe', ['-B', '-c', LOCAL_RUNTIME_BRIDGE, root, mode], { encoding: 'utf8', windowsHide: true, timeout: 60_000, maxBuffer: 2 * 1024 * 1024 });
-  // Never expose child stderr/stdout on failure (including Python local variables).
-  check(!result.error && result.status === 0);
-  try { return JSON.parse(result.stdout); } catch { throw new Error('T9_BOUNDARY'); }
+  const stdout = await new Promise<string>((resolve, reject) => {
+    execFile('D:/soft/python3/python.exe', ['-B', '-c', LOCAL_RUNTIME_BRIDGE, root, mode],
+      { encoding: 'utf8', windowsHide: true, timeout: 60_000, maxBuffer: 2 * 1024 * 1024 },
+      (error, stdout) => {
+        // Never propagate child errors: they contain command/args and output.
+        if (error) reject(new Error('T9_BOUNDARY')); else resolve(stdout);
+      });
+  });
+  try { return JSON.parse(stdout); } catch { throw new Error('T9_BOUNDARY'); }
 }
-export const protect = () => { invoke('protect'); };
+export const protect = async () => { await invoke('protect'); };
 function toolchain(): { browserRevision: string; browserVersion: string } {
   check(process.version === 'v24.20.0');
   for (const [file, digest] of [
@@ -139,12 +144,12 @@ function toolchain(): { browserRevision: string; browserVersion: string } {
   const browser = JSON.parse(readFileSync(join(root, 'node_modules/playwright-core/browsers.json'), 'utf8')).browsers.find((x: any) => x.name === 'chromium');
   return { browserRevision: browser.revision, browserVersion: browser.browserVersion };
 }
-export function loadLocalEnvironment() {
+export async function loadLocalEnvironment() {
   requireLocalAcceptance(process.env.TASK9_LOCAL_ACCEPTANCE);
   check(!process.env.DEBUG && !process.env.PWDEBUG && !process.env.PW_TEST_DEBUG);
   const tools = toolchain();
-  const snapshot = invoke('snapshot'); validateEnvironment({ ...snapshot, ...tools });
-  const loaded = invoke('load'); validateEnvironment({ ...loaded, ...tools });
+  const snapshot = await invoke('snapshot'); validateEnvironment({ ...snapshot, ...tools });
+  const loaded = await invoke('load'); validateEnvironment({ ...loaded, ...tools });
   check(snapshot.apiIdentity === loaded.apiIdentity && snapshot.processIdentity === loaded.processIdentity && snapshot.releaseIdentity === loaded.releaseIdentity);
   validateAccounts(loaded.original, loaded.credentials, loaded.operation);
   const environmentDigest = sha(JSON.stringify({ ...snapshot, ...tools }));
@@ -152,11 +157,11 @@ export function loadLocalEnvironment() {
     ...PIN, environmentDigest, apiIdentity: snapshot.apiIdentity,
     bootstrap: loaded.bootstrap as { tenantId: string; rootId: string; founderId: string; appointmentId: string },
     accounts: { ...loaded.original, ...loaded.credentials.accounts } as Record<Alias | 'founder' | 'unmapped', Account>,
-    assertUnchanged() {
-      const now = invoke('snapshot'); validateEnvironment({ ...now, ...tools });
+    async assertUnchanged() {
+      const now = await invoke('snapshot'); validateEnvironment({ ...now, ...tools });
       check(sha(JSON.stringify({ ...now, ...tools })) === environmentDigest);
     },
     verifyBrowser(actual: string) { check(actual === PIN.browserVersion); },
   };
 }
-export type LocalEnvironment = ReturnType<typeof loadLocalEnvironment>;
+export type LocalEnvironment = Awaited<ReturnType<typeof loadLocalEnvironment>>;

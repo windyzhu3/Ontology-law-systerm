@@ -14,9 +14,9 @@ for (const id of CASES) {
       check(info.config.reporter.length === 1 && info.config.reporter[0][0].replaceAll('\\', '/').endsWith('/e2e/reporters/safe-reporter.ts'));
       check(info.project.use.trace === 'off' && info.project.use.screenshot === 'off' && info.project.use.video === 'off' && !info.project.use.storageState);
       if (!setup) {
-        loadLocalEnvironment(); // Approval and protection BEFORE browser launch.
+        await loadLocalEnvironment(); // Approval and protection BEFORE browser launch.
         browser = await chromium.launch({ headless: true });
-        setup = new IdentitySetup(browser);
+        setup = await IdentitySetup.create(browser);
         if (process.env.TASK9_RECOVER_COMMAND_ID) await setup.recoverPending();
       }
       await setup.stage(id);

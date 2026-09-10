@@ -15,7 +15,7 @@
 ```powershell
 $env:PATH='C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/npm-11.9.0/node_modules/.bin;C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64;' + $env:PATH
 node C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/npm-11.9.0/node_modules/npm/bin/npm-cli.js run test:e2e:task9 -- --project offline-harness
-node node_modules/typescript/bin/tsc --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --strict playwright.config.ts e2e/fixtures/local-environment.ts e2e/fixtures/operation-journal.ts e2e/fixtures/identity-setup.ts e2e/reporters/safe-reporter.ts e2e/tests/task9-harness.spec.ts e2e/tests/task9-identity-entry.spec.ts
+node node_modules/typescript/bin/tsc --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --strict playwright.config.ts e2e/readonly-session.config.ts e2e/fixtures/local-environment.ts e2e/fixtures/operation-journal.ts e2e/fixtures/identity-setup.ts e2e/fixtures/readonly-session.ts e2e/reporters/safe-reporter.ts e2e/reporters/readonly-reporter.ts e2e/tests/task9-harness.spec.ts e2e/tests/task9-identity-entry.spec.ts e2e/readonly/session-refresh.spec.ts
 node node_modules/@playwright/test/cli.js test --config playwright.config.ts --list --reporter list
 ```
 
@@ -40,3 +40,20 @@ node node_modules/@playwright/test/cli.js test --config playwright.config.ts --l
 阶段完成使用持久 `.completion.pending` 隔离文件：先创建并刷盘待提交清单，再独占写入和刷盘 `ACTIONS_VERIFIED` 证据（exitCode=null，不单独声明通过），核对字节、保护和原清单后，以最后一次原子 rename 发布阶段资格。发布之后不再执行可能失败的证据/保护操作。只有正式 journal 的 `stages` 中对应 `PASSED_SUBSCENARIO`/exitCode0 和一致的 reportSha256 同时存在，才表示该子场景完成。任何此前完成错误保留隔离文件；本进程及明确续跑的新进程均不能继续写入。隔离文件和不确定证据不得自动删除/覆盖，需要控制者明确核对处理；普通 `TASK9_CONTINUE_RUN_ID` 不解除这种阻断。旧字符串阶段格式不会静默升级。
 
 每个实际子场景的受保护独立 JSON 包含真实二进制 buildSha、environmentDigest、API启动身份摘要、时间、caseIdentity、证据状态、退出码、reportPath，以及仅含固定path/status的HTTP证据；完成状态以该 JSON 和正式 journal 的哈希绑定记录共同确认。原始响应、凭据、token、selector、subject/HMAC、storageState和请求正文不落盘。自定义 reporter 只输出闭合ID/状态/阶段码；敏感错误在测试退出前替换，关闭自动DOM快照，且无主动截图。本单元不包含十四管理生命周期、七卡、代办/等待恢复、撤销/禁用或人工签认。
+
+## 非阻塞边界与独立只读持续会话入口
+
+Python 边界使用固定可执行文件的异步子进程，仍逐次运行完整保护/快照，不缓存或跳过检查；60秒上限、stdout/stderr各2MiB上限、隐藏窗口和错误脱敏不变。所有调用等待完成后才使用结果。Journal 同一实例的 mutator 在第一个 await 前排他占用，竞争请求直接拒绝而非排队；跨实例仍以独占 pending 文件和原字节比较拒绝旧状态覆盖。写入路由在 headers/环境检查前消耗唯一 armed 许可，派发前再次核对失败状态。任何未知结果保留原 key/pending，不自动重试。
+
+以下是控制者专用的独立验收入口，不在原7 CASES中、不打开 OperationJournal、不改原清单、不重放任何命令。原 run 已有7阶段/16 CONFIRMED；只读取其精确 SHA256 `44c95f59853fa552d2d7ba933dcb80a4877464fe26dab7c34202d3e1fb0ad9a1`，前后均须相同。继续使用上文固定 Node、原 protect 前置及**仅测试进程**的既有 CA `NODE_EXTRA_CA_CERTS`；保持严格 TLS，禁止全局环境/信任修改或 `NODE_TLS_REJECT_UNAUTHORIZED=0`。不设置 CONTINUE/RECOVER，不需要新 run。
+
+```powershell
+# 仅控制者：先完成上文 protect 与进程级 CA 设置，再启动此独立进程。
+# 向测试进程传入 TASK9_LOCAL_ACCEPTANCE=APPROVED_SYNTHETIC_ONLY
+# 和 TASK9_READONLY_SESSION=APPROVED_EXISTING_RUN_ONLY。
+node node_modules/@playwright/test/cli.js test --config e2e/readonly-session.config.ts
+```
+
+入口真实 founder 登录并确认管理员，250秒无 keepalive 后站内读取组织与主体；只有真实 token endpoint POST 的内存 `grant_type=refresh_token` 才启动完整 assertUnchanged 快照及3次 protect。请求不 Mock，刷新 HTTP 必须发生在该异步边界未结束时，并且随后组织/主体 GET200、no-store及安全管理员 UI 同时成立。所有业务 mutations 和非白名单请求均拦截；任何被拦截请求均使结果不能通过。普通列表GET不等同于生产 OIDC/SELF 的10秒 bound。零业务写入不声称零读取审计。
+
+独占新建的闭合报告为 `.superpowers/sdd/2026-09-08-task9-real-user-access-plan/output/task96e-readonly-session-<uuid>.json`；只含固定 step/status、refresh/组织/主体 HTTP、session/login/admin booleans、阻断计数及 journal/environment 摘要，不含 token、凭据、raw DOM/error/body。明确异常为 FAILED；无其他故障且未观察 refresh 为 NOT_TRIGGERED，绝非 PASS。仅全部门同时满足才可标记 PASSED_READ_ONLY_SUBSCENARIO，不能代替原7阶段或U01–U03。当前已报告的生产 refresh nonce 兼容问题单独处理，此入口不放宽生产校验、不把 refresh200 单独当成功，也不据离线异步测试推断旧 I05/I06 timeout 根因或持续会话已验收。

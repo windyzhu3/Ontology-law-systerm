@@ -56,18 +56,34 @@ function durableExclusive(path: string, bytes: string): void {
   try { writeFileSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
 }
 export class OperationJournal {
-  private text: string;
-  private data: Journal;
-  constructor(readonly path: string, identity: RunIdentity, private readonly protect: () => void) {
-    protect(); noLinks(dirname(path)); this.requireCompletionClear(); check(!existsSync(path + '.pending'));
+  private text = '';
+  private data!: Journal;
+  private busy = false;
+  private failed = false;
+  private constructor(readonly path: string, private readonly protect: () => void | Promise<void>) {}
+  static async open(path: string, identity: RunIdentity, protect: () => void | Promise<void>): Promise<OperationJournal> {
+    const journal = new OperationJournal(path, protect);
+    await journal.initialize(structuredClone(identity)); return journal;
+  }
+  private async initialize(identity: RunIdentity): Promise<void> {
+    const path = this.path;
+    await this.protect(); noLinks(dirname(path)); this.requireCompletionClear(); check(!existsSync(path + '.pending'));
     if (existsSync(path)) { noLinks(path); this.text = readFileSync(path, 'utf8'); this.data = JSON.parse(this.text); validate(this.data); check(JSON.stringify(this.data.identity) === JSON.stringify(identity)); }
     else {
       this.data = { identity, commands: [], stages: [] }; validate(this.data);
       this.text = JSON.stringify(this.data); const fd = openSync(path, 'wx', 0o600);
       try { writeFileSync(fd, this.text); fsyncSync(fd); } finally { closeSync(fd); }
-      protect();
+      await this.protect();
     }
     this.verifyEvidence();
+  }
+  private async mutate<T>(action: () => Promise<T>): Promise<T> {
+    // Claim synchronously, before the first awaited protection. Never queue a
+    // stale mutation or retry it after an unknown outcome.
+    check(!this.busy && !this.failed); this.busy = true;
+    try { return await action(); }
+    catch (error) { this.failed = true; throw error; }
+    finally { this.busy = false; }
   }
   private requireCompletionClear(): void { check(!existsSync(this.path + '.completion.pending')); }
   private validateEvidence(evidence: PhaseEvidence, id: CaseId): void {
@@ -89,36 +105,51 @@ export class OperationJournal {
       this.validateEvidence(JSON.parse(bytes), stage.caseIdentity);
     }
   }
-  private save(next: Journal): void {
+  private async save(next: Journal): Promise<void> {
     this.requireCompletionClear(); this.verifyEvidence();
-    this.protect(); noLinks(this.path); validate(next);
+    await this.protect(); this.requireCompletionClear(); noLinks(this.path); validate(next);
+    const nextBytes = JSON.stringify(next);
     const fd = openSync(this.path + '.pending', 'wx', 0o600);
-    try { check(readFileSync(this.path, 'utf8') === this.text); writeFileSync(fd, JSON.stringify(next)); fsyncSync(fd); } finally { closeSync(fd); }
-    this.protect(); renameSync(this.path + '.pending', this.path);
-    this.text = JSON.stringify(next); this.data = next;
-    this.protect(); check(readFileSync(this.path, 'utf8') === this.text);
+    try { check(readFileSync(this.path, 'utf8') === this.text); writeFileSync(fd, nextBytes); fsyncSync(fd); } finally { closeSync(fd); }
+    await this.protect(); this.requireCompletionClear(); this.verifyEvidence();
+    await this.protect(); this.requireCompletionClear(); noLinks(this.path); noLinks(this.path + '.pending');
+    check(readFileSync(this.path, 'utf8') === this.text && readFileSync(this.path + '.pending', 'utf8') === nextBytes);
+    // Publish only after every fallible check. Failure preserves the pending file.
+    renameSync(this.path + '.pending', this.path);
+    this.text = nextBytes; this.data = next;
   }
-  begin(command: Command): void {
-    validCommand(command); check(!this.pending()); check(!this.data.commands.some(e => e.step === command.step || e.commandId === command.commandId));
-    this.save({ ...this.data, commands: [...this.data.commands, { ...command, at: new Date().toISOString(), status: 'PENDING' }] });
+  async begin(command: Command): Promise<void> {
+    const original = structuredClone(command);
+    return this.mutate(async () => {
+      validCommand(original); check(!this.pending()); check(!this.data.commands.some(e => e.step === original.step || e.commandId === original.commandId));
+      await this.save({ ...this.data, commands: [...this.data.commands, { ...original, at: new Date().toISOString(), status: 'PENDING' }] });
+    });
   }
   pending(): Entry | undefined { return structuredClone(this.data.commands.find(e => e.status === 'PENDING')); }
   confirmed(step: string): Entry | undefined { return structuredClone(this.data.commands.find(e => e.step === step && e.status === 'CONFIRMED')); }
-  complete(commandId: string, status: number, receipt: any, resourcePath: string): Fact {
+  async complete(commandId: string, status: number, receipt: any, resourcePath: string): Promise<Fact> {
+    receipt = structuredClone(receipt);
+    return this.mutate(async () => {
     const pending = this.pending(); check(pending && pending.commandId === commandId && (status === 201 || status === 200));
     check(exact(receipt, ['commandId', 'receiptId', 'completedAt', 'outcome', 'resultFact']) && receipt.commandId === commandId && receipt.outcome === 'SUCCEEDED' && uuid.test(receipt.receiptId));
     check(Number.isFinite(Date.parse(receipt.completedAt)));
     const fact = receipt.resultFact;
     check(exact(fact, ['factType', 'factRef', 'revision']) && fact.factType === PATH_FACT[pending.path as keyof typeof PATH_FACT] && /^[A-Za-z0-9_-]{43}$/.test(fact.factRef) && fact.revision === 0);
     const entry: Entry = { ...pending, status: 'CONFIRMED', httpStatus: status, receiptId: receipt.receiptId, resourcePath, resultFact: { factType: fact.factType, factRef: fact.factRef, revision: fact.revision } };
-    this.save({ ...this.data, commands: this.data.commands.map(e => e.commandId === commandId ? entry : e) }); return structuredClone(entry.resultFact!);
+    await this.save({ ...this.data, commands: this.data.commands.map(e => e.commandId === commandId ? entry : e) }); return structuredClone(entry.resultFact!);
+    });
   }
   requirePrevious(id: CaseId): void {
+    check(!this.busy && !this.failed); this.requirePreviousState(id);
+  }
+  private requirePreviousState(id: CaseId): void {
     this.requireCompletionClear(); this.verifyEvidence();
     check(!this.pending()); const index = CASES.indexOf(id); check(index >= 0 && this.data.stages.length === index);
   }
-  finishStage(id: CaseId, evidence: PhaseEvidence, io: CompletionIO = {}): void {
-    this.requirePrevious(id); this.validateEvidence(evidence, id); this.protect();
+  async finishStage(id: CaseId, evidence: PhaseEvidence, io: CompletionIO = {}): Promise<void> {
+    evidence = structuredClone(evidence);
+    return this.mutate(async () => {
+    this.requirePreviousState(id); this.validateEvidence(evidence, id); await this.protect();
     noLinks(this.path); check(readFileSync(this.path, 'utf8') === this.text && !existsSync(this.path + '.pending'));
     const evidenceBytes = JSON.stringify(evidence);
     const next: Journal = { ...this.data, stages: [...this.data.stages, { caseIdentity: id, reportPath: evidence.reportPath, reportSha256: sha(evidenceBytes), status: 'PASSED_SUBSCENARIO', exitCode: 0 }] };
@@ -127,15 +158,16 @@ export class OperationJournal {
     // all command saves reject it. Never delete/overwrite it after an error.
     durableExclusive(intent, nextBytes);
     (io.writeEvidence ?? durableExclusive)(evidence.reportPath, evidenceBytes);
-    this.protect(); noLinks(evidence.reportPath);
+    await this.protect(); noLinks(evidence.reportPath);
     check(readFileSync(evidence.reportPath, 'utf8') === evidenceBytes);
     this.verifyEvidence();
     noLinks(intent); check(readFileSync(intent, 'utf8') === nextBytes);
-    noLinks(this.path); check(readFileSync(this.path, 'utf8') === this.text);
+    noLinks(this.path); check(readFileSync(this.path, 'utf8') === this.text && !existsSync(this.path + '.pending'));
     // The final atomic rename is the publication boundary. No protection, I/O,
     // validation, reporter callback, or other fallible completion work follows.
     // A failed native rename preserves the intent and blocks every later write.
     renameSync(intent, this.path);
     this.text = nextBytes; this.data = next;
+    });
   }
 }

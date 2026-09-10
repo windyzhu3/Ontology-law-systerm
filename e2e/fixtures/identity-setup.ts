@@ -7,7 +7,7 @@ import { ALIASES, ISSUER, ORIGIN, check, exact, loadLocalEnvironment, protect, r
 import { CASES, OperationJournal, PATH_FACT, type CaseId, type Command } from './operation-journal';
 import { safeFailureCode } from '../reporters/safe-reporter';
 
-export async function dispatchObserved(journal: OperationJournal, command: Command, send: () => Promise<void>) { journal.begin(command); await send(); }
+export async function dispatchObserved(journal: OperationJournal, command: Command, send: () => Promise<void>) { await journal.begin(command); await send(); }
 export function requireReceiptLocationBuild(buildSha: string): void {
   check(/^[0-9a-f]{40}$/.test(buildSha) && buildSha !== '04bd695f7a8f656a5ed8fb96c5168e44a91bab8d');
 }
@@ -39,16 +39,21 @@ export class IdentitySetup {
   readonly runId: string;
   readonly journal: OperationJournal;
   private armed?: Armed;
+  private submitting = false;
   private dispatchFailed = false;
   private sessions: Session[] = [];
   private admin?: Session;
   private http: Array<{ path: string; status: number }> = [];
-  constructor(private browser: Browser) {
-    this.environment = loadLocalEnvironment(); this.environment.verifyBrowser(browser.version());
-    check(uuid.test(process.env.TASK9_RUN_ID ?? '')); this.runId = process.env.TASK9_RUN_ID!;
+  private constructor(private browser: Browser, environment: LocalEnvironment, runId: string, journal: OperationJournal) {
+    this.environment = environment; this.runId = runId; this.journal = journal;
+  }
+  static async create(browser: Browser): Promise<IdentitySetup> {
+    const environment = await loadLocalEnvironment(); environment.verifyBrowser(browser.version());
+    check(uuid.test(process.env.TASK9_RUN_ID ?? '')); const runId = process.env.TASK9_RUN_ID!;
     const path = join(runtime, 'task9-identity-operation.json');
-    check(!existsSync(path) || process.env.TASK9_CONTINUE_RUN_ID === this.runId);
-    this.journal = new OperationJournal(path, { runId: this.runId, environmentDigest: this.environment.environmentDigest, buildSha: this.environment.buildSha }, protect);
+    check(!existsSync(path) || process.env.TASK9_CONTINUE_RUN_ID === runId);
+    const journal = await OperationJournal.open(path, { runId, environmentDigest: environment.environmentDigest, buildSha: environment.buildSha }, protect);
+    return new IdentitySetup(browser, environment, runId, journal);
   }
   async close() { for (const session of this.sessions) await session.context.close(); this.sessions = []; }
   private async observe(request: Request, session: Session): Promise<void> {
@@ -59,7 +64,7 @@ export class IdentitySetup {
     }
   }
   async login(alias: Alias | 'founder' | 'unmapped'): Promise<Session> {
-    this.environment.assertUnchanged();
+    await this.environment.assertUnchanged();
     const context = await this.browser.newContext({ serviceWorkers: 'block', ignoreHTTPSErrors: false, locale: 'zh-CN', timezoneId: 'Asia/Shanghai' });
     const page = await context.newPage();
     const session: Session = { context, page, self: null, auth: {} }; this.sessions.push(session);
@@ -71,10 +76,11 @@ export class IdentitySetup {
           check(url.pathname.startsWith('/realms/local-r1/') || url.pathname.startsWith('/resources/'));
           await route.continue(); return;
         }
-        await this.observe(request, session);
         if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) {
           check(url.pathname.startsWith('/api/') && this.armed && !this.dispatchFailed && !this.journal.pending());
+          // Reserve the sole write before observe()/headers or any other await.
           const armed = this.armed; this.armed = undefined;
+          await this.observe(request, session);
           check(request.method() === 'POST' && url.pathname === armed.path && !url.search);
           const bytes = request.postDataBuffer(); check(bytes);
           const body = JSON.parse(bytes.toString('utf8'));
@@ -82,10 +88,14 @@ export class IdentitySetup {
           const headers = await request.allHeaders();
           check(session === this.admin && session.self?.canEnterIdentityAdmin === true && session.self.selectedAppointmentId === this.environment.bootstrap.appointmentId && session.self.selectedOnBehalfAppointmentId === null);
           check(headers['x-appointment-id'] === this.environment.bootstrap.appointmentId && !headers['x-on-behalf-appointment-id']);
-          this.environment.assertUnchanged();
-          await dispatchObserved(this.journal, { step: armed.step, commandId: headers['idempotency-key'], method: request.method(), path: url.pathname, bodySha256: sha(bytes), actorScopeKey: session.self.actorScopeKey }, () => route.continue());
+          await this.environment.assertUnchanged();
+          check(!this.dispatchFailed);
+          await dispatchObserved(this.journal, { step: armed.step, commandId: headers['idempotency-key'], method: request.method(), path: url.pathname, bodySha256: sha(bytes), actorScopeKey: session.self.actorScopeKey }, () => {
+            check(!this.dispatchFailed); return route.continue();
+          });
           return;
         }
+        await this.observe(request, session);
         await route.continue();
       } catch { this.dispatchFailed = true; await route.abort().catch(() => {}); }
     });
@@ -113,7 +123,7 @@ export class IdentitySetup {
   }
   private async read(session: Session, path: string): Promise<any> {
     check(path === SELF || COLLECTIONS.some(p => path === p + '?limit=50') || /^\/api\/v1\/commands\/[0-9a-f-]{36}\/receipt$/.test(path));
-    this.environment.assertUnchanged();
+    await this.environment.assertUnchanged();
     const response = await session.context.request.get(ORIGIN + path, { headers: session.auth, maxRedirects: 0 });
     this.http.push({ path: path.split('?')[0], status: response.status() });
     check(response.status() === 200 && response.headers()['cache-control']?.includes('no-store'));
@@ -157,13 +167,15 @@ export class IdentitySetup {
     // No request body was retained, so this path cannot resend the write.
     const receipt = await this.read(admin, `/api/v1/commands/${pending.commandId}/receipt`);
     const id = matchFact(this.environment.bootstrap, receipt.resultFact, await this.rows(pending.path));
-    this.journal.complete(pending.commandId, 200, receipt, pending.path + '/' + id);
+    await this.journal.complete(pending.commandId, 200, receipt, pending.path + '/' + id);
   }
   private async submit(step: string, path: string, body: Record<string, unknown>): Promise<string> {
     // Named 9.6f prerequisite: the reviewed defective binary cannot dispatch a
     // CREATE even if someone supplies the local approval flag before rebuilding.
     requireReceiptLocationBuild(this.environment.buildSha);
-    check(this.admin && !this.armed && !this.dispatchFailed && !this.journal.pending());
+    check(this.admin && !this.submitting && !this.armed && !this.dispatchFailed && !this.journal.pending());
+    this.submitting = true;
+    try {
     const page = this.admin.page;
     this.armed = { step, path, body };
     const waiting = page.waitForResponse(response => response.url() === ORIGIN + path && response.request().method() === 'POST');
@@ -177,9 +189,11 @@ export class IdentitySetup {
     const id = matchFact(this.environment.bootstrap, receipt.resultFact, await this.rows(path));
     const recovered = await this.read(this.admin, `/api/v1/commands/${pending.commandId}/receipt`);
     check(JSON.stringify(recovered) === JSON.stringify(receipt));
-    this.journal.complete(pending.commandId, response.status(), receipt, path + '/' + id);
+    await this.journal.complete(pending.commandId, response.status(), receipt, path + '/' + id);
     await expect(page.getByRole('button', { name: '确认创建', exact: true })).toHaveCount(0);
-    this.environment.assertUnchanged(); return id;
+    await this.environment.assertUnchanged(); return id;
+    } catch (error) { this.dispatchFailed = true; throw error; }
+    finally { this.submitting = false; }
   }
   async entry() {
     const session = await this.administrator();
@@ -282,21 +296,21 @@ export class IdentitySetup {
       await expect(page.getByRole('heading', { name: '当前暂无可处理责任', exact: true })).toBeVisible();
     } else await expect(page.getByText('当前任职不能进入业务工作台；请联系律所管理员。', { exact: true })).toBeVisible();
   }
-  async dynamic() { for (const alias of ALIASES) await this.qualification(alias, alias === 'intake' || alias === 'supervisor'); this.environment.assertUnchanged(); }
+  async dynamic() { for (const alias of ALIASES) await this.qualification(alias, alias === 'intake' || alias === 'supervisor'); await this.environment.assertUnchanged(); }
   async stage(id: CaseId) {
     let completing = false; const at = new Date().toISOString();
     const reportPath = join(runtime, `task9-${this.runId}-${id}-${randomUUID()}.json`);
     try {
-      this.journal.requirePrevious(id); this.environment.assertUnchanged();
+      this.journal.requirePrevious(id); await this.environment.assertUnchanged();
       const actions = [() => this.entry(), () => this.unmapped(), () => this.bind(), () => this.noAppointment(), () => this.appointments(), () => this.grants(), () => this.dynamic()];
-      await actions[CASES.indexOf(id)](); this.environment.assertUnchanged();
+      await actions[CASES.indexOf(id)](); await this.environment.assertUnchanged();
       const http = this.http; this.http = []; completing = true;
-      this.journal.finishStage(id, { runId: this.runId, buildSha: this.environment.buildSha, environmentDigest: this.environment.environmentDigest, apiIdentity: this.environment.apiIdentity, executedAt: at, caseIdentity: id, status: 'ACTIONS_VERIFIED', exitCode: null, reportPath, http, U01: 'NOT_EXECUTED', U02: 'NOT_EXECUTED', U03: 'NOT_EXECUTED' });
+      await this.journal.finishStage(id, { runId: this.runId, buildSha: this.environment.buildSha, environmentDigest: this.environment.environmentDigest, apiIdentity: this.environment.apiIdentity, executedAt: at, caseIdentity: id, status: 'ACTIONS_VERIFIED', exitCode: null, reportPath, http, U01: 'NOT_EXECUTED', U02: 'NOT_EXECUTED', U03: 'NOT_EXECUTED' });
     } catch {
       if (!completing) {
-        protect();
+        await protect();
         writeFileSync(reportPath, JSON.stringify({ runId: this.runId, buildSha: this.environment.buildSha, environmentDigest: this.environment.environmentDigest, apiIdentity: this.environment.apiIdentity, executedAt: at, caseIdentity: id, status: 'FAILED', exitCode: 1, reportPath, http: this.http, U01: 'NOT_EXECUTED', U02: 'NOT_EXECUTED', U03: 'NOT_EXECUTED' }), { flag: 'wx', mode: 0o600 });
-        this.http = []; protect();
+        this.http = []; await protect();
       }
       throw new Error(safeFailureCode(id));
     }
