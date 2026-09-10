@@ -133,6 +133,94 @@ def _instant(value):
     return parsed
 
 
+def _rename_closure(plan, item, outcome, expected_subject_revision=None):
+    if type(item) is not dict or set(item) != {'slot', 'receipt', 'audit'}: raise ValueError()
+    slot, receipt, audit = item['slot'], item['receipt'], item['audit']
+    if type(slot) is not dict or type(receipt) is not dict or type(audit) is not dict: raise ValueError()
+    tenant = plan['identity']['tenantId']; root_id = plan['original']['root']['organization_unit_id']
+    founder = plan['original']['founder']['principal_id']
+    founder_appointment = plan['original']['founderAppointment']['appointment_id']
+    management = [row for row in plan['original']['founderGrants']
+        if row.get('authority_code') == 'IDENTITY_ORGANIZATION_MANAGE']
+    if len(management) != 1: raise ValueError()
+    management = management[0]
+    command = _canonical_uuid(slot['command_id']); slot_id = _canonical_uuid(slot['command_execution_slot_id'])
+    receipt_id = _canonical_uuid(receipt['command_receipt_id'])
+    subject_revision = audit['subject_revision']
+    if (type(subject_revision) is not int or expected_subject_revision is not None
+        and subject_revision != expected_subject_revision): raise ValueError()
+    if (slot['tenant_id'] != tenant or slot['envelope_type'] != 'INTERNAL_ADMIN'
+        or slot['command_type'] != 'RENAME_ORGANIZATION_UNIT'
+        or not re.fullmatch('[0-9a-f]{64}', slot['payload_digest'])):
+        raise ValueError()
+    scope = {'profile': 'R1_IDENTITY_COMMAND_SCOPE_V1', 'tenantId': tenant,
+        'commandType': 'RENAME_ORGANIZATION_UNIT', 'principalId': founder,
+        'appointmentId': founder_appointment,
+        'target': {'kind': 'identity.organization_unit', 'id': root_id}}
+    if slot['command_scope_digest'] != _sha256(_canonical(scope)): raise ValueError()
+    result_revision = subject_revision + 1 if outcome == 'SUCCEEDED' else subject_revision
+    result_fact = {'type': 'identity.organization_unit', 'id': root_id, 'revision': result_revision}
+    rejection = receipt['rejection_code']
+    if outcome == 'REJECTED':
+        if type(rejection) is not str or not rejection: raise ValueError()
+        receipt_fact = (None, None, None, None)
+        summary_fact = None
+    else:
+        if rejection is not None: raise ValueError()
+        receipt_fact = ('identity.organization_unit', root_id, result_revision, None)
+        summary_fact = result_fact
+    if (receipt['tenant_id'] != tenant or receipt['command_execution_slot_id'] != slot_id
+        or receipt['outcome'] != outcome
+        or (receipt['result_fact_type'], receipt['result_fact_id'], receipt['result_fact_revision'],
+            receipt['result_fact_hash']) != receipt_fact):
+        raise ValueError()
+    expected_audit = {'tenant_id': tenant, 'entry_type': 'EVENT', 'audit_scope_code': 'OBJECT',
+        'action_code': 'RENAME_ORGANIZATION_UNIT', 'result_code': outcome,
+        'actor_principal_id': founder, 'actor_appointment_id': founder_appointment,
+        'on_behalf_of_principal_id': None, 'on_behalf_of_appointment_id': None,
+        'command_id': command, 'command_type': 'RENAME_ORGANIZATION_UNIT', 'causation_id': None,
+        'authorization_slot_code': 'IDENTITY_ADMIN', 'authorization_path_code': 'DIRECT',
+        'authorization_scope_organization_unit_id': root_id, 'service_role_code': 'API',
+        'summary_schema_code': 'R1_IDENTITY_COMMAND_AUDIT_V1', 'summary_schema_version': 1,
+        'subject_type': 'identity.organization_unit', 'subject_id': root_id,
+        'subject_revision': subject_revision, 'subject_hash': None,
+        'correction_target_type': None, 'correction_target_id': None,
+        'correction_target_revision': None, 'correction_target_hash': None,
+        'authorization_fact_type': 'identity.authority_grant',
+        'authorization_fact_id': management['authority_grant_id'],
+        'authorization_fact_revision': management['revision'], 'authorization_fact_hash': None}
+    if any(type(audit.get(key)) is not type(value) or audit.get(key) != value for key, value in expected_audit.items()):
+        raise ValueError()
+    if _canonical_uuid(audit['trace_id']) != _canonical_uuid(audit['correlation_id']): raise ValueError()
+    summary = audit['change_summary']
+    if type(summary) is not dict or set(summary) != {'result', 'authorizationEvidence', 'receiptRecovery'}:
+        raise ValueError()
+    expected_result = {'outcome': outcome, 'resultFact': summary_fact,
+        'rejectionCode': rejection if outcome == 'REJECTED' else None}
+    recovery = summary['receiptRecovery']
+    target_fact = {'type': 'identity.organization_unit', 'id': root_id, 'revision': subject_revision}
+    if outcome != 'REJECTED': target_fact = result_fact
+    if (summary['result'] != expected_result or type(summary['authorizationEvidence']) is not str
+        or type(recovery) is not dict or set(recovery) != {'profile', 'scope', 'target', 'authorizationAnchor'}
+        or recovery['profile'] != 'R1_IDENTITY_RECEIPT_RECOVERY_V1' or recovery['scope'] != scope
+        or recovery['target'] != target_fact
+        or recovery['authorizationAnchor'] != {'type': 'identity.organization_unit', 'id': root_id,
+            'revision': subject_revision}):
+        raise ValueError()
+    if (audit['change_summary_digest'] != _sha256(_canonical(summary))
+        or audit['authorization_snapshot_digest'] != _sha256(summary['authorizationEvidence'])):
+        raise ValueError()
+    trusted = _instant(audit['trusted_at'])
+    if not _instant(slot['occupied_at']) <= trusted <= _instant(receipt['completed_at']): raise ValueError()
+    if (management['tenant_id'] != tenant or management['grantee_appointment_id'] != founder_appointment
+        or management['scope_organization_unit_id'] != root_id or management['state'] != 'ACTIVE'
+        or management['revoked_at'] is not None or management['revocation_reason_code'] is not None
+        or _instant(management['valid_from']) > trusted
+        or management['valid_until'] is not None and trusted >= _instant(management['valid_until'])):
+        raise ValueError()
+    return command, slot_id, receipt_id, subject_revision
+
+
 def runtime_grants_current(plan, current):
     """Validate read-only running eligibility without changing first-grant semantics."""
     try:
@@ -152,6 +240,7 @@ def runtime_grants_current(plan, current):
         if grant_delta(plan, baseline) != 0:
             raise ValueError()
         candidates = []
+        seen, seen_slots, seen_receipts = set(), set(), set()
         for item in evidence:
             if type(item) is not dict or set(item) != {'slot', 'receipt', 'audit'}: raise ValueError()
             slot, receipt, audit = item['slot'], item['receipt'], item['audit']
@@ -167,7 +256,12 @@ def runtime_grants_current(plan, current):
             terminal = (receipt.get('outcome'), audit.get('result_code'))
             harmless_attempt = (all(marker == 'RENAME_ORGANIZATION_UNIT' for marker in command_markers)
                 and terminal in (('NO_CHANGE','NO_CHANGE'), ('REJECTED','REJECTED')))
-            if not harmless_attempt: candidates.append(item)
+            if harmless_attempt:
+                ids = _rename_closure(plan,item,terminal[0])
+                if not original_revision <= ids[3] <= revision: raise ValueError()
+                if ids[0] in seen or ids[1] in seen_slots or ids[2] in seen_receipts: raise ValueError()
+                seen.add(ids[0]); seen_slots.add(ids[1]); seen_receipts.add(ids[2])
+            else: candidates.append(item)
         if revision == original_revision:
             if root != original_root or candidates: raise ValueError()
             return
@@ -176,76 +270,10 @@ def runtime_grants_current(plan, current):
             or difference == 1 and root.get('display_name') == original_root.get('display_name')
             or len(candidates) != difference):
             raise ValueError()
-        tenant = plan['identity']['tenantId']; root_id = original_root['organization_unit_id']
-        founder = plan['original']['founder']['principal_id']
-        founder_appointment = plan['original']['founderAppointment']['appointment_id']
-        management = [row for row in plan['original']['founderGrants']
-            if row.get('authority_code') == 'IDENTITY_ORGANIZATION_MANAGE']
-        if len(management) != 1: raise ValueError()
-        management = management[0]
-        seen, seen_slots, seen_receipts = set(), set(), set()
         for step, item in enumerate(candidates, original_revision + 1):
-            slot, receipt, audit = item['slot'], item['receipt'], item['audit']
-            command = _canonical_uuid(slot['command_id']); slot_id = _canonical_uuid(slot['command_execution_slot_id'])
-            receipt_id = _canonical_uuid(receipt['command_receipt_id'])
+            command, slot_id, receipt_id, _ = _rename_closure(plan,item,'SUCCEEDED',step - 1)
             if command in seen or slot_id in seen_slots or receipt_id in seen_receipts: raise ValueError()
             seen.add(command); seen_slots.add(slot_id); seen_receipts.add(receipt_id)
-            if (slot['tenant_id'] != tenant or slot['envelope_type'] != 'INTERNAL_ADMIN'
-                or slot['command_type'] != 'RENAME_ORGANIZATION_UNIT'
-                or not re.fullmatch('[0-9a-f]{64}', slot['payload_digest'])):
-                raise ValueError()
-            scope = {'profile': 'R1_IDENTITY_COMMAND_SCOPE_V1', 'tenantId': tenant,
-                'commandType': 'RENAME_ORGANIZATION_UNIT', 'principalId': founder,
-                'appointmentId': founder_appointment,
-                'target': {'kind': 'identity.organization_unit', 'id': root_id}}
-            if slot['command_scope_digest'] != _sha256(_canonical(scope)): raise ValueError()
-            result_fact = {'type': 'identity.organization_unit', 'id': root_id, 'revision': step}
-            if (receipt['tenant_id'] != tenant or receipt['command_execution_slot_id'] != slot_id
-                or receipt['outcome'] != 'SUCCEEDED' or receipt['rejection_code'] is not None
-                or receipt['result_fact_type'] != 'identity.organization_unit'
-                or receipt['result_fact_id'] != root_id or receipt['result_fact_revision'] != step
-                or receipt['result_fact_hash'] is not None):
-                raise ValueError()
-            expected_audit = {'tenant_id': tenant, 'entry_type': 'EVENT', 'audit_scope_code': 'OBJECT',
-                'action_code': 'RENAME_ORGANIZATION_UNIT', 'result_code': 'SUCCEEDED',
-                'actor_principal_id': founder, 'actor_appointment_id': founder_appointment,
-                'on_behalf_of_principal_id': None, 'on_behalf_of_appointment_id': None,
-                'command_id': command, 'command_type': 'RENAME_ORGANIZATION_UNIT', 'causation_id': None,
-                'authorization_slot_code': 'IDENTITY_ADMIN', 'authorization_path_code': 'DIRECT',
-                'authorization_scope_organization_unit_id': root_id, 'service_role_code': 'API',
-                'summary_schema_code': 'R1_IDENTITY_COMMAND_AUDIT_V1', 'summary_schema_version': 1,
-                'subject_type': 'identity.organization_unit', 'subject_id': root_id,
-                'subject_revision': step - 1, 'subject_hash': None,
-                'correction_target_type': None, 'correction_target_id': None,
-                'correction_target_revision': None, 'correction_target_hash': None,
-                'authorization_fact_type': 'identity.authority_grant',
-                'authorization_fact_id': management['authority_grant_id'],
-                'authorization_fact_revision': management['revision'], 'authorization_fact_hash': None}
-            if any(type(audit.get(key)) is not type(value) or audit.get(key) != value for key, value in expected_audit.items()):
-                raise ValueError()
-            if _canonical_uuid(audit['trace_id']) != _canonical_uuid(audit['correlation_id']): raise ValueError()
-            summary = audit['change_summary']
-            if type(summary) is not dict or set(summary) != {'result', 'authorizationEvidence', 'receiptRecovery'}:
-                raise ValueError()
-            expected_result = {'outcome': 'SUCCEEDED', 'resultFact': result_fact, 'rejectionCode': None}
-            recovery = summary['receiptRecovery']
-            if (summary['result'] != expected_result or type(summary['authorizationEvidence']) is not str
-                or type(recovery) is not dict or set(recovery) != {'profile', 'scope', 'target', 'authorizationAnchor'}
-                or recovery['profile'] != 'R1_IDENTITY_RECEIPT_RECOVERY_V1' or recovery['scope'] != scope
-                or recovery['target'] != result_fact
-                or recovery['authorizationAnchor'] != {'type': 'identity.organization_unit', 'id': root_id, 'revision': step - 1}):
-                raise ValueError()
-            if (audit['change_summary_digest'] != _sha256(_canonical(summary))
-                or audit['authorization_snapshot_digest'] != _sha256(summary['authorizationEvidence'])):
-                raise ValueError()
-            trusted = _instant(audit['trusted_at'])
-            if not _instant(slot['occupied_at']) <= trusted <= _instant(receipt['completed_at']): raise ValueError()
-            if (management['tenant_id'] != tenant or management['grantee_appointment_id'] != founder_appointment
-                or management['scope_organization_unit_id'] != root_id or management['state'] != 'ACTIVE'
-                or management['revoked_at'] is not None or management['revocation_reason_code'] is not None
-                or _instant(management['valid_from']) > trusted
-                or management['valid_until'] is not None and trusted >= _instant(management['valid_until'])):
-                raise ValueError()
     except (KeyError, TypeError, ValueError, OverflowError, UnicodeError):
         raise RuntimeError('exact current Worker grants or approved ROOT rename evidence unavailable') from None
 

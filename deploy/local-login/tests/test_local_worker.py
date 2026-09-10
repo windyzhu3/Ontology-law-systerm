@@ -371,6 +371,45 @@ class WorkerTest(unittest.TestCase):
             harmless_root_attempt(plan, 70, 'REJECTED', 'CLOSE_ORGANIZATION_UNIT', revision=0)]
         self.assertIsNone(self.m.runtime_grants_current(plan, unchanged))
 
+    def test_runtime_rejects_malformed_harmless_rename_history_for_changed_and_unchanged_root(self):
+        worker,state,package = self.assembly(); worker.grant()
+        plan = json.loads((self.runtime/'worker/grants.json').read_text())
+        changed = renamed_runtime_facts(plan)
+        malformed = harmless_root_attempt(plan, 80, 'NO_CHANGE', revision=1)
+        malformed['audit']['command_id'] = F
+        changed['rootRenameEvidence'].append(malformed)
+        state['facts'] = changed
+        with self.assertRaises(RuntimeError): worker.prepare()
+
+        def command_id(x): x['audit'].__setitem__('command_id', F)
+        def scope_digest(x): x['slot'].__setitem__('command_scope_digest', '00'*32)
+        def foreign_actor(x): x['audit'].__setitem__('actor_principal_id', P)
+        def wrong_tenant(x): x['receipt'].__setitem__('tenant_id', P)
+        def wrong_envelope(x): x['slot'].__setitem__('envelope_type', 'INTERNAL_TASK')
+        def wrong_slot(x): x['receipt'].__setitem__('command_execution_slot_id', F)
+        def contradictory_result(x): x['receipt'].__setitem__('result_fact_revision', 9)
+        def wrong_revision(x): x['audit'].__setitem__('subject_revision', 9)
+        def wrong_time(x): x['slot'].__setitem__('occupied_at', '2026-09-09T01:00:03+00:00')
+        def wrong_digest(x): x['audit'].__setitem__('change_summary_digest', '00'*32)
+        def wrong_root(x):
+            x['audit']['change_summary']['receiptRecovery']['target']['id'] = F
+            x['audit']['change_summary_digest'] = hashlib.sha256(
+                canonical(x['audit']['change_summary']).encode()).hexdigest()
+        mutations = {'command id':command_id, 'scope digest':scope_digest, 'foreign actor':foreign_actor,
+            'tenant':wrong_tenant, 'envelope':wrong_envelope, 'slot link':wrong_slot,
+            'contradictory result':contradictory_result, 'revision':wrong_revision,
+            'time order':wrong_time, 'summary digest':wrong_digest, 'ROOT target':wrong_root}
+        for unchanged in (False, True):
+            for outcome in ('NO_CHANGE','REJECTED'):
+                for name, mutation in mutations.items():
+                    current = copy.deepcopy(plan['original']) if unchanged else renamed_runtime_facts(plan)
+                    current['grants'] = copy.deepcopy(plan['grants'])
+                    current.setdefault('rootRenameEvidence', [])
+                    attempt = harmless_root_attempt(plan, 90, outcome, revision=0 if unchanged else 1)
+                    mutation(attempt); current['rootRenameEvidence'].append(attempt)
+                    with self.subTest(unchanged=unchanged, outcome=outcome, fault=name), self.assertRaises(RuntimeError):
+                        self.m.runtime_grants_current(plan, current)
+
     def test_runtime_validator_accepts_unchanged_root_without_synthetic_history(self):
         plan = self.m.grant_plan(self.identity, fixture(), self.now)
         current = copy.deepcopy(plan['original'])
