@@ -1,5 +1,11 @@
 # Task9 扩展验收矩阵
 
+**2026-09-10持续会话阻断：** 真实无同步阻塞控制组观察到自然refresh HTTP200、刷新ID Token无nonce后前端退回登录；独立源码检查确认首次nonce必填误用于刷新。登录持续使用／真实轮换相关项仍未通过；测试驱动异步修复的离线结果不能覆盖该产品缺陷。首次state/nonce/PKCE不放宽，最小刷新兼容修复待确认；现场与诊断限制见[最新本地整链记录](../progress/2026-09-09-task9-local-chain-acceptance.md)。
+
+测试驱动`9e4ab39`／`31d34c6`的33项离线、strict类型及独立复审已通过；原环境绑定与已知故障分类反例补齐。该源码门不关闭L组持续会话、任何七卡／生命周期／恢复项或UAT；新独立持续会话入口仍未执行。
+
+**2026-09-10身份链增量：** 9.6e的L01-entry、L03-unmapped、I02-exact-directory-binding、L04-qualification-stages、I05-appointment-no-implicit-grant、I06-minimum-business-grants、I13-dynamic-entry共7项真实子场景已在同run／同制品／同API进程下分段通过；16条真实页面CREATE及Fact／Slot／Receipt／Audit闭包核验通过。详见[最新本地整链记录](../progress/2026-09-09-task9-local-chain-acceptance.md)。这是对应ID的具名子集，不勾选整个混合ID；两次长流程自动化超时仍未关闭，七卡／生命周期／撤权代办等待恢复及用户本人U01～U03仍待执行。不能将重新登录后的分段成功当作持续会话稳定性或Task9总验收通过。
+
 日期：2026-09-08建立，2026-09-09更新。状态：**Task9.1/9.2a静态、Task9.2身份接入、Task9.3受控管理后端、Task9.4会话及Task9.5a/b/c/d源码阶段已验收；9.6真实浏览器整链及人工总验收尚未完成，扩展Task9未完成。用户现已批准仅本地测试环境更新构建／启用Worker／建立专用测试账号和最小权限以推进9.6。**
 
 T9-I02～12的后端／HTTP部分、D05全部管理拒绝及C02～03相关命令／回执回归已取得[Task9.3阶段证据](../progress/2026-09-09-task9-identity-admin-acceptance.md)：最终修复da57aff受影响244项、实际CLI、独立复审通过。四项Important与共享邮箱证据缺口已关闭；这不是混合验收项全部通过，页面和最终管理API建档到真实登录链仍分别由9.5／9.6验收。
