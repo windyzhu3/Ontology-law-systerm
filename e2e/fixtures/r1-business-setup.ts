@@ -1,5 +1,5 @@
 import { expect, type Browser, type BrowserContext, type Page, type Request, type Response } from '@playwright/test';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BUSINESS_PIN, IDENTITY_PREDECESSOR, loadBusinessEnvironment, type BusinessEnvironment } from './business-environment';
@@ -49,6 +49,20 @@ function recoveredSubmitSelectors(session: Session, value: RequestSelectors): Ca
     draftETag: value.draftETag!, draftValuesSha256: value.intendedValuesSha256!, successorTaskId: null, successorTaskType: null,
     successorOwnerAppointmentId: null, successorSubjectRef: null, successorSubjectRevision: null, successorTaskETag: null,
   };
+}
+function draftFactRef(environment: BusinessEnvironment, session: Session, draftId: string): string {
+  check(['intake', 'supervisor', 'contact'].includes(session.alias) && uuid.test(draftId));
+  const principalId = environment.resources[`principal-${session.alias}` as keyof typeof environment.resources];
+  check(uuid.test(environment.bootstrap.tenantId) && uuid.test(principalId) && uuid.test(session.appointmentId));
+  const scope = { appointment: session.appointmentId, id: draftId, kind: 'HUMAN', onBehalfAppointment: null, onBehalfPrincipal: null,
+    principal: principalId, profile: 'R1_PUBLIC_FACT_REF_V1', tenant: environment.bootstrap.tenantId, type: 'responsibility.action_draft' };
+  return createHash('sha256').update(canonicalBusinessJson(scope)).digest('base64url');
+}
+function sameInstant(actual: unknown, expected: string): boolean {
+  return typeof actual === 'string' && Number.isFinite(Date.parse(actual)) && Number.isFinite(Date.parse(expected)) && Date.parse(actual) === Date.parse(expected);
+}
+function sameOptionalInstant(actual: unknown, expected: string | null): boolean {
+  return actual === null || expected === null ? actual === expected : sameInstant(actual, expected);
 }
 function stepAlias(step: BusinessStep): Alias {
   if (step === 'grant-contact-owner') return 'founder';
@@ -196,6 +210,15 @@ export class BusinessSetup {
     }
     return true;
   }
+  private requireAppointment(appointments: any[], alias: 'intake'|'supervisor'|'contact'|'delegate') {
+    const resources = this.environment.resources, appointment = appointments.find(row => row.id === resources[`appointment-${alias}`]);
+    const role = alias === 'intake' ? 'INTAKE_OPERATOR' : alias === 'supervisor' ? 'ROUTING_SUPERVISOR' : 'CONTACT_OPERATOR';
+    check(appointment && exact(appointment, ['id','principal','organization','roleCode','effectiveFrom','effectiveUntil','state','etag'])
+      && appointment.principal.id === resources[`principal-${alias}`] && appointment.state === 'ACTIVE' && appointment.organization.id === resources.organization && appointment.roleCode === role);
+    const from = Date.parse(appointment.effectiveFrom), until = appointment.effectiveUntil === null ? null : Date.parse(appointment.effectiveUntil);
+    check(Number.isFinite(from) && from <= Date.now() && (until === null || Number.isFinite(until) && until > Date.now()) && /^"identity\.[A-Za-z0-9_-]{43}"$/.test(appointment.etag));
+    return { effectiveFrom: appointment.effectiveFrom as string, effectiveUntil: appointment.effectiveUntil as string | null };
+  }
   private async verifyPredecessor() {
     const admin = await this.administrator(), resources = this.environment.resources;
     const principals = await this.rows(admin, '/api/v1/admin/identity/principals'), organizations = await this.rows(admin, '/api/v1/admin/identity/organizations');
@@ -207,13 +230,8 @@ export class BusinessSetup {
       && originalOrganization.parentOrganizationId === this.environment.bootstrap.rootId && originalOrganization.state === 'ACTIVE' && /^"identity\.[A-Za-z0-9_-]{43}"$/.test(originalOrganization.etag));
     for (const alias of ['intake','supervisor','contact','delegate'] as const) {
       check(principals.some(row => row.id === resources[`principal-${alias}`] && row.state === 'ACTIVE'));
-      const appointment = appointments.find(row => row.id === resources[`appointment-${alias}`]);
-      const role = alias === 'intake' ? 'INTAKE_OPERATOR' : alias === 'supervisor' ? 'ROUTING_SUPERVISOR' : 'CONTACT_OPERATOR';
-      check(appointment && exact(appointment, ['id','principal','organization','roleCode','effectiveFrom','effectiveUntil','state','etag'])
-        && appointment.principal.id === resources[`principal-${alias}`] && appointment.state === 'ACTIVE' && appointment.organization.id === resources.organization && appointment.roleCode === role);
-      const from = Date.parse(appointment.effectiveFrom), until = appointment.effectiveUntil === null ? null : Date.parse(appointment.effectiveUntil);
-      check(Number.isFinite(from) && from <= Date.now() && (until === null || Number.isFinite(until) && until > Date.now()) && /^"identity\.[A-Za-z0-9_-]{43}"$/.test(appointment.etag));
-      if (alias === 'contact') this.contactAppointment = { effectiveFrom: appointment.effectiveFrom, effectiveUntil: appointment.effectiveUntil };
+      const appointment = this.requireAppointment(appointments, alias);
+      if (alias === 'contact') this.contactAppointment = appointment;
     }
     const expected = [...GRANTS.intake, ...GRANTS.supervisor];
     const businessSteps = ['grant-intake-0','grant-intake-1','grant-intake-2','grant-intake-3','grant-supervisor-0','grant-supervisor-1','grant-supervisor-2'] as const;
@@ -316,7 +334,7 @@ export class BusinessSetup {
   }
   private async grant() {
     const admin = await this.administrator(), path = '/api/v1/admin/identity/authority-grants', appointmentId = this.environment.resources['appointment-contact'];
-    const appointment = this.contactAppointment; check(appointment);
+    const appointment = this.contactAppointment ?? this.requireAppointment(await this.rows(admin, '/api/v1/admin/identity/appointments'), 'contact');
     if (await this.verifyRecorded('grant-contact-owner', admin)) return;
     const existing = (await this.rows(admin, path)).filter(row => row.appointment.id === appointmentId && row.authorityCode === 'SALES_CONTACT_OWNER');
     check(existing.length === 0);
@@ -324,9 +342,9 @@ export class BusinessSetup {
     await admin.page.getByRole('button', { name: '新增直接授权', exact: true }).click();
     await admin.page.getByLabel('授权任职', { exact: true }).selectOption(appointmentId); await admin.page.getByLabel('组织范围', { exact: true }).selectOption(this.environment.bootstrap.rootId);
     await admin.page.getByLabel('权限', { exact: true }).selectOption('SALES_CONTACT_OWNER');
-    const startMillis = Math.ceil(Date.now() / 60_000) * 60_000;
+    const startMillis = Math.floor(Date.now() / 60_000) * 60_000;
     const endMillis = appointment.effectiveUntil === null ? null : Math.floor(Date.parse(appointment.effectiveUntil) / 60_000) * 60_000;
-    check(startMillis >= Date.parse(appointment.effectiveFrom) && (endMillis === null || endMillis > startMillis));
+    check(startMillis >= Date.parse(appointment.effectiveFrom) && startMillis <= Date.now() && (endMillis === null || endMillis > startMillis));
     const validFrom = new Date(startMillis).toISOString(), validUntil = endMillis === null ? null : new Date(endMillis).toISOString();
     const local = (instant: string) => new Date(Date.parse(instant) + 8 * 3600_000).toISOString().slice(0, 16);
     await admin.page.getByLabel('生效时间', { exact: true }).fill(local(validFrom));
@@ -337,7 +355,7 @@ export class BusinessSetup {
     await admin.page.getByRole('button', { name: '确认创建', exact: true }).click(); const response = await waiting, result = await response.json();
     this.http.push({ path, status: response.status() });
     const id = matchFact(this.environment.bootstrap, result.resultFact, await this.rows(admin, path));
-    const row = (await this.rows(admin, path)).find(x => x.id === id); check(row?.appointment.id === appointmentId && row.authorityCode === 'SALES_CONTACT_OWNER' && row.scopeOrganization.id === this.environment.bootstrap.rootId && row.state === 'ACTIVE' && row.validFrom === validFrom && row.validUntil === validUntil);
+    const row = (await this.rows(admin, path)).find(x => x.id === id); check(row?.appointment.id === appointmentId && row.authorityCode === 'SALES_CONTACT_OWNER' && row.scopeOrganization.id === this.environment.bootstrap.rootId && row.state === 'ACTIVE' && sameInstant(row.validFrom, validFrom) && sameOptionalInstant(row.validUntil, validUntil));
     await this.complete('grant-contact-owner', response, result, { resourceId: id });
   }
   private async reconcilePending() {
@@ -361,7 +379,8 @@ export class BusinessSetup {
         check(type); this.validateCard(current, type, session, true);
         check(current.taskId === pending.requestSelectors.taskId && current.subject.subjectRef === pending.requestSelectors.subjectRef
           && current.subject.subjectRevision === pending.requestSelectors.subjectRevision && current.preconditions.taskETag === pending.requestSelectors.taskETag);
-        check(current.actionDraft.draftRevision === receipt.resultFact?.revision && sha(canonicalBusinessJson(current.actionDraft.values)) === pending.requestSelectors.intendedValuesSha256);
+        check(current.actionDraft.draftRevision === receipt.resultFact?.revision && receipt.resultFact?.factRef === draftFactRef(this.environment, session, current.actionDraft.draftId)
+          && sha(canonicalBusinessJson(current.actionDraft.values)) === pending.requestSelectors.intendedValuesSha256);
       }
       const original = pending.step.endsWith('-draft') ? current : pending.requestSelectors.taskId ? { taskId: pending.requestSelectors.taskId, subject: { subjectType: 'LEAD', subjectRef: pending.requestSelectors.subjectRef, subjectRevision: pending.requestSelectors.subjectRevision }, preconditions: { taskETag: pending.requestSelectors.taskETag }, actionDraft: null } : current;
       check(original && (!type || pending.step.endsWith('-submit') || current?.taskType === type));

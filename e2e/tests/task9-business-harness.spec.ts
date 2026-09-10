@@ -318,8 +318,12 @@ test('offline BusinessSetup rejects an inactive original organization', async ()
 });
 
 test('offline BusinessSetup bounds a new contact grant by a finite original appointment interval', async () => {
+  const originalNow = Date.now;
+  Date.now = () => Date.parse('2026-09-10T02:00:30Z');
+  try {
   const fixture = predecessorFixture();
   const contact: any = fixture.appointments.find(row => row.id === fixture.ids['appointment-contact'])!;
+  contact.effectiveFrom = '2026-09-10T01:59:30Z';
   contact.effectiveUntil = '2099-09-10T02:00:00Z';
   const setup = predecessorSetup(fixture);
   await (setup as any).verifyPredecessor();
@@ -338,8 +342,90 @@ test('offline BusinessSetup bounds a new contact grant by a finite original appo
   (setup as any).complete = async () => {};
   await (setup as any).grant();
   expect(body.validUntil).not.toBeNull();
+  expect(body.validFrom).toBe('2026-09-10T02:00:00.000Z');
+  expect(Date.parse(body.validFrom)).toBeLessThanOrEqual(Date.now());
   expect(Date.parse(body.validFrom)).toBeGreaterThanOrEqual(Date.parse(contact.effectiveFrom));
   expect(Date.parse(body.validUntil)).toBeLessThanOrEqual(Date.parse(contact.effectiveUntil));
+  } finally { Date.now = originalNow; }
+});
+
+test('offline BusinessSetup refuses a grant before dispatch when no effective whole minute is inside the appointment', async () => {
+  const originalNow = Date.now;
+  Date.now = () => Date.parse('2026-09-10T02:00:30Z');
+  try {
+    const fixture = predecessorFixture();
+    const contact: any = fixture.appointments.find(row => row.id === fixture.ids['appointment-contact'])!;
+    contact.effectiveFrom = '2026-09-10T02:00:15Z'; contact.effectiveUntil = '2099-09-10T02:00:00Z';
+    const setup = predecessorSetup(fixture); await (setup as any).verifyPredecessor();
+    const locator = { click: async () => {}, selectOption: async () => {}, fill: async () => {} };
+    const admin = { ...syntheticSession('founder', fixture.founderAppointmentId), page: { locator: () => locator, getByRole: () => locator, getByLabel: () => locator } };
+    let armCalls = 0;
+    (setup as any).administrator = async () => admin; (setup as any).verifyRecorded = async () => false;
+    (setup as any).rows = async () => fixture.grants;
+    (setup as any).arm = () => { armCalls++; throw new Error('synthetic-write-was-armed'); };
+    await expect((setup as any).grant()).rejects.toThrow();
+    expect(armCalls).toBe(0);
+  } finally { Date.now = originalNow; }
+});
+
+test('offline BusinessSetup accepts normalized Z instants after the exact grant response succeeds', async () => {
+  const originalNow = Date.now;
+  Date.now = () => Date.parse('2026-09-10T02:00:30Z');
+  try {
+    const fixture = predecessorFixture();
+    const contact: any = fixture.appointments.find(row => row.id === fixture.ids['appointment-contact'])!;
+    contact.effectiveFrom = '2026-09-10T01:59:30Z'; contact.effectiveUntil = '2099-09-10T02:00:00Z';
+    const setup = predecessorSetup(fixture); await (setup as any).verifyPredecessor();
+    const newId = '00000000-0000-4000-8000-000000000311';
+    const bootstrap = { tenantId: '00000000-0000-4000-8000-000000000297', rootId: fixture.rootId, founderId: '00000000-0000-4000-8000-000000000296', appointmentId: fixture.founderAppointmentId };
+    (setup as any).environment.bootstrap = bootstrap;
+    let rowCall = 0, completeCalls = 0;
+    const created = { id: newId, appointment: { id: fixture.ids['appointment-contact'], label: 'synthetic-contact' }, authorityCode: 'SALES_CONTACT_OWNER', scopeOrganization: { id: fixture.rootId, label: 'ROOT' }, validFrom: '2026-09-10T02:00:00Z', validUntil: '2099-09-10T02:00:00Z', state: 'ACTIVE', etag: '"identity.' + 'j'.repeat(43) + '"' };
+    const locator = { click: async () => {}, selectOption: async () => {}, fill: async () => {} };
+    const response = { status: () => 201, json: async () => ({ ...receipt, resultFact: { factType: 'AUTHORITY_GRANT', factRef: publicFactRef(bootstrap, 'AUTHORITY_GRANT', newId), revision: 0 } }) };
+    const admin = { ...syntheticSession('founder', bootstrap.appointmentId), page: { locator: () => locator, getByRole: () => locator, getByLabel: () => locator, waitForResponse: () => Promise.resolve(response) } };
+    (setup as any).administrator = async () => admin; (setup as any).verifyRecorded = async () => false;
+    (setup as any).rows = async () => rowCall++ === 0 ? fixture.grants : [...fixture.grants, created];
+    (setup as any).arm = () => {};
+    (setup as any).complete = async () => { completeCalls++; };
+    await expect((setup as any).grant()).resolves.toBeUndefined();
+    expect(completeCalls).toBe(1);
+  } finally { Date.now = originalNow; }
+});
+
+test('offline BusinessSetup fresh-process phase two reads the contact appointment after reopening phase one', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'task96k-business-reopened-grant-')), path = join(folder, 'task9-business-operation.json');
+  const journal = await BusinessJournal.open(path, runIdentity, () => {}); await seedFirstStage(journal);
+  const firstEvidence = { ...phaseEvidence(folder, BUSINESS_CASES[0]), commands: journal.reportCommands(BUSINESS_CASES[0]) };
+  await journal.finishStage(BUSINESS_CASES[0], firstEvidence);
+  const reopened = await BusinessJournal.open(path, runIdentity, () => {});
+  expect(() => reopened.requirePrevious(BUSINESS_CASES[1])).not.toThrow();
+
+  const fixture = predecessorFixture();
+  const contact: any = fixture.appointments.find(row => row.id === fixture.ids['appointment-contact'])!;
+  contact.effectiveUntil = '2099-09-10T02:00:00Z';
+  const bootstrap = { tenantId: '00000000-0000-4000-8000-000000000297', rootId: fixture.rootId, founderId: '00000000-0000-4000-8000-000000000296', appointmentId: fixture.founderAppointmentId };
+  const environment: any = { resources: fixture.ids, bootstrap, assertUnchanged: async () => {} };
+  const setup = new (BusinessSetup as any)({}, environment, reopened);
+  const newId = '00000000-0000-4000-8000-000000000309', commandId = '00000000-0000-4000-8000-000000000310';
+  let body: any, grantReads = 0, appointmentReads = 0;
+  const locator = { click: async () => {}, selectOption: async () => {}, fill: async () => {} };
+  const result = { ...receipt, commandId, resultFact: { factType: 'AUTHORITY_GRANT', factRef: publicFactRef(bootstrap, 'AUTHORITY_GRANT', newId), revision: 0 } };
+  const response = { status: () => 201, json: async () => result };
+  const admin = { ...syntheticSession('founder', bootstrap.appointmentId), page: { locator: () => locator, getByRole: () => locator, getByLabel: () => locator, waitForResponse: () => Promise.resolve(response) } };
+  (setup as any).administrator = async () => admin;
+  (setup as any).rows = async (_session: unknown, readPath: string) => {
+    if (readPath.endsWith('/appointments')) { appointmentReads++; return fixture.appointments; }
+    grantReads++; return grantReads === 1 ? fixture.grants : [...fixture.grants, { id: newId, appointment: { id: fixture.ids['appointment-contact'], label: 'synthetic-contact' }, authorityCode: 'SALES_CONTACT_OWNER', scopeOrganization: { id: fixture.rootId, label: 'ROOT' }, validFrom: body.validFrom, validUntil: body.validUntil, state: 'ACTIVE', etag: '"identity.' + 'j'.repeat(43) + '"' }];
+  };
+  (setup as any).arm = (_session: unknown, _step: string, _method: string, _path: string, value: unknown) => { body = value; };
+  (setup as any).complete = async (_step: string, _response: unknown, receiptValue: any, selectorsValue: any) => {
+    await reopened.begin({ step: 'grant-contact-owner', commandId, method: 'POST', path: '/api/v1/admin/identity/authority-grants', bodySha256: '7'.repeat(64), actorScopeKey: admin.self.actorScopeKey, requestSelectors: { ...command.requestSelectors, actorAppointmentId: admin.appointmentId } });
+    await reopened.complete(commandId, 201, receiptValue, selectorsValue);
+  };
+  await expect((setup as any).grant()).resolves.toBeUndefined();
+  expect(appointmentReads).toBe(1);
+  expect(reopened.confirmed('grant-contact-owner')?.selectors).toEqual({ resourceId: newId });
 });
 
 test('offline BusinessSetup refuses a different same-type task during confirmed-draft continuation', async () => {
@@ -461,6 +547,52 @@ test('offline BusinessSetup pending draft recovery refuses an unrelated same-typ
     (setup as any).workbench = async () => session;
     (setup as any).read = async () => ({ ...receipt, commandId: pending.commandId, resultFact: { factType: 'ACTION_DRAFT', factRef: 'p'.repeat(43), revision: recoveredDraft.draftRevision } });
     (setup as any).current = async () => syntheticCard('ACK_SOURCE_INTAKE_STOP_REQUEST', '00000000-0000-4000-8000-000000000289', 'opaque-lead-ref-unrelated-0001', recoveredDraft);
+    await expect((setup as any).reconcilePending()).rejects.toThrow();
+    expect(completeCalls).toBe(0);
+  } finally {
+    if (savedRun === undefined) delete process.env.TASK9_BUSINESS_RUN_ID; else process.env.TASK9_BUSINESS_RUN_ID = savedRun;
+    if (savedContinue === undefined) delete process.env.TASK9_BUSINESS_CONTINUE_RUN_ID; else process.env.TASK9_BUSINESS_CONTINUE_RUN_ID = savedContinue;
+  }
+});
+
+test('offline BusinessSetup pending draft recovery accepts the exact same-Actor public draft factRef', async () => {
+  const savedRun = process.env.TASK9_BUSINESS_RUN_ID, savedContinue = process.env.TASK9_BUSINESS_CONTINUE_RUN_ID;
+  process.env.TASK9_BUSINESS_RUN_ID = runIdentity.runId; process.env.TASK9_BUSINESS_CONTINUE_RUN_ID = runIdentity.runId;
+  try {
+    const appointmentId = '00000000-0000-4000-8000-000000000215';
+    const session = syntheticSession('intake', appointmentId);
+    const recoveredDraft = syntheticDraft('00000000-0000-4000-8000-000000000306', { rationaleSummary: 'Task 9.6k synthetic acknowledgement received.' });
+    const pending: any = { ...command, step: 'ack-draft', commandId: '00000000-0000-4000-8000-000000000307', status: 'PENDING', actorScopeKey: session.self.actorScopeKey,
+      requestSelectors: { ...taskRequestSelectors('ack-draft'), actorAppointmentId: appointmentId, taskId, subjectRef: 'opaque-lead-ref-recorded-0001', intendedValuesSha256: sha(canonicalBusinessJson(recoveredDraft.values)) } };
+    let completedSelectors: any;
+    const environment = { bootstrap: { tenantId: '00000000-0000-4000-8000-000000000201' }, resources: { 'principal-intake': '00000000-0000-4000-8000-000000000211' } };
+    const setup = new (BusinessSetup as any)({}, environment, { pending: () => pending, complete: async (_id: string, _status: number, _receipt: any, selected: any) => { completedSelectors = selected; } });
+    (setup as any).workbench = async () => session;
+    (setup as any).read = async () => ({ ...receipt, commandId: pending.commandId, resultFact: { factType: 'ACTION_DRAFT', factRef: '6fPLw_QLCoD1Kzy-d4J8qyYm3UfuYjI_STKJGKmKTPc', revision: 0 } });
+    (setup as any).current = async () => syntheticCard('ACK_SOURCE_INTAKE_STOP_REQUEST', taskId, 'opaque-lead-ref-recorded-0001', recoveredDraft);
+    await expect((setup as any).reconcilePending()).resolves.toBeUndefined();
+    expect(completedSelectors.draftId).toBe(recoveredDraft.draftId);
+  } finally {
+    if (savedRun === undefined) delete process.env.TASK9_BUSINESS_RUN_ID; else process.env.TASK9_BUSINESS_RUN_ID = savedRun;
+    if (savedContinue === undefined) delete process.env.TASK9_BUSINESS_CONTINUE_RUN_ID; else process.env.TASK9_BUSINESS_CONTINUE_RUN_ID = savedContinue;
+  }
+});
+
+test('offline BusinessSetup pending draft recovery refuses a mismatched same-Actor draft factRef', async () => {
+  const savedRun = process.env.TASK9_BUSINESS_RUN_ID, savedContinue = process.env.TASK9_BUSINESS_CONTINUE_RUN_ID;
+  process.env.TASK9_BUSINESS_RUN_ID = runIdentity.runId; process.env.TASK9_BUSINESS_CONTINUE_RUN_ID = runIdentity.runId;
+  try {
+    const appointmentId = '00000000-0000-4000-8000-000000000215';
+    const session = syntheticSession('intake', appointmentId);
+    const recoveredDraft = syntheticDraft('00000000-0000-4000-8000-000000000306', { rationaleSummary: 'Task 9.6k synthetic acknowledgement received.' });
+    const pending: any = { ...command, step: 'ack-draft', commandId: '00000000-0000-4000-8000-000000000308', status: 'PENDING', actorScopeKey: session.self.actorScopeKey,
+      requestSelectors: { ...taskRequestSelectors('ack-draft'), actorAppointmentId: appointmentId, taskId, subjectRef: 'opaque-lead-ref-recorded-0001', intendedValuesSha256: sha(canonicalBusinessJson(recoveredDraft.values)) } };
+    let completeCalls = 0;
+    const environment = { bootstrap: { tenantId: '00000000-0000-4000-8000-000000000201' }, resources: { 'principal-intake': '00000000-0000-4000-8000-000000000211' } };
+    const setup = new (BusinessSetup as any)({}, environment, { pending: () => pending, complete: async () => { completeCalls++; } });
+    (setup as any).workbench = async () => session;
+    (setup as any).read = async () => ({ ...receipt, commandId: pending.commandId, resultFact: { factType: 'ACTION_DRAFT', factRef: 'x'.repeat(43), revision: 0 } });
+    (setup as any).current = async () => syntheticCard('ACK_SOURCE_INTAKE_STOP_REQUEST', taskId, 'opaque-lead-ref-recorded-0001', recoveredDraft);
     await expect((setup as any).reconcilePending()).rejects.toThrow();
     expect(completeCalls).toBe(0);
   } finally {
