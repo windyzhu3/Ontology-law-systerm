@@ -95,6 +95,29 @@ def redigest_evidence(current):
     audit['change_summary_digest'] = hashlib.sha256(canonical(audit['change_summary']).encode()).hexdigest()
 
 
+def harmless_root_attempt(plan, serial, outcome='NO_CHANGE', command_type='RENAME_ORGANIZATION_UNIT', revision=0):
+    item = copy.deepcopy(renamed_runtime_facts(plan)['rootRenameEvidence'][0])
+    command, slot, receipt, correlation = [str(__import__('uuid').UUID(int=serial+n)) for n in range(4)]
+    item['slot'].update(command_id=command, command_execution_slot_id=slot, command_type=command_type)
+    item['receipt'].update(command_receipt_id=receipt, command_execution_slot_id=slot, outcome=outcome,
+        rejection_code=None if outcome == 'NO_CHANGE' else 'STALE_IDENTITY',
+        result_fact_type='identity.organization_unit' if outcome == 'NO_CHANGE' else None,
+        result_fact_id=R if outcome == 'NO_CHANGE' else None,
+        result_fact_revision=revision if outcome == 'NO_CHANGE' else None, result_fact_hash=None)
+    audit = item['audit']; summary = audit['change_summary']; scope = summary['receiptRecovery']['scope']
+    audit.update(command_id=command, command_type=command_type, action_code=command_type,
+        correlation_id=correlation, trace_id=correlation, result_code=outcome, subject_revision=revision)
+    scope['commandType'] = command_type
+    summary['result'] = {'outcome': outcome,
+        'resultFact': {'type':'identity.organization_unit','id':R,'revision':revision} if outcome == 'NO_CHANGE' else None,
+        'rejectionCode': None if outcome == 'NO_CHANGE' else 'STALE_IDENTITY'}
+    summary['receiptRecovery']['target']['revision'] = revision
+    summary['receiptRecovery']['authorizationAnchor']['revision'] = revision
+    item['slot']['command_scope_digest'] = hashlib.sha256(canonical(scope).encode()).hexdigest()
+    audit['change_summary_digest'] = hashlib.sha256(canonical(summary).encode()).hexdigest()
+    return item
+
+
 class WorkerTest(unittest.TestCase):
     def setUp(self):
         self.assertTrue(MODULE.exists(), 'local Worker assembly is missing')
@@ -328,6 +351,25 @@ class WorkerTest(unittest.TestCase):
         worker.prepare()
         self.assertEqual(plan_path.read_bytes(), original)
         self.assertTrue((self.runtime/'worker/application.properties').is_file())
+
+    def test_runtime_consumer_ignores_harmless_root_history_around_the_successful_chain(self):
+        worker,state,package = self.assembly(); worker.grant()
+        plan = json.loads((self.runtime/'worker/grants.json').read_text())
+        current = renamed_runtime_facts(plan)
+        current['rootRenameEvidence'].extend([
+            harmless_root_attempt(plan, 20, 'NO_CHANGE', revision=1),
+            harmless_root_attempt(plan, 30, 'REJECTED', revision=1),
+            harmless_root_attempt(plan, 40, 'REJECTED', 'CLOSE_ORGANIZATION_UNIT', revision=1)])
+        state['facts'] = current
+        worker.prepare()
+        self.assertTrue((self.runtime/'worker/application.properties').is_file())
+
+        unchanged = copy.deepcopy(plan['original']); unchanged['grants'] = copy.deepcopy(plan['grants'])
+        unchanged['rootRenameEvidence'] = [
+            harmless_root_attempt(plan, 50, 'NO_CHANGE', revision=0),
+            harmless_root_attempt(plan, 60, 'REJECTED', revision=0),
+            harmless_root_attempt(plan, 70, 'REJECTED', 'CLOSE_ORGANIZATION_UNIT', revision=0)]
+        self.assertIsNone(self.m.runtime_grants_current(plan, unchanged))
 
     def test_runtime_validator_accepts_unchanged_root_without_synthetic_history(self):
         plan = self.m.grant_plan(self.identity, fixture(), self.now)

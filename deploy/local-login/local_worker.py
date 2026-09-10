@@ -151,13 +151,30 @@ def runtime_grants_current(plan, current):
         baseline = {**facts, 'root': original_root}
         if grant_delta(plan, baseline) != 0:
             raise ValueError()
+        candidates = []
+        for item in evidence:
+            if type(item) is not dict or set(item) != {'slot', 'receipt', 'audit'}: raise ValueError()
+            slot, receipt, audit = item['slot'], item['receipt'], item['audit']
+            if type(slot) is not dict or type(receipt) is not dict or type(audit) is not dict: raise ValueError()
+            try:
+                scope_command = audit['change_summary']['receiptRecovery']['scope']['commandType']
+            except (KeyError, TypeError):
+                scope_command = None
+            command_markers = (slot.get('command_type'), audit.get('command_type'),
+                audit.get('action_code'), scope_command)
+            if 'RENAME_ORGANIZATION_UNIT' not in command_markers:
+                continue
+            terminal = (receipt.get('outcome'), audit.get('result_code'))
+            harmless_attempt = (all(marker == 'RENAME_ORGANIZATION_UNIT' for marker in command_markers)
+                and terminal in (('NO_CHANGE','NO_CHANGE'), ('REJECTED','REJECTED')))
+            if not harmless_attempt: candidates.append(item)
         if revision == original_revision:
-            if root != original_root or evidence: raise ValueError()
+            if root != original_root or candidates: raise ValueError()
             return
         difference = revision - original_revision
         if (type(root.get('display_name')) is not str
             or difference == 1 and root.get('display_name') == original_root.get('display_name')
-            or len(evidence) != difference):
+            or len(candidates) != difference):
             raise ValueError()
         tenant = plan['identity']['tenantId']; root_id = original_root['organization_unit_id']
         founder = plan['original']['founder']['principal_id']
@@ -167,10 +184,8 @@ def runtime_grants_current(plan, current):
         if len(management) != 1: raise ValueError()
         management = management[0]
         seen, seen_slots, seen_receipts = set(), set(), set()
-        for step, item in enumerate(evidence, original_revision + 1):
-            if type(item) is not dict or set(item) != {'slot', 'receipt', 'audit'}: raise ValueError()
+        for step, item in enumerate(candidates, original_revision + 1):
             slot, receipt, audit = item['slot'], item['receipt'], item['audit']
-            if type(slot) is not dict or type(receipt) is not dict or type(audit) is not dict: raise ValueError()
             command = _canonical_uuid(slot['command_id']); slot_id = _canonical_uuid(slot['command_execution_slot_id'])
             receipt_id = _canonical_uuid(receipt['command_receipt_id'])
             if command in seen or slot_id in seen_slots or receipt_id in seen_receipts: raise ValueError()
