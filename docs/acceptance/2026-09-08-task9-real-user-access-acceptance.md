@@ -1,5 +1,9 @@
 # Task9 扩展验收矩阵
 
+**当前门状态（2026-09-10）：** Task9.6i最终`02ce7a0`经两轮修复独立复审Approved，无未决finding；定向32项、Root精确最终代码完整本地部署工具83项退出0。原环境实际Worker健康门退出0，database／mTLS／三项循环READY、listeners0，未重授予或回退原ROOT。9.6h新制品部署及自然刷新复验尚未执行，七卡及人工UAT仍未完成。下方为历史增量记录，早先“待确认／正在修复”按本段及后续证据更新，不作为当前停点。详见[本地整链进度](../progress/2026-09-09-task9-local-chain-acceptance.md)。
+
+**2026-09-10 Task9.6i执行：** 用户已确认独立Worker运行校验修正；首次授予保持严格，原ROOT合法改名按原Slot／Receipt／Audit版本链核对。首版`9ce2a5a`定向30／完整本地部署工具81项通过；独立评审发现“合法链与无变化／失败尝试并存时误拒绝”一项Important，正在窄修复，尚未部署或关闭运行门。所有真实持续会话、七卡及人工UAT仍保持未完成，见[本地整链进度](../progress/2026-09-09-task9-local-chain-acceptance.md)。
+
 **2026-09-10 Task9.6h增量（源码门完成、未部署）：** 用户已确认下述最小刷新修复；源码`451d0ed`仅修改OIDC adapter及测试，真实锁定SDK刷新路径19项、完整前端462项、离线安全33项及类型检查通过，独立规格／质量评审Approved，无未决finding。首次state／nonce／PKCE保持严格，同会话刷新nonce可缺省、携带须与原值相同，原subject／audience／auth_time绑定不变。发布前既有Worker健康门被ROOT历史改名（名称与revision0→1）和首次授予快照全等校验冲突阻断；尚未构建／停止／部署，旧制品仍运行。修复源码不关闭真实持续会话、七卡或UAT；独立Worker合同修正须另确认，禁止回退原组织或绕过门禁。详见[本轮范围与停点](../progress/2026-09-09-task9-local-chain-acceptance.md)。
 
 **2026-09-10持续会话阻断：** 真实无同步阻塞控制组观察到自然refresh HTTP200、刷新ID Token无nonce后前端退回登录；独立源码检查确认首次nonce必填误用于刷新。登录持续使用／真实轮换相关项仍未通过；测试驱动异步修复的离线结果不能覆盖该产品缺陷。首次state/nonce/PKCE不放宽，最小刷新兼容修复待确认；现场与诊断限制见[最新本地整链记录](../progress/2026-09-09-task9-local-chain-acceptance.md)。
