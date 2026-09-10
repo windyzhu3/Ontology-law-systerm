@@ -8,6 +8,12 @@ export interface OidcConfiguration {
   redirectUri: string;
   logoutRedirectUri: string;
 }
+interface InitialBinding {
+  nonce: string;
+  subject: string;
+  idAudience: string;
+  authenticationTime: number;
+}
 export function createOidcAdapter(
   config: OidcConfiguration,
   createClient: (config: KeycloakConfig) => Keycloak = (config) =>
@@ -32,7 +38,8 @@ export function createOidcAdapter(
   let client: Keycloak | null = null,
     generation = 0,
     authenticated = false,
-    started = NaN;
+    started = NaN,
+    original: InitialBinding | null = null;
   const fail = () => new Error("登录验证未完成，请重新登录。");
   const wipe = (sdk: Keycloak) => {
     // SDK clearToken only cleans up when an access token exists; incomplete
@@ -53,21 +60,44 @@ export function createOidcAdapter(
     generation++;
     authenticated = false;
     started = NaN;
+    original = null;
     if (client) wipe(client);
   };
-  const validate = (sdk: Keycloak) => {
+  const audienceKey = (a: unknown) => {
+    const values =
+      typeof a === "string"
+        ? [a]
+        : Array.isArray(a) && a.every((value) => typeof value === "string")
+          ? a
+          : null;
+    return values?.length && new Set(values).size === values.length
+      ? JSON.stringify([...values].sort())
+      : null;
+  };
+  const validate = (sdk: Keycloak, initial: boolean) => {
     const id = sdk.idTokenParsed;
     const access = sdk.tokenParsed;
     const audience = (a: unknown, want: string) =>
       a === want || (Array.isArray(a) && a.includes(want));
+    const idAudience = audienceKey(id?.aud);
+    const nonceInvalid = initial
+      ? typeof id?.nonce !== "string" || !id.nonce
+      : !original ||
+        (Object.hasOwn(id ?? {}, "nonce") && id?.nonce !== original.nonce);
+    const bindingInvalid = initial
+      ? typeof id?.sub !== "string" || !id.sub || !idAudience
+      : !original ||
+        id?.sub !== original.subject ||
+        idAudience !== original.idAudience ||
+        id?.auth_time !== original.authenticationTime;
     if (
       !sdk.authenticated ||
       !sdk.token ||
       !sdk.refreshToken ||
       !sdk.idToken ||
       !id ||
-      typeof id.nonce !== "string" ||
-      !id.nonce ||
+      nonceInvalid ||
+      bindingInvalid ||
       id.iss !== fixed.issuer ||
       !audience(id.aud, fixed.clientId) ||
       !access ||
@@ -78,6 +108,7 @@ export function createOidcAdapter(
       id.auth_time < 0
     )
       throw fail();
+    return idAudience!;
   };
   return {
     async initialize() {
@@ -118,7 +149,13 @@ export function createOidcAdapter(
           return false;
         }
         if (!callback) throw fail();
-        validate(sdk);
+        const idAudience = validate(sdk, true);
+        original = {
+          nonce: sdk.idTokenParsed!.nonce as string,
+          subject: sdk.idTokenParsed!.sub!,
+          idAudience,
+          authenticationTime: sdk.idTokenParsed!.auth_time as number,
+        };
         authenticated = true;
         started =
           ((sdk.idTokenParsed!.auth_time as number) + (sdk.timeSkew ?? 0)) *
@@ -148,7 +185,7 @@ export function createOidcAdapter(
         );
         if (captured !== generation || !authenticated)
           throw new SessionFailure(401);
-        validate(sdk);
+        validate(sdk, false);
         return sdk.token!;
       } catch {
         const invalid = !sdk.authenticated;
