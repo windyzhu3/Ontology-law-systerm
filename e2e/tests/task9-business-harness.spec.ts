@@ -11,6 +11,7 @@ import {
   validateBusinessEnvironment,
 } from '../fixtures/business-environment';
 import { LOCAL_RUNTIME_BRIDGE, sha } from '../fixtures/local-environment';
+import { publicFactRef } from '../fixtures/identity-setup';
 import {
   BUSINESS_CASES,
   BusinessJournal,
@@ -18,7 +19,8 @@ import {
   type BusinessEvidence,
   type BusinessRunIdentity,
 } from '../fixtures/business-journal';
-import { BusinessDispatchGate, allowBusinessRequest } from '../fixtures/business-session';
+import { BusinessDispatchGate, allowBusinessRequest, canonicalBusinessJson } from '../fixtures/business-session';
+import { BusinessSetup } from '../fixtures/r1-business-setup';
 import BusinessReporter, { businessFailureCode } from '../reporters/business-reporter';
 
 const runIdentity: BusinessRunIdentity = {
@@ -36,7 +38,7 @@ const command: BusinessCommand = {
   path: '/api/v1/leads',
   bodySha256: 'b'.repeat(64),
   actorScopeKey: 'ask1.' + 'c'.repeat(43),
-  requestSelectors: { actorAppointmentId: '00000000-0000-4000-8000-000000000108', taskId: null, subjectRef: null, subjectRevision: null, taskETag: null },
+  requestSelectors: { actorAppointmentId: '00000000-0000-4000-8000-000000000108', taskId: null, subjectRef: null, subjectRevision: null, taskETag: null, draftId: null, draftRevision: null, draftDigest: null, draftETag: null, intendedValuesSha256: null },
 };
 const receipt = {
   commandId: command.commandId,
@@ -157,7 +159,7 @@ test('offline dispatch gate consumes its permit before any await and poisons a d
 test('offline journal confirms only an exact receipt and non-secret lead selectors', async () => {
   const path = join(mkdtempSync(join(tmpdir(), 'task96k-business-receipt-')), 'task9-business-operation.json');
   const journal = await BusinessJournal.open(path, runIdentity, () => {}); await journal.begin(command);
-  const selectors = { taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, ownerAppointmentId: '00000000-0000-4000-8000-000000000108', taskETag: '"task.' + 'e'.repeat(43) + '"', draftETag: null, draftId: null, successorTaskId: taskId, successorTaskType: 'COMPLETE_LEAD_INGRESS' };
+  const selectors = { taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, ownerAppointmentId: '00000000-0000-4000-8000-000000000108', taskETag: '"task.' + 'e'.repeat(43) + '"', draftETag: null, draftId: null, draftRevision: null, draftDigest: null, draftValuesSha256: null, ...successorEvidence(taskId, 'COMPLETE_LEAD_INGRESS', '00000000-0000-4000-8000-000000000108') };
   await expect(journal.complete(command.commandId, 201, { ...receipt, commandId: '00000000-0000-4000-8000-000000000109' }, selectors)).rejects.toThrow();
   const reopened = await BusinessJournal.open(path, runIdentity, () => {});
   await expect(reopened.complete(command.commandId, 201, receipt, selectors)).resolves.toEqual(receipt.resultFact);
@@ -169,8 +171,8 @@ test('offline immutable public facts require digest while mutable facts require 
   const journal = await BusinessJournal.open(path, runIdentity, () => {}); await seedCommands(journal, 4);
   const commandId = '00000000-0000-4000-8000-000000000150';
   await journal.begin({ step: 'routing-submit', commandId, method: 'POST', path: `/api/v1/tasks/${taskId}/commands/record-routing-disposition`, bodySha256: '9'.repeat(64), actorScopeKey: command.actorScopeKey,
-    requestSelectors: { ...command.requestSelectors, taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, taskETag: '"task.' + 'e'.repeat(43) + '"' } });
-  const selected = { taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, ownerAppointmentId: command.requestSelectors.actorAppointmentId, taskETag: '"task.' + 'e'.repeat(43) + '"', draftETag: null, draftId: null, successorTaskId: taskId, successorTaskType: 'ACK_SOURCE_INTAKE_STOP_REQUEST' };
+    requestSelectors: taskRequestSelectors('routing-submit') });
+  const selected = { taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, ownerAppointmentId: command.requestSelectors.actorAppointmentId, taskETag: '"task.' + 'e'.repeat(43) + '"', draftETag: null, draftId: null, draftRevision: null, draftDigest: null, draftValuesSha256: null, ...successorEvidence(taskId, 'ACK_SOURCE_INTAKE_STOP_REQUEST', command.requestSelectors.actorAppointmentId) };
   const base = { ...receipt, commandId, receiptId: '00000000-0000-4000-8000-000000000151' };
   await expect(journal.complete(commandId, 200, { ...base, resultFact: { factType: 'DECISION_RECORD', factRef: 'q'.repeat(43), revision: 0, digest: 'r'.repeat(43) } }, selected)).rejects.toThrow();
   const reopened = await BusinessJournal.open(path, runIdentity, () => {});
@@ -182,10 +184,10 @@ test('offline same-stage continuation accepts exact earlier confirmations after 
   const journal = await BusinessJournal.open(path, runIdentity, () => {}); await seedCommands(journal, 2);
   const commandId = '00000000-0000-4000-8000-000000000152';
   await journal.begin({ step: 'complete-submit', commandId, method: 'POST', path: `/api/v1/tasks/${taskId}/commands/complete-lead-ingress`, bodySha256: '8'.repeat(64), actorScopeKey: command.actorScopeKey,
-    requestSelectors: { ...command.requestSelectors, taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, taskETag: '"task.' + 'e'.repeat(43) + '"' } });
+    requestSelectors: taskRequestSelectors('complete-submit') });
   const reopened = await BusinessJournal.open(path, runIdentity, () => {});
   await reopened.complete(commandId, 200, { ...receipt, commandId, receiptId: '00000000-0000-4000-8000-000000000153' },
-    { taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, ownerAppointmentId: command.requestSelectors.actorAppointmentId, taskETag: '"task.' + 'e'.repeat(43) + '"', draftETag: null, draftId: null, successorTaskId: taskId, successorTaskType: 'RESOLVE_LEAD_ROUTING_GAP' });
+    { taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, ownerAppointmentId: command.requestSelectors.actorAppointmentId, taskETag: '"task.' + 'e'.repeat(43) + '"', draftETag: null, draftId: null, draftRevision: null, draftDigest: null, draftValuesSha256: null, ...successorEvidence(taskId, 'RESOLVE_LEAD_ROUTING_GAP', command.requestSelectors.actorAppointmentId) });
   expect(() => reopened.requirePrevious(BUSINESS_CASES[0])).not.toThrow();
 });
 
@@ -246,6 +248,311 @@ test('offline request policy allows only exact IdP reads and named business read
   expect(allowBusinessRequest(new URL('https://example.invalid/api/v1/workcards/current'), 'GET')).toBe(false);
 });
 
+test('offline BusinessSetup route aborts forbidden IdP paths and methods instead of bypassing its policy', async () => {
+  const { setup, routeHandler } = await syntheticSetupRoute();
+  for (const [url, method] of [
+    ['https://localhost:19443/admin/realms/local-r1/users', 'GET'],
+    ['https://localhost:19443/realms/other/protocol/openid-connect/token', 'POST'],
+    ['https://localhost:19443/resources/local-r1/account', 'POST'],
+  ]) {
+    let continued = 0, aborted = 0;
+    await routeHandler({
+      request: () => ({ url: () => url, method: () => method, allHeaders: async () => ({}), headers: () => ({}), postDataBuffer: () => null }),
+      continue: async () => { continued++; }, abort: async () => { aborted++; },
+    });
+    expect({ continued, aborted }).toEqual({ continued: 0, aborted: 1 });
+  }
+  await setup.close();
+});
+
+test('offline BusinessSetup manual capture records the actual supervisor task owner separately from its intake actor', async () => {
+  const actorAppointmentId = '00000000-0000-4000-8000-000000000108';
+  const ownerAppointmentId = '00000000-0000-4000-8000-000000000110';
+  const actor = syntheticSession('intake', actorAppointmentId);
+  const owner = syntheticSession('supervisor', ownerAppointmentId);
+  const card = syntheticCard('ASSIGN_LEAD', taskId, 'opaque-lead-ref-manual-0001');
+  let selected: any;
+  const setup = new (BusinessSetup as any)({}, {}, { pending: () => undefined });
+  (setup as any).verifyRecorded = async () => false;
+  (setup as any).arm = () => {};
+  (setup as any).fetch = async () => ({ status: 201, headers: {}, body: receipt });
+  (setup as any).workbench = async () => owner;
+  (setup as any).current = async () => null;
+  (setup as any).refreshUi = async () => card;
+  (setup as any).complete = async (_step: string, _response: unknown, _result: unknown, selectors: unknown) => { selected = selectors; };
+  await (setup as any).capture(actor, 'capture-manual', 'LOCAL_SYNTHETIC', true, 'ASSIGN_LEAD', 'supervisor');
+  expect(selected.ownerAppointmentId).toBe(ownerAppointmentId);
+  expect(selected.ownerAppointmentId).not.toBe(actorAppointmentId);
+  expect(selected).toMatchObject({ successorTaskId: card.taskId, successorTaskType: card.taskType, successorOwnerAppointmentId: ownerAppointmentId,
+    successorSubjectRef: card.subject.subjectRef, successorSubjectRevision: card.subject.subjectRevision, successorTaskETag: card.preconditions.taskETag });
+});
+
+test('offline BusinessSetup accepts the schema-shaped ROOT projection without a fabricated revision field', async () => {
+  const fixture = predecessorFixture();
+  const setup = predecessorSetup(fixture);
+  await expect((setup as any).verifyPredecessor()).resolves.toBeUndefined();
+});
+
+test('offline BusinessSetup accepts eleven visible original grants only when the seven business IDs and relationships are exact', async () => {
+  const fixture = predecessorFixture();
+  await expect((predecessorSetup(fixture) as any).verifyPredecessor()).resolves.toBeUndefined();
+  expect(fixture.grants).toHaveLength(11);
+});
+
+test('offline BusinessSetup rejects a replacement predecessor grant ID', async () => {
+  const fixture = predecessorFixture();
+  fixture.grants[0] = { ...fixture.grants[0], id: '00000000-0000-4000-8000-000000000299' };
+  await expect((predecessorSetup(fixture) as any).verifyPredecessor()).rejects.toThrow();
+});
+
+test('offline BusinessSetup rejects a predecessor business grant attached to the wrong appointment', async () => {
+  const fixture = predecessorFixture();
+  fixture.grants[0] = { ...fixture.grants[0], appointment: { ...fixture.grants[0].appointment, id: fixture.ids['appointment-supervisor'] } };
+  await expect((predecessorSetup(fixture) as any).verifyPredecessor()).rejects.toThrow();
+});
+
+test('offline BusinessSetup rejects an inactive original organization', async () => {
+  const fixture = predecessorFixture();
+  fixture.organizations[1] = { ...fixture.organizations[1], state: 'CLOSED' };
+  await expect((predecessorSetup(fixture) as any).verifyPredecessor()).rejects.toThrow();
+});
+
+test('offline BusinessSetup bounds a new contact grant by a finite original appointment interval', async () => {
+  const fixture = predecessorFixture();
+  const contact: any = fixture.appointments.find(row => row.id === fixture.ids['appointment-contact'])!;
+  contact.effectiveUntil = '2099-09-10T02:00:00Z';
+  const setup = predecessorSetup(fixture);
+  await (setup as any).verifyPredecessor();
+  const newId = '00000000-0000-4000-8000-000000000298';
+  const bootstrap = { tenantId: '00000000-0000-4000-8000-000000000297', rootId: fixture.rootId, founderId: '00000000-0000-4000-8000-000000000296', appointmentId: fixture.founderAppointmentId };
+  (setup as any).environment.bootstrap = bootstrap;
+  let body: any, rowCall = 0;
+  const created = { id: newId, appointment: { id: fixture.ids['appointment-contact'], label: 'synthetic-contact' }, authorityCode: 'SALES_CONTACT_OWNER', scopeOrganization: { id: fixture.rootId, label: 'ROOT' }, validFrom: '2026-09-10T02:00:00Z', validUntil: '2099-09-10T01:59:00Z', state: 'ACTIVE', etag: '"identity.' + 'j'.repeat(43) + '"' };
+  const locator = { click: async () => {}, selectOption: async () => {}, fill: async () => {} };
+  const response = { status: () => 201, json: async () => ({ ...receipt, resultFact: { factType: 'AUTHORITY_GRANT', factRef: publicFactRef(bootstrap, 'AUTHORITY_GRANT', newId), revision: 0 } }) };
+  const admin = { ...syntheticSession('founder', bootstrap.appointmentId), page: { locator: () => locator, getByRole: () => locator, getByLabel: () => locator, waitForResponse: () => Promise.resolve(response) } };
+  (setup as any).administrator = async () => admin;
+  (setup as any).verifyRecorded = async () => false;
+  (setup as any).rows = async () => rowCall++ === 0 ? fixture.grants : [...fixture.grants, { ...created, validFrom: body.validFrom, validUntil: body.validUntil }];
+  (setup as any).arm = (_session: unknown, _step: string, _method: string, _path: string, value: unknown) => { body = value; };
+  (setup as any).complete = async () => {};
+  await (setup as any).grant();
+  expect(body.validUntil).not.toBeNull();
+  expect(Date.parse(body.validFrom)).toBeGreaterThanOrEqual(Date.parse(contact.effectiveFrom));
+  expect(Date.parse(body.validUntil)).toBeLessThanOrEqual(Date.parse(contact.effectiveUntil));
+});
+
+test('offline BusinessSetup refuses a different same-type task during confirmed-draft continuation', async () => {
+  const originalTaskId = '00000000-0000-4000-8000-000000000270';
+  const unrelatedTaskId = '00000000-0000-4000-8000-000000000271';
+  const session = syntheticCommandSession('intake', command.requestSelectors.actorAppointmentId);
+  const draft = syntheticDraft('00000000-0000-4000-8000-000000000272', { rationaleSummary: 'Task 9.6k synthetic acknowledgement received.' });
+  const current = syntheticCard('ACK_SOURCE_INTAKE_STOP_REQUEST', unrelatedTaskId, 'opaque-lead-ref-unrelated-0001', draft);
+  const recorded = recordedDraftEntry('ack-draft', originalTaskId, session.appointmentId, draft);
+  const setup = continuationSetup(recorded, session, current);
+  await expect((setup as any).card(session, 'ack', 'ACK_SOURCE_INTAKE_STOP_REQUEST', draft.values, null, null)).rejects.toThrow();
+  expect(session.submitClicks).toBe(0);
+});
+
+test('offline BusinessSetup refuses a changed saved draft before continuation submit', async () => {
+  const originalTaskId = '00000000-0000-4000-8000-000000000270';
+  const session = syntheticCommandSession('intake', command.requestSelectors.actorAppointmentId);
+  const recordedDraft = syntheticDraft('00000000-0000-4000-8000-000000000272', { rationaleSummary: 'Task 9.6k synthetic acknowledgement received.' });
+  const changedDraft = { ...recordedDraft, draftId: '00000000-0000-4000-8000-000000000273', digest: 'm'.repeat(43), values: { rationaleSummary: 'changed-value' } };
+  const current = syntheticCard('ACK_SOURCE_INTAKE_STOP_REQUEST', originalTaskId, 'opaque-lead-ref-recorded-0001', changedDraft);
+  const recorded = recordedDraftEntry('ack-draft', originalTaskId, session.appointmentId, recordedDraft);
+  const setup = continuationSetup(recorded, session, current);
+  await expect((setup as any).card(session, 'ack', 'ACK_SOURCE_INTAKE_STOP_REQUEST', recordedDraft.values, null, null)).rejects.toThrow();
+  expect(session.submitClicks).toBe(0);
+});
+
+test('offline BusinessSetup refuses changed revision digest or intended values on the recorded draft ID', async () => {
+  const originalTaskId = '00000000-0000-4000-8000-000000000270';
+  const session = syntheticCommandSession('intake', command.requestSelectors.actorAppointmentId);
+  const recordedDraft = syntheticDraft('00000000-0000-4000-8000-000000000272', { rationaleSummary: 'Task 9.6k synthetic acknowledgement received.' });
+  const changedDraft = { ...recordedDraft, draftRevision: 1, digest: 'm'.repeat(43), values: { rationaleSummary: 'changed-value' } };
+  const current = syntheticCard('ACK_SOURCE_INTAKE_STOP_REQUEST', originalTaskId, 'opaque-lead-ref-recorded-0001', changedDraft);
+  const recorded = recordedDraftEntry('ack-draft', originalTaskId, session.appointmentId, recordedDraft);
+  const setup = continuationSetup(recorded, session, current);
+  await expect((setup as any).card(session, 'ack', 'ACK_SOURCE_INTAKE_STOP_REQUEST', recordedDraft.values, null, null)).rejects.toThrow();
+  expect(session.submitClicks).toBe(0);
+});
+
+test('offline BusinessSetup leaves an ambiguous pending cross-owner submit fenced with its original draft evidence', async () => {
+  const savedRun = process.env.TASK9_BUSINESS_RUN_ID, savedContinue = process.env.TASK9_BUSINESS_CONTINUE_RUN_ID;
+  process.env.TASK9_BUSINESS_RUN_ID = runIdentity.runId; process.env.TASK9_BUSINESS_CONTINUE_RUN_ID = runIdentity.runId;
+  try {
+    const supervisor = syntheticSession('supervisor', '00000000-0000-4000-8000-000000000280');
+    const intake = syntheticSession('intake', '00000000-0000-4000-8000-000000000281');
+    const draft = syntheticDraft('00000000-0000-4000-8000-000000000282', { decisionCode: 'REQUEST_SOURCE_INTAKE_STOP', rationaleSummary: 'Task 9.6k requests source intake stop acknowledgement.' });
+    const pending: any = {
+      ...command, step: 'routing-submit', commandId: '00000000-0000-4000-8000-000000000283', status: 'PENDING', actorScopeKey: supervisor.self.actorScopeKey,
+      requestSelectors: { actorAppointmentId: supervisor.appointmentId, taskId, subjectRef: 'opaque-lead-ref-routing-0001', subjectRevision: 1, taskETag: '"task.' + 'e'.repeat(43) + '"', draftId: draft.draftId, draftRevision: draft.draftRevision, draftDigest: draft.digest, draftETag: '"draft.' + 'f'.repeat(43) + '"', intendedValuesSha256: sha(canonicalBusinessJson(draft.values)) },
+    };
+    let completeCalls = 0;
+    const journal = { pending: () => pending, complete: async () => { completeCalls++; } };
+    const setup = new (BusinessSetup as any)({}, {}, journal);
+    (setup as any).workbench = async (alias: string) => alias === 'supervisor' ? supervisor : intake;
+    (setup as any).read = async () => ({ ...receipt, commandId: pending.commandId, resultFact: { factType: 'DECISION_RECORD', factRef: 'n'.repeat(43), digest: 'o'.repeat(43) } });
+    (setup as any).current = async (session: any) => session.alias === 'supervisor' ? null : syntheticCard('ACK_SOURCE_INTAKE_STOP_REQUEST', '00000000-0000-4000-8000-000000000284', 'opaque-lead-ref-ack-0001');
+    await expect((setup as any).reconcilePending()).rejects.toThrow();
+    expect(completeCalls).toBe(0);
+    expect(pending.requestSelectors).toMatchObject({ draftId: draft.draftId, draftRevision: 0, draftDigest: draft.digest, draftETag: '"draft.' + 'f'.repeat(43) + '"' });
+  } finally {
+    if (savedRun === undefined) delete process.env.TASK9_BUSINESS_RUN_ID; else process.env.TASK9_BUSINESS_RUN_ID = savedRun;
+    if (savedContinue === undefined) delete process.env.TASK9_BUSINESS_CONTINUE_RUN_ID; else process.env.TASK9_BUSINESS_CONTINUE_RUN_ID = savedContinue;
+  }
+});
+
+test('offline BusinessSetup terminal pending-submit recovery retains the exact stored draft evidence', async () => {
+  const savedRun = process.env.TASK9_BUSINESS_RUN_ID, savedContinue = process.env.TASK9_BUSINESS_CONTINUE_RUN_ID;
+  process.env.TASK9_BUSINESS_RUN_ID = runIdentity.runId; process.env.TASK9_BUSINESS_CONTINUE_RUN_ID = runIdentity.runId;
+  try {
+    const intake = syntheticSession('intake', command.requestSelectors.actorAppointmentId);
+    const values = { rationaleSummary: 'Task 9.6k synthetic acknowledgement received.' };
+    const draft = syntheticDraft('00000000-0000-4000-8000-000000000304', values);
+    const requestSelectors = {
+      actorAppointmentId: intake.appointmentId, taskId, subjectRef: 'opaque-lead-ref-ack-terminal-0001', subjectRevision: 1,
+      taskETag: '"task.' + 't'.repeat(43) + '"', draftId: draft.draftId, draftRevision: draft.draftRevision,
+      draftDigest: draft.digest, draftETag: '"draft.' + 'u'.repeat(43) + '"', intendedValuesSha256: sha(canonicalBusinessJson(values)),
+    };
+    const pending: any = { ...command, step: 'ack-submit', commandId: '00000000-0000-4000-8000-000000000305', status: 'PENDING', actorScopeKey: intake.self.actorScopeKey, requestSelectors };
+    let completedSelectors: any;
+    const setup = new (BusinessSetup as any)({}, {}, { pending: () => pending, complete: async (_id: string, _status: number, _receipt: any, result: any) => { completedSelectors = result; } });
+    (setup as any).workbench = async () => intake;
+    (setup as any).read = async () => ({ ...receipt, commandId: pending.commandId, resultFact: { factType: 'DECISION_RECORD', factRef: 'v'.repeat(43), digest: 'w'.repeat(43) } });
+    (setup as any).current = async () => null;
+    await expect((setup as any).reconcilePending()).resolves.toBeUndefined();
+    expect(completedSelectors).toEqual({
+      taskId, subjectRef: requestSelectors.subjectRef, subjectRevision: requestSelectors.subjectRevision, ownerAppointmentId: intake.appointmentId,
+      taskETag: requestSelectors.taskETag, draftId: draft.draftId, draftRevision: draft.draftRevision, draftDigest: draft.digest,
+      draftETag: requestSelectors.draftETag, draftValuesSha256: requestSelectors.intendedValuesSha256,
+      successorTaskId: null, successorTaskType: null, successorOwnerAppointmentId: null,
+      successorSubjectRef: null, successorSubjectRevision: null, successorTaskETag: null,
+    });
+  } finally {
+    if (savedRun === undefined) delete process.env.TASK9_BUSINESS_RUN_ID; else process.env.TASK9_BUSINESS_RUN_ID = savedRun;
+    if (savedContinue === undefined) delete process.env.TASK9_BUSINESS_CONTINUE_RUN_ID; else process.env.TASK9_BUSINESS_CONTINUE_RUN_ID = savedContinue;
+  }
+});
+
+test('offline journal durably retains exact original draft evidence before submit dispatch', async () => {
+  const path = join(mkdtempSync(join(tmpdir(), 'task96k-business-submit-evidence-')), 'task9-business-operation.json');
+  const journal = await BusinessJournal.open(path, runIdentity, () => {}); await seedCommands(journal, 4);
+  const draft = syntheticDraft('00000000-0000-4000-8000-000000000285', { decisionCode: 'REQUEST_SOURCE_INTAKE_STOP', rationaleSummary: 'Task 9.6k requests source intake stop acknowledgement.' });
+  const requestSelectors = {
+    actorAppointmentId: command.requestSelectors.actorAppointmentId, taskId, subjectRef: 'opaque-lead-ref-routing-0001', subjectRevision: 1, taskETag: '"task.' + 'e'.repeat(43) + '"',
+    draftId: draft.draftId, draftRevision: draft.draftRevision, draftDigest: draft.digest, draftETag: '"draft.' + 'f'.repeat(43) + '"', intendedValuesSha256: sha(canonicalBusinessJson(draft.values)),
+  };
+  await expect(journal.begin({ step: 'routing-submit', commandId: '00000000-0000-4000-8000-000000000286', method: 'POST', path: `/api/v1/tasks/${taskId}/commands/record-routing-disposition`, bodySha256: '6'.repeat(64), actorScopeKey: command.actorScopeKey, requestSelectors })).resolves.toBeUndefined();
+  expect(JSON.parse(readFileSync(path, 'utf8')).commands[4].requestSelectors).toEqual(requestSelectors);
+});
+
+test('offline BusinessSetup pending draft recovery refuses an unrelated same-type current task', async () => {
+  const savedRun = process.env.TASK9_BUSINESS_RUN_ID, savedContinue = process.env.TASK9_BUSINESS_CONTINUE_RUN_ID;
+  process.env.TASK9_BUSINESS_RUN_ID = runIdentity.runId; process.env.TASK9_BUSINESS_CONTINUE_RUN_ID = runIdentity.runId;
+  try {
+    const session = syntheticSession('intake', command.requestSelectors.actorAppointmentId);
+    const recoveredDraft = syntheticDraft('00000000-0000-4000-8000-000000000287', { rationaleSummary: 'Task 9.6k synthetic acknowledgement received.' });
+    const pending: any = { ...command, step: 'ack-draft', commandId: '00000000-0000-4000-8000-000000000288', status: 'PENDING',
+      requestSelectors: { ...taskRequestSelectors('ack-draft'), actorAppointmentId: session.appointmentId, taskId, subjectRef: 'opaque-lead-ref-recorded-0001', intendedValuesSha256: sha(canonicalBusinessJson(recoveredDraft.values)) } };
+    let completeCalls = 0;
+    const setup = new (BusinessSetup as any)({}, {}, { pending: () => pending, complete: async () => { completeCalls++; } });
+    (setup as any).workbench = async () => session;
+    (setup as any).read = async () => ({ ...receipt, commandId: pending.commandId, resultFact: { factType: 'ACTION_DRAFT', factRef: 'p'.repeat(43), revision: recoveredDraft.draftRevision } });
+    (setup as any).current = async () => syntheticCard('ACK_SOURCE_INTAKE_STOP_REQUEST', '00000000-0000-4000-8000-000000000289', 'opaque-lead-ref-unrelated-0001', recoveredDraft);
+    await expect((setup as any).reconcilePending()).rejects.toThrow();
+    expect(completeCalls).toBe(0);
+  } finally {
+    if (savedRun === undefined) delete process.env.TASK9_BUSINESS_RUN_ID; else process.env.TASK9_BUSINESS_RUN_ID = savedRun;
+    if (savedContinue === undefined) delete process.env.TASK9_BUSINESS_CONTINUE_RUN_ID; else process.env.TASK9_BUSINESS_CONTINUE_RUN_ID = savedContinue;
+  }
+});
+
+test('offline BusinessSetup leaves ambiguous manual-capture recovery fenced instead of adopting a supervisor card', async () => {
+  const savedRun = process.env.TASK9_BUSINESS_RUN_ID, savedContinue = process.env.TASK9_BUSINESS_CONTINUE_RUN_ID;
+  process.env.TASK9_BUSINESS_RUN_ID = runIdentity.runId; process.env.TASK9_BUSINESS_CONTINUE_RUN_ID = runIdentity.runId;
+  try {
+    const intake = syntheticSession('intake', command.requestSelectors.actorAppointmentId);
+    const supervisor = syntheticSession('supervisor', '00000000-0000-4000-8000-000000000290');
+    const pending: any = { ...command, step: 'capture-manual', commandId: '00000000-0000-4000-8000-000000000291', status: 'PENDING', actorScopeKey: intake.self.actorScopeKey };
+    let completeCalls = 0;
+    const setup = new (BusinessSetup as any)({}, {}, { pending: () => pending, complete: async () => { completeCalls++; } });
+    (setup as any).workbench = async (alias: string) => alias === 'intake' ? intake : supervisor;
+    (setup as any).read = async () => ({ ...receipt, commandId: pending.commandId });
+    (setup as any).current = async (session: any) => session.alias === 'intake' ? null : syntheticCard('ASSIGN_LEAD', '00000000-0000-4000-8000-000000000292', 'opaque-lead-ref-manual-recovery');
+    await expect((setup as any).reconcilePending()).rejects.toThrow();
+    expect(completeCalls).toBe(0);
+  } finally {
+    if (savedRun === undefined) delete process.env.TASK9_BUSINESS_RUN_ID; else process.env.TASK9_BUSINESS_RUN_ID = savedRun;
+    if (savedContinue === undefined) delete process.env.TASK9_BUSINESS_CONTINUE_RUN_ID; else process.env.TASK9_BUSINESS_CONTINUE_RUN_ID = savedContinue;
+  }
+});
+
+test('offline BusinessSetup rejects a known-success successor whose causal digest does not match the original receipt', async () => {
+  const supervisor = syntheticCommandSession('supervisor', '00000000-0000-4000-8000-000000000293');
+  const intake = syntheticSession('intake', command.requestSelectors.actorAppointmentId);
+  const draft = { ...syntheticDraft('00000000-0000-4000-8000-000000000294', { decisionCode: 'REQUEST_SOURCE_INTAKE_STOP', rationaleSummary: 'Task 9.6k requests source intake stop acknowledgement.' }), actionCode: 'RECORD_ROUTING_DISPOSITION' };
+  const original = syntheticCard('RESOLVE_LEAD_ROUTING_GAP', taskId, 'opaque-lead-ref-recorded-0001', draft);
+  const successor = { ...syntheticCard('ACK_SOURCE_INTAKE_STOP_REQUEST', '00000000-0000-4000-8000-000000000295', 'opaque-lead-ref-ack-0001'), commandForm: { values: { causalDecisionId: '00000000-0000-4000-8000-000000000296', causalDecisionHash: 'wrong-digest' } } };
+  const recorded = recordedDraftEntry('routing-draft', taskId, supervisor.appointmentId, draft);
+  let clicked = false, responseCall = 0;
+  const result = { ...receipt, commandId: '00000000-0000-4000-8000-000000000297', resultFact: { factType: 'DECISION_RECORD', factRef: 'q'.repeat(43), digest: 'r'.repeat(43) } };
+  const post = { url: () => `https://localhost:19444/api/v1/tasks/${taskId}/commands/record-routing-disposition`, status: () => 200, json: async () => result };
+  const refreshed = { status: () => 200, json: async () => ({ currentCard: null }) };
+  supervisor.page.locator = () => ({ _apiName: 'Locator', _expect: async () => ({ matches: true, received: 'enabled', log: [], timeout: 0 }), click: async () => { clicked = true; supervisor.submitClicks++; } });
+  supervisor.page.waitForResponse = () => Promise.resolve(responseCall++ === 0 ? post : refreshed);
+  const setup = continuationSetup(recorded, supervisor, original);
+  (setup as any).workbench = async () => intake;
+  (setup as any).current = async (session: any) => session === supervisor ? original : clicked ? successor : null;
+  (setup as any).refreshUi = async (session: any) => session === intake && clicked ? successor : null;
+  await expect((setup as any).card(supervisor, 'routing', 'RESOLVE_LEAD_ROUTING_GAP', draft.values, 'ACK_SOURCE_INTAKE_STOP_REQUEST', 'intake')).rejects.toThrow();
+});
+
+test('offline BusinessSetup refuses capture before dispatch when the intended owner already has a same-type card', async () => {
+  const actor = syntheticSession('intake', command.requestSelectors.actorAppointmentId);
+  const owner = syntheticSession('supervisor', '00000000-0000-4000-8000-000000000290');
+  const unrelated = syntheticCard('ASSIGN_LEAD', '00000000-0000-4000-8000-000000000298', 'opaque-lead-ref-existing-0001');
+  let fetchCalls = 0;
+  const setup = new (BusinessSetup as any)({}, {}, { pending: () => undefined });
+  (setup as any).verifyRecorded = async () => false; (setup as any).workbench = async () => owner; (setup as any).current = async () => unrelated;
+  (setup as any).fetch = async () => { fetchCalls++; return { status: 201, headers: {}, body: receipt }; };
+  (setup as any).arm = () => {}; (setup as any).complete = async () => {};
+  await expect((setup as any).capture(actor, 'capture-manual', 'LOCAL_SYNTHETIC', true, 'ASSIGN_LEAD', 'supervisor')).rejects.toThrow();
+  expect(fetchCalls).toBe(0);
+});
+
+test('offline BusinessSetup rejects a captured card whose Lead revision does not match the exact receipt', async () => {
+  const actor = syntheticSession('intake', command.requestSelectors.actorAppointmentId);
+  const card = syntheticCard('COMPLETE_LEAD_INGRESS', '00000000-0000-4000-8000-000000000299', 'opaque-lead-ref-captured-0001');
+  card.subject.subjectRevision = 1;
+  const setup = new (BusinessSetup as any)({}, {}, { pending: () => undefined });
+  (setup as any).verifyRecorded = async () => false; (setup as any).current = async () => null; (setup as any).refreshUi = async () => card;
+  (setup as any).fetch = async () => ({ status: 201, headers: {}, body: receipt });
+  (setup as any).arm = () => {}; (setup as any).complete = async () => {};
+  await expect((setup as any).capture(actor, 'capture-auto', 'LOCAL_SYNTHETIC_AUTO', false, 'COMPLETE_LEAD_INGRESS', 'intake')).rejects.toThrow();
+});
+
+test('offline BusinessSetup never arms a fresh draft write for a card different from the recorded predecessor successor', async () => {
+  const session: any = syntheticSession('intake', command.requestSelectors.actorAppointmentId);
+  session.page.locator = () => ({ _apiName: 'Locator', _expect: async () => ({ matches: true, received: 'disabled', log: [], timeout: 0 }), fill: async () => {}, selectOption: async () => {} });
+  const expectedTaskId = '00000000-0000-4000-8000-000000000300', unrelatedTaskId = '00000000-0000-4000-8000-000000000301';
+  const current: any = syntheticCard('ACK_SOURCE_INTAKE_STOP_REQUEST', unrelatedTaskId, 'opaque-lead-ref-unrelated-0002');
+  current.commandForm = { actionCode: 'ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST', schemaVersion: 1, fields: [], values: { causalDecisionId: '00000000-0000-4000-8000-000000000302', causalDecisionHash: 'h'.repeat(43) } };
+  const predecessor = { ...command, step: 'routing-submit', status: 'CONFIRMED', selectors: {
+    taskId, subjectRef: 'opaque-lead-ref-routing-0002', subjectRevision: 1, ownerAppointmentId: '00000000-0000-4000-8000-000000000293', taskETag: '"task.' + 'g'.repeat(43) + '"',
+    draftETag: '"draft.' + 'f'.repeat(43) + '"', draftId: '00000000-0000-4000-8000-000000000303', draftRevision: 0, draftDigest: 'd'.repeat(43), draftValuesSha256: '1'.repeat(64),
+    ...successorEvidence(expectedTaskId, 'ACK_SOURCE_INTAKE_STOP_REQUEST', session.appointmentId),
+  } };
+  predecessor.selectors.successorSubjectRef = 'opaque-lead-ref-expected-0002';
+  let armCalls = 0;
+  const setup = new (BusinessSetup as any)({}, {}, { confirmed: (step: string) => step === 'routing-submit' ? predecessor : undefined });
+  (setup as any).verifyRecorded = async () => false; (setup as any).current = async () => current;
+  (setup as any).arm = () => { armCalls++; throw new Error('synthetic-stop-after-arm'); };
+  await (setup as any).card(session, 'ack', 'ACK_SOURCE_INTAKE_STOP_REQUEST', { rationaleSummary: 'Task 9.6k synthetic acknowledgement received.' }, null, null).catch(() => {});
+  expect(armCalls).toBe(0);
+});
+
 test('offline reporter never emits credentials or raw errors', () => {
   const output: string[] = [], write = process.stdout.write;
   process.stdout.write = ((chunk: any) => { output.push(String(chunk)); return true; }) as typeof write;
@@ -278,10 +585,10 @@ async function seedFirstStage(journal: BusinessJournal) {
   for (const [index, [step, method, path, factType]] of entries.entries()) {
     const commandId = `00000000-0000-4000-8000-${String(120 + index).padStart(12, '0')}`;
     await journal.begin({ step, commandId, method, path, bodySha256: String(index + 1).repeat(64).slice(0, 64), actorScopeKey: command.actorScopeKey,
-      requestSelectors: index === 0 ? command.requestSelectors : { ...command.requestSelectors, taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, taskETag: '"task.' + 'e'.repeat(43) + '"' } });
+      requestSelectors: index === 0 ? command.requestSelectors : taskRequestSelectors(step) });
     const immutable = factType === 'DECISION_RECORD';
     await journal.complete(commandId, step.endsWith('-draft') ? 200 : 201, { ...receipt, commandId, receiptId: `00000000-0000-4000-8000-${String(130 + index).padStart(12, '0')}`, resultFact: immutable ? { factType, factRef: String.fromCharCode(97 + index).repeat(43), digest: 'z'.repeat(43) } : { factType, factRef: String.fromCharCode(97 + index).repeat(43), revision: 0 } },
-      { taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, ownerAppointmentId: '00000000-0000-4000-8000-000000000108', taskETag: '"task.' + 'e'.repeat(43) + '"', draftETag: step.endsWith('-draft') ? '"draft.' + 'f'.repeat(43) + '"' : null, draftId: step.endsWith('-draft') ? '00000000-0000-4000-8000-000000000140' : null, successorTaskId: taskId, successorTaskType: step === 'complete-submit' ? 'RESOLVE_LEAD_ROUTING_GAP' : step === 'routing-submit' ? 'ACK_SOURCE_INTAKE_STOP_REQUEST' : step === 'ack-submit' ? null : 'COMPLETE_LEAD_INGRESS' });
+      { taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, ownerAppointmentId: '00000000-0000-4000-8000-000000000108', taskETag: '"task.' + 'e'.repeat(43) + '"', draftETag: step.endsWith('-draft') ? '"draft.' + 'f'.repeat(43) + '"' : null, draftId: step.endsWith('-draft') ? '00000000-0000-4000-8000-000000000140' : null, draftRevision: step.endsWith('-draft') ? 0 : null, draftDigest: step.endsWith('-draft') ? 'y'.repeat(43) : null, draftValuesSha256: step.endsWith('-draft') ? '0'.repeat(64) : null, ...successorEvidence(step === 'ack-submit' ? null : taskId, step === 'complete-submit' ? 'RESOLVE_LEAD_ROUTING_GAP' : step === 'routing-submit' ? 'ACK_SOURCE_INTAKE_STOP_REQUEST' : step === 'ack-submit' ? null : 'COMPLETE_LEAD_INGRESS', '00000000-0000-4000-8000-000000000108') });
   }
 }
 
@@ -295,8 +602,138 @@ async function seedCommands(journal: BusinessJournal, count: number) {
   for (const [index, [step, method, path, factType]] of entries.slice(0, count).entries()) {
     const commandId = `00000000-0000-4000-8000-${String(160 + index).padStart(12, '0')}`;
     await journal.begin({ step, commandId, method, path, bodySha256: String(index + 1).repeat(64), actorScopeKey: command.actorScopeKey,
-      requestSelectors: index === 0 ? command.requestSelectors : { ...command.requestSelectors, taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, taskETag: '"task.' + 'e'.repeat(43) + '"' } });
+      requestSelectors: index === 0 ? command.requestSelectors : taskRequestSelectors(step) });
     await journal.complete(commandId, step.endsWith('-draft') ? 200 : 201, { ...receipt, commandId, receiptId: `00000000-0000-4000-8000-${String(170 + index).padStart(12, '0')}`, resultFact: { factType, factRef: String.fromCharCode(103 + index).repeat(43), revision: 0 } },
-      { taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, ownerAppointmentId: command.requestSelectors.actorAppointmentId, taskETag: '"task.' + 'e'.repeat(43) + '"', draftETag: step.endsWith('-draft') ? '"draft.' + 'f'.repeat(43) + '"' : null, draftId: step.endsWith('-draft') ? '00000000-0000-4000-8000-000000000180' : null, successorTaskId: taskId, successorTaskType: index === 2 ? 'RESOLVE_LEAD_ROUTING_GAP' : 'COMPLETE_LEAD_INGRESS' });
+      { taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, ownerAppointmentId: command.requestSelectors.actorAppointmentId, taskETag: '"task.' + 'e'.repeat(43) + '"', draftETag: step.endsWith('-draft') ? '"draft.' + 'f'.repeat(43) + '"' : null, draftId: step.endsWith('-draft') ? '00000000-0000-4000-8000-000000000180' : null, draftRevision: step.endsWith('-draft') ? 0 : null, draftDigest: step.endsWith('-draft') ? 'y'.repeat(43) : null, draftValuesSha256: step.endsWith('-draft') ? '0'.repeat(64) : null, ...successorEvidence(taskId, index === 2 ? 'RESOLVE_LEAD_ROUTING_GAP' : 'COMPLETE_LEAD_INGRESS', command.requestSelectors.actorAppointmentId) });
   }
+}
+
+async function syntheticSetupRoute() {
+  let handler: any;
+  const appointmentId = '00000000-0000-4000-8000-000000000108';
+  const payload = Buffer.from(JSON.stringify({ iss: BUSINESS_PIN.issuer, preferred_username: 'task9-local-intake', sub: '00000000-0000-4000-8000-000000000109' })).toString('base64url');
+  const tokenResponse = { status: () => 200, json: async () => ({ access_token: `e30.${payload}.signature` }) };
+  const selfResponse = { status: () => 200, json: async () => ({ state: 'READY', selectedAppointmentId: appointmentId, selectedOnBehalfAppointmentId: null, appointmentChoices: [{ id: appointmentId }], actorScopeKey: 'ask1.' + 'c'.repeat(43), canEnterWorkbench: true, canEnterIdentityAdmin: false }) };
+  let responseCall = 0;
+  const clickable = { click: async () => {}, fill: async () => {} };
+  const page = {
+    goto: async () => {}, waitForURL: async () => {}, getByRole: () => clickable, locator: () => clickable,
+    waitForResponse: () => Promise.resolve(responseCall++ === 0 ? tokenResponse : selfResponse),
+  };
+  const context = { route: async (_pattern: string, value: any) => { handler = value; }, newPage: async () => page, close: async () => {} };
+  const browser = { newContext: async () => context };
+  const environment = {
+    assertUnchanged: async () => {}, resources: { 'appointment-intake': appointmentId }, bootstrap: { appointmentId: '00000000-0000-4000-8000-000000000107' },
+    accounts: { intake: { username: 'task9-local-intake', password: 'synthetic-password', providerUserId: '00000000-0000-4000-8000-000000000109' } },
+  };
+  const setup = new (BusinessSetup as any)(browser, environment, {});
+  await (setup as any).login('intake');
+  return { setup, routeHandler: handler as (route: any) => Promise<void> };
+}
+
+function syntheticSession(alias: string, appointmentId: string) {
+  return {
+    alias, appointmentId, context: { close: async () => {} },
+    self: { selectedAppointmentId: appointmentId, actorScopeKey: 'ask1.' + 'c'.repeat(43) }, auth: {},
+    page: { locator: () => ({ _apiName: 'Locator', _expect: async () => ({ matches: true, received: 'visible', log: [], timeout: 0 }) }) },
+  };
+}
+
+function syntheticCard(taskType: string, id: string, subjectRef: string, actionDraft: any = null) {
+  return {
+    taskId: id, taskType, taskRevision: 0, versionStatus: 'CURRENT',
+    subject: { subjectType: 'LEAD', subjectRef, subjectRevision: 0 },
+    primaryCommand: { enabled: true }, actionDraft,
+    preconditions: { taskETag: '"task.' + 'e'.repeat(43) + '"', subjectETag: '"subject.' + 's'.repeat(43) + '"', draftETag: actionDraft ? '"draft.' + 'f'.repeat(43) + '"' : null },
+    commandForm: { values: {} },
+  };
+}
+
+function predecessorFixture() {
+  const ids: Record<string, string> = {
+    organization: '00000000-0000-4000-8000-000000000210',
+    'principal-intake': '00000000-0000-4000-8000-000000000211', 'principal-supervisor': '00000000-0000-4000-8000-000000000212',
+    'principal-contact': '00000000-0000-4000-8000-000000000213', 'principal-delegate': '00000000-0000-4000-8000-000000000214',
+    'appointment-intake': '00000000-0000-4000-8000-000000000215', 'appointment-supervisor': '00000000-0000-4000-8000-000000000216',
+    'appointment-contact': '00000000-0000-4000-8000-000000000217', 'appointment-delegate': '00000000-0000-4000-8000-000000000218',
+    'grant-intake-0': '00000000-0000-4000-8000-000000000220', 'grant-intake-1': '00000000-0000-4000-8000-000000000221',
+    'grant-intake-2': '00000000-0000-4000-8000-000000000222', 'grant-intake-3': '00000000-0000-4000-8000-000000000223',
+    'grant-supervisor-0': '00000000-0000-4000-8000-000000000224', 'grant-supervisor-1': '00000000-0000-4000-8000-000000000225',
+    'grant-supervisor-2': '00000000-0000-4000-8000-000000000226',
+  };
+  const rootId = '00000000-0000-4000-8000-000000000219';
+  const etag = '"identity.' + 'i'.repeat(43) + '"';
+  const aliases = ['intake', 'supervisor', 'contact', 'delegate'] as const;
+  const principals = aliases.map(alias => ({ id: ids[`principal-${alias}`], displayName: `synthetic-${alias}`, state: 'ACTIVE', etag }));
+  const organizations = [
+    { id: rootId, parentOrganizationId: null, code: 'ROOT', displayName: 'ROOT', state: 'ACTIVE', etag },
+    { id: ids.organization, parentOrganizationId: rootId, code: 'LOCAL_ACCEPTANCE', displayName: 'Local acceptance', state: 'ACTIVE', etag },
+  ];
+  const appointments = aliases.map(alias => ({ id: ids[`appointment-${alias}`], principal: { id: ids[`principal-${alias}`], label: `synthetic-${alias}` }, organization: { id: ids.organization, label: 'Local acceptance' }, roleCode: alias === 'intake' ? 'INTAKE_OPERATOR' : alias === 'supervisor' ? 'ROUTING_SUPERVISOR' : 'CONTACT_OPERATOR', effectiveFrom: '2026-09-09T00:00:00Z', effectiveUntil: null, state: 'ACTIVE', etag }));
+  const codes = ['LEAD_CAPTURE', 'LEAD_INGRESS_RESOLVE', 'LEAD_INGRESS_COMPLETE', 'SOURCE_INTAKE_REQUEST_ACK', 'LEAD_ASSIGN', 'LEAD_ROUTING_DECIDE', 'LEAD_VALIDITY_REVIEW'];
+  const businessSteps = ['grant-intake-0', 'grant-intake-1', 'grant-intake-2', 'grant-intake-3', 'grant-supervisor-0', 'grant-supervisor-1', 'grant-supervisor-2'];
+  const grants = codes.map((authorityCode, index) => ({ id: ids[businessSteps[index]], appointment: { id: index < 4 ? ids['appointment-intake'] : ids['appointment-supervisor'], label: 'synthetic' }, authorityCode, scopeOrganization: { id: rootId, label: 'ROOT' }, validFrom: '2026-09-09T00:00:00Z', validUntil: null, state: 'ACTIVE', etag }));
+  for (const [index, authorityCode] of ['IDENTITY_PRINCIPAL_MANAGE', 'IDENTITY_ORGANIZATION_MANAGE', 'IDENTITY_APPOINTMENT_MANAGE', 'IDENTITY_AUTHORITY_MANAGE'].entries()) {
+    grants.push({ id: `00000000-0000-4000-8000-${String(230 + index).padStart(12, '0')}`, appointment: { id: '00000000-0000-4000-8000-000000000204', label: 'synthetic-founder' }, authorityCode, scopeOrganization: { id: rootId, label: 'ROOT' }, validFrom: '2026-09-08T00:00:00Z', validUntil: null, state: 'ACTIVE', etag });
+  }
+  return { ids, rootId, founderAppointmentId: '00000000-0000-4000-8000-000000000204', principals, organizations, appointments, grants };
+}
+
+function predecessorSetup(fixture: ReturnType<typeof predecessorFixture>) {
+  const setup = new (BusinessSetup as any)({}, { resources: fixture.ids, bootstrap: { rootId: fixture.rootId, appointmentId: fixture.founderAppointmentId } }, {});
+  (setup as any).administrator = async () => ({});
+  (setup as any).rows = async (_session: unknown, path: string) => path.endsWith('/principals') ? fixture.principals : path.endsWith('/organizations') ? fixture.organizations : path.endsWith('/appointments') ? fixture.appointments : fixture.grants;
+  return setup;
+}
+
+function syntheticDraft(draftId: string, values: Record<string, unknown>) {
+  return { draftId, draftRevision: 0, actionCode: 'ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST', schemaVersion: 1, values, digest: 'k'.repeat(43), updatedAt: '2026-09-10T02:00:00Z', editable: true };
+}
+
+function syntheticCommandSession(alias: string, appointmentId: string) {
+  let responseCall = 0;
+  const post = { url: () => `https://localhost:19444/api/v1/tasks/${taskId}/commands/acknowledge-source-intake-stop-request`, status: () => 200, json: async () => receipt };
+  const refreshed = { url: () => 'https://localhost:19444/api/v1/workcards/current', status: () => 200, json: async () => ({ currentCard: null }) };
+  const session: any = syntheticSession(alias, appointmentId);
+  session.submitClicks = 0;
+  session.page.locator = () => ({ _apiName: 'Locator', _expect: async () => ({ matches: true, received: 'enabled', log: [], timeout: 0 }), click: async () => { session.submitClicks++; } });
+  session.page.waitForResponse = () => Promise.resolve(responseCall++ === 0 ? post : refreshed);
+  return session;
+}
+
+function recordedDraftEntry(step: string, recordedTaskId: string, appointmentId: string, draft: any) {
+  const card = syntheticCard('ACK_SOURCE_INTAKE_STOP_REQUEST', recordedTaskId, 'opaque-lead-ref-recorded-0001', draft);
+  return {
+    ...command, step, path: `/api/v1/tasks/${recordedTaskId}/draft`, method: 'PUT', status: 'CONFIRMED', resultFact: { factType: 'ACTION_DRAFT', factRef: 'x'.repeat(43), revision: draft.draftRevision },
+    requestSelectors: { actorAppointmentId: appointmentId, taskId: recordedTaskId, subjectRef: card.subject.subjectRef, subjectRevision: card.subject.subjectRevision, taskETag: card.preconditions.taskETag, draftId: null, draftRevision: null, draftDigest: null, draftETag: null, intendedValuesSha256: sha(canonicalBusinessJson(draft.values)) },
+    selectors: { taskId: recordedTaskId, subjectRef: card.subject.subjectRef, subjectRevision: card.subject.subjectRevision, ownerAppointmentId: appointmentId, taskETag: card.preconditions.taskETag, draftETag: card.preconditions.draftETag, draftId: draft.draftId, draftRevision: draft.draftRevision, draftDigest: draft.digest, draftValuesSha256: sha(canonicalBusinessJson(draft.values)), ...successorEvidence(null, null, appointmentId) },
+  };
+}
+
+function continuationSetup(recorded: any, session: any, current: any) {
+  const previous: Record<string, string> = { 'complete-draft': 'capture-auto', 'routing-draft': 'complete-submit', 'ack-draft': 'routing-submit', 'assign-draft': 'capture-manual', 'contact-draft': 'assign-submit', 'review-draft': 'contact-submit' };
+  const predecessor = { ...command, step: previous[recorded.step], status: 'CONFIRMED', selectors: {
+    ...recorded.selectors, successorTaskId: recorded.requestSelectors.taskId, successorTaskType: current.taskType,
+    successorOwnerAppointmentId: session.appointmentId, successorSubjectRef: recorded.requestSelectors.subjectRef,
+    successorSubjectRevision: recorded.requestSelectors.subjectRevision, successorTaskETag: recorded.requestSelectors.taskETag,
+  } };
+  const journal = { confirmed: (step: string) => step === recorded.step ? recorded : step === predecessor.step ? predecessor : undefined };
+  const setup = new (BusinessSetup as any)({}, { assertUnchanged: async () => {} }, journal);
+  (setup as any).verifyRecorded = async (step: string) => step === recorded.step;
+  (setup as any).current = async () => current;
+  (setup as any).arm = () => {};
+  (setup as any).complete = async () => {};
+  return setup;
+}
+
+function taskRequestSelectors(step: string) {
+  const submit = step.endsWith('-submit');
+  return { ...command.requestSelectors, taskId, subjectRef: 'opaque-lead-ref-0001', subjectRevision: 0, taskETag: '"task.' + 'e'.repeat(43) + '"',
+    draftId: submit ? '00000000-0000-4000-8000-000000000189' : null, draftRevision: submit ? 0 : null, draftDigest: submit ? 'v'.repeat(43) : null,
+    draftETag: submit ? '"draft.' + 'f'.repeat(43) + '"' : null, intendedValuesSha256: '0'.repeat(64) };
+}
+
+function successorEvidence(successorTaskId: string | null, successorTaskType: string | null, ownerAppointmentId: string) {
+  return successorTaskId === null ? { successorTaskId: null, successorTaskType: null, successorOwnerAppointmentId: null, successorSubjectRef: null, successorSubjectRevision: null, successorTaskETag: null }
+    : { successorTaskId, successorTaskType, successorOwnerAppointmentId: ownerAppointmentId, successorSubjectRef: 'opaque-lead-ref-0001', successorSubjectRevision: 0, successorTaskETag: '"task.' + 'e'.repeat(43) + '"' };
 }

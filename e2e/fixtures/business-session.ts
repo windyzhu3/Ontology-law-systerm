@@ -19,9 +19,9 @@ export function allowBusinessRequest(url: URL, method: string): boolean {
 }
 export interface ArmedBusinessWrite { step: BusinessStep; method: string; path: string; body: Record<string, unknown>; actorScopeKey: string; requestSelectors: RequestSelectors }
 export interface ObservedBusinessWrite { method: string; path: string; bodyBytes: Buffer; commandId: string; actorScopeKey: string }
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value && typeof value === 'object') return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(',')}}`;
+export function canonicalBusinessJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalBusinessJson).join(',')}]`;
+  if (value && typeof value === 'object') return `{${Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonicalBusinessJson(item)}`).join(',')}}`;
   return JSON.stringify(value);
 }
 export class BusinessDispatchGate {
@@ -42,7 +42,7 @@ export class BusinessDispatchGate {
       check(exact(observed, ['method', 'path', 'bodyBytes', 'commandId', 'actorScopeKey']));
       check(observed.method === armed.method && observed.path === armed.path && observed.actorScopeKey === armed.actorScopeKey && uuid.test(observed.commandId));
       const parsed = JSON.parse(observed.bodyBytes.toString('utf8'));
-      check(parsed && typeof parsed === 'object' && !Array.isArray(parsed) && canonical(parsed) === canonical(armed.body));
+      check(parsed && typeof parsed === 'object' && !Array.isArray(parsed) && canonicalBusinessJson(parsed) === canonicalBusinessJson(armed.body));
       await this.journal.begin({ step: armed.step, commandId: observed.commandId, method: observed.method, path: observed.path, bodySha256: sha(observed.bodyBytes), actorScopeKey: observed.actorScopeKey, requestSelectors: armed.requestSelectors });
       check(!this.poisoned); await send();
     } catch (error) { this.poisoned = true; throw error; }

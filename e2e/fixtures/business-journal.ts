@@ -17,15 +17,19 @@ const ACTOR = /^ask1\.[A-Za-z0-9_-]{43}$/;
 const TASK_PATH = /^\/api\/v1\/tasks\/([0-9a-f-]{36})\/(draft|commands\/(complete-lead-ingress|record-routing-disposition|acknowledge-source-intake-stop-request|assign-lead|record-contact-result|review-lead-validity))$/;
 
 export interface BusinessRunIdentity { runId: string; environmentDigest: string; buildSha: string; predecessorRunId: string; predecessorSha256: string }
-export interface RequestSelectors { actorAppointmentId: string; taskId: string | null; subjectRef: string | null; subjectRevision: number | null; taskETag: string | null }
+export interface RequestSelectors {
+  actorAppointmentId: string; taskId: string | null; subjectRef: string | null; subjectRevision: number | null; taskETag: string | null;
+  draftId: string | null; draftRevision: number | null; draftDigest: string | null; draftETag: string | null; intendedValuesSha256: string | null;
+}
 export interface BusinessCommand { step: BusinessStep; commandId: string; method: string; path: string; bodySha256: string; actorScopeKey: string; requestSelectors: RequestSelectors }
 export type BusinessFact =
   | { factType: 'LEAD' | 'ACTION_DRAFT' | 'TASK_OCCURRENCE' | 'LEAD_ASSIGNMENT' | 'AUTHORITY_GRANT'; factRef: string; revision: number }
   | { factType: 'DECISION_RECORD' | 'LEAD_CONTACT_RESULT'; factRef: string; digest: string };
 export interface CardSelectors {
   taskId: string; subjectRef: string; subjectRevision: number; ownerAppointmentId: string;
-  taskETag: string; draftETag: string | null; draftId: string | null;
-  successorTaskId: string | null; successorTaskType: string | null;
+  taskETag: string; draftETag: string | null; draftId: string | null; draftRevision: number | null; draftDigest: string | null; draftValuesSha256: string | null;
+  successorTaskId: string | null; successorTaskType: string | null; successorOwnerAppointmentId: string | null;
+  successorSubjectRef: string | null; successorSubjectRevision: number | null; successorTaskETag: string | null;
 }
 export interface GrantSelectors { resourceId: string }
 export type BusinessSelectors = CardSelectors | GrantSelectors;
@@ -71,21 +75,26 @@ function validCommand(command: BusinessCommand, index?: number): void {
   check(BUSINESS_STEPS.includes(command.step) && (index === undefined || command.step === BUSINESS_STEPS[index]));
   check(uuid.test(command.commandId) && HASH.test(command.bodySha256) && ACTOR.test(command.actorScopeKey));
   check(expectedRoute(command.step, command.method, command.path));
-  const s = command.requestSelectors; check(s && exact(s, ['actorAppointmentId', 'taskId', 'subjectRef', 'subjectRevision', 'taskETag']) && uuid.test(s.actorAppointmentId));
+  const s = command.requestSelectors; check(s && exact(s, ['actorAppointmentId', 'taskId', 'subjectRef', 'subjectRevision', 'taskETag', 'draftId', 'draftRevision', 'draftDigest', 'draftETag', 'intendedValuesSha256']) && uuid.test(s.actorAppointmentId));
   check((s.taskId === null && s.subjectRef === null && s.subjectRevision === null && s.taskETag === null) ||
     (uuid.test(s.taskId ?? '') && typeof s.subjectRef === 'string' && s.subjectRef.length >= 16 && Number.isSafeInteger(s.subjectRevision) && Number(s.subjectRevision) >= 0 && /^"task\.[A-Za-z0-9_-]{43}"$/.test(s.taskETag ?? '')));
   check((command.step === 'capture-auto' || command.step === 'capture-manual' || command.step === 'grant-contact-owner') === (s.taskId === null));
+  if (s.taskId === null) check(s.draftId === null && s.draftRevision === null && s.draftDigest === null && s.draftETag === null && s.intendedValuesSha256 === null);
+  else if (command.step.endsWith('-draft')) check(s.draftId === null && s.draftRevision === null && s.draftDigest === null && s.draftETag === null && HASH.test(s.intendedValuesSha256 ?? ''));
+  else check(uuid.test(s.draftId ?? '') && Number.isSafeInteger(s.draftRevision) && Number(s.draftRevision) >= 0 && DIGEST.test(s.draftDigest ?? '') && /^"draft\.[A-Za-z0-9_-]{43}"$/.test(s.draftETag ?? '') && HASH.test(s.intendedValuesSha256 ?? ''));
 }
 function validSelectors(step: BusinessStep, value: unknown): void {
   check(value && typeof value === 'object'); const v = value as Record<string, any>;
   if (step === 'grant-contact-owner') { check(exact(v, ['resourceId']) && uuid.test(v.resourceId)); return; }
-  check(exact(v, ['taskId', 'subjectRef', 'subjectRevision', 'ownerAppointmentId', 'taskETag', 'draftETag', 'draftId', 'successorTaskId', 'successorTaskType']));
+  check(exact(v, ['taskId', 'subjectRef', 'subjectRevision', 'ownerAppointmentId', 'taskETag', 'draftETag', 'draftId', 'draftRevision', 'draftDigest', 'draftValuesSha256', 'successorTaskId', 'successorTaskType', 'successorOwnerAppointmentId', 'successorSubjectRef', 'successorSubjectRevision', 'successorTaskETag']));
   check(uuid.test(v.taskId) && typeof v.subjectRef === 'string' && v.subjectRef.length >= 16 && v.subjectRef.length <= 512);
   check(Number.isSafeInteger(v.subjectRevision) && v.subjectRevision >= 0 && uuid.test(v.ownerAppointmentId));
   check(/^"task\.[A-Za-z0-9_-]{43}"$/.test(v.taskETag));
-  check(v.draftETag === null || /^"draft\.[A-Za-z0-9_-]{43}"$/.test(v.draftETag));
-  check(v.draftId === null || uuid.test(v.draftId)); check(v.successorTaskId === null || uuid.test(v.successorTaskId));
-  check(v.successorTaskType === null || ['COMPLETE_LEAD_INGRESS', 'RESOLVE_LEAD_ROUTING_GAP', 'ACK_SOURCE_INTAKE_STOP_REQUEST', 'ASSIGN_LEAD', 'CONTACT_LEAD', 'REVIEW_LEAD_VALIDITY'].includes(v.successorTaskType));
+  check((v.draftETag === null && v.draftId === null && v.draftRevision === null && v.draftDigest === null && v.draftValuesSha256 === null)
+    || (/^"draft\.[A-Za-z0-9_-]{43}"$/.test(v.draftETag) && uuid.test(v.draftId) && Number.isSafeInteger(v.draftRevision) && v.draftRevision >= 0 && DIGEST.test(v.draftDigest) && HASH.test(v.draftValuesSha256)));
+  check((v.successorTaskId === null && v.successorTaskType === null && v.successorOwnerAppointmentId === null && v.successorSubjectRef === null && v.successorSubjectRevision === null && v.successorTaskETag === null)
+    || (uuid.test(v.successorTaskId) && ['COMPLETE_LEAD_INGRESS', 'RESOLVE_LEAD_ROUTING_GAP', 'ACK_SOURCE_INTAKE_STOP_REQUEST', 'ASSIGN_LEAD', 'CONTACT_LEAD', 'REVIEW_LEAD_VALIDITY'].includes(v.successorTaskType)
+      && uuid.test(v.successorOwnerAppointmentId) && typeof v.successorSubjectRef === 'string' && v.successorSubjectRef.length >= 16 && Number.isSafeInteger(v.successorSubjectRevision) && v.successorSubjectRevision >= 0 && /^"task\.[A-Za-z0-9_-]{43}"$/.test(v.successorTaskETag)));
 }
 function validate(data: Journal): void {
   check(exact(data, ['identity', 'commands', 'stages'])); validIdentity(data.identity);

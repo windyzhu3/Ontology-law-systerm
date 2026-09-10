@@ -3,9 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BUSINESS_PIN, IDENTITY_PREDECESSOR, loadBusinessEnvironment, type BusinessEnvironment } from './business-environment';
-import { BusinessJournal, BUSINESS_CASES, type BusinessCaseId, type BusinessEntry, type BusinessSelectors, type BusinessStep, type CardSelectors } from './business-journal';
-import { BusinessDispatchGate, allowBusinessRequest } from './business-session';
-import { check, exact, ORIGIN, ISSUER, protect, uuid } from './local-environment';
+import { BusinessJournal, BUSINESS_CASES, type BusinessCaseId, type BusinessEntry, type BusinessSelectors, type BusinessStep, type CardSelectors, type RequestSelectors } from './business-journal';
+import { BusinessDispatchGate, allowBusinessRequest, canonicalBusinessJson } from './business-session';
+import { check, exact, ORIGIN, ISSUER, protect, sha, uuid } from './local-environment';
 import { GRANTS, matchFact, NAMES } from './identity-setup';
 import { businessFailureCode } from '../reporters/business-reporter';
 import { candidate } from '../../apps/workbench/src/features/workcard/contract';
@@ -19,17 +19,35 @@ type Session = { alias: Alias; context: BrowserContext; page: Page; self: any; a
 type Wire = { status: number; headers: Record<string, string>; body: any };
 type CardType = typeof TASK_TYPES[number];
 
-function requestSelectors(session: Session, card?: any) {
-  return card ? { actorAppointmentId: session.appointmentId, taskId: card.taskId, subjectRef: card.subject.subjectRef, subjectRevision: card.subject.subjectRevision, taskETag: card.preconditions.taskETag }
-    : { actorAppointmentId: session.appointmentId, taskId: null, subjectRef: null, subjectRevision: null, taskETag: null };
+function requestSelectors(session: Session, card?: any, body?: Record<string, unknown>) {
+  if (!card) return { actorAppointmentId: session.appointmentId, taskId: null, subjectRef: null, subjectRevision: null, taskETag: null, draftId: null, draftRevision: null, draftDigest: null, draftETag: null, intendedValuesSha256: null };
+  const draft = card.actionDraft, values = draft?.values ?? body?.values;
+  return { actorAppointmentId: session.appointmentId, taskId: card.taskId, subjectRef: card.subject.subjectRef, subjectRevision: card.subject.subjectRevision, taskETag: card.preconditions.taskETag,
+    draftId: draft?.draftId ?? null, draftRevision: draft?.draftRevision ?? null, draftDigest: draft?.digest ?? null, draftETag: draft ? card.preconditions.draftETag : null,
+    intendedValuesSha256: values ? sha(canonicalBusinessJson(values)) : null };
 }
-function selectors(session: Session, original: any, successor: any | null, draft = original?.actionDraft ?? null): CardSelectors {
+function selectors(session: Session, original: any, successor: any | null, draft = original?.actionDraft ?? null, successorOwner: Session | null = successor ? session : null): CardSelectors {
   check(original && uuid.test(original.taskId) && original.subject?.subjectType === 'LEAD');
   return {
     taskId: original.taskId, subjectRef: original.subject.subjectRef, subjectRevision: original.subject.subjectRevision,
     ownerAppointmentId: session.appointmentId, taskETag: original.preconditions.taskETag,
     draftETag: draft ? original.preconditions.draftETag : null, draftId: draft?.draftId ?? null,
+    draftRevision: draft?.draftRevision ?? null, draftDigest: draft?.digest ?? null,
+    draftValuesSha256: draft ? sha(canonicalBusinessJson(draft.values)) : null,
     successorTaskId: successor?.taskId ?? null, successorTaskType: successor?.taskType ?? null,
+    successorOwnerAppointmentId: successorOwner?.appointmentId ?? null, successorSubjectRef: successor?.subject.subjectRef ?? null,
+    successorSubjectRevision: successor?.subject.subjectRevision ?? null, successorTaskETag: successor?.preconditions.taskETag ?? null,
+  };
+}
+function recoveredSubmitSelectors(session: Session, value: RequestSelectors): CardSelectors {
+  check(value.actorAppointmentId === session.appointmentId && uuid.test(value.taskId ?? '') && typeof value.subjectRef === 'string');
+  check(Number.isSafeInteger(value.subjectRevision) && typeof value.taskETag === 'string' && uuid.test(value.draftId ?? ''));
+  check(Number.isSafeInteger(value.draftRevision) && typeof value.draftDigest === 'string' && typeof value.draftETag === 'string' && typeof value.intendedValuesSha256 === 'string');
+  return {
+    taskId: value.taskId!, subjectRef: value.subjectRef!, subjectRevision: value.subjectRevision!, ownerAppointmentId: session.appointmentId,
+    taskETag: value.taskETag!, draftId: value.draftId!, draftRevision: value.draftRevision!, draftDigest: value.draftDigest!,
+    draftETag: value.draftETag!, draftValuesSha256: value.intendedValuesSha256!, successorTaskId: null, successorTaskType: null,
+    successorOwnerAppointmentId: null, successorSubjectRef: null, successorSubjectRevision: null, successorTaskETag: null,
   };
 }
 function stepAlias(step: BusinessStep): Alias {
@@ -47,10 +65,18 @@ function successorOwner(step: BusinessStep): 'intake'|'supervisor'|'contact'|nul
   return step === 'complete-submit' || step === 'contact-submit' || step === 'capture-manual' ? 'supervisor'
     : step === 'routing-submit' ? 'intake' : step === 'assign-submit' ? 'contact' : null;
 }
+function predecessorStep(step: BusinessStep): BusinessStep | undefined {
+  const values: Partial<Record<BusinessStep, BusinessStep>> = {
+    'complete-draft': 'capture-auto', 'routing-draft': 'complete-submit', 'ack-draft': 'routing-submit',
+    'assign-draft': 'capture-manual', 'contact-draft': 'assign-submit', 'review-draft': 'contact-submit',
+  };
+  return values[step];
+}
 
 export class BusinessSetup {
   readonly environment: BusinessEnvironment; readonly runId: string; readonly journal: BusinessJournal;
   private gate: BusinessDispatchGate; private sessions = new Map<Alias, Session>(); private http: Array<{path: string; status: number}> = [];
+  private contactAppointment?: { effectiveFrom: string; effectiveUntil: string | null };
   private dispatchFailed = false;
   private constructor(private readonly browser: Browser, environment: BusinessEnvironment, journal: BusinessJournal) {
     this.environment = environment; this.runId = process.env.TASK9_BUSINESS_RUN_ID!; this.journal = journal; this.gate = new BusinessDispatchGate(journal);
@@ -78,7 +104,7 @@ export class BusinessSetup {
     await context.route('**/*', async route => {
       const request = route.request(), url = new URL(request.url()), method = request.method();
       try {
-        if (url.origin === new URL(ISSUER).origin || allowBusinessRequest(url, method)) {
+        if (allowBusinessRequest(url, method)) {
           await this.observe(request, session); await route.continue(); return;
         }
         check(url.origin === ORIGIN && url.pathname.startsWith('/api/') && !this.dispatchFailed);
@@ -149,7 +175,7 @@ export class BusinessSetup {
     return envelope.currentCard;
   }
   private arm(session: Session, step: BusinessStep, method: string, path: string, body: Record<string, unknown>, card?: any) {
-    check(!this.dispatchFailed && session.self.actorScopeKey); this.gate.arm({ step, method, path, body, actorScopeKey: session.self.actorScopeKey, requestSelectors: requestSelectors(session, card) });
+    check(!this.dispatchFailed && session.self.actorScopeKey); this.gate.arm({ step, method, path, body, actorScopeKey: session.self.actorScopeKey, requestSelectors: requestSelectors(session, card, body) });
   }
   private async complete(step: BusinessStep, response: Wire | Response, result: any, selected: BusinessSelectors) {
     const entry = this.journal.pending(); check(entry?.step === step);
@@ -174,14 +200,29 @@ export class BusinessSetup {
     const admin = await this.administrator(), resources = this.environment.resources;
     const principals = await this.rows(admin, '/api/v1/admin/identity/principals'), organizations = await this.rows(admin, '/api/v1/admin/identity/organizations');
     const appointments = await this.rows(admin, '/api/v1/admin/identity/appointments'), grants = await this.rows(admin, '/api/v1/admin/identity/authority-grants');
-    const root = organizations.find(row => row.id === this.environment.bootstrap.rootId); check(root?.code === 'ROOT' && root.state === 'ACTIVE' && root.revision === 1);
+    const root = organizations.find(row => row.id === this.environment.bootstrap.rootId);
+    check(root && exact(root, ['id','parentOrganizationId','code','displayName','state','etag']) && root.code === 'ROOT' && root.parentOrganizationId === null && root.state === 'ACTIVE' && /^"identity\.[A-Za-z0-9_-]{43}"$/.test(root.etag));
+    const originalOrganization = organizations.find(row => row.id === resources.organization);
+    check(originalOrganization && exact(originalOrganization, ['id','parentOrganizationId','code','displayName','state','etag'])
+      && originalOrganization.parentOrganizationId === this.environment.bootstrap.rootId && originalOrganization.state === 'ACTIVE' && /^"identity\.[A-Za-z0-9_-]{43}"$/.test(originalOrganization.etag));
     for (const alias of ['intake','supervisor','contact','delegate'] as const) {
       check(principals.some(row => row.id === resources[`principal-${alias}`] && row.state === 'ACTIVE'));
       const appointment = appointments.find(row => row.id === resources[`appointment-${alias}`]);
-      check(appointment?.principal.id === resources[`principal-${alias}`] && appointment.state === 'ACTIVE' && appointment.organization.id === resources.organization);
+      const role = alias === 'intake' ? 'INTAKE_OPERATOR' : alias === 'supervisor' ? 'ROUTING_SUPERVISOR' : 'CONTACT_OPERATOR';
+      check(appointment && exact(appointment, ['id','principal','organization','roleCode','effectiveFrom','effectiveUntil','state','etag'])
+        && appointment.principal.id === resources[`principal-${alias}`] && appointment.state === 'ACTIVE' && appointment.organization.id === resources.organization && appointment.roleCode === role);
+      const from = Date.parse(appointment.effectiveFrom), until = appointment.effectiveUntil === null ? null : Date.parse(appointment.effectiveUntil);
+      check(Number.isFinite(from) && from <= Date.now() && (until === null || Number.isFinite(until) && until > Date.now()) && /^"identity\.[A-Za-z0-9_-]{43}"$/.test(appointment.etag));
+      if (alias === 'contact') this.contactAppointment = { effectiveFrom: appointment.effectiveFrom, effectiveUntil: appointment.effectiveUntil };
     }
     const expected = [...GRANTS.intake, ...GRANTS.supervisor];
-    check(grants.length === expected.length && expected.every(code => grants.some(row => row.authorityCode === code && row.state === 'ACTIVE' && row.scopeOrganization.id === this.environment.bootstrap.rootId)));
+    const businessSteps = ['grant-intake-0','grant-intake-1','grant-intake-2','grant-intake-3','grant-supervisor-0','grant-supervisor-1','grant-supervisor-2'] as const;
+    const business = grants.filter(row => expected.includes(row.authorityCode));
+    const management = ['IDENTITY_PRINCIPAL_MANAGE', 'IDENTITY_ORGANIZATION_MANAGE', 'IDENTITY_APPOINTMENT_MANAGE', 'IDENTITY_AUTHORITY_MANAGE'];
+    check(grants.length === 11 && business.length === expected.length && expected.every(code => business.some(row => row.authorityCode === code && row.state === 'ACTIVE' && row.scopeOrganization.id === this.environment.bootstrap.rootId)));
+    check(businessSteps.every((step, index) => business.some(row => row.id === resources[step] && row.authorityCode === expected[index]
+      && row.appointment.id === resources[step.startsWith('grant-intake-') ? 'appointment-intake' : 'appointment-supervisor'])));
+    check(management.every(code => grants.some(row => row.authorityCode === code && row.appointment.id === this.environment.bootstrap.appointmentId && row.scopeOrganization.id === this.environment.bootstrap.rootId && row.state === 'ACTIVE')));
     check(grants.every(row => ![resources['appointment-contact'], resources['appointment-delegate']].includes(row.appointment.id)));
   }
   private validateCard(card: any, type: CardType, session: Session, allowDraft = false) {
@@ -189,23 +230,53 @@ export class BusinessSetup {
     check(card.versionStatus === 'CURRENT' && card.primaryCommand.enabled && (allowDraft ? !!card.actionDraft && !!card.preconditions.draftETag : card.actionDraft === null && card.preconditions.draftETag === null));
     check(/^"task\.[A-Za-z0-9_-]{43}"$/.test(card.preconditions.taskETag) && session.self.selectedAppointmentId === session.appointmentId);
   }
+  private requireRecordedCard(entry: BusinessEntry, card: any, session: Session) {
+    check('taskId' in entry.selectors! && entry.selectors.ownerAppointmentId === session.appointmentId);
+    check(card.taskId === entry.requestSelectors.taskId && card.taskId === entry.selectors.taskId);
+    check(card.subject.subjectRef === entry.requestSelectors.subjectRef && card.subject.subjectRef === entry.selectors.subjectRef);
+    check(card.subject.subjectRevision === entry.requestSelectors.subjectRevision && card.subject.subjectRevision === entry.selectors.subjectRevision);
+    check(card.preconditions.taskETag === entry.requestSelectors.taskETag && card.preconditions.taskETag === entry.selectors.taskETag);
+    check(card.actionDraft?.draftId === entry.selectors.draftId && card.preconditions.draftETag === entry.selectors.draftETag);
+    check(card.actionDraft?.draftRevision === entry.selectors.draftRevision && card.actionDraft?.digest === entry.selectors.draftDigest);
+    check(sha(canonicalBusinessJson(card.actionDraft?.values)) === entry.selectors.draftValuesSha256);
+  }
+  private requireExpectedSuccessor(entry: BusinessEntry, card: any, session: Session) {
+    check('successorTaskId' in entry.selectors! && entry.selectors.successorOwnerAppointmentId === session.appointmentId);
+    check(card.taskId === entry.selectors.successorTaskId && card.taskType === entry.selectors.successorTaskType);
+    check(card.subject.subjectRef === entry.selectors.successorSubjectRef && card.subject.subjectRevision === entry.selectors.successorSubjectRevision);
+    check(card.preconditions.taskETag === entry.selectors.successorTaskETag);
+  }
+  private requireKnownSuccessor(step: BusinessStep, original: any, receipt: any, successor: any) {
+    if (step === 'complete-submit') check(receipt.resultFact?.factType === 'LEAD' && successor.subject.subjectRevision === receipt.resultFact.revision);
+    else check(successor.subject.subjectRevision === original.subject.subjectRevision);
+    const values = successor.commandForm?.values;
+    if (step === 'routing-submit') check(receipt.resultFact?.factType === 'DECISION_RECORD' && values?.causalDecisionHash === receipt.resultFact.digest && uuid.test(values.causalDecisionId));
+    if (step === 'assign-submit') check(receipt.resultFact?.factType === 'LEAD_ASSIGNMENT' && values?.leadAssignmentRevision === receipt.resultFact.revision && uuid.test(values.leadAssignmentId));
+    if (step === 'contact-submit') check(receipt.resultFact?.factType === 'LEAD_CONTACT_RESULT' && values?.triggeringContactResultHash === receipt.resultFact.digest && uuid.test(values.triggeringContactResultId));
+  }
   private async capture(session: Session, step: 'capture-auto' | 'capture-manual', account: 'LOCAL_SYNTHETIC_AUTO' | 'LOCAL_SYNTHETIC', withEmail: boolean, expected: CardType, taskOwner: 'intake'|'supervisor') {
     if (await this.verifyRecorded(step, session)) return;
+    const owner = taskOwner === session.alias ? session : await this.workbench(taskOwner);
+    check(await this.current(owner) === null);
     const body: Record<string, unknown> = { sourceChannelCode: 'LOCAL_SYNTHETIC', sourceAccountCode: account, sourceRecordKey: `task96k-${this.runId}-${step === 'capture-auto' ? 'auto' : 'manual'}`,
       capturedAt: new Date().toISOString(), serviceCategoryCode: 'LOCAL_ACCEPTANCE', jurisdictionCode: 'CN', urgencyCode: 'NORMAL', legalNeedSummary: 'Task 9.6k synthetic acceptance lead.' };
     if (withEmail) body.email = `task96k-${this.runId}-manual@example.invalid`;
     const commandId = randomUUID(); this.arm(session, step, 'POST', '/api/v1/leads', body);
     const response = await this.fetch(session, '/api/v1/leads', { method: 'POST', body, commandId });
-    const existed = this.sessions.has(taskOwner), owner = taskOwner === session.alias ? session : await this.workbench(taskOwner);
-    const card = taskOwner === session.alias || existed ? await this.refreshUi(owner) : await this.current(owner);
+    const card = await this.refreshUi(owner);
     await expect(owner.page.locator('article.current-card')).toBeVisible({ timeout: SCREEN_TIMEOUT }); this.validateCard(card, expected, owner);
-    await this.complete(step, response, response.body, selectors(session, card, card));
+    check(response.body?.resultFact?.factType === 'LEAD' && response.body.resultFact.revision === card.subject.subjectRevision);
+    await this.complete(step, response, response.body, selectors(owner, card, card));
   }
   private async card(session: Session, prefix: 'complete'|'routing'|'ack'|'assign'|'contact'|'review', type: CardType, values: Record<string, unknown>, successorType: CardType | null, successorAlias: 'intake'|'supervisor'|'contact'|null) {
     const draftStep = `${prefix}-draft` as BusinessStep, submitStep = `${prefix}-submit` as BusinessStep;
     if (await this.verifyRecorded(submitStep, session)) return;
     await this.verifyRecorded(draftStep, session);
-    let card = await this.current(session); this.validateCard(card, type, session, !!this.journal.confirmed(draftStep));
+    const recordedDraft = this.journal.confirmed(draftStep);
+    let card = await this.current(session); this.validateCard(card, type, session, !!recordedDraft);
+    const previous = predecessorStep(draftStep); check(previous); const predecessor = this.journal.confirmed(previous); check(predecessor);
+    this.requireExpectedSuccessor(predecessor, card, session);
+    if (recordedDraft) this.requireRecordedCard(recordedDraft, card, session);
     if (!this.journal.confirmed(draftStep)) {
       for (const [name, value] of Object.entries(values)) {
         const selector = name === 'sourceSummary' || name === 'resultSummary' || name === 'rationaleSummary' ? '#chat-candidate' : `#candidate-${name}`;
@@ -225,6 +296,9 @@ export class BusinessSetup {
     }
     const original = card, draft = card.actionDraft; check(draft);
     const submitBody = { ...draft.values, draftId: draft.draftId, expectedDraftRevision: draft.draftRevision, draftDigest: draft.digest };
+    const successorTarget = successorType && successorAlias ? await this.workbench(successorAlias) : null;
+    if (successorTarget) check(await this.current(successorTarget) === null);
+    else check(successorType === null && successorAlias === null);
     this.arm(session, submitStep, 'POST', `/api/v1/tasks/${card.taskId}/commands/${({ complete:'complete-lead-ingress', routing:'record-routing-disposition', ack:'acknowledge-source-intake-stop-request', assign:'assign-lead', contact:'record-contact-result', review:'review-lead-validity' } as const)[prefix]}`, submitBody, card);
     const waiting = session.page.waitForResponse(r => r.request().method() === 'POST' && new URL(r.url()).pathname.includes(`/api/v1/tasks/${card.taskId}/commands/`));
     const successorWaiting = session.page.waitForResponse(r => r.request().method() === 'GET' && new URL(r.url()).pathname === CURRENT);
@@ -233,16 +307,16 @@ export class BusinessSetup {
     const successorResponse = await successorWaiting; this.http.push({ path: CURRENT, status: successorResponse.status() }); check(successorResponse.status() === 200);
     const originEnvelope = await successorResponse.json(); check(originEnvelope.currentCard === null);
     let successor: any | null = null;
-    if (successorType && successorAlias) {
-      const existed = this.sessions.has(successorAlias), target = await this.workbench(successorAlias);
-      successor = existed ? await this.refreshUi(target) : await this.current(target);
-      await expect(target.page.locator('article.current-card')).toBeVisible({ timeout: SCREEN_TIMEOUT }); this.validateCard(successor, successorType, target);
+    if (successorType && successorTarget) {
+      successor = await this.refreshUi(successorTarget);
+      await expect(successorTarget.page.locator('article.current-card')).toBeVisible({ timeout: SCREEN_TIMEOUT }); this.validateCard(successor, successorType, successorTarget);
+      this.requireKnownSuccessor(submitStep, original, result, successor);
     }
-    else check(successorType === null && successorAlias === null);
-    await this.complete(submitStep, response, result, selectors(session, original, successor, draft));
+    await this.complete(submitStep, response, result, selectors(session, original, successor, draft, successorTarget));
   }
   private async grant() {
     const admin = await this.administrator(), path = '/api/v1/admin/identity/authority-grants', appointmentId = this.environment.resources['appointment-contact'];
+    const appointment = this.contactAppointment; check(appointment);
     if (await this.verifyRecorded('grant-contact-owner', admin)) return;
     const existing = (await this.rows(admin, path)).filter(row => row.appointment.id === appointmentId && row.authorityCode === 'SALES_CONTACT_OWNER');
     check(existing.length === 0);
@@ -250,14 +324,20 @@ export class BusinessSetup {
     await admin.page.getByRole('button', { name: '新增直接授权', exact: true }).click();
     await admin.page.getByLabel('授权任职', { exact: true }).selectOption(appointmentId); await admin.page.getByLabel('组织范围', { exact: true }).selectOption(this.environment.bootstrap.rootId);
     await admin.page.getByLabel('权限', { exact: true }).selectOption('SALES_CONTACT_OWNER');
-    const local = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 16); await admin.page.getByLabel('生效时间', { exact: true }).fill(local);
-    const body = { appointmentId, authorityCode: 'SALES_CONTACT_OWNER', scopeOrganizationId: this.environment.bootstrap.rootId, validFrom: new Date(local + ':00+08:00').toISOString(), validUntil: null };
+    const startMillis = Math.ceil(Date.now() / 60_000) * 60_000;
+    const endMillis = appointment.effectiveUntil === null ? null : Math.floor(Date.parse(appointment.effectiveUntil) / 60_000) * 60_000;
+    check(startMillis >= Date.parse(appointment.effectiveFrom) && (endMillis === null || endMillis > startMillis));
+    const validFrom = new Date(startMillis).toISOString(), validUntil = endMillis === null ? null : new Date(endMillis).toISOString();
+    const local = (instant: string) => new Date(Date.parse(instant) + 8 * 3600_000).toISOString().slice(0, 16);
+    await admin.page.getByLabel('生效时间', { exact: true }).fill(local(validFrom));
+    if (validUntil) await admin.page.getByLabel('失效时间', { exact: true }).fill(local(validUntil));
+    const body = { appointmentId, authorityCode: 'SALES_CONTACT_OWNER', scopeOrganizationId: this.environment.bootstrap.rootId, validFrom, validUntil };
     this.arm(admin, 'grant-contact-owner', 'POST', path, body);
     const waiting = admin.page.waitForResponse(r => new URL(r.url()).pathname === path && r.request().method() === 'POST');
     await admin.page.getByRole('button', { name: '确认创建', exact: true }).click(); const response = await waiting, result = await response.json();
     this.http.push({ path, status: response.status() });
     const id = matchFact(this.environment.bootstrap, result.resultFact, await this.rows(admin, path));
-    const row = (await this.rows(admin, path)).find(x => x.id === id); check(row?.appointment.id === appointmentId && row.authorityCode === 'SALES_CONTACT_OWNER' && row.scopeOrganization.id === this.environment.bootstrap.rootId && row.state === 'ACTIVE');
+    const row = (await this.rows(admin, path)).find(x => x.id === id); check(row?.appointment.id === appointmentId && row.authorityCode === 'SALES_CONTACT_OWNER' && row.scopeOrganization.id === this.environment.bootstrap.rootId && row.state === 'ACTIVE' && row.validFrom === validFrom && row.validUntil === validUntil);
     await this.complete('grant-contact-owner', response, result, { resourceId: id });
   }
   private async reconcilePending() {
@@ -266,15 +346,26 @@ export class BusinessSetup {
     const session = stepAlias(pending.step) === 'founder' ? await this.administrator() : await this.workbench(stepAlias(pending.step) as 'intake'|'supervisor'|'contact');
     check(session.self.actorScopeKey === pending.actorScopeKey && session.appointmentId === pending.requestSelectors.actorAppointmentId);
     const receipt = await this.read(session, `/api/v1/commands/${pending.commandId}/receipt`);
+    check(receipt?.commandId === pending.commandId && receipt.outcome === 'SUCCEEDED');
+    if (pending.step === 'capture-auto' || pending.step === 'capture-manual') throw new Error('T9_BUSINESS_BOUNDARY');
+    if (pending.step.endsWith('-submit') && successorOwner(pending.step)) throw new Error('T9_BUSINESS_BOUNDARY');
     let result: BusinessSelectors;
     if (pending.step === 'grant-contact-owner') {
       const id = matchFact(this.environment.bootstrap, receipt.resultFact, await this.rows(session, '/api/v1/admin/identity/authority-grants')); result = { resourceId: id };
+    } else if (pending.step.endsWith('-submit')) {
+      result = recoveredSubmitSelectors(session, pending.requestSelectors);
     } else {
-      let current = await this.current(session); const type = commandType(pending.step), target = successorOwner(pending.step);
-      if (target) current = await this.current(await this.workbench(target));
+      let owner = session, current = await this.current(session); const type = commandType(pending.step), target = successorOwner(pending.step);
+      if (target) { owner = await this.workbench(target); current = await this.current(owner); }
+      if (pending.step.endsWith('-draft')) {
+        check(type); this.validateCard(current, type, session, true);
+        check(current.taskId === pending.requestSelectors.taskId && current.subject.subjectRef === pending.requestSelectors.subjectRef
+          && current.subject.subjectRevision === pending.requestSelectors.subjectRevision && current.preconditions.taskETag === pending.requestSelectors.taskETag);
+        check(current.actionDraft.draftRevision === receipt.resultFact?.revision && sha(canonicalBusinessJson(current.actionDraft.values)) === pending.requestSelectors.intendedValuesSha256);
+      }
       const original = pending.step.endsWith('-draft') ? current : pending.requestSelectors.taskId ? { taskId: pending.requestSelectors.taskId, subject: { subjectType: 'LEAD', subjectRef: pending.requestSelectors.subjectRef, subjectRevision: pending.requestSelectors.subjectRevision }, preconditions: { taskETag: pending.requestSelectors.taskETag }, actionDraft: null } : current;
       check(original && (!type || pending.step.endsWith('-submit') || current?.taskType === type));
-      result = selectors(session, original, pending.step.endsWith('-draft') ? null : current, pending.step.endsWith('-draft') ? current?.actionDraft : null);
+      result = selectors(owner, original, pending.step.endsWith('-draft') ? null : current, pending.step.endsWith('-draft') ? current?.actionDraft : null);
     }
     await this.journal.complete(pending.commandId, 200, receipt, result);
   }
