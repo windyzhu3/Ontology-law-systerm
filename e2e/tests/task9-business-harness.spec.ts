@@ -57,6 +57,32 @@ test('offline business approval accepts only the named six-card run and same-run
   expect(() => requireBusinessAcceptance('APPROVED_SYNTHETIC_ONLY', 'APPROVED_SIX_CARD_CHAIN', runIdentity.runId, runIdentity.runId)).not.toThrow();
 });
 
+test('offline actual business config keeps stable worker projects and enables live matching only for the exact project option', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'task96k-actual-config-'));
+  const configPath = join(folder, 'probe.config.cjs'), testPath = join(folder, 'benign.spec.cjs');
+  const actualConfig = resolve(__dirname, '../business.config.ts'), playwright = resolve(__dirname, '../../node_modules/@playwright/test');
+  writeFileSync(testPath, `const { test, expect } = require(${JSON.stringify(playwright)});\ntest('approved-local-business benign no-browser', () => expect(true).toBe(true));\n`);
+  writeFileSync(configPath, `const loaded = require(${JSON.stringify(actualConfig)});\nconst actual = loaded.default ?? loaded;\nmodule.exports = { ...actual, testDir: __dirname, outputDir: ${JSON.stringify(join(folder, 'results'))}, reporter: [['line']], projects: actual.projects.map(project => ({ ...project, testDir: __dirname, testMatch: 'benign.spec.cjs' })) };\n`);
+  const pinnedNode = 'C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe';
+  const cli = resolve(__dirname, '../../node_modules/@playwright/test/cli.js');
+  const run = (...args: string[]) => spawnSync(pinnedNode, [cli, 'test', '--config', configPath, ...args], { cwd: resolve(__dirname, '../..'), encoding: 'utf8', windowsHide: true });
+
+  const explicit = run('--project', 'approved-local-business');
+  expect(explicit.status, explicit.stdout + explicit.stderr).toBe(0);
+  expect(explicit.stdout).toContain('[approved-local-business]'); expect(explicit.stdout).toContain('1 passed');
+
+  const listed = run('--list');
+  expect(listed.status, listed.stdout + listed.stderr).toBe(0);
+  expect(listed.stdout).toContain('[offline-business]'); expect(listed.stdout).not.toContain('[approved-local-business]'); expect(listed.stdout).toContain('Total: 1 test in 1 file');
+
+  const sameNameGrep = run('--grep', 'approved-local-business');
+  expect(sameNameGrep.status, sameNameGrep.stdout + sameNameGrep.stderr).toBe(0);
+  expect(sameNameGrep.stdout).toContain('[offline-business]'); expect(sameNameGrep.stdout).not.toContain('[approved-local-business]'); expect(sameNameGrep.stdout).toContain('1 passed');
+
+  const reporterOverride = run('--project=approved-local-business', '--reporter=line', '--list');
+  expect(reporterOverride.status).not.toBe(0); expect(reporterOverride.stdout + reporterOverride.stderr).toContain('T9_BUSINESS_BOUNDARY');
+});
+
 test('offline business environment rejects current artifact drift and an incomplete identity predecessor', () => {
   const value = {
     ...BUSINESS_PIN,
