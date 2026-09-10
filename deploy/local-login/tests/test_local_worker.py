@@ -1,6 +1,7 @@
 """Worker assembly tests use temporary material and synthetic external boundaries only."""
 import copy
 from datetime import datetime, timezone
+import hashlib
 import importlib.util
 import json
 import re
@@ -16,7 +17,7 @@ import subprocess
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 MODULE = Path(__file__).resolve().parents[1] / 'local_worker.py'
-T, P, A, R, F, FA = [str(__import__('uuid').UUID(int=n)) for n in range(1, 7)]
+T, P, A, R, F, FA, G, COMMAND, SLOT, RECEIPT = [str(__import__('uuid').UUID(int=n)) for n in range(1, 11)]
 AT = '2026-09-09T01:00:00+00:00'
 
 
@@ -26,12 +27,72 @@ def fixture():
         'principal': {**common, 'principal_id': P, 'principal_kind': 'SERVICE', 'identity_provider_code': 'LOCAL_SERVICE'},
         'appointment': {**common, 'appointment_id': A, 'principal_id': P, 'organization_unit_id': R,
                         'role_code': 'SERVICE', 'effective_from': AT, 'effective_until': None, 'ended_at': None},
-        'root': {**common, 'organization_unit_id': R, 'unit_code': 'ROOT', 'parent_organization_unit_id': None},
+        'root': {**common, 'organization_unit_id': R, 'unit_code': 'ROOT', 'display_name': 'Original Root',
+                 'parent_organization_unit_id': None},
         'founder': {**common, 'principal_id': F, 'principal_kind': 'HUMAN', 'identity_provider_code': 'LOCAL_R1'},
         'founderAppointment': {**common, 'appointment_id': FA, 'principal_id': F, 'organization_unit_id': R,
                                'role_code': 'IDENTITY_ADMIN', 'effective_from': AT, 'effective_until': None},
         'bootstrap': {'appointmentId': FA, 'founderPrincipalId': F, 'rootOrganizationId': R},
+        'founderGrants': [{'tenant_id': T, 'authority_grant_id': G, 'grantee_appointment_id': FA,
+            'scope_organization_unit_id': R, 'authority_code': 'IDENTITY_ORGANIZATION_MANAGE',
+            'state': 'ACTIVE', 'revision': 0, 'valid_from': AT, 'valid_until': None,
+            'revoked_at': None, 'revocation_reason_code': None}],
         'grants': []}
+
+
+def canonical(value):
+    ordered = lambda v: ({k: ordered(v[k]) for k in sorted(v, key=lambda x: x.encode('utf-16-be'))}
+                         if type(v) is dict else [ordered(x) for x in v] if type(v) is list else v)
+    return json.dumps(ordered(value), ensure_ascii=False, separators=(',', ':'))
+
+
+def renamed_runtime_facts(plan):
+    current = copy.deepcopy(plan['original'])
+    current['grants'] = copy.deepcopy(plan['grants'])
+    current['root']['display_name'] = 'Approved Renamed Root'
+    current['root']['revision'] = 1
+    scope = {'profile': 'R1_IDENTITY_COMMAND_SCOPE_V1', 'tenantId': T,
+        'commandType': 'RENAME_ORGANIZATION_UNIT', 'principalId': F, 'appointmentId': FA,
+        'target': {'kind': 'identity.organization_unit', 'id': R}}
+    result = {'outcome': 'SUCCEEDED',
+        'resultFact': {'type': 'identity.organization_unit', 'id': R, 'revision': 1},
+        'rejectionCode': None}
+    summary = {'result': result, 'authorizationEvidence': 'synthetic original authorization evidence',
+        'receiptRecovery': {'profile': 'R1_IDENTITY_RECEIPT_RECOVERY_V1', 'scope': scope,
+            'target': result['resultFact'],
+            'authorizationAnchor': {'type': 'identity.organization_unit', 'id': R, 'revision': 0}}}
+    sha = lambda text: hashlib.sha256(text.encode('utf-8')).hexdigest()
+    current['rootRenameEvidence'] = [{'slot': {
+            'tenant_id': T, 'command_execution_slot_id': SLOT, 'command_id': COMMAND,
+            'envelope_type': 'INTERNAL_ADMIN', 'command_type': 'RENAME_ORGANIZATION_UNIT',
+            'command_scope_digest': sha(canonical(scope)), 'payload_digest': 'ab'*32, 'occupied_at': AT},
+        'receipt': {'tenant_id': T, 'command_receipt_id': RECEIPT,
+            'command_execution_slot_id': SLOT, 'outcome': 'SUCCEEDED', 'rejection_code': None,
+            'completed_at': '2026-09-09T01:00:02+00:00', 'result_fact_type': 'identity.organization_unit',
+            'result_fact_id': R, 'result_fact_revision': 1, 'result_fact_hash': None},
+        'audit': {'tenant_id': T, 'entry_type': 'EVENT', 'audit_scope_code': 'OBJECT',
+            'trusted_at': '2026-09-09T01:00:01+00:00', 'action_code': 'RENAME_ORGANIZATION_UNIT',
+            'result_code': 'SUCCEEDED', 'actor_principal_id': F, 'actor_appointment_id': FA,
+            'on_behalf_of_principal_id': None, 'on_behalf_of_appointment_id': None,
+            'command_id': COMMAND, 'command_type': 'RENAME_ORGANIZATION_UNIT',
+            'correlation_id': str(__import__('uuid').UUID(int=11)), 'causation_id': None,
+            'authorization_slot_code': 'IDENTITY_ADMIN', 'authorization_path_code': 'DIRECT',
+            'authorization_scope_organization_unit_id': R,
+            'authorization_snapshot_digest': sha(summary['authorizationEvidence']),
+            'trace_id': str(__import__('uuid').UUID(int=11)), 'service_role_code': 'API',
+            'summary_schema_code': 'R1_IDENTITY_COMMAND_AUDIT_V1', 'summary_schema_version': 1,
+            'change_summary': summary, 'change_summary_digest': sha(canonical(summary)),
+            'subject_type': 'identity.organization_unit', 'subject_id': R, 'subject_revision': 0,
+            'subject_hash': None, 'correction_target_type': None, 'correction_target_id': None,
+            'correction_target_revision': None, 'correction_target_hash': None,
+            'authorization_fact_type': 'identity.authority_grant', 'authorization_fact_id': G,
+            'authorization_fact_revision': 0, 'authorization_fact_hash': None}}]
+    return current
+
+
+def redigest_evidence(current):
+    audit = current['rootRenameEvidence'][0]['audit']
+    audit['change_summary_digest'] = hashlib.sha256(canonical(audit['change_summary']).encode()).hexdigest()
 
 
 class WorkerTest(unittest.TestCase):
@@ -201,6 +262,10 @@ class WorkerTest(unittest.TestCase):
             release_boundary = SimpleNamespace(protect=lambda:None, processes=lambda:[], process=lambda pid:state['process'])
             def verify_original(self): state['verified'] += 1
             def facts(self, identity, command): return copy.deepcopy(state['facts'])
+            def runtime_facts(self, identity, command):
+                result = copy.deepcopy(state['facts'])
+                result.setdefault('rootRenameEvidence', [])
+                return result
             def database(self, paths):
                 if not state['db']: raise RuntimeError('Worker database unavailable')
             def certificate(self): return 'd'*64
@@ -250,6 +315,139 @@ class WorkerTest(unittest.TestCase):
         state['db'] = True
         config.write_bytes(before + b'ols.worker.api-origin=http://evil\n')
         with self.assertRaises(RuntimeError): worker.validate()
+
+    def test_runtime_consumer_accepts_approved_root_rename_without_mutating_original_plan(self):
+        worker,state,package = self.assembly()
+        worker.grant()
+        plan_path = self.runtime/'worker/grants.json'
+        plan = json.loads(plan_path.read_text())
+        state['facts'] = renamed_runtime_facts(plan)
+        original = plan_path.read_bytes()
+        with self.assertRaises(RuntimeError):
+            self.m.grant_delta(plan, {k:v for k,v in state['facts'].items() if k != 'rootRenameEvidence'})
+        worker.prepare()
+        self.assertEqual(plan_path.read_bytes(), original)
+        self.assertTrue((self.runtime/'worker/application.properties').is_file())
+
+    def test_runtime_validator_accepts_unchanged_root_without_synthetic_history(self):
+        plan = self.m.grant_plan(self.identity, fixture(), self.now)
+        current = copy.deepcopy(plan['original'])
+        current['grants'] = copy.deepcopy(plan['grants'])
+        current['rootRenameEvidence'] = []
+        self.assertIsNone(self.m.runtime_grants_current(plan, current))
+        self.assertEqual(self.m.grant_delta(plan, {k:v for k,v in current.items() if k != 'rootRenameEvidence'}), 0)
+
+    def test_runtime_rename_rejects_missing_ambiguous_or_broken_command_closure(self):
+        plan = self.m.grant_plan(self.identity, fixture(), self.now)
+        def missing(x): x['rootRenameEvidence'].clear()
+        def ambiguous(x): x['rootRenameEvidence'].append(copy.deepcopy(x['rootRenameEvidence'][0]))
+        def slot_tenant(x): x['rootRenameEvidence'][0]['slot'].__setitem__('tenant_id', P)
+        def envelope(x): x['rootRenameEvidence'][0]['slot'].__setitem__('envelope_type', 'INTERNAL_TASK')
+        def command_type(x): x['rootRenameEvidence'][0]['slot'].__setitem__('command_type', 'CLOSE_ORGANIZATION_UNIT')
+        def payload_digest(x): x['rootRenameEvidence'][0]['slot'].__setitem__('payload_digest', 'ab')
+        def receipt_id(x): x['rootRenameEvidence'][0]['receipt'].__setitem__('command_receipt_id', 'not-a-uuid')
+        def no_change(x): x['rootRenameEvidence'][0]['receipt'].__setitem__('outcome', 'NO_CHANGE')
+        def rejected(x): x['rootRenameEvidence'][0]['receipt'].update(outcome='REJECTED', rejection_code='DENIED')
+        def result_revision(x): x['rootRenameEvidence'][0]['receipt'].__setitem__('result_fact_revision', 2)
+        def audit_actor(x): x['rootRenameEvidence'][0]['audit'].__setitem__('actor_principal_id', P)
+        def audit_action(x): x['rootRenameEvidence'][0]['audit'].__setitem__('action_code', 'CLOSE_ORGANIZATION_UNIT')
+        def audit_revision(x): x['rootRenameEvidence'][0]['audit'].__setitem__('subject_revision', 1)
+        def scope_digest(x): x['rootRenameEvidence'][0]['slot'].__setitem__('command_scope_digest', '00'*32)
+        def summary_digest(x): x['rootRenameEvidence'][0]['audit'].__setitem__('change_summary_digest', '00'*32)
+        def authorization_digest(x):
+            x['rootRenameEvidence'][0]['audit']['change_summary']['authorizationEvidence'] += '-tampered'
+            redigest_evidence(x)
+        def wrong_root_scope(x):
+            summary = x['rootRenameEvidence'][0]['audit']['change_summary']
+            summary['receiptRecovery']['scope']['target']['id'] = F
+            x['rootRenameEvidence'][0]['slot']['command_scope_digest'] = hashlib.sha256(
+                canonical(summary['receiptRecovery']['scope']).encode()).hexdigest()
+            redigest_evidence(x)
+        def wrong_anchor(x):
+            x['rootRenameEvidence'][0]['audit']['change_summary']['receiptRecovery']['authorizationAnchor']['id'] = F
+            redigest_evidence(x)
+        def wrong_grant(x): x['rootRenameEvidence'][0]['audit'].__setitem__('authorization_fact_id', F)
+        def invalid_name(x): x['root'].__setitem__('display_name', None)
+        faults = {'missing':missing, 'ambiguous':ambiguous, 'slot tenant':slot_tenant,
+            'envelope':envelope, 'command type':command_type, 'payload digest':payload_digest,
+            'receipt id':receipt_id, 'NO_CHANGE':no_change, 'rejected':rejected,
+            'result revision':result_revision, 'audit actor':audit_actor, 'audit action':audit_action,
+            'audit revision gap':audit_revision, 'scope digest':scope_digest,
+            'summary digest':summary_digest, 'authorization digest':authorization_digest,
+            'wrong ROOT scope':wrong_root_scope, 'wrong recovery anchor':wrong_anchor,
+            'wrong authorization grant':wrong_grant, 'invalid renamed display':invalid_name}
+        for name, mutation in faults.items():
+            current = renamed_runtime_facts(plan)
+            mutation(current)
+            with self.subTest(fault=name), self.assertRaises(RuntimeError):
+                self.m.runtime_grants_current(plan, current)
+
+    def test_runtime_rename_never_relaxes_grants_or_other_original_facts(self):
+        plan = self.m.grant_plan(self.identity, fixture(), self.now)
+        def partial(x): x['grants'].pop()
+        def extra(x): x['grants'].append(copy.deepcopy(x['grants'][0]))
+        def changed(x): x['grants'][0].__setitem__('revision', 1)
+        def revoked(x): x['grants'][0].update(state='REVOKED', revoked_at=AT)
+        def principal(x): x['principal'].__setitem__('revision', 1)
+        def root_code(x): x['root'].__setitem__('unit_code', 'OTHER')
+        def root_parent(x): x['root'].__setitem__('parent_organization_unit_id', F)
+        def founder_grant(x): x['founderGrants'][0].__setitem__('revision', 1)
+        for name, mutation in {'partial grants':partial, 'extra grants':extra, 'changed grant':changed,
+                'revoked grant':revoked, 'principal drift':principal, 'root code drift':root_code,
+                'root parent drift':root_parent, 'original management grant drift':founder_grant}.items():
+            current = renamed_runtime_facts(plan); mutation(current)
+            with self.subTest(fault=name), self.assertRaises(RuntimeError):
+                self.m.runtime_grants_current(plan, current)
+
+    def test_runtime_rename_requires_a_contiguous_unique_revision_chain(self):
+        plan = self.m.grant_plan(self.identity, fixture(), self.now)
+        current = renamed_runtime_facts(plan)
+        second = copy.deepcopy(current['rootRenameEvidence'][0])
+        second['slot'].update(command_execution_slot_id=str(__import__('uuid').UUID(int=13)),
+            command_id=str(__import__('uuid').UUID(int=12)), occupied_at='2026-09-09T01:00:03+00:00')
+        second['receipt'].update(command_receipt_id=str(__import__('uuid').UUID(int=14)),
+            command_execution_slot_id=second['slot']['command_execution_slot_id'],
+            completed_at='2026-09-09T01:00:05+00:00', result_fact_revision=2)
+        second['audit'].update(command_id=second['slot']['command_id'],
+            correlation_id=str(__import__('uuid').UUID(int=15)), trace_id=str(__import__('uuid').UUID(int=15)),
+            trusted_at='2026-09-09T01:00:04+00:00', subject_revision=1)
+        summary = second['audit']['change_summary']
+        summary['result']['resultFact']['revision'] = 2
+        summary['receiptRecovery']['target']['revision'] = 2
+        summary['receiptRecovery']['authorizationAnchor']['revision'] = 1
+        second['audit']['change_summary_digest'] = hashlib.sha256(canonical(summary).encode()).hexdigest()
+        current['root'].update(display_name='Second Approved Name', revision=2)
+        current['rootRenameEvidence'].append(second)
+        self.assertIsNone(self.m.runtime_grants_current(plan, current))
+        restored_name = copy.deepcopy(current)
+        restored_name['root']['display_name'] = plan['original']['root']['display_name']
+        self.assertIsNone(self.m.runtime_grants_current(plan, restored_name),
+            'stored summaries do not record rename text, while two succeeded revisions can legitimately restore it')
+        for fault in ('gap', 'duplicate', 'future', 'out of order'):
+            broken = copy.deepcopy(current)
+            if fault == 'gap': broken['rootRenameEvidence'].pop(0)
+            if fault == 'duplicate': broken['rootRenameEvidence'][1]['slot']['command_id'] = COMMAND
+            if fault == 'future': broken['rootRenameEvidence'][1]['receipt']['result_fact_revision'] = 3
+            if fault == 'out of order': broken['rootRenameEvidence'].reverse()
+            with self.subTest(fault=fault), self.assertRaises(RuntimeError):
+                self.m.runtime_grants_current(plan, broken)
+
+    def test_runtime_query_is_one_read_only_snapshot_scoped_to_canonical_tenant_and_root(self):
+        calls = []
+        expected = renamed_runtime_facts(self.m.grant_plan(self.identity, fixture(), self.now))
+        boundary = self.m.WorkerBoundary(SimpleNamespace(RUNTIME=self.runtime),
+            SimpleNamespace(sql=lambda sql: calls.append(sql) or json.dumps(expected)))
+        self.assertEqual(boundary.runtime_facts(self.identity, str(__import__('uuid').UUID(int=7))), expected)
+        self.assertEqual(len(calls), 1)
+        sql = calls[0]
+        self.assertTrue(sql.startswith("BEGIN READ ONLY; SET LOCAL TIME ZONE 'UTC'; WITH worker_facts"))
+        self.assertGreater(sql.count("'"+T+"'::uuid"), 1)
+        self.assertIn("a.change_summary#>>'{receiptRecovery,scope,target,id}'=worker_facts.value->'bootstrap'->>'rootOrganizationId'", sql)
+        self.assertIn('JOIN execution.command_execution_slot s', sql)
+        self.assertIn('JOIN execution.command_receipt r', sql)
+        self.assertTrue(sql.endswith('; COMMIT;'))
+        for mutation in ('INSERT INTO', 'UPDATE ', 'DELETE FROM', 'LOCK TABLE'):
+            self.assertNotIn(mutation, sql)
 
     def test_release_change_requires_explicit_prepare_and_retains_old_config(self):
         worker,state,package = self.assembly(); worker.grant(); worker.prepare()

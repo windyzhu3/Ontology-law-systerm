@@ -4,6 +4,7 @@ No bootstrap, business command, migration, identity replacement, or grant deleti
 Private material and uncertain-operation journals always remain in the protected runtime.
 """
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -102,6 +103,136 @@ def grant_delta(plan, current):
     except (ValueError, KeyError, TypeError):
         pass
     raise RuntimeError('original grant operation or exact existing grant shape conflicts; no writes')
+
+
+def _canonical(value):
+    def ordered(item):
+        if type(item) is dict:
+            if any(type(key) is not str for key in item): raise ValueError()
+            return {key: ordered(item[key]) for key in sorted(item, key=lambda text: text.encode('utf-16-be'))}
+        if type(item) is list: return [ordered(element) for element in item]
+        if item is None or type(item) in (str, bool) or type(item) is int and abs(item) <= 9007199254740991:
+            return item
+        raise ValueError()
+    return json.dumps(ordered(value), ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+
+
+def _sha256(text):
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+
+def _canonical_uuid(value):
+    if type(value) is not str or str(uuid.UUID(value)) != value: raise ValueError()
+    return value
+
+
+def _instant(value):
+    if type(value) is not str: raise ValueError()
+    parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    if parsed.tzinfo is None or parsed.utcoffset() is None: raise ValueError()
+    return parsed
+
+
+def runtime_grants_current(plan, current):
+    """Validate read-only running eligibility without changing first-grant semantics."""
+    try:
+        if type(current) is not dict or set(current) != set(plan['original']) | {'rootRenameEvidence'}:
+            raise ValueError()
+        facts = {key: value for key, value in current.items() if key != 'rootRenameEvidence'}
+        evidence = current['rootRenameEvidence']
+        original_root, root = plan['original']['root'], facts['root']
+        if type(evidence) is not list or type(original_root) is not dict or type(root) is not dict or set(root) != set(original_root):
+            raise ValueError()
+        if any(root[key] != original_root[key] for key in root if key not in ('display_name', 'revision')):
+            raise ValueError()
+        original_revision, revision = original_root['revision'], root['revision']
+        if type(original_revision) is not int or type(revision) is not int or revision < original_revision:
+            raise ValueError()
+        baseline = {**facts, 'root': original_root}
+        if grant_delta(plan, baseline) != 0:
+            raise ValueError()
+        if revision == original_revision:
+            if root != original_root or evidence: raise ValueError()
+            return
+        difference = revision - original_revision
+        if (type(root.get('display_name')) is not str
+            or difference == 1 and root.get('display_name') == original_root.get('display_name')
+            or len(evidence) != difference):
+            raise ValueError()
+        tenant = plan['identity']['tenantId']; root_id = original_root['organization_unit_id']
+        founder = plan['original']['founder']['principal_id']
+        founder_appointment = plan['original']['founderAppointment']['appointment_id']
+        management = [row for row in plan['original']['founderGrants']
+            if row.get('authority_code') == 'IDENTITY_ORGANIZATION_MANAGE']
+        if len(management) != 1: raise ValueError()
+        management = management[0]
+        seen, seen_slots, seen_receipts = set(), set(), set()
+        for step, item in enumerate(evidence, original_revision + 1):
+            if type(item) is not dict or set(item) != {'slot', 'receipt', 'audit'}: raise ValueError()
+            slot, receipt, audit = item['slot'], item['receipt'], item['audit']
+            if type(slot) is not dict or type(receipt) is not dict or type(audit) is not dict: raise ValueError()
+            command = _canonical_uuid(slot['command_id']); slot_id = _canonical_uuid(slot['command_execution_slot_id'])
+            receipt_id = _canonical_uuid(receipt['command_receipt_id'])
+            if command in seen or slot_id in seen_slots or receipt_id in seen_receipts: raise ValueError()
+            seen.add(command); seen_slots.add(slot_id); seen_receipts.add(receipt_id)
+            if (slot['tenant_id'] != tenant or slot['envelope_type'] != 'INTERNAL_ADMIN'
+                or slot['command_type'] != 'RENAME_ORGANIZATION_UNIT'
+                or not re.fullmatch('[0-9a-f]{64}', slot['payload_digest'])):
+                raise ValueError()
+            scope = {'profile': 'R1_IDENTITY_COMMAND_SCOPE_V1', 'tenantId': tenant,
+                'commandType': 'RENAME_ORGANIZATION_UNIT', 'principalId': founder,
+                'appointmentId': founder_appointment,
+                'target': {'kind': 'identity.organization_unit', 'id': root_id}}
+            if slot['command_scope_digest'] != _sha256(_canonical(scope)): raise ValueError()
+            result_fact = {'type': 'identity.organization_unit', 'id': root_id, 'revision': step}
+            if (receipt['tenant_id'] != tenant or receipt['command_execution_slot_id'] != slot_id
+                or receipt['outcome'] != 'SUCCEEDED' or receipt['rejection_code'] is not None
+                or receipt['result_fact_type'] != 'identity.organization_unit'
+                or receipt['result_fact_id'] != root_id or receipt['result_fact_revision'] != step
+                or receipt['result_fact_hash'] is not None):
+                raise ValueError()
+            expected_audit = {'tenant_id': tenant, 'entry_type': 'EVENT', 'audit_scope_code': 'OBJECT',
+                'action_code': 'RENAME_ORGANIZATION_UNIT', 'result_code': 'SUCCEEDED',
+                'actor_principal_id': founder, 'actor_appointment_id': founder_appointment,
+                'on_behalf_of_principal_id': None, 'on_behalf_of_appointment_id': None,
+                'command_id': command, 'command_type': 'RENAME_ORGANIZATION_UNIT', 'causation_id': None,
+                'authorization_slot_code': 'IDENTITY_ADMIN', 'authorization_path_code': 'DIRECT',
+                'authorization_scope_organization_unit_id': root_id, 'service_role_code': 'API',
+                'summary_schema_code': 'R1_IDENTITY_COMMAND_AUDIT_V1', 'summary_schema_version': 1,
+                'subject_type': 'identity.organization_unit', 'subject_id': root_id,
+                'subject_revision': step - 1, 'subject_hash': None,
+                'correction_target_type': None, 'correction_target_id': None,
+                'correction_target_revision': None, 'correction_target_hash': None,
+                'authorization_fact_type': 'identity.authority_grant',
+                'authorization_fact_id': management['authority_grant_id'],
+                'authorization_fact_revision': management['revision'], 'authorization_fact_hash': None}
+            if any(type(audit.get(key)) is not type(value) or audit.get(key) != value for key, value in expected_audit.items()):
+                raise ValueError()
+            if _canonical_uuid(audit['trace_id']) != _canonical_uuid(audit['correlation_id']): raise ValueError()
+            summary = audit['change_summary']
+            if type(summary) is not dict or set(summary) != {'result', 'authorizationEvidence', 'receiptRecovery'}:
+                raise ValueError()
+            expected_result = {'outcome': 'SUCCEEDED', 'resultFact': result_fact, 'rejectionCode': None}
+            recovery = summary['receiptRecovery']
+            if (summary['result'] != expected_result or type(summary['authorizationEvidence']) is not str
+                or type(recovery) is not dict or set(recovery) != {'profile', 'scope', 'target', 'authorizationAnchor'}
+                or recovery['profile'] != 'R1_IDENTITY_RECEIPT_RECOVERY_V1' or recovery['scope'] != scope
+                or recovery['target'] != result_fact
+                or recovery['authorizationAnchor'] != {'type': 'identity.organization_unit', 'id': root_id, 'revision': step - 1}):
+                raise ValueError()
+            if (audit['change_summary_digest'] != _sha256(_canonical(summary))
+                or audit['authorization_snapshot_digest'] != _sha256(summary['authorizationEvidence'])):
+                raise ValueError()
+            trusted = _instant(audit['trusted_at'])
+            if not _instant(slot['occupied_at']) <= trusted <= _instant(receipt['completed_at']): raise ValueError()
+            if (management['tenant_id'] != tenant or management['grantee_appointment_id'] != founder_appointment
+                or management['scope_organization_unit_id'] != root_id or management['state'] != 'ACTIVE'
+                or management['revoked_at'] is not None or management['revocation_reason_code'] is not None
+                or _instant(management['valid_from']) > trusted
+                or management['valid_until'] is not None and trusted >= _instant(management['valid_until'])):
+                raise ValueError()
+    except (KeyError, TypeError, ValueError, OverflowError, UnicodeError):
+        raise RuntimeError('exact current Worker grants or approved ROOT rename evidence unavailable') from None
 
 
 def worker_properties(runtime, package, identity, fingerprint, db_secret, tls_secret):
@@ -272,6 +403,39 @@ def facts_query(identity, command):
     return 'SELECT jsonb_build_object('+','.join(literal(k)+','+v for k,v in fields.items())+')'
 
 
+def runtime_facts_query(identity, command):
+    """One read-only snapshot of current grant facts and narrowly scoped ROOT rename evidence."""
+    identity_valid(identity)
+    tenant = literal(identity['tenantId']) + '::uuid'
+    def projection(alias, fields, digests=()):
+        values = []
+        for field in fields:
+            value = "encode("+alias+'.'+field+",'hex')" if field in digests else alias+'.'+field
+            values.extend((literal(field), value))
+        return 'jsonb_build_object('+','.join(values)+')'
+    slot_fields = ('tenant_id','command_execution_slot_id','command_id','envelope_type','command_type',
+        'command_scope_digest','payload_digest','occupied_at')
+    receipt_fields = ('tenant_id','command_receipt_id','command_execution_slot_id','outcome','rejection_code',
+        'completed_at','result_fact_type','result_fact_id','result_fact_revision','result_fact_hash')
+    audit_fields = ('tenant_id','entry_type','audit_scope_code','trusted_at','action_code','result_code',
+        'actor_principal_id','actor_appointment_id','on_behalf_of_principal_id','on_behalf_of_appointment_id',
+        'command_id','command_type','correlation_id','causation_id','authorization_slot_code',
+        'authorization_path_code','authorization_scope_organization_unit_id','authorization_snapshot_digest',
+        'trace_id','service_role_code','summary_schema_code','summary_schema_version','change_summary',
+        'change_summary_digest','subject_type','subject_id','subject_revision','subject_hash',
+        'correction_target_type','correction_target_id','correction_target_revision','correction_target_hash',
+        'authorization_fact_type','authorization_fact_id','authorization_fact_revision','authorization_fact_hash')
+    item = ("jsonb_build_object('slot',"+projection('s',slot_fields,('command_scope_digest','payload_digest'))
+        +",'receipt',"+projection('r',receipt_fields,('result_fact_hash',))
+        +",'audit',"+projection('a',audit_fields,('authorization_snapshot_digest','change_summary_digest',
+            'subject_hash','correction_target_hash','authorization_fact_hash'))+")")
+    evidence = "(SELECT coalesce(jsonb_agg("+item+" ORDER BY a.subject_revision,s.command_id,a.audit_entry_id),'[]'::jsonb) " \
+        "FROM audit.audit_entry a JOIN execution.command_execution_slot s ON s.tenant_id=a.tenant_id AND s.command_id=a.command_id " \
+        "JOIN execution.command_receipt r ON r.tenant_id=s.tenant_id AND r.command_execution_slot_id=s.command_execution_slot_id " \
+        "WHERE a.tenant_id="+tenant+" AND a.change_summary#>>'{receiptRecovery,scope,target,id}'=worker_facts.value->'bootstrap'->>'rootOrganizationId')"
+    return "WITH worker_facts(value) AS ("+facts_query(identity,command)+") SELECT value||jsonb_build_object('rootRenameEvidence',"+evidence+") FROM worker_facts"
+
+
 class WorkerBoundary:
     def __init__(self, runner, release_boundary):
         self.runner, self.release_boundary = runner, release_boundary
@@ -290,6 +454,10 @@ class WorkerBoundary:
     def facts(self, identity, command):
         return json.loads(self.release_boundary.sql("BEGIN READ ONLY; SET LOCAL TIME ZONE 'UTC'; "
             + facts_query(identity,command) + '; COMMIT;'))
+
+    def runtime_facts(self, identity, command):
+        return json.loads(self.release_boundary.sql("BEGIN READ ONLY; SET LOCAL TIME ZONE 'UTC'; "
+            + runtime_facts_query(identity,command) + '; COMMIT;'))
 
     def certificate(self):
         return verify_certificate(self.runner)
@@ -417,8 +585,9 @@ class LocalWorker:
     def desired(self):
         paths,identity,command = self.context()
         plan = read_json(regular(self.folder/'grants.json'))
-        if plan['identity'] != identity or grant_delta(plan,self.boundary.facts(identity,command)) != 0:
+        if plan['identity'] != identity:
             raise RuntimeError('fixed Worker grants unavailable')
+        runtime_grants_current(plan,self.boundary.runtime_facts(identity,command))
         self.boundary.database(paths)
         fingerprint = self.boundary.certificate()
         config = worker_properties(self.runtime,paths,identity,fingerprint,
