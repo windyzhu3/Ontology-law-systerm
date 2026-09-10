@@ -316,6 +316,26 @@ grants cannot be called READY. Startup alone is not W09 or seven-card business
 acceptance. SQL adapters and real local Worker deployment still require the
 controller's deployment-gate evidence; unit fixtures do not replace it.
 
+After all three consumers are running, the approved current-release runtime
+gate is a separate read-only operation:
+
+```powershell
+& D:/soft/python3/python.exe deploy/local-login/local_login.py release-verify-current-runtime
+```
+
+It accepts no arguments and runs under the existing `release-operation.lock`.
+It requires an exact current controlled package, complete gate/schema/original
+material consistency, no pending release or launch marker, and exactly the live
+API, SPA, and Worker commands from that package. It then uses the existing
+Worker current-grant/ROOT-rename, certificate, mTLS, database, loop, and
+no-listener health checks and repeats the release/process checks before emitting
+only `VERIFIED_CURRENT_RUNTIME`, release ID, source commit, gate revision, and
+the fixed Worker health summary. It never grants, prepares, starts, bootstraps,
+repairs, or substitutes the original verifier. First creation and original
+manifest recovery continue to use the strict original bootstrap entrypoints;
+`bootstrap-verify-current-release` remains the distinct original-operation
+verification command.
+
 After registration, `stop-apps` stops API, SPA and Worker using the same exact
 process checks and bounded handle-based wait. `start-apps`/`resume` regenerate
 Worker release expectations from the selected package and restart the registered

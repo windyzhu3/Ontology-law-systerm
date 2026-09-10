@@ -585,6 +585,11 @@ def release_operation(operation, arguments):
             require_original_verification_output(result)
             release.paths()
             print('VERIFIED_ORIGINAL with current release expectations; original operator preserved')
+        elif operation == 'release-verify-current-runtime':
+            if arguments:
+                raise RuntimeError('current runtime verification accepts no arguments')
+            from local_runtime_verification import verify_current_runtime
+            print(json.dumps(verify_current_runtime(sys.modules[__name__], release, boundary), sort_keys=True))
         else:
             raise RuntimeError('unknown release operation')
     finally:
@@ -611,7 +616,8 @@ if __name__ == '__main__':
         if sys.argv[1] not in ('prepare', 'stop', 'stop-apps', 'release-status', 'worker-grant', 'worker-prepare', 'worker-start', 'worker-health'):
             secret_bundle(RUNTIME)
         if sys.argv[1] in ('snapshot-release', 'capture-build-inputs', 'describe-candidate', 'stage-release', 'stage-local-auto-source', 'activate-release',
-                          'rollback-release', 'release-status', 'recover-release', 'bootstrap-verify-current-release'):
+                          'rollback-release', 'release-status', 'recover-release', 'bootstrap-verify-current-release',
+                          'release-verify-current-runtime'):
             release_operation(sys.argv[1], sys.argv[2:])
             sys.exit(0)
         if sys.argv[1] in ('start-apps', 'stop-apps', 'stop', 'resume', 'worker-grant', 'worker-prepare', 'worker-start', 'worker-health'):
