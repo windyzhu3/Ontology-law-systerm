@@ -1,6 +1,6 @@
 # Task9 扩展验收矩阵
 
-**当前门状态（2026-09-10）：** Task9.6i最终`02ce7a0`经两轮修复独立复审Approved，无未决finding；定向32项、Root精确最终代码完整本地部署工具83项退出0。原环境实际Worker健康门退出0，database／mTLS／三项循环READY、listeners0，未重授予或回退原ROOT。9.6h新制品部署及自然刷新复验尚未执行，七卡及人工UAT仍未完成。下方为历史增量记录，早先“待确认／正在修复”按本段及后续证据更新，不作为当前停点。详见[本地整链进度](../progress/2026-09-09-task9-local-chain-acceptance.md)。
+**当前门状态（2026-09-10）：** Task9.6i最终`02ce7a0`经两轮修复独立复审Approved；定向32项、Root精确最终代码完整本地部署工具83项退出0。新构建`421ca57`已受控切换至release`6411135a52094b6ba16a80df80b025a1`／gate12；构建退出0、schema不变、五个TLS页面200，新包Worker健康退出0（database／mTLS／三项循环READY、listeners0）。但发布后`bootstrap-verify-current-release`退出失败：该原始核验要求ROOT原名称／revision0，实际合法改名为revision1。原始合同不在本次运行核验修正范围，未放宽或绕过；协议及真实自然刷新尚未执行，整次发布验收、七卡及UAT仍未完成。部署后54表仅gate变化，245原审计／84IdP静态表／原材料及7阶段16命令均保留。下一步须先确认原始核验与后续发布运行核验的最小合同区分。下方为历史增量，以本段最新门状态为准。详见[本地整链进度](../progress/2026-09-09-task9-local-chain-acceptance.md)。
 
 **2026-09-10 Task9.6i执行：** 用户已确认独立Worker运行校验修正；首次授予保持严格，原ROOT合法改名按原Slot／Receipt／Audit版本链核对。首版`9ce2a5a`定向30／完整本地部署工具81项通过；独立评审发现“合法链与无变化／失败尝试并存时误拒绝”一项Important，正在窄修复，尚未部署或关闭运行门。所有真实持续会话、七卡及人工UAT仍保持未完成，见[本地整链进度](../progress/2026-09-09-task9-local-chain-acceptance.md)。
 

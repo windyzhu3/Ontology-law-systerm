@@ -1,12 +1,24 @@
 # Task9.6 本地整链验收进度
 
-## 当前结论：9.6i源码及原环境健康门通过，待发布与刷新复验
+## 当前结论：9.6i完成；新包已切换，发布后引导核验阻断自然刷新验收
+
+受控构建绑定`421ca57aed3d2f364fea2af64b12b5c9d6226c7d`：锁定JDK25.0.4.1+1运行`mvnw.cmd -B -f backend/pom.xml -DskipTests package`实际退出0（`1a2734/67597 → e113d2`，Maven BUILD SUCCESS）；锁定Node24.20.0／npm11.9.0和四项固定本地OIDC值运行`npm-cli.js run build`退出0（`43f35e`，含tsc）。`-DskipTests`不是新后端测试证据；既有OpenAPI生成器mutualTLS诊断保留，不声称构建日志无告警。首次短SHA capture被40位校验拒绝，改用完整SHA后退出0，未发生部分发布。
+
+新包`6411135a52094b6ba16a80df80b025a1`暂存／摘要核对通过；准确停止原API／SPA／Worker后，原受控CAS从gate11推进至12并启动三进程，Keycloak和数据库未停止。`release-status`为COMPLETE／new／schemaMatches；登录及四个管理页面直接TLS入口均200（`9ecf7d`）。新包Worker健康（`c88ab2/60412 → 3ef94b`）退出0，database及mTLS READY、requiredLoops3、listeners0。制品Jar SHA256为`d496603eaeda6e7893f002e4c1ade7c317369b743eec21fd39210cde43bec586`，manifest为`051010dfc50c3259cb52ae5af09f5cb1013639e0a91fdba8773893ceba2d61eb`。
+
+**仍未通过的发布后门：** `bootstrap-verify-current-release`（`c3b462/89376 → 6424be`）内部CLI退出2、外层退出1，原始失败日志及本轮专用副本均保留。源码`JooqIdentityBootstrapService.verify`明确要求原ROOT名称和revision0，而当前经原合法改名闭包验证的ROOT为revision1；该核验按既有合同要求原事实版本严格不变，与将其当作正常演进环境的重复发布门不一致。这不是Worker运行核验再次失败。当前批准范围保留首次授予／原始核验严格语义，不能顺带修改Java引导合同或绕过门禁。因此后续protocol-check／unmapped及250秒真实自然刷新尚未执行，不将制品切换成功等同于整次发布验收完成。
+
+部署后保留检查`f0c0c7`退出0：54表中只有`platform_meta.deployment_state`变化，245条原审计逐行摘要不变、没有新增披露审计；84张IdP静态表、受保护材料及原7阶段／16命令不变。`90f1e0`再次确认精确新release／gate12／build及原journal SHA256，after-deploy报告SHA256为`2188009443b94acf87689a0079ba5ebbcd9724668912e8902689f757ca596b84`。没有业务或IdP管理写入、未重放原创建；自然刷新和after-ui报告未执行。
+
+**下一最小合同澄清待用户确认：** 保留`verifyOriginal`“原始事实仍原样”的严格语义；将正常后续发布的“当前运行状态核验”与之区分，仅复用已审查的同ROOT合法改名证据链，并保持原引导Slot／Receipt／Audit、其他原事实、权限、证书、schema及制品门严格。先明确发布流程使用哪一门，再作最小实现／回归／独立评审，随后恢复协议及自然刷新验收。不回退组织、不重新引导或补授权、不扩展业务审计合同。本次不自动实施这一独立合同变化，新包服务保留运行，不擅自回滚。
+
+### 本轮源码及发布前门证据
 
 `9ce2a5a`／`d44524b`／`02ce7a0`完成运行核验分离及两轮评审修复。完整无变化／拒绝改名证据可与成功版本链共存，但损坏证据不能被忽略；首次授予与其他身份、三项固定授权、证书规则保持严格。最终独立复审Approved，无未决finding。定向32项通过，Root对精确`02ce7a0`重跑全部本地部署工具83项（`a4c27c`，66.650秒，退出0）。
 
 原环境实际`worker-health`（`4c44f7/75301 → b3d05a`，退出0）已恢复READY：database及mTLS READY、requiredLoops3、listeners0。这是新只读验证器对原环境真实SQL／进程／证书核验，不是重新授予或新部署；原ROOT保持revision1。审计未保存改名正文，不宣称重建原payload或If-Match。受保护基线为54业务表、245条原审计及84张IdP静态表，原7阶段／16命令保留。
 
-下一步按原受控制品流程构建发布9.6h并复验自然刷新；这两个门尚未完成。七卡、生命周期、撤权／代办／等待恢复及本人U01～U03仍待验收，不扩大到R2。以下为按时间保留的历史记录，早先“待确认／正在修复”的停点已由本段取代。
+上述源码及发布前健康证据不替代发布后验收；实际新停点见本页顶部。七卡、生命周期、撤权／代办／等待恢复及本人U01～U03仍待验收，不扩大到R2。以下为按时间保留的历史记录，早先“待确认／正在修复”的停点以本页顶部最新结论为准。
 
 ## 最新执行：2026-09-10 Task9.6i Worker运行校验修正
 
