@@ -109,8 +109,31 @@ export class BusinessSetup {
     const headers = await request.allHeaders();
     if (headers.authorization) session.auth = { Authorization: headers.authorization, 'X-Appointment-Id': session.appointmentId };
   }
+  private async refreshCachedSession(session: Session): Promise<void> {
+    // Let the SPA validate/renew its own token before reusing an observed header after an idle phase.
+    session.auth = {};
+    try {
+      check(!this.dispatchFailed && session.self.selectedAppointmentId === session.appointmentId);
+      const pageUrl = new URL(session.page.url()); check(pageUrl.origin === ORIGIN);
+      const admin = session.alias === 'founder';
+      if (admin) check(/^\/admin\/identity\/(principals|organizations|appointments|authority-grants)$/.test(pageUrl.pathname));
+      const path = admin ? '/api/v1' + pageUrl.pathname : CURRENT;
+      const [response] = await Promise.all([
+        session.page.waitForResponse(r => new URL(r.url()).origin === ORIGIN && new URL(r.url()).pathname === path && r.request().method() === 'GET', { timeout: SCREEN_TIMEOUT }),
+        session.page.getByRole('button', { name: admin ? '刷新' : '刷新当前责任', exact: true }).click({ timeout: SCREEN_TIMEOUT }),
+      ]);
+      this.http.push({ path, status: response.status() });
+      check(response.status() === 200 && (await response.allHeaders())['cache-control']?.includes('no-store'));
+      const headers = await response.request().allHeaders();
+      check(/^Bearer \S+$/.test(headers.authorization ?? '') && headers['x-appointment-id'] === session.appointmentId && !headers['x-on-behalf-appointment-id']);
+      check(session.auth.Authorization === headers.authorization && session.auth['X-Appointment-Id'] === session.appointmentId);
+    } catch {
+      session.auth = {}; this.dispatchFailed = true;
+      throw new Error('T9_BUSINESS_BOUNDARY');
+    }
+  }
   private async login(alias: Alias): Promise<Session> {
-    const cached = this.sessions.get(alias); if (cached) return cached;
+    const cached = this.sessions.get(alias); if (cached) { await this.refreshCachedSession(cached); return cached; }
     await this.environment.assertUnchanged();
     const context = await this.browser.newContext({ serviceWorkers: 'block', ignoreHTTPSErrors: false, locale: 'zh-CN', timezoneId: 'Asia/Shanghai' });
     const page = await context.newPage(), appointmentId = this.expectedAppointment(alias);

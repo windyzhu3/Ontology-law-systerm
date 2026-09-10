@@ -6,6 +6,8 @@
 
 项目选择和 reporter 覆盖判定复用锁定的 Playwright 1.63.0 所导出的 `playwright/lib/program` 的已解析 test options，不自行扫描 argv；`--project=approved-local-business` 等价有效，其他选项的必需值和 `--` 后的参数不构成项目选择或 reporter 覆盖。worker 无主进程解析状态时仍保留稳定项目身份；无浏览器合成子进程回归消费实际配置验证此边界。升级 Playwright 时必须重新验证该导出及控制者到 worker 行为。
 
+跨阶段复用已登录页面时，先通过原管理页“刷新”或工作台“刷新当前责任”让 SPA 校验／续期自身会话；只在准确同源 GET 成功且已观察到原任职、无代办的请求凭据后，才继续测试侧读取。刷新失败清空旧凭据并停止写入，不回退旧 Bearer、不手动刷新令牌、不改变会话寿命。
+
 真实入口只接受当前 release `6411135a52094b6ba16a80df80b025a1`、build `421ca57aed3d2f364fea2af64b12b5c9d6226c7d`、gate12，以及已完成身份 run `74a496f6-494e-417d-9abd-69a85c94f165` 的原 journal SHA256 `44c95f59853fa552d2d7ba933dcb80a4877464fe26dab7c34202d3e1fb0ad9a1`。它逐份核对原七阶段报告并只读取得原 resource IDs；所有业务操作前后重新核对原记录和当前三进程／制品，绝不改写身份 journal。
 
 业务 journal 固定为受保护 runtime 下的 `task9-business-operation.json`。只允许两次合成 capture、一个 `SALES_CONTACT_OWNER` 直接授权、六次候选保存和六次明确提交，共15个首次派发；PENDING、持久化不确定、阶段报告隔离、跨run或跨制品均禁止新key。续跑必须显式设置同一 `TASK9_BUSINESS_CONTINUE_RUN_ID`，只查询原回执并从当前阶段的准确已确认位置继续，不重放完成步骤。

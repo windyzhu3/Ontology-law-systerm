@@ -446,6 +446,74 @@ test('offline BusinessSetup accepts normalized Z instants after the exact grant 
   } finally { Date.now = originalNow; }
 });
 
+test('offline BusinessSetup refreshes the cached founder through UI before phase-two header-based reads', async () => {
+  const fixture = predecessorFixture(), reads: Array<{ path: string; authorization: string }> = [];
+  const environment = { resources: fixture.ids, bootstrap: { rootId: fixture.rootId, appointmentId: fixture.founderAppointmentId } };
+  const setup = new (BusinessSetup as any)({}, environment, { confirmed: () => undefined });
+  const admin: any = { ...syntheticSession('founder', fixture.founderAppointmentId), auth: { Authorization: 'Bearer synthetic-expired' } };
+  admin.self.canEnterIdentityAdmin = true; admin.self.canEnterWorkbench = false;
+  let refreshed = false, responseWaiter: { predicate: (response: any) => boolean; resolve: (response: any) => void } | undefined;
+  const uiPath = '/api/v1/admin/identity/principals';
+  const currentHeaders = { authorization: 'Bearer synthetic-current', 'x-appointment-id': admin.appointmentId };
+  const uiResponse = { url: () => 'https://localhost:19444' + uiPath + '?limit=20', status: () => 200,
+    request: () => ({ method: () => 'GET', allHeaders: async () => currentHeaders }), allHeaders: async () => ({ 'cache-control': 'no-store' }),
+    json: async () => ({ items: fixture.principals, nextCursor: null }) };
+  const refresh = async () => {
+    // Model only the browser/UI boundary. The real observer must capture the newly validated outgoing header.
+    await (setup as any).observe({ allHeaders: async () => currentHeaders }, admin);
+    refreshed = true;
+    if (responseWaiter?.predicate(uiResponse)) responseWaiter.resolve(uiResponse);
+  };
+  admin.page = {
+    url: () => 'https://localhost:19444/admin/identity/principals',
+    getByRole: (role: string, options: { name: string }) => role === 'main' ? { count: async () => 1 } : {
+      click: async () => {
+        if (options.name === '刷新') return refresh();
+        if (options.name === '新增直接授权') throw new Error('SYNTHETIC_PRE_DISPATCH_STOP');
+        throw new Error('UNEXPECTED_UI_ACTION');
+      },
+    },
+    locator: () => ({ click: async () => {} }),
+    waitForResponse: (predicate: (response: any) => boolean) => new Promise(resolve => { responseWaiter = { predicate, resolve }; }),
+    evaluate: async (_fn: unknown, value: { path: string; auth: Record<string, string> }) => {
+      reads.push({ path: value.path, authorization: value.auth.Authorization });
+      return { status: value.auth.Authorization === 'Bearer synthetic-current' ? 200 : 401, headers: { 'cache-control': 'no-store' },
+        body: { items: fixture.grants, nextCursor: null } };
+    },
+  };
+  (setup as any).sessions.set('founder', admin);
+  (setup as any).contactAppointment = { effectiveFrom: '2026-09-09T00:00:00Z', effectiveUntil: null };
+  await expect((setup as any).grant()).rejects.toThrow('SYNTHETIC_PRE_DISPATCH_STOP');
+  expect(refreshed).toBe(true);
+  expect(reads).toEqual([{ path: 'https://localhost:19444/api/v1/admin/identity/authority-grants?limit=50', authorization: 'Bearer synthetic-current' }]);
+});
+
+test('offline BusinessSetup refreshes a cached workbench before current reads and write arming', async () => {
+  const { setup, session, counts } = cachedRefreshSetup('intake');
+  const ready = await setup.workbench('intake');
+  expect(await setup.current(ready)).toBeNull();
+  setup.arm(ready, 'capture-auto', 'POST', '/api/v1/leads', {});
+  expect(counts).toEqual({ refreshes: 1, reads: 1, arms: 1 });
+  expect(session.auth.Authorization).toBe('Bearer synthetic-current');
+});
+
+test('offline BusinessSetup refuses cached admin and workbench reads or arming when UI refresh fails or changes Actor', async () => {
+  for (const alias of ['founder', 'intake'] as const) {
+    for (const failure of ['401', '403', '503', 'click', 'wrong-actor', 'on-behalf', 'wrong-origin', 'wrong-path', 'unobserved'] as const) {
+      const { setup, session, counts } = cachedRefreshSetup(alias, failure);
+      const action = async () => {
+        const ready = alias === 'founder' ? await setup.administrator() : await setup.workbench('intake');
+        if (alias === 'founder') await setup.rows(ready, '/api/v1/admin/identity/authority-grants');
+        else await setup.current(ready);
+        setup.arm(ready, 'capture-auto', 'POST', '/api/v1/leads', {});
+      };
+      await expect(action(), alias + ':' + failure).rejects.toThrow();
+      expect(counts, alias + ':' + failure).toEqual({ refreshes: 1, reads: 0, arms: 0 });
+      expect(session.auth, alias + ':' + failure).toEqual({});
+    }
+  }
+});
+
 test('offline BusinessSetup fresh-process phase two reads the contact appointment after reopening phase one', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'task96k-business-reopened-grant-')), path = join(folder, 'task9-business-operation.json');
   const journal = await BusinessJournal.open(path, runIdentity, () => {}); await seedFirstStage(journal);
@@ -814,6 +882,46 @@ async function syntheticSetupRoute() {
   const setup = new (BusinessSetup as any)(browser, environment, {});
   await (setup as any).login('intake');
   return { setup, routeHandler: handler as (route: any) => Promise<void> };
+}
+
+function cachedRefreshSetup(alias: 'founder' | 'intake', failure = '') {
+  const appointmentId = '00000000-0000-4000-8000-000000000108';
+  const setup = new (BusinessSetup as any)({}, { bootstrap: { appointmentId }, resources: { 'appointment-intake': appointmentId } }, {});
+  const counts = { refreshes: 0, reads: 0, arms: 0 };
+  const session: any = { ...syntheticSession(alias, appointmentId), auth: { Authorization: 'Bearer synthetic-expired' } };
+  session.self.canEnterIdentityAdmin = alias === 'founder'; session.self.canEnterWorkbench = alias !== 'founder';
+  const pagePath = alias === 'founder' ? '/admin/identity/principals' : '/workbench';
+  const readPath = alias === 'founder' ? '/api/v1/admin/identity/principals' : '/api/v1/workcards/current';
+  let waiter: { predicate: (response: any) => boolean; resolve: (response: any) => void; reject: (error: Error) => void } | undefined;
+  const headers = { authorization: 'Bearer synthetic-current', 'x-appointment-id': failure === 'wrong-actor' ? 'different-appointment' : appointmentId,
+    ...(failure === 'on-behalf' ? { 'x-on-behalf-appointment-id': appointmentId } : {}) };
+  const response = {
+    url: () => (failure === 'wrong-origin' ? 'https://invalid.example' : 'https://localhost:19444') + (failure === 'wrong-path' ? '/api/v1/session/context' : readPath),
+    status: () => /^\d+$/.test(failure) ? Number(failure) : 200,
+    request: () => ({ method: () => 'GET', allHeaders: async () => headers }), allHeaders: async () => ({ 'cache-control': 'no-store' }),
+  };
+  session.page = {
+    url: () => 'https://localhost:19444' + pagePath,
+    getByRole: (role: string, options: { name: string }) => role === 'main' ? { count: async () => 1 } : {
+      click: async () => {
+        counts.refreshes++;
+        if (failure === 'click') throw new Error('SYNTHETIC_REFRESH_FAILURE');
+        expect(options.name).toBe(alias === 'founder' ? '刷新' : '刷新当前责任');
+        if (failure !== 'unobserved') await setup.observe({ allHeaders: async () => headers }, session);
+        if (waiter?.predicate(response)) waiter.resolve(response);
+        else waiter?.reject(new Error('SYNTHETIC_NO_MATCHING_RESPONSE'));
+      },
+    },
+    waitForResponse: (predicate: (response: any) => boolean) => new Promise((resolve, reject) => { waiter = { predicate, resolve, reject }; }),
+    evaluate: async (_fn: unknown, value: { auth: Record<string, string> }) => {
+      counts.reads++;
+      return { status: value.auth.Authorization === 'Bearer synthetic-current' ? 200 : 401,
+        headers: { etag: '"wb.' + 'a'.repeat(43) + '"', 'cache-control': 'no-store' },
+        body: alias === 'founder' ? { items: [], nextCursor: null } : { todaySummary: '', currentCard: null, nextSummaries: [], waitingCount: 0, chatComposer: {} } };
+    },
+  };
+  setup.sessions.set(alias, session); setup.gate = { arm: () => { counts.arms++; } };
+  return { setup, session, counts };
 }
 
 function syntheticSession(alias: string, appointmentId: string) {
