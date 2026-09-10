@@ -3,7 +3,7 @@ import { requireLocalAcceptance, validateEnvironment, validateAccounts, LOCAL_RU
 import { safeFailureCode } from '../reporters/safe-reporter';
 import { OperationJournal, type PhaseEvidence } from '../fixtures/operation-journal';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
-import { noLinks } from '../fixtures/local-environment';
+import { noLinks, sha } from '../fixtures/local-environment';
 import { IdentitySetup, dispatchObserved, matchFact, requireReceiptLocationBuild, requireUnmappedSelfStatus } from '../fixtures/identity-setup';
 import SafeReporter from '../reporters/safe-reporter';
 import { createIdentityApi } from '../../apps/workbench/src/features/identity/identityApi';
@@ -11,8 +11,20 @@ import { RecoveryStore } from '../../apps/workbench/src/features/session/recover
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { boundaryProbe } from './boundary-probe';
+import { boundaryProbe, journalBindingProbe } from './boundary-probe';
 import { allowReadOnlyRequest, COMPLETE_JOURNAL_SHA, readOnlyOutcome, type ReadOnlyEvidence } from '../fixtures/readonly-session';
+
+for (const mismatch of ['environment', 'run', 'build'] as const) test(`offline readonly journal binding rejects wrong ${mismatch} despite matching byte hash`, () => {
+  const current = { buildSha: '6c6c6d90105b6d647fd213afed0c30dd9ff3a594', environmentDigest: 'b'.repeat(64) };
+  const identity = { runId: '74a496f6-494e-417d-9abd-69a85c94f165', ...current };
+  const valid = Buffer.from(JSON.stringify({ identity, commands: [], stages: [] }));
+  expect(journalBindingProbe(sha(valid))(valid, current)).toBe(sha(valid));
+  const changed = mismatch === 'run' ? { ...identity, runId: '00000000-0000-4000-8000-000000000093' }
+    : mismatch === 'build' ? { ...identity, buildSha: 'c'.repeat(40) } : identity;
+  const bytes = Buffer.from(JSON.stringify({ identity: changed, commands: [], stages: [] }));
+  const target = mismatch === 'environment' ? { ...current, environmentDigest: 'd'.repeat(64) } : current;
+  expect(() => journalBindingProbe(sha(bytes))(bytes, target)).toThrow();
+});
 
 test('offline readonly entry allows only business reads and exact normal IdP authentication', () => {
   for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) expect(allowReadOnlyRequest(new URL('https://localhost:19444/api/v1/admin/identity/organizations'), method)).toBe(false);
@@ -31,6 +43,14 @@ test('offline readonly evidence never promotes refresh HTTP alone or masks bound
   for (const patch of [{ organizationStatus: 401 }, { principalStatus: null }, { adminVisible: false }, { refreshDuringBoundary: false }, { boundaryCompleted: false },
     { journalAfter: '0'.repeat(64) }, { environmentUnchanged: false }, { blockedBusinessWrites: 1 }, { loginVisible: true }, { sessionNoticeVisible: true },
     { refreshObserved: false, failureStep: 'BOUNDARY' }, { refreshObserved: false, failureStep: 'APPROVAL' }]) expect(readOnlyOutcome({ ...evidence, ...patch })).toBe('FAILED');
+});
+
+for (const mismatch of ['blocked', 'journal'] as const) test(`offline readonly no refresh with known ${mismatch} failure is FAILED`, () => {
+  const evidence: ReadOnlyEvidence = { refreshObserved: false, refreshStatus: null, refreshDuringBoundary: false, organizationStatus: 200, principalStatus: 200,
+    adminVisible: true, loginVisible: false, sessionNoticeVisible: false, blockedBusinessWrites: 0, blockedRequests: 0, boundaryCompleted: false,
+    journalBefore: COMPLETE_JOURNAL_SHA, journalAfter: COMPLETE_JOURNAL_SHA, environmentUnchanged: true, failureStep: null };
+  expect(readOnlyOutcome(evidence)).toBe('NOT_TRIGGERED');
+  expect(readOnlyOutcome({ ...evidence, ...(mismatch === 'blocked' ? { blockedRequests: 1 } : { journalAfter: '0'.repeat(64) }) })).toBe('FAILED');
 });
 
 test('offline delayed Python boundary keeps the route event loop runnable', async () => {

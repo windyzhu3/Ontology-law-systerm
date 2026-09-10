@@ -22,3 +22,14 @@ export function boundaryProbe(program: string, timeout?: number, maxBuffer?: num
       process: { ...process, env: { TASK9_LOCAL_ACCEPTANCE: 'APPROVED_SYNTHETIC_ONLY' } } });
   return exports.probe as (mode: 'snapshot') => any;
 }
+
+// The real read-only binding with only the private-journal SHA replaced by a
+// synthetic fixture SHA. No runtime read or configurable live SHA bypass.
+export function journalBindingProbe(syntheticSha: string) {
+  const file = resolve(__dirname, '../fixtures/readonly-session.ts');
+  const source = readFileSync(file, 'utf8').replace(/export const COMPLETE_JOURNAL_SHA = '[0-9a-f]{64}'/, `export const COMPLETE_JOURNAL_SHA = '${syntheticSha}'`);
+  const exports: any = {};
+  runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText,
+    { exports, require: createRequire(file), Buffer });
+  return exports.validateReadOnlyJournal as (bytes: Buffer, environment: { buildSha: string; environmentDigest: string }) => string;
+}

@@ -2,8 +2,8 @@ import { test, chromium, type Browser, type Page } from '@playwright/test';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { resolve, join } from 'node:path';
-import { check, loadLocalEnvironment, noLinks, ORIGIN, ISSUER, protect, runtime, sha } from '../fixtures/local-environment';
-import { allowReadOnlyRequest, COMPLETE_JOURNAL_SHA, readOnlyOutcome, type ReadOnlyEvidence } from '../fixtures/readonly-session';
+import { check, loadLocalEnvironment, noLinks, ORIGIN, ISSUER, protect, runtime } from '../fixtures/local-environment';
+import { allowReadOnlyRequest, readOnlyOutcome, validateReadOnlyJournal, type ReadOnlyEvidence } from '../fixtures/readonly-session';
 
 test('T9-READONLY-SESSION', async ({}, info) => {
   let browser: Browser | undefined, page: Page | undefined;
@@ -14,7 +14,7 @@ test('T9-READONLY-SESSION', async ({}, info) => {
   const journal = join(runtime, 'task9-identity-operation.json');
   const journalHash = () => {
     noLinks(journal); check(!existsSync(journal + '.pending') && !existsSync(journal + '.completion.pending'));
-    return sha(readFileSync(journal));
+    check(environment); return validateReadOnlyJournal(readFileSync(journal), environment);
   };
   const ui = async () => {
     if (!page || page.isClosed()) return;
@@ -33,7 +33,7 @@ test('T9-READONLY-SESSION', async ({}, info) => {
     check(info.config.reporter.length === 1 && info.config.reporter[0][0].replaceAll('\\', '/').endsWith('/e2e/reporters/readonly-reporter.ts'));
     check(info.project.use.trace === 'off' && info.project.use.video === 'off' && info.project.use.screenshot === 'off' && !info.project.use.storageState);
     environment = await loadLocalEnvironment();
-    evidence.journalBefore = journalHash(); check(evidence.journalBefore === COMPLETE_JOURNAL_SHA);
+    evidence.journalBefore = journalHash();
     browser = await chromium.launch({ headless: true }); environment.verifyBrowser(browser.version());
     const context = await browser.newContext({ ignoreHTTPSErrors: false, serviceWorkers: 'block', locale: 'zh-CN', timezoneId: 'Asia/Shanghai' });
     await context.route('**/*', async route => {
