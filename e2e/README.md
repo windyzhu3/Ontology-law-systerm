@@ -4,6 +4,8 @@
 
 `e2e/business.config.ts` 是独立入口，并以稳定名称定义 `offline-business` 和 `approved-local-business`，以便控制者与 worker 重载同一项目身份；默认发现和运行仍只有 `offline-business`，真实项目保持惰性且只有命令行明确选择 `--project approved-local-business` 时才匹配测试。实现者仅运行离线项目；离线通过不代表真实浏览器、数据库闭包、U01–U03、完整七卡、容量或R1总验收通过。
 
+项目选择和 reporter 覆盖判定复用锁定的 Playwright 1.63.0 所导出的 `playwright/lib/program` 的已解析 test options，不自行扫描 argv；`--project=approved-local-business` 等价有效，其他选项的必需值和 `--` 后的参数不构成项目选择或 reporter 覆盖。worker 无主进程解析状态时仍保留稳定项目身份；无浏览器合成子进程回归消费实际配置验证此边界。升级 Playwright 时必须重新验证该导出及控制者到 worker 行为。
+
 真实入口只接受当前 release `6411135a52094b6ba16a80df80b025a1`、build `421ca57aed3d2f364fea2af64b12b5c9d6226c7d`、gate12，以及已完成身份 run `74a496f6-494e-417d-9abd-69a85c94f165` 的原 journal SHA256 `44c95f59853fa552d2d7ba933dcb80a4877464fe26dab7c34202d3e1fb0ad9a1`。它逐份核对原七阶段报告并只读取得原 resource IDs；所有业务操作前后重新核对原记录和当前三进程／制品，绝不改写身份 journal。
 
 业务 journal 固定为受保护 runtime 下的 `task9-business-operation.json`。只允许两次合成 capture、一个 `SALES_CONTACT_OWNER` 直接授权、六次候选保存和六次明确提交，共15个首次派发；PENDING、持久化不确定、阶段报告隔离、跨run或跨制品均禁止新key。续跑必须显式设置同一 `TASK9_BUSINESS_CONTINUE_RUN_ID`，只查询原回执并从当前阶段的准确已确认位置继续，不重放完成步骤。

@@ -65,22 +65,49 @@ test('offline actual business config keeps stable worker projects and enables li
   writeFileSync(configPath, `const loaded = require(${JSON.stringify(actualConfig)});\nconst actual = loaded.default ?? loaded;\nmodule.exports = { ...actual, testDir: __dirname, outputDir: ${JSON.stringify(join(folder, 'results'))}, reporter: [['line']], projects: actual.projects.map(project => ({ ...project, testDir: __dirname, testMatch: 'benign.spec.cjs' })) };\n`);
   const pinnedNode = 'C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe';
   const cli = resolve(__dirname, '../../node_modules/@playwright/test/cli.js');
-  const run = (...args: string[]) => spawnSync(pinnedNode, [cli, 'test', '--config', configPath, ...args], { cwd: resolve(__dirname, '../..'), encoding: 'utf8', windowsHide: true });
+  const run = (...args: string[]) => spawnSync(pinnedNode, [cli, 'test', '--config', configPath, ...args], { cwd: folder, encoding: 'utf8', windowsHide: true, timeout: 30_000, maxBuffer: 2 * 1024 * 1024 });
 
-  const explicit = run('--project', 'approved-local-business');
-  expect(explicit.status, explicit.stdout + explicit.stderr).toBe(0);
-  expect(explicit.stdout).toContain('[approved-local-business]'); expect(explicit.stdout).toContain('1 passed');
+  for (const args of [
+    ['--project', 'approved-local-business'],
+    ['--project=approved-local-business'],
+    ['--project=approved-local-business', '--grep-invert', '--reporter=line'],
+    ['--project=approved-local-business', '--', '--reporter=line'],
+  ]) {
+    const explicit = run(...args);
+    expect(explicit.status, explicit.stdout + explicit.stderr).toBe(0);
+    expect(explicit.stdout).toContain('[approved-local-business]'); expect(explicit.stdout).toContain('1 passed');
+  }
 
   const listed = run('--list');
   expect(listed.status, listed.stdout + listed.stderr).toBe(0);
   expect(listed.stdout).toContain('[offline-business]'); expect(listed.stdout).not.toContain('[approved-local-business]'); expect(listed.stdout).toContain('Total: 1 test in 1 file');
 
+  const defaultRun = run();
+  expect(defaultRun.status, defaultRun.stdout + defaultRun.stderr).toBe(0);
+  expect(defaultRun.stdout).toContain('[offline-business]'); expect(defaultRun.stdout).not.toContain('[approved-local-business]'); expect(defaultRun.stdout).toContain('1 passed');
+
+  for (const args of [
+    ['--output', '--project=approved-local-business'],
+    ['--grep-invert', '--project=approved-local-business'],
+    ['-G', '--project=approved-local-business'],
+    ['--', '--project=approved-local-business'],
+    ['--', '--project', 'approved-local-business'],
+  ]) {
+    const unselected = run('--list', ...args);
+    expect(unselected.status, JSON.stringify(args) + unselected.stdout + unselected.stderr).toBe(0);
+    expect(unselected.stdout, JSON.stringify(args)).toContain('[offline-business]');
+    expect(unselected.stdout, JSON.stringify(args)).not.toContain('[approved-local-business]');
+    expect(unselected.stdout).toContain('Total: 1 test in 1 file');
+  }
+
   const sameNameGrep = run('--grep', 'approved-local-business');
   expect(sameNameGrep.status, sameNameGrep.stdout + sameNameGrep.stderr).toBe(0);
   expect(sameNameGrep.stdout).toContain('[offline-business]'); expect(sameNameGrep.stdout).not.toContain('[approved-local-business]'); expect(sameNameGrep.stdout).toContain('1 passed');
 
-  const reporterOverride = run('--project=approved-local-business', '--reporter=line', '--list');
-  expect(reporterOverride.status).not.toBe(0); expect(reporterOverride.stdout + reporterOverride.stderr).toContain('T9_BUSINESS_BOUNDARY');
+  for (const args of [['--reporter=line'], ['--reporter', 'line']]) {
+    const reporterOverride = run('--project=approved-local-business', ...args, '--list');
+    expect(reporterOverride.status).not.toBe(0); expect(reporterOverride.stdout + reporterOverride.stderr).toContain('T9_BUSINESS_BOUNDARY');
+  }
 });
 
 test('offline business environment rejects current artifact drift and an incomplete identity predecessor', () => {
