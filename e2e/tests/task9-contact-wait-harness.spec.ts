@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { BusinessJournal, CONTACT_WAIT_CASE, type BusinessCommand, type BusinessStep, type BusinessRunIdentity } from '../fixtures/business-journal';
 import { BusinessDispatchGate } from '../fixtures/business-session';
-import { BUSINESS_PIN, IDENTITY_PREDECESSOR, IDENTITY_RESOURCE_STEPS, loadBusinessEnvironment } from '../fixtures/business-environment';
+import { BUSINESS_PIN, IDENTITY_PREDECESSOR, IDENTITY_RESOURCE_STEPS, contactGrantResourceId, loadBusinessEnvironment } from '../fixtures/business-environment';
 import { BusinessSetup } from '../fixtures/r1-business-setup';
 import BusinessReporter from '../reporters/business-reporter';
 
@@ -82,9 +82,21 @@ test('waiting approval reaches the existing bridge and rejects restart recovery 
   let reads = 0;
   const external = { runtime: mkdtempSync(join(tmpdir(), 'task96p-environment-')), toolchain: () => ({ browserVersion: BUSINESS_PIN.browserVersion, browserRevision: BUSINESS_PIN.browserRevision }), invokeLocalRuntime: async () => { reads++; throw new Error('synthetic external bridge'); } };
   await approval(async () => { await expect(loadBusinessEnvironment(external)).rejects.toThrow('synthetic external bridge'); expect(reads).toBe(1); });
-  for (const patch of [{ TASK9_LOCAL_ACCEPTANCE: undefined }, { TASK9_BUSINESS_RUN_ID: 'invalid' }, { TASK9_BUSINESS_RUN_ID: predecessor.runId }, { TASK9_BUSINESS_CONTINUE_RUN_ID: id(999) }, { TASK9_BUSINESS_RESTART_SHA256: '' }, { TASK9_BUSINESS_RECOVER_COMMAND_ID: '' }, { TASK9_BUSINESS_RECOVER_JOURNAL_SHA256: '' }]) {
+  for (const patch of [{ TASK9_LOCAL_ACCEPTANCE: undefined }, { TASK9_BUSINESS_RUN_ID: 'invalid' }, { TASK9_BUSINESS_RUN_ID: '00000000-0000-7000-8000-000000000901' }, { TASK9_BUSINESS_RUN_ID: predecessor.runId }, { TASK9_BUSINESS_CONTINUE_RUN_ID: id(999) }, { TASK9_BUSINESS_RESTART_SHA256: '' }, { TASK9_BUSINESS_RECOVER_COMMAND_ID: '' }, { TASK9_BUSINESS_RECOVER_JOURNAL_SHA256: '' }]) {
     reads = 0; await approval(async () => { await expect(loadBusinessEnvironment(external)).rejects.toThrow(); expect(reads).toBe(0); }, patch);
   }
+});
+test('waiting authenticated journal projection accepts a canonical v7 contact resource selector', () => {
+  // This is the loader's real projection after authentication, not a synthetic fixed-SHA proof.
+  const value = contactGrantResourceId({ step: 'grant-contact-owner', selectors: { resourceId: '00000000-0000-7000-8000-000000000901' } });
+  expect(value).toBe('00000000-0000-7000-8000-000000000901');
+});
+test('waiting authenticated journal projection rejects malformed resource UUID and selector confusion', () => {
+  for (const resourceId of ['not-a-uuid','00000000-0000-7000-8000-00000000090z','00000000000070008000000000000901','00000000-0000-7000-8000-000000000901-extra',901,null]) {
+    expect(() => contactGrantResourceId({ step: 'grant-contact-owner', selectors: { resourceId } })).toThrow();
+  }
+  expect(() => contactGrantResourceId({ step: 'capture-manual', selectors: { resourceId: id(901) } })).toThrow();
+  expect(() => contactGrantResourceId({ step: 'grant-contact-owner', selectors: { resourceId: id(901), other: id(902) } })).toThrow();
 });
 
 function environmentFixture(folder: string) {

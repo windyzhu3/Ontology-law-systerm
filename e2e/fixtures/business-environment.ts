@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { check, exact, invokeLocalRuntime, noLinks, runtime, sha, toolchain, validateAccounts, type Account } from './local-environment';
+import { check, exact, invokeLocalRuntime, noLinks, runtime, sha, toolchain, uuid, validateAccounts, type Account } from './local-environment';
 import { loadBusinessRestart } from './business-restart';
 import { BUSINESS_CASES, BUSINESS_STEPS } from './business-journal';
 
@@ -33,6 +33,12 @@ export function requireContactWaitAcceptance(): void {
   check(process.env.TASK9_BUSINESS_CONTINUE_RUN_ID === undefined || process.env.TASK9_BUSINESS_CONTINUE_RUN_ID === runId);
   for (const key of ['TASK9_BUSINESS_RESTART_SHA256','TASK9_BUSINESS_RECOVER_COMMAND_ID','TASK9_BUSINESS_RECOVER_JOURNAL_SHA256']) check(process.env[key] === undefined);
 }
+// Projection only: the loader authenticates the fixed raw journal and reports before calling this.
+export function contactGrantResourceId(grant: { step: string; selectors: Record<string, unknown> }): string {
+  const resourceId = grant.selectors.resourceId;
+  check(grant.step === 'grant-contact-owner' && exact(grant.selectors, ['resourceId']) && typeof resourceId === 'string' && uuid.test(resourceId));
+  return resourceId;
+}
 async function contactWaitPredecessor(folder: string, guard: () => Promise<unknown>) {
   await guard(); noLinks(folder);
   const path = join(folder, 'task9-business-operation.json');
@@ -52,8 +58,7 @@ async function contactWaitPredecessor(folder: string, guard: () => Promise<unkno
       check(evidence.runId === CONTACT_WAIT_PREDECESSOR.runId && evidence.caseIdentity === stage.caseIdentity && evidence.status === 'ACTIONS_VERIFIED' && evidence.exitCode === null);
       check(evidence.buildSha === BUSINESS_PIN.buildSha && evidence.predecessorRunId === IDENTITY_PREDECESSOR.runId && evidence.predecessorSha256 === IDENTITY_PREDECESSOR.journalSha256);
     }
-    const grant = data.commands[7]; check(grant.step === 'grant-contact-owner' && exact(grant.selectors, ['resourceId']) && UUID.test(grant.selectors.resourceId));
-    return grant.selectors.resourceId as string;
+    return contactGrantResourceId(data.commands[7]);
   };
   const contactGrantId = assertFiles(); await guard(); check(assertFiles() === contactGrantId);
   return Object.freeze({ ...CONTACT_WAIT_PREDECESSOR, contactGrantId, assertUnchanged() { check(assertFiles() === contactGrantId); } });
