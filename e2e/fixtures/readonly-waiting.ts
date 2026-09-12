@@ -112,7 +112,7 @@ export async function runReadOnlyWaiting(browserSource: Browser | (() => Promise
     const heading = page.getByRole('heading', { name: '当前无可处理责任，另有等待事项', exact: true });
     await heading.waitFor({ state: 'visible', timeout: 15_000 }); check(await heading.isVisible());
     check(await page.locator('article.current-card').count() === 0 && await page.locator('.next-summary').count() === 0);
-    check((await page.locator('.waiting-count > span').textContent())?.trim() === '等待 1');
+    check((await page.locator('.waiting-count > span').first().textContent())?.trim() === '等待 1');
     check(await page.locator('.today-summary p').isVisible() && (await page.locator('.today-summary p').textContent())?.trim() === baseline.todaySummary);
     check((await page.locator('.session-actions > span').textContent())?.trim() === `${self.displayName} · ${self.appointmentChoices[0].label}`);
     if (paused) { check(await page.getByText(PAUSED, { exact: true }).isVisible()); report.checks.paused = true; }

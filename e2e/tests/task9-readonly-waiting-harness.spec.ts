@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { chromium, expect, test, type Page } from '@playwright/test';
 import * as environments from '../fixtures/business-environment';
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -31,7 +31,7 @@ test('readonly loader refuses absent approval before external bridge or credenti
   expect(invoked).toBe(false);
 });
 
-function fakeTransport(failure = '') {
+function fakeTransport(failure = '', waitingPage?: Page) {
   const folder = mkdtempSync(join(tmpdir(), 'task96q-flow-')), wall = Date.parse('2026-09-12T02:00:00Z');
   let elapsed = 0, mountedAt = -1, automatic = 0, current = 0, renewed = false, manual = false, closed = false, opened = false, drift = false;
   let route: any; const listeners: Record<string, Function> = {}, forwarded: string[] = [];
@@ -57,8 +57,9 @@ function fakeTransport(failure = '') {
     listeners.response?.(response);
   }
   function locator(selector: string): any {
+    if (waitingPage && selector.startsWith('.waiting-count')) return waitingPage.locator(selector);
     const visible = () => !(failure === 'wrong-ui' && selector.includes('当前无可处理'));
-    return { isVisible: async () => visible(), waitFor: async () => {}, count: async () => selector === 'article.current-card' || selector === '.next-summary' ? 0 : 1,
+    return { first: () => locator(selector), isVisible: async () => visible(), waitFor: async () => {}, count: async () => selector === 'article.current-card' || selector === '.next-summary' ? 0 : 1,
       textContent: async () => selector === '.today-summary p' ? envelope().todaySummary : selector === '.waiting-count > span' ? (failure === 'wait11' ? '等待 11' : '等待 1') : selector === '.session-actions > span' ? '原合成联系人 · 原合成任职' : selector === '.choice-account > span' ? '原合成联系人' : '',
       inputValue: async () => appointment,
       fill: async () => {},
@@ -97,6 +98,39 @@ test('actual readonly flow preserves six automatic reads, same Actor 304, natura
 });
 test('actual readonly consumer handles pinned Playwright unreadable 304 body through the prior parsed cache', async () => {
   const { result } = await runTransport('unreadable-304'); expect(result.status).toBe('PASSED_READ_ONLY_SUBSCENARIO'); expect(result.counts.notModified).toBe(7);
+});
+async function withSyntheticWaiting(count: number, consume: (page: Page) => Promise<void>) {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    expect(browser.version()).toBe(environments.BUSINESS_PIN.browserVersion);
+    const context = await browser.newContext({ offline: true, serviceWorkers: 'block', ignoreHTTPSErrors: false });
+    await context.route('**/*', route => route.abort());
+    const page = await context.newPage();
+    await page.setContent(`<meta http-equiv="Content-Security-Policy" content="default-src 'none'"><section aria-label="后续责任与等待"><p class="waiting-count"><svg aria-hidden="true"></svg><span>等待 ${count}</span><span class="muted">当前无需操作</span></p></section>`);
+    await consume(page);
+  } finally { await browser.close(); }
+}
+test('synthetic DOM pinned locator refuses the original strict selector matching both waiting spans', async () => {
+  await withSyntheticWaiting(1, async page => {
+    expect(await page.locator('.waiting-count > span').count()).toBe(2);
+    await expect(page.locator('.waiting-count > span').textContent({ timeout: 1000 })).rejects.toThrow(/strict mode violation/);
+  });
+});
+test('synthetic DOM actual readonly consumer accepts waiting 1 alongside the second explanatory span', async () => {
+  await withSyntheticWaiting(1, async page => {
+    const transport = fakeTransport('', page);
+    const result = await runReadOnlyWaiting(transport.browser, transport.environment, { clock: transport.clock });
+    expect(result.status).toBe('PASSED_READ_ONLY_SUBSCENARIO');
+    expect(result.counts).toMatchObject({ current: 8, automatic: 6, manual: 1 });
+  });
+});
+test('synthetic DOM actual readonly consumer refuses waiting 11 alongside the second explanatory span', async () => {
+  await withSyntheticWaiting(11, async page => {
+    const transport = fakeTransport('', page);
+    const result = await runReadOnlyWaiting(transport.browser, transport.environment, { clock: transport.clock });
+    expect(result.status).toBe('FAILED'); expect(result.failureStep).toBe('INITIAL_UI');
+    expect(result.counts).toMatchObject({ current: 1, automatic: 0, manual: 0 });
+  });
 });
 for (const failure of ['seventh','budget-reset','wrong-ui','wait11','same-bearer','no-refresh','no-304','mutation','final-guard','token-password','token-failed','too-late','wrong-appointment','service-worker','no-prior-304','changed-envelope','bad-cache','late-identity','unknown-api']) test(`actual readonly flow cannot pass ${failure}`, async () => {
   const { result, transport } = await runTransport(failure);
