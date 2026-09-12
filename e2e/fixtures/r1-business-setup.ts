@@ -422,10 +422,15 @@ export class BusinessSetup {
   }
   private requireKnownSuccessor(step: BusinessStep, original: any, receipt: any, successor: any) {
     if (step === 'complete-submit') check(receipt.resultFact?.factType === 'LEAD' && successor.subject.subjectRevision === receipt.resultFact.revision);
+    else if (step === 'assign-submit') {
+      const revision = original.subject.subjectRevision;
+      check(Number.isSafeInteger(revision) && revision >= 0 && revision < Number.MAX_SAFE_INTEGER);
+      check(successor.subject.subjectRevision === revision + 1);
+    }
     else check(successor.subject.subjectRevision === original.subject.subjectRevision);
     const values = successor.commandForm?.values;
     if (step === 'routing-submit') check(receipt.resultFact?.factType === 'DECISION_RECORD' && values?.causalDecisionHash === receipt.resultFact.digest && uuid.test(values.causalDecisionId));
-    if (step === 'assign-submit') check(receipt.resultFact?.factType === 'LEAD_ASSIGNMENT' && values?.leadAssignmentRevision === receipt.resultFact.revision && uuid.test(values.leadAssignmentId));
+    if (step === 'assign-submit') check(receipt.resultFact?.factType === 'LEAD_ASSIGNMENT' && receipt.resultFact.revision === 0 && values?.leadAssignmentRevision === receipt.resultFact.revision && uuid.test(values.leadAssignmentId));
     if (step === 'contact-submit') check(receipt.resultFact?.factType === 'LEAD_CONTACT_RESULT' && values?.triggeringContactResultHash === receipt.resultFact.digest && uuid.test(values.triggeringContactResultId));
   }
   private async capture(session: Session, step: 'capture-auto' | 'capture-manual', account: 'LOCAL_SYNTHETIC_AUTO' | 'LOCAL_SYNTHETIC', withEmail: boolean, expected: CardType, taskOwner: 'intake'|'supervisor') {

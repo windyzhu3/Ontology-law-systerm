@@ -1051,6 +1051,74 @@ test('offline BusinessSetup rejects a known-success successor whose causal diges
   await expect((setup as any).card(supervisor, 'routing', 'RESOLVE_LEAD_ROUTING_GAP', draft.values, 'ACK_SOURCE_INTAKE_STOP_REQUEST', 'intake')).rejects.toThrow();
 });
 
+test('offline BusinessSetup actual ASSIGN consumer accepts the successor Lead revision from zero to one', async () => {
+  const supervisor = syntheticCommandSession('supervisor', '00000000-0000-4000-8000-000000000310');
+  const contact = syntheticSession('contact', '00000000-0000-4000-8000-000000000311');
+  const values = { ownerAppointmentId: contact.appointmentId };
+  const draft = { ...syntheticDraft('00000000-0000-4000-8000-000000000312', values), actionCode: 'ASSIGN_LEAD' };
+  const original = syntheticCard('ASSIGN_LEAD', taskId, 'opaque-lead-ref-recorded-0001', draft);
+  const successor = syntheticCard('CONTACT_LEAD', '00000000-0000-4000-8000-000000000313', 'opaque-lead-ref-contact-0001');
+  successor.subject.subjectRevision = 1;
+  successor.commandForm = { values: { leadAssignmentId: '00000000-0000-4000-8000-000000000314', leadAssignmentRevision: 0 } };
+  const recorded = recordedDraftEntry('assign-draft', taskId, supervisor.appointmentId, draft);
+  const result = { ...receipt, commandId: '00000000-0000-4000-8000-000000000315', resultFact: { factType: 'LEAD_ASSIGNMENT', factRef: 'q'.repeat(43), revision: 0 } };
+  const post = { url: () => `https://localhost:19444/api/v1/tasks/${taskId}/commands/assign-lead`, status: () => 200, json: async () => result };
+  const refreshed = { status: () => 200, json: async () => ({ currentCard: null }) };
+  let clicked = false, responseCall = 0;
+  supervisor.page.locator = () => ({ _apiName: 'Locator', _expect: async () => ({ matches: true, received: 'enabled', log: [], timeout: 0 }), click: async () => { clicked = true; supervisor.submitClicks++; } });
+  supervisor.page.waitForResponse = () => Promise.resolve(responseCall++ === 0 ? post : refreshed);
+  const setup = continuationSetup(recorded, supervisor, original);
+  (setup as any).workbench = async () => contact;
+  (setup as any).current = async (session: any) => session === supervisor ? original : clicked ? successor : null;
+  (setup as any).refreshUi = async (session: any) => session === contact && clicked ? successor : null;
+
+  await expect((setup as any).card(supervisor, 'assign', 'ASSIGN_LEAD', values, 'CONTACT_LEAD', 'contact')).resolves.toBeUndefined();
+  expect(supervisor.submitClicks).toBe(1);
+});
+
+test('offline BusinessSetup requires exact ASSIGN successor and new Assignment revisions', () => {
+  const setup = new (BusinessSetup as any)({}, {}, {});
+  const assignmentId = '00000000-0000-4000-8000-000000000316';
+  const requireAssign = (originalRevision: number, successorRevision: number, factType = 'LEAD_ASSIGNMENT', receiptRevision = 0,
+    leadAssignmentRevision = receiptRevision, leadAssignmentId = assignmentId) => (setup as any).requireKnownSuccessor(
+      'assign-submit', { subject: { subjectRevision: originalRevision } }, { resultFact: { factType, revision: receiptRevision } },
+      { subject: { subjectRevision: successorRevision }, commandForm: { values: { leadAssignmentId, leadAssignmentRevision } } },
+    );
+
+  expect(() => requireAssign(0, 1)).not.toThrow();
+  expect(() => requireAssign(8, 9)).not.toThrow();
+  for (const invalid of [
+    [-1, 0], [0, 0], [0, 2], [2.5, 3.5],
+    [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER], [Number.MAX_SAFE_INTEGER + 1, Number.MAX_SAFE_INTEGER + 1],
+  ] as const) expect(() => requireAssign(invalid[0], invalid[1])).toThrow();
+  expect(() => requireAssign(0, 1, 'LEAD', 0)).toThrow();
+  expect(() => requireAssign(0, 1, 'LEAD_ASSIGNMENT', 1, 1)).toThrow();
+  expect(() => requireAssign(0, 1, 'LEAD_ASSIGNMENT', 0, 1)).toThrow();
+  expect(() => requireAssign(0, 1, 'LEAD_ASSIGNMENT', 0, 0, 'not-a-uuid')).toThrow();
+});
+
+test('offline BusinessSetup keeps COMPLETE ROUTING and CONTACT successor revision rules unchanged', () => {
+  const setup = new (BusinessSetup as any)({}, {}, {});
+  const original = { subject: { subjectRevision: 3 } };
+  const leadReceipt = { resultFact: { factType: 'LEAD', revision: 7 } };
+  expect(() => (setup as any).requireKnownSuccessor('complete-submit', original, leadReceipt,
+    { subject: { subjectRevision: 7 }, commandForm: { values: {} } })).not.toThrow();
+  expect(() => (setup as any).requireKnownSuccessor('complete-submit', original, leadReceipt,
+    { subject: { subjectRevision: 6 }, commandForm: { values: {} } })).toThrow();
+
+  const decisionReceipt = { resultFact: { factType: 'DECISION_RECORD', digest: 'd'.repeat(43) } };
+  const routing = { subject: { subjectRevision: 3 }, commandForm: { values: { causalDecisionId: '00000000-0000-4000-8000-000000000317', causalDecisionHash: 'd'.repeat(43) } } };
+  expect(() => (setup as any).requireKnownSuccessor('routing-submit', original, decisionReceipt, routing)).not.toThrow();
+  expect(() => (setup as any).requireKnownSuccessor('routing-submit', original, decisionReceipt,
+    { ...routing, subject: { subjectRevision: 4 } })).toThrow();
+
+  const contactReceipt = { resultFact: { factType: 'LEAD_CONTACT_RESULT', digest: 'e'.repeat(43) } };
+  const contact = { subject: { subjectRevision: 3 }, commandForm: { values: { triggeringContactResultId: '00000000-0000-4000-8000-000000000318', triggeringContactResultHash: 'e'.repeat(43) } } };
+  expect(() => (setup as any).requireKnownSuccessor('contact-submit', original, contactReceipt, contact)).not.toThrow();
+  expect(() => (setup as any).requireKnownSuccessor('contact-submit', original, contactReceipt,
+    { ...contact, subject: { subjectRevision: 4 } })).toThrow();
+});
+
 test('offline BusinessSetup refuses capture before dispatch when the intended owner already has a same-type card', async () => {
   const actor = syntheticSession('intake', command.requestSelectors.actorAppointmentId);
   const owner = syntheticSession('supervisor', '00000000-0000-4000-8000-000000000290');
