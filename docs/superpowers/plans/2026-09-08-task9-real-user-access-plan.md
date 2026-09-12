@@ -559,6 +559,8 @@ test("offline explicit-local gate", () => {
 
 ## Task 9.6k: 真实六卡链（七卡中的可执行子集）
 
+**2026-09-12 已完成六卡子集：** 原 run 三阶段／15条命令全部确认，最新第三场景真实退出0，六卡DONE、六草稿CONFIRMED及完整事实／审计／原数据闭包通过。下列旧9／15检查点为历史；步骤1～6现已关闭。前置修正9.6l/m/n/o均有独立评审，最新工具源码`d77ee27`；应用仍为421ca57／gate12，未重新部署。详细原失败、恢复与277条新增审计核对见[整链进度](../../progress/2026-09-09-task9-local-chain-acceptance.md)。这不是七卡或完整Task9通过。
+
 **实际执行检查点：** 当前`db7fe38`源码完成第5轮限定复审，43项离线测试通过，但真实续验仍退出1。原run已记录9／15条命令（前7条不变、首联授权和MANUAL接入新增确认）、2阶段报告，无pending；分配草稿尚未派发。工作台缓存会话刷新被错误套用管理端`no-store`要求；冻结工作台合同为`private, no-cache`、`Vary: Authorization`和200／304。该缺陷真实且影响后续验收，不以源码绿色关闭Step 6；五轮上限后先独立诊断并审定合同消费修正，不直接追加第6轮或改产品合同。原身份／数据／部署保持，续验不得换run或重放9条已确认命令。
 
 **运行器澄清：** 首次真实启动发现Playwright工作进程重载配置时没有主进程argv，动态增删project无法执行。内部project身份改为稳定；未通过准确的`--project approved-local-business`或`--project=approved-local-business`选择时，真实项目不匹配任何测试，默认发现／执行仍只有离线测试。该澄清覆盖下文“仅显式选择时注册”的实现方式，不改变显式选择、安全授权、固定制品、无录制或15次写入边界；同名值出现在其他参数中不得启用真实项目。须以消费实际配置的无浏览器子进程测试证明默认拒绝及显式选中可跨工作进程执行。
@@ -584,12 +586,12 @@ test("offline explicit-local gate", () => {
 
 两次capture只作为真实API准备，使用本次真实浏览器登录获得的当前Bearer／Appointment，不注入JWT／SQL／测试Actor／mock fetch。没有capture页面，不新增页面或把API准备写成页面验收。合成email用`task96k-<runId>-auto@example.invalid`和`task96k-<runId>-manual@example.invalid`，sourceRecordKey同run固定准确值；不保存请求正文或真实人员资料。新run只允许以上2 capture＋1 Grant＋6 draft保存＋6明确提交，最多15个首次派发，不自动新key重跑。
 
-- [ ] **Step 1 — RED and independent current binding.** 离线合成输入测试current PIN、旧前驱SHA／报告缺失／pending、错误current build／进程、未经批准入口、跨run恢复、错误Actor／方法／路径／body、意外第二写入均拒绝；旧33项保持原行为。建立`loadBusinessEnvironment`消费测试先见缺能力失败，再最小提取旧模块边界。只允许受保护读取后取credentials，异步timeout60s／2MiB上限、隐藏窗口和错误脱敏不变。
-- [ ] **Step 2 — durable business journal.** 新路径固定`task9-business-operation.json`，不可打开旧OperationJournal写者；复用小型共享持久化原语或实现独立具名业务记录，不复制整个身份引擎。新记录绑定run UUID、当前build/environment/process摘要及前驱SHA。派发前持久保存原command UUID、step、method/path、准确请求bytes SHA、actorScopeKey和必要非秘密结果selectors；原子排他保护在第一个await前占用。PENDING／落盘不确定／报告隔离均禁止新命令，不自动删除。测试真实临时文件和异步竞争，不靠源码grep。
-- [ ] **Step 3 — real UI consumer.** `BusinessSetup.create(browser)`、`stage(caseId)`、`close()`提供上述三阶段。所有业务网络先白名单并验证armed准确body／Actor，再记录后派发；capture的API准备也走同一持久记录门，不从APIRequestContext绕过。对外IdP限原realm协议／resources，业务仅所需GET与15个具名写入。每卡确认当前Owner、准确类型、保存≠完成、保存后输入一致才启用主提交；不改DOM或直接调用React状态。首联结果无Evidence时保持零Evidence访问。最终结果仅用准确Receipt证据，不把刷新GET成功当POST成功。
-- [ ] **Step 4 — evidence and explicit continuation.** 每阶段独占新报告含固定case ID、UTC执行时刻、当前build/environment/API身份、前驱SHA、原命令引用／准确非秘密结果Fact、固定HTTP path/status和U01～U03 NOT_EXECUTED，不含token／密码／raw DOM／响应正文／subject／HMAC。阶段正文只标ACTIONS_VERIFIED，Root结合真实exit0与数据库闭包后才记通过；未知结果保留原key并停止。明确`TASK9_BUSINESS_CONTINUE_RUN_ID`与同环境同run只允许核对原Receipt/精确原资源再续未完成步骤，不重放完成步骤、不用404证明未提交。不实现无正文重发或跨制品迁移。覆盖报告写失败／串改／重复完成／前驱缺失／跳阶段等实际行为。
-- [ ] **Step 5 — offline verification and review.** 固定Node24.20.0／Playwright1.63.0／Chromium1243，workers1、retries0、trace/video/screenshot/storageState禁用，安全reporter不可替换；默认业务配置仅offline项目，真实项目需显式选`approved-local-business`、`TASK9_LOCAL_ACCEPTANCE=APPROVED_SYNTHETIC_ONLY`和`TASK9_BUSINESS_ACCEPTANCE=APPROVED_SIX_CARD_CHAIN`及新UUID `TASK9_BUSINESS_RUN_ID`。先focused RED/GREEN，最终一次全部e2e离线工具回归、strict tsc和list检查、diffcheck，提交owned源码并独立spec/quality评审。实现者不访问真实runtime／启动浏览器／运行真实项目，不spawn子代理；Root单独运行真实验收。
-- [ ] **Step 6 — Root actual acceptance.** 先fresh current-runtime gate、原身份闭包及54表/84IdP静态/原材料基线，后实际三阶段；以原command IDs只读核对Fact／Slot／Receipt／Task／Draft／Event／Outbox／Audit和明确Wait零增量、精确Owner与来源配置不变。保留全部原行，仅本次具名新增／CAS／投影／读取审计允许变化；不允许按表粗略放行。用原Actor／resultFact/审计与result引用证明闭包，不按显示名收养。Root读写工具仅保留闭合摘要和受保护证据。只有源码评审、真实退出、报告哈希及闭包均合格才关闭六卡子集；随后继续原9.6等待／安全／代办和Task10可独立自动项，人工暂缓不阻塞实施，完整七卡／容量／R1总验收不假报完成。
+- [x] **Step 1 — RED and independent current binding.** 离线合成输入测试current PIN、旧前驱SHA／报告缺失／pending、错误current build／进程、未经批准入口、跨run恢复、错误Actor／方法／路径／body、意外第二写入均拒绝；旧33项保持原行为。建立`loadBusinessEnvironment`消费测试先见缺能力失败，再最小提取旧模块边界。只允许受保护读取后取credentials，异步timeout60s／2MiB上限、隐藏窗口和错误脱敏不变。
+- [x] **Step 2 — durable business journal.** 新路径固定`task9-business-operation.json`，不可打开旧OperationJournal写者；复用小型共享持久化原语或实现独立具名业务记录，不复制整个身份引擎。新记录绑定run UUID、当前build/environment/process摘要及前驱SHA。派发前持久保存原command UUID、step、method/path、准确请求bytes SHA、actorScopeKey和必要非秘密结果selectors；原子排他保护在第一个await前占用。PENDING／落盘不确定／报告隔离均禁止新命令，不自动删除。测试真实临时文件和异步竞争，不靠源码grep。
+- [x] **Step 3 — real UI consumer.** `BusinessSetup.create(browser)`、`stage(caseId)`、`close()`提供上述三阶段。所有业务网络先白名单并验证armed准确body／Actor，再记录后派发；capture的API准备也走同一持久记录门，不从APIRequestContext绕过。对外IdP限原realm协议／resources，业务仅所需GET与15个具名写入。每卡确认当前Owner、准确类型、保存≠完成、保存后输入一致才启用主提交；不改DOM或直接调用React状态。首联结果无Evidence时保持零Evidence访问。最终结果仅用准确Receipt证据，不把刷新GET成功当POST成功。
+- [x] **Step 4 — evidence and explicit continuation.** 每阶段独占新报告含固定case ID、UTC执行时刻、当前build/environment/API身份、前驱SHA、原命令引用／准确非秘密结果Fact、固定HTTP path/status和U01～U03 NOT_EXECUTED，不含token／密码／raw DOM／响应正文／subject／HMAC。阶段正文只标ACTIONS_VERIFIED，Root结合真实exit0与数据库闭包后才记通过；未知结果保留原key并停止。明确`TASK9_BUSINESS_CONTINUE_RUN_ID`与同环境同run只允许核对原Receipt/精确原资源再续未完成步骤，不重放完成步骤、不用404证明未提交。不实现无正文重发或跨制品迁移。覆盖报告写失败／串改／重复完成／前驱缺失／跳阶段等实际行为。
+- [x] **Step 5 — offline verification and review.** 固定Node24.20.0／Playwright1.63.0／Chromium1243，workers1、retries0、trace/video/screenshot/storageState禁用，安全reporter不可替换；默认业务配置仅offline项目，真实项目需显式选`approved-local-business`、`TASK9_LOCAL_ACCEPTANCE=APPROVED_SYNTHETIC_ONLY`和`TASK9_BUSINESS_ACCEPTANCE=APPROVED_SIX_CARD_CHAIN`及新UUID `TASK9_BUSINESS_RUN_ID`。先focused RED/GREEN，最终一次全部e2e离线工具回归、strict tsc和list检查、diffcheck，提交owned源码并独立spec/quality评审。实现者不访问真实runtime／启动浏览器／运行真实项目，不spawn子代理；Root单独运行真实验收。
+- [x] **Step 6 — Root actual acceptance.** 先fresh current-runtime gate、原身份闭包及54表/84IdP静态/原材料基线，后实际三阶段；以原command IDs只读核对Fact／Slot／Receipt／Task／Draft／Event／Outbox／Audit和明确Wait零增量、精确Owner与来源配置不变。保留全部原行，仅本次具名新增／CAS／投影／读取审计允许变化；不允许按表粗略放行。用原Actor／resultFact/审计与result引用证明闭包，不按显示名收养。Root读写工具仅保留闭合摘要和受保护证据。只有源码评审、真实退出、报告哈希及闭包均合格才关闭六卡子集；随后继续原9.6等待／安全／代办和Task10可独立自动项，人工暂缓不阻塞实施，完整七卡／容量／R1总验收不假报完成。
 
 Offline commands (prepend pinned Node/npm bin PATH):
 
@@ -700,6 +702,32 @@ git diff --check
 **控制者后续门禁：** 原 run `9848f4ee-5612-49df-9e10-a8c40c09bd3d` 已确认九命令不得重放。此次用户批准的服务重启改变进程身份，先只读核对并明确同构建续验的证据衔接，不改写旧 environmentDigest 或用新 run 绕过；另核对 ASSIGN 后 Lead revision 与后继卡断言，发现偏差先按冻结合同诊断，不借本缓存修正扩大文件范围。U01～U03仍搁置，附件／通知属于 R2，语音后置，Task10 不在本单元范围。
 
 **9.6l 第一次评审处置：** `1ea6ea3` 的50项离线回归通过但评审发现三项缺陷，未关闭本单元：初始异步校验未阻止写入、仅顶层键检查不能证明前端接受响应、测试自身读取／晚到响应会污染页面缓存证据。窄修复复用生产 `parseEnvelope`，给 UI 请求绑定原 Actor／请求代次并在初始及最终写入边界等待校验。仅允许 `current()` 自身只读查询改用现有 `BrowserContext.request.get`，准确 `ORIGIN+CURRENT`、原页面观察 Bearer／任职、严格 TLS、`maxRedirects:0`、GET无正文；保持环境及失败门和响应校验，不改变其他 fetch／写路由。此区分只为避免测试读伪装成 SPA 缓存，不增加生产能力。补实际消费者反例并独立复审后才关闭源码门。
+
+## Task 9.6o: 草稿语义比较与具名成功回执恢复
+
+**2026-09-12 已完成：** `d77ee27`，38项定向GREEN、最终一次157项业务离线和严格类型检查通过，独立规格／质量Approved，无阻断finding。Root原回执恢复及第三场景真实退出0；原十一命令和恢复命令不变，15／15全部确认、无pending，最终闭包退出0。原失败日志与检查点保留，未重发原草稿。两恢复参数只存在本轮子进程，不残留宿主；旧参数不能重开已改变journal。
+
+**Approved bounded continuation:** 用户在上轮明确提出“最小修正比较＋核对原成功回执受控恢复PENDING、不重发不换键”后回复继续验收，并要求避免重复测试。本单元仅延续既有 `reconcilePending` 草稿恢复流程，不新增产品恢复接口。原9.6m／9.6n源码门不重开；原run、九命令检查点、衔接凭据、历史报告及失败日志不修改。
+
+**Files:** 仅修改 `e2e/fixtures/r1-business-setup.ts`、`business-restart.ts`、`business-journal.ts`、`business-environment.ts`、`e2e/tests/task9-business-harness.spec.ts`、`e2e/tests/task9-business-restart.spec.ts`、`e2e/README.md`。不改产品、DTO、页面、数据库、PIN、依赖、配置或原identity harness。实施者不读取受保护runtime，不操作浏览器／DB／IdP／Docker／部署／推送，不再委派。Root独立执行真实恢复和后续场景。
+
+**Known diagnosis:** 同SDD目录 `task-contact-draft-diagnosis.md` 已证明：真实CONTACT候选值以assignment开头，生成响应DTO将resultCode判别字段置首。内容一致、生产sameValues=true，但fixture原JSON.stringify比较=false。直接复用生产 `sameValues`：
+```typescript
+import { candidate, parseEnvelope, sameValues } from '../../apps/workbench/src/features/workcard/contract';
+check(sameValues(card.actionDraft.values, draftBody.values));
+```
+只替换该草稿值比较，不改用于字节完整性、身份或journal记录的JSON.stringify检查。
+
+**Explicit recovery capability:** 使用现有restart上下文，新增可选 `recovery?: { commandId: string; journalSha256: string }`（可作为 `loadBusinessRestart` 最后参数），由environment读取成对的 `TASK9_BUSINESS_RECOVER_COMMAND_ID`／`TASK9_BUSINESS_RECOVER_JOURNAL_SHA256`。任一出现必须两者合法且原BUSINESS_CONTINUE_RUN_ID／RESTART_SHA256具备；无restart或部分／非法值不得忽略回退。Root仅为当前固定原run传入已检查的pending命令UUID和原journal原始SHA `1c35efc0cf060718439baed5ae1acc34bccda1ac8745faef2cad146c296612b5`，实施者使用纯合成fixture，不硬编码真实UUID。
+
+- [x] 行为RED：实际BusinessSetup.card收到resultCode首位但内容相同的CONTACT草稿响应，必须到达complete一次；现有实现失败。另用真实临时BusinessJournal合成原九命令两阶段、assign两成功、contact-draft PENDING，合法具名恢复仍被现有重开拒绝，记录RED。无需重复生产DTO探针或已通过的旧整套基线。
+- [x] 最小语义修正；同内容不同顺序通过，改变字段值／缺失／多余字段仍拒绝。不得降低Receipt、ETag、Actor、任务及意图摘要核验。
+- [x] restart loader仅当显式capability与当前journal原始SHA、唯一第12条contact-draft PENDING原commandId一致，前11条CONFIRMED、两阶段、原checkpoint及实际当前进程全部通过时，允许打开供既有只读恢复使用。非该step／数量／SHA／ID、有任一.pending或.completion.pending、额外PENDING仍拒绝。context递归冻结／WeakSet来源证明不变，保存本次原前11条及pending原命令字段用于后续前缀不变核验，不能由当前可变journal重新刷新pin。
+- [x] BusinessJournal.initialize把“无pending”改为“无pending或已验证context精确允许该pending”。新写入在pending存在时仍被原journal.begin与BusinessDispatchGate拒绝；只允许通过既有complete确认该原command。完成仍走原protect、pending互斥、CAS、fsync和原子发布，禁止手工JSON改状态。初始恢复检查点SHA只用于打开本次原pending，不能阻止本次合法complete后journal正常推进。带旧恢复参数重新加载已变journal拒绝；Root成功后须移除这两个参数，普通restart无pending路径仍工作。
+- [x] BusinessSetup既有reconcilePending经原contact账号登录，只GET原回执和获权current卡，准确核对原Actor、task、subject/revision、taskETag、draftRef/revision及canonical意图SHA；成功才 `journal.complete(originalId, 200, receipt, selectors)`，200明确表示回执查询，不伪造原PUT状态。不重发PUT/POST、不产生新commandId；404／失败回执／错误Actor／草稿变化均保持原PENDING、阻止新写入。未显式批准的restart pending不得到达恢复流程。既有非restart行为不扩大。
+- [x] 用实际journal和environment/setup消费者测试上述合法恢复、无／部分批准、错ID/SHA/step、pending旁路与sidecar拒绝、错回执/Actor/意图摘要、确认前不能arm/begin、成功后仅进入contact-submit、原11条与旧阶段保持、二次打开要求正确参数。合并同形状负例为表驱动，避免重复搭建庞大框架；不mock journal校验或持久化，不用源码字符串断言。
+- [x] 测试预算遵照用户要求：迭代仅新定向RED/GREEN；最终实施者执行一次默认business受影响离线集合、一次严格E2E类型检查及diff检查。Root与评审不重复同提交全量测试；只有具体未覆盖疑问才跑定向补证。沿用已验证的33identity、前端／后端全量与默认发现证据，本单元不变这些入口。真实操作前当前环境／数据核验和操作后数据闭包是必要门禁，不视为重复回归。
+- [x] 仅提交拥有文件；报告 `.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task-9.6o-report.md` 包含SHA、RED/GREEN、命令／数量／退出码及边界。独立规格＋质量评审后Root才原run只续第三case；保持人工UAT延期与R2排除，不声称完整Task9已完成。
 
 ## Task 9.6m: ASSIGN 后继卡版本的最小验收修正
 
