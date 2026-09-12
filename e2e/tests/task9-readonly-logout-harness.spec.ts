@@ -79,7 +79,7 @@ function transport(failure = '') {
       if (selector === 'input[name="username"]' || selector === 'input[name="password"]' || selector.includes('[type="submit"]')) return page.stage === 'keycloak-login';
       if (selector === '#kc-logout-confirm' || selector === 'form.form-actions' || selector === '#kc-logout') return page.stage === 'keycloak';
       if (selector === '.session-actions > span' || selector === '.waiting-count > span' || selector === '.today-summary p') return page.stage === 'workbench';
-      if (selector === 'article.current-card' || selector === '.next-summary' || selector === 'textarea, input:not([type="hidden"])') return false;
+      if (selector === 'article.current-card' || selector === '.next-summary' || selector === 'textarea' || selector === 'input:not([type="hidden"])' || selector === 'textarea, input:not([type="hidden"])') return false;
       if (selector.startsWith('text=')) return page.message === selector.slice(5);
       return true;
     };
@@ -118,16 +118,18 @@ function transport(failure = '') {
       async waitForURL(predicate: any) { if (typeof predicate === 'function' ? !predicate(new URL(page.currentUrl)) : false) throw Error('wrong URL'); },
       getByRole: (role: string, options: any) => locator(page, '', role, options.name), getByText: (name: string) => locator(page, 'text=' + name), locator: (selector: string) => locator(page, selector),
       async bringToFront() {}, mainFrame: () => page.main,
-      async waitForEvent(event: string, options: any) { expect(event).toBe('framenavigated'); if (failure === 'history-none') throw Error('no history'); return new Promise((resolve, reject) => { page.navigation = (frame: any) => options?.predicate && !options.predicate(frame) ? reject(Error('unrelated history')) : resolve(frame); }); },
+      async waitForEvent(event: string, options: any) { expect(event).toBe('framenavigated'); if (failure === 'history-none' || failure === 'history-back-error') throw Error('no target history'); return new Promise((resolve, reject) => { page.navigation = (frame: any) => options?.predicate && !options.predicate(frame) ? reject(Error('unrelated history')) : resolve(frame); }); },
       async goBack() {
         if (failure === 'history-none') return null;
+        if (failure === 'history-back-error') throw Error('synthetic back failure');
         const target = environments.BUSINESS_PIN.origin + '/workbench';
         const frame = failure === 'history-subframe' ? { page: () => page, url: () => environments.BUSINESS_PIN.origin + '/workbench' } : page.main;
         if (failure === 'history-unrelated') page.main.historyUrl = new URL(environments.BUSINESS_PIN.issuer).origin + '/unrelated';
         else page.main.historyUrl = target;
         page.navigation?.(frame);
-        page.stage = failure === 'history-revival' || failure === 'history-delayed-safe-redirect' ? 'workbench' : 'login'; page.currentUrl = environments.BUSINESS_PIN.origin + (page.stage === 'workbench' ? '/workbench' : '/login'); page.main.historyUrl = page.currentUrl;
-        if (failure === 'history-delayed-safe-redirect') pendingClears.push({ due: elapsed + 500, page, message: page.message });
+        page.stage = failure === 'history-revival' || failure === 'history-transient-revival' ? 'workbench' : failure === 'history-delayed-neutral-redirect' ? 'history-loading' : 'login';
+        page.currentUrl = environments.BUSINESS_PIN.origin + (page.stage === 'login' ? '/login' : '/workbench'); page.main.historyUrl = page.currentUrl;
+        if (failure === 'history-delayed-neutral-redirect' || failure === 'history-transient-revival') pendingClears.push({ due: elapsed + 500, page, message: page.message });
         return failure === 'history-same-document' ? null : {};
       },
     };
@@ -175,8 +177,8 @@ test('actual logout consumer treats a same-document history event as triggered e
   expect(result.status).toBe('PASSED_READ_ONLY_SUBSCENARIO'); expect(result.scenarios.historySafety).toBe('PASSED');
 });
 
-test('actual logout consumer allows a recorded application history visit to finish its safe redirect', async () => {
-  const { result } = await execute('history-delayed-safe-redirect');
+test('actual logout consumer allows a neutral recorded application load to finish its safe redirect', async () => {
+  const { result } = await execute('history-delayed-neutral-redirect');
   expect(result.status).toBe('PASSED_READ_ONLY_SUBSCENARIO'); expect(result.scenarios.historySafety).toBe('PASSED');
 });
 
@@ -199,10 +201,11 @@ test('actual logout consumer reuses the verified same-Actor workbench cache for 
 for (const [failure, step] of [
   ['fault-as-success','CONFIRMED_LOGOUT'], ['old-token-200','TOKEN_REJECTION'], ['identity-drift','REENTRY'], ['peer-not-cleared','FAULT_LOCAL_CLEAR'], ['peer-success-message','FAULT_LOCAL_CLEAR'],
   ['history-none','HISTORY'], ['history-revival','HISTORY'], ['expired-token','TOKEN_REJECTION'], ['final-guard','FINAL_GUARD'], ['unexpected-write','NETWORK'], ['id-token-hint','NETWORK'], ['fault-no-requestfailed','FAULT_TRANSPORT'],
-  ['unrelated-realm-get','NETWORK'], ['logout-confirm-get','NETWORK'], ['history-unrelated','HISTORY'], ['history-subframe','HISTORY'], ['delayed-previous-entry','REENTRY'],
+  ['unrelated-realm-get','NETWORK'], ['logout-confirm-get','NETWORK'], ['history-unrelated','HISTORY'], ['history-subframe','HISTORY'], ['history-back-error','HISTORY'], ['history-transient-revival','HISTORY'], ['delayed-previous-entry','REENTRY'],
 ] as const) test(`actual logout consumer cannot pass ${failure}`, async () => {
   const { result, value } = await execute(failure);
   expect(result.status).not.toBe('PASSED_READ_ONLY_SUBSCENARIO'); expect(result.failureStep).toBe(step);
+  if (failure === 'history-none' || failure === 'history-unrelated' || failure === 'history-subframe' || failure === 'history-back-error') { expect(result.status).toBe('NOT_TRIGGERED'); expect(result.scenarios.historySafety).toBe('NOT_TRIGGERED'); }
   if (failure === 'fault-as-success') expect(result.scenarios.confirmedLogout).not.toBe('PASSED');
   if (failure === 'old-token-200' || failure === 'expired-token') expect(result.scenarios.tokenRejection).not.toBe('PASSED');
   if (failure === 'unexpected-write') expect(value.forwarded).not.toContain('POST /api/v1/leads');

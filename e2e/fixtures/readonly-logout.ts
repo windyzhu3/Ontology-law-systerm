@@ -266,20 +266,24 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
       if (!expected) { report.status = 'NOT_TRIGGERED'; report.scenarios.historySafety = 'NOT_TRIGGERED'; throw Error(); }
       await page.bringToFront();
       const navigated = page.waitForEvent('framenavigated', { timeout: 30_000, predicate: frame => frame === page.mainFrame() && frame.url() === expected }).then(() => true).catch(() => false);
-      const navigation = await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30_000 });
+      await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30_000 }).catch(() => null);
       const visited = await navigated;
-      if (navigation === null && !visited) { report.status = 'NOT_TRIGGERED'; report.scenarios.historySafety = 'NOT_TRIGGERED'; throw Error(); }
-      check(visited);
+      if (!visited) { report.status = 'NOT_TRIGGERED'; report.scenarios.historySafety = 'NOT_TRIGGERED'; throw Error(); }
       await page.bringToFront(); const displayName = baseline.self?.displayName; check(typeof displayName === 'string');
-      await untilAsync(async () => {
+      const end = clock.now() + 30_000;
+      while (true) {
         const url = new URL(page.url());
-        return (url.origin !== BUSINESS_PIN.origin || url.pathname !== '/workbench')
-          && await page.locator('.session-actions > span').count() === 0
-          && await page.locator('article.current-card').count() === 0
-          && await page.locator('.next-summary').count() === 0
-          && await page.locator('textarea, input:not([type="hidden"])').count() === 0
-          && await page.getByText(displayName, { exact: true }).count() === 0;
-      });
+        const resurrected = await page.locator('.session-actions > span').count() > 0
+          || await page.locator('article.current-card').count() > 0
+          || await page.locator('.next-summary').count() > 0
+          || await page.locator('textarea').count() > 0
+          || (url.origin === BUSINESS_PIN.origin && await page.locator('input:not([type="hidden"])').count() > 0)
+          || await page.getByText(displayName, { exact: true }).count() > 0;
+        check(!resurrected);
+        if (url.origin !== BUSINESS_PIN.origin || url.pathname !== '/workbench') break;
+        healthy(); check(clock.now() < end); await delay(Math.min(250, end - clock.now()));
+      }
+      await settle();
     }
     report.checks.historyDidNotRevive = true; report.scenarios.historySafety = 'PASSED'; report.status = 'PASSED_READ_ONLY_SUBSCENARIO';
   } catch {
