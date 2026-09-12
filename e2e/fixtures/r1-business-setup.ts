@@ -27,6 +27,11 @@ type WorkbenchRequestSnapshot = {
   generation: number; actorScopeKey: string; appointmentId: string; authorization: string;
   completion: Promise<void>; resolve: () => void; reject: (error: unknown) => void;
 };
+class WorkbenchIdentityError extends Error {}
+
+function workbenchIdentity(value: unknown): asserts value {
+  if (!value) throw new WorkbenchIdentityError('T9_BUSINESS_BOUNDARY');
+}
 
 function exactHeaderTokens(value: string | undefined, expected: readonly string[]): boolean {
   if (!value) return false;
@@ -145,18 +150,21 @@ export class BusinessSetup {
   private settleWorkbenchFailure(session: Session, snapshot: WorkbenchRequestSnapshot, error: unknown): void {
     const sameActor = snapshot.actorScopeKey === session.self?.actorScopeKey && snapshot.appointmentId === session.appointmentId
       && session.self?.selectedAppointmentId === snapshot.appointmentId;
-    if (sameActor && snapshot.generation !== session.workbenchGeneration) snapshot.resolve(); else snapshot.reject(error);
+    if (!(error instanceof WorkbenchIdentityError) && sameActor && snapshot.generation !== session.workbenchGeneration) snapshot.resolve();
+    else snapshot.reject(error);
   }
   private async validateWorkbenchResponse(response: Response, session: Session, snapshot: WorkbenchRequestSnapshot): Promise<void> {
     await session.identityReady;
     const url = new URL(response.url()), request = response.request();
-    check(url.origin === ORIGIN && url.pathname === CURRENT && request.method() === 'GET');
-    const responseHeaders = await response.allHeaders(), requestHeaders = await request.allHeaders();
+    workbenchIdentity(url.origin === ORIGIN && url.pathname === CURRENT && request.method() === 'GET');
+    let requestHeaders: Record<string, string>;
+    try { requestHeaders = await request.allHeaders(); } catch { throw new WorkbenchIdentityError('T9_BUSINESS_BOUNDARY'); }
     const currentActor = () => snapshot.actorScopeKey === session.self?.actorScopeKey && snapshot.appointmentId === session.appointmentId
       && session.self?.selectedAppointmentId === snapshot.appointmentId;
-    check(currentActor() && /^Bearer \S+$/.test(requestHeaders.authorization ?? '') && requestHeaders.authorization === snapshot.authorization
+    workbenchIdentity(currentActor() && /^Bearer \S+$/.test(requestHeaders.authorization ?? '') && requestHeaders.authorization === snapshot.authorization
       && requestHeaders['x-appointment-id'] === snapshot.appointmentId && !requestHeaders['x-on-behalf-appointment-id']);
     if (snapshot.generation !== session.workbenchGeneration) return;
+    const responseHeaders = await response.allHeaders();
     check(session.auth.Authorization === snapshot.authorization && session.auth['X-Appointment-Id'] === snapshot.appointmentId);
     check(exactHeaderTokens(responseHeaders['cache-control'], ['private', 'no-cache'])
       && exactHeaderTokens(responseHeaders.vary, ['authorization']) && workbenchETag(responseHeaders.etag));

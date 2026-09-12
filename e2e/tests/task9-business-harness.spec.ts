@@ -663,6 +663,24 @@ test('offline BusinessSetup ignores a superseded same-Actor body rejection after
   await expect(setup.workbench('intake')).resolves.toBe(session);
 });
 
+for (const scenario of [
+  { name: 'wrong appointment', wire: { requestAppointmentId: '00000000-0000-4000-8000-000000000299' } },
+  { name: 'forbidden on-behalf appointment', wire: { onBehalfAppointmentId: '00000000-0000-4000-8000-000000000298' } },
+] as const) {
+  test(`offline BusinessSetup poisons an older ${scenario.name} UI request after a newer response succeeds`, async () => {
+    const NEWEST_TAG = '"wb.' + 'n'.repeat(43) + '"';
+    const { setup, session, counts, beginUi } = cachedRefreshSetup('intake', { installObserver: true });
+    const older = await beginUi({ etag: OTHER_WORKBENCH_TAG, ...scenario.wire });
+    const newer = await beginUi({ etag: NEWEST_TAG }); await newer.deliver();
+    await expect(older.deliver()).rejects.toThrow();
+    expect(session.auth).toEqual({});
+    expect(session.workbenchCache).toBeUndefined();
+    expect(setup.dispatchFailed).toBe(true);
+    expect(() => setup.arm(session, 'capture-auto', 'POST', '/api/v1/leads', {})).toThrow();
+    expect(counts.arms).toBe(0);
+  });
+}
+
 test('offline BusinessSetup rejects a response when its request Actor snapshot is no longer current', async () => {
   const { setup, session, counts, beginUi } = cachedRefreshSetup('intake', { installObserver: true });
   let releaseEnvelope!: (value: any) => void;
@@ -1173,7 +1191,8 @@ async function syntheticSetupRoute() {
 
 const WORKBENCH_TAG = '"wb.' + 'a'.repeat(43) + '"';
 const OTHER_WORKBENCH_TAG = '"wb.' + 'b'.repeat(43) + '"';
-type CachedRefreshWire = { status?: number; cacheControl?: string; vary?: string | null; etag?: string | null; ifNoneMatch?: string; body?: any };
+type CachedRefreshWire = { status?: number; cacheControl?: string; vary?: string | null; etag?: string | null; ifNoneMatch?: string; body?: any;
+  requestAppointmentId?: string; onBehalfAppointmentId?: string };
 
 function validEmptyEnvelope(todaySummary = '今日暂无待处理责任。') {
   return { todaySummary, currentCard: null, nextSummaries: [], waitingCount: 0,
@@ -1199,7 +1218,10 @@ function cachedRefreshSetup(alias: 'founder' | 'intake', input: string | { failu
     const responseHeaders = alias === 'founder'
       ? { 'cache-control': selected.cacheControl ?? 'no-store', ...(selected.vary == null ? {} : { vary: selected.vary }), ...(selected.etag == null ? {} : { etag: selected.etag }) }
       : { 'cache-control': selected.cacheControl ?? 'private, no-cache', ...(selected.vary === null ? {} : { vary: selected.vary ?? 'Authorization' }), ...(selected.etag === null ? {} : { etag: selected.etag ?? WORKBENCH_TAG }) };
-    const requestHeaders = { ...headers, ...(selected.ifNoneMatch === undefined ? {} : { 'if-none-match': selected.ifNoneMatch }) };
+    const requestHeaders = { ...headers,
+      ...(selected.requestAppointmentId === undefined ? {} : { 'x-appointment-id': selected.requestAppointmentId }),
+      ...(selected.onBehalfAppointmentId === undefined ? {} : { 'x-on-behalf-appointment-id': selected.onBehalfAppointmentId }),
+      ...(selected.ifNoneMatch === undefined ? {} : { 'if-none-match': selected.ifNoneMatch }) };
     const request = { url: () => 'https://localhost:19444' + readPath, method: () => 'GET', allHeaders: async () => requestHeaders,
       headers: () => requestHeaders, postDataBuffer: () => null };
     return {
