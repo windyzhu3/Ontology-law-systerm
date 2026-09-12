@@ -703,6 +703,51 @@ git diff --check
 
 **9.6l 第一次评审处置：** `1ea6ea3` 的50项离线回归通过但评审发现三项缺陷，未关闭本单元：初始异步校验未阻止写入、仅顶层键检查不能证明前端接受响应、测试自身读取／晚到响应会污染页面缓存证据。窄修复复用生产 `parseEnvelope`，给 UI 请求绑定原 Actor／请求代次并在初始及最终写入边界等待校验。仅允许 `current()` 自身只读查询改用现有 `BrowserContext.request.get`，准确 `ORIGIN+CURRENT`、原页面观察 Bearer／任职、严格 TLS、`maxRedirects:0`、GET无正文；保持环境及失败门和响应校验，不改变其他 fetch／写路由。此区分只为避免测试读伪装成 SPA 缓存，不增加生产能力。补实际消费者反例并独立复审后才关闭源码门。
 
+## Task 9.6p: 首联未接通的真实等待生成与页面提示
+
+**完成记录（2026-09-12）：** 源码`0a1c8ba`及资源UUID兼容修正`5670ba6`独立评审通过；最终真实准备场景与数据库闭包均退出0，5命令／2DONE／1WAITING／1WaitReceipt，原数据保全通过。以下四步已完成。实际Worker恢复不属于本单元完成：检查点到期`2026-09-14 10:00 +08:00`，SLA10:30，W09实际恢复仍待观察。证据和初次loader失败历史见[当前验收进度](../../progress/2026-09-09-task9-local-chain-acceptance.md)。
+
+**Scope and authority:** 继续已批准Task9设计§6/9、CONTACT_RETRY_V1与T9-W02/03/04/09的等待分支。六卡已闭合，原15条记录不可追加、改写或重放。此单元交付独立的真实NOT_CONNECTED→WAITING准备场景，不声称Worker到期恢复或整个W组完成。复用原四个合成账号、原组织/任职、9.6k新增的准确contact Grant与现有LOCAL_SYNTHETIC MANUAL来源；不建用户、不改授权/来源/IdP，不新增产品UI、API、表、DTO、制品或R2内容。
+
+**Files:** Modify `e2e/fixtures/business-journal.ts`（仅两个封闭场景的记录策略）、`business-environment.ts`（显式等待入口及只读原六卡前驱绑定）、`r1-business-setup.ts`（复用原真实会话/派发/页面保存提交，新增等待准备）、`e2e/business.config.ts`、`e2e/reporters/business-reporter.ts`、`e2e/README.md`。Create `e2e/tests/task9-contact-wait.spec.ts`（一个真实准备case）、`e2e/tests/task9-contact-wait-harness.spec.ts`（离线真实消费者/临时文件/配置门测试）。`business-session.ts`的BusinessDispatchGate继续使用原BusinessJournal接口，不复制会话或持久引擎。若确需修改其类型，只限与上述封闭类型联通并说明理由。不得改原identity harness、restart/recovery范围、PIN、依赖、Java/SPA或其他测试。Root拥有计划/进度/验收及本机闭包脚本；实施者不读runtime，不操作真实浏览器/DB/IdP/Docker/部署/网络/推送，不委派子代理。
+
+**Fixed predecessor:** 原六卡run `9848f4ee-5612-49df-9e10-a8c40c09bd3d`，raw journal SHA `841a4d275bf97bdb832bbb138f70efbc310dbbe10f532d6c4dbb435380d52333`，3阶段/15CONFIRMED，无sidecar。其原字段/三个报告路径与原SHA只能读取；固定hash证明的第8条grant-contact-owner.selector.resourceId是本次复用的唯一首联Grant ID。旧identity16/7前驱仍按原验证，不更换它。当前BUSINESS_PIN原样沿用。新journal的identity.predecessorRunId/predecessorSha256指向已闭合六卡，而非假称重新执行旧identity。每次保护/派发/完成仍验证当前制品/进程和两层前驱及报告不变。
+
+**Interfaces:**
+```typescript
+export const CONTACT_WAIT_CASE = 'T9-W09-contact-wait-preparation' as const;
+// BusinessCaseId adds this closed literal; BUSINESS_CASES remains old three cases.
+// Internal immutable registry only: no caller-supplied steps/routes or generic scenario DSL.
+BusinessJournal.openContactWait(path, identity, protect): Promise<BusinessJournal>;
+BusinessSetup.createContactWait(browser, loadEnvironment = loadBusinessEnvironment): Promise<BusinessSetup>;
+// Existing stage accepts the new literal only on the contact-wait instance.
+await setup.stage(CONTACT_WAIT_CASE);
+```
+
+**Closed journal/entry behavior:** Old `open` remains exactly the old15/3 default; old JSON shape, filenames, validators, restart and recovery unchanged. New `openContactWait` is restricted to basename`task9-contact-wait-operation.json`, no restart argument; five steps only `capture-manual,assign-draft,assign-submit,contact-draft,contact-submit`, one stage end5. Reuse original validators for method/path/Fact/Actor/ETag/digest, durable exclusion/CAS/protect/fsync/rename and completion intent. Route/order/allowed Fact are not user-configurable. Reject opening old-path data through the new entry, profile confusion, extra sixth write, grant/review/auto-capture, reorder, other-run data, missing/changed predecessor, partial completion, pending/sidecar bypass. New report prefix`task9-contact-wait-<run>-<case>-<uuid>.json`; original report shape with the new exact case and five commands, no secret additions. Public constructor paths must reject mode mixing before opening any journal.
+
+**Environment/config:** Keep original `requireBusinessAcceptance` default contract; add a closed waiting mode selected only by exact `TASK9_BUSINESS_ACCEPTANCE=APPROVED_CONTACT_WAIT_CHAIN`, local`APPROVED_SYNTHETIC_ONLY`, valid newUUID`TASK9_BUSINESS_RUN_ID`; explicit CONTINUE must equal that newrun. Reject any presence of RESTART_SHA256/RECOVER_COMMAND_ID/RECOVER_JOURNAL_SHA256 in wait mode, not silently ignore. Waiting mode cannot open originalBusinessSetup.create, and createContactWait cannot run under SIX_CARD flag. Shared loader continues original async runtime bridge and account/resource validation. Add read-only six-card predecessor verification under protect/noLinks; only return required immutable identity/Grant selector and assertions, never expose raw protected journal or credentials to logs. New default project`offline-business` also matches new harness file. New real project`approved-local-contact-wait` matches only new real file; stable project identity/actual CLI opts parsing as existing config, no real test matching unless exact explicit project selected. Do not let `--grep`, unrelated option values or tokens after `--` activate it; explicit real reporter override rejected. Existing real six-card project selection behavior unchanged. Reporter recognizes only new closed case; no raw exception/stdout/stderr, trace/video/screenshot/storageState remain off, retries0/workers1.
+
+**Real sequence:**
+```typescript
+// Existing authenticated sessions and gate; no mock response or injected JWT.
+await verifyExactPredecessorWithContactGrant();
+await capture(intake, 'capture-manual', 'LOCAL_SYNTHETIC', true, 'ASSIGN_LEAD', 'supervisor');
+await card(supervisor, 'assign', 'ASSIGN_LEAD',
+  { ownerAppointmentId: originalContactAppointmentId }, 'CONTACT_LEAD', 'contact');
+await card(contact, 'contact', 'CONTACT_LEAD',
+  { resultCode: 'NOT_CONNECTED', contactChannelCode: 'EMAIL', resultSummary: 'Task 9.6p synthetic contact not connected.' }, null, null);
+// No OPEN successor is disclosed yet. Read and assert actual envelope/DOM.
+```
+Use unique newrun sourceRecordKey/email, clearly prefix`task96p-`, onlysynthetic`example.invalid`, no phone/evidence. Initial supervisor/contact currentCard null, nextSummaries empty, waitingCount0; exact originalfounder/current12grants verified (old11 plus exactcontactGrant), no delegation grant. Contact has exactlyone valid DIRECT SALES_CONTACT_OWNER at originalROOT; verify actualGrantID/currentstate/appointment/scope/validity, not adopt by code/name. Intake capture is realAPI preparation, not captureUI. Assignment andcontact saves/maincommands onlythroughoriginalUIandarmednetwork; currentcard canonicalparser and semantic sameValues reused.
+
+After successful NOT_CONNECTED require actual contact envelope `currentCard===null`, `nextSummaries.length===0`, `waitingCount===1`, `chatComposer.targetTaskId===null`, `enabled===false`; DOM heading exact`当前无可处理责任，另有等待事项`, current-card count0, waitcount1, actual todaySummary matches visible text, no next action. Existing refreshUi must distinguish actual zero vs waiting heading by serverenvelope, not hardcodedzero. If extracting `currentEnvelope()` from existing current(), preserve original validation/identity/generation/read-only transport; current() remains wrapper returning currentCard. Do not feed CurrentCard into no-store identityread helper. Newstage records only after explicit successReceipt+waitingUI assertions; Root SQL independently checks actual waitingTask/WaitReceipt and resume_due_at. Unknown capture/submit or inconsistent response keepsPENDING and blocks newwrites; only existing safe same-run draft reconciliation may be reused, no new unknown-submit/restart recovery allowance. UI failed after knownconfirmation must stop and retain evidence, no newkey.
+
+- [x] **RED:** New real-config selection is absent by default, wrongflag/mode/predecessor rejects. Behavior tests with real tempjournal show oldmode cannot perform five-step waitingprofile; integration injects only external browser/runtime transport, executes actual shared consumers and persistence. Use e.g. `expect(await loadWith(waitFlags, changedPredecessor)).rejects.toThrow()` and actualgate dispatch extra/reordered step rejects; first implement checks must fail meaningfully, not only missingimport.
+- [x] **Implement and focused GREEN:** Cover newmode valid5commands/1report, oldmode shape/order15/3unchanged, sixth/forbidden/reordered/otherpath/sidecar/duplicate/asyncbusy rejection, original raw15/3/reports preserved. Environment partial/illegal/wrongrun/predecessorSHA/reporttamper/restart/recoveryflags refuse beforewrite. Actualsetup tests accept NOT_CONNECTED semantic payload and positivewaiting envelope/DOM, reject waitingCount0/2, straycurrent/nextcard, enabledcomposer, wrongheading, wrongActor/Receipt/owner. Assert actual5armedwrites and no grant/review/newkey, failed response retains pending. Table-driven negatives, no journalvalidation/persistence mocks, no source-text tests, no duplicate framework.
+- [x] **Single final verification:** PinnedNode24.20.0 runs one defaultbusiness suite after focusediteration; strictE2Etypecheck includes newfiles, one subprocessconfiguration discovery probe in tests. No reinstall/no repeatedidentity33/frontend/backend/oldlive6cards. Report exactcounts/commands/exits and originaltooloutputpaths, no separate log claim unlesscreated. Sourcecommitownedfilesonly, selfreview thenRootindependent spec/qualityreview.
+- [x] **Root real gate:** Freshcurrentruntime and newread-onlybaseline onlyafterreview; preserve completed15record/hash and originalidentity. Generate one newUUID, exclusive newreport/log, strictoriginalCA, explicitnewprojectandwaitflag. Execute onlynewpreparation, no originaltest rerun. Confirm5originalcommandIDs uniquelymap Slot/Receipt/Audit,2DONEoldTasks+1WAITINGnewTask/revision1,2CONFIRMEDDraft,1Lead/Assignment/ContactResult/contactNo1,1WaitReceipt CONTACT_RETRY_V1, exactnextbusinessday10:00/SLA10:30 from serverdecision/timezone and EMAIL unchanged,5Events/Outbox, originalrowpreservation andknownnewaudits; no SQLwrites or clockchange. Saveexactwaitingselectors/due in protectedRootcheckpoint for subsequent realWorkerread-onlyresume unit. Mark onlywaitpreparation andspecificW02/03/04subset, W09reopen remains pending until trustedtimeandrealWorker transitionobserved. Waitingdoesnotblockunrelatedremaining9.6scenarios.
+
 ## Task 9.6o: 草稿语义比较与具名成功回执恢复
 
 **2026-09-12 已完成：** `d77ee27`，38项定向GREEN、最终一次157项业务离线和严格类型检查通过，独立规格／质量Approved，无阻断finding。Root原回执恢复及第三场景真实退出0；原十一命令和恢复命令不变，15／15全部确认、无pending，最终闭包退出0。原失败日志与检查点保留，未重发原草稿。两恢复参数只存在本轮子进程，不残留宿主；旧参数不能重开已改变journal。
