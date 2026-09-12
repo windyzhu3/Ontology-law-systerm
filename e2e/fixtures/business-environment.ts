@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { check, exact, invokeLocalRuntime, noLinks, runtime, sha, toolchain, uuid, validateAccounts, type Account } from './local-environment';
 import { loadBusinessRestart } from './business-restart';
 import { BUSINESS_CASES, BUSINESS_STEPS } from './business-journal';
@@ -13,6 +13,7 @@ export const BUSINESS_PIN = {
 } as const;
 export const IDENTITY_PREDECESSOR = { runId: '74a496f6-494e-417d-9abd-69a85c94f165', journalSha256: '44c95f59853fa552d2d7ba933dcb80a4877464fe26dab7c34202d3e1fb0ad9a1' } as const;
 export const CONTACT_WAIT_PREDECESSOR = Object.freeze({ runId: '9848f4ee-5612-49df-9e10-a8c40c09bd3d', journalSha256: '841a4d275bf97bdb832bbb138f70efbc310dbbe10f532d6c4dbb435380d52333' });
+export const READONLY_WAITING_PIN = Object.freeze({ runId: '45d51425-e402-44ce-a757-eeb6dbf930b0', journalSha256: '181ed859930c6ad25c2b546c83ec5be4e78725aa99d7169087193bc1d2cfeee2', checkpointSha256: '2ac851dc17729d1b64b269c8eae5dc893a6cfaf814899545b495e8e5cf5dca30', dueAt: '2026-09-14T02:00:00Z' });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const HASH = /^[0-9a-f]{64}$/;
 export const IDENTITY_RESOURCE_STEPS = [
@@ -76,9 +77,53 @@ export function validateBusinessArtifact(value: unknown): void {
   for (const [key, expected] of Object.entries(BUSINESS_PIN)) check(data[key] === expected);
 }
 
-export async function loadBusinessEnvironment(dependencies = { invokeLocalRuntime, runtime, toolchain }) {
+const existingBridgeDependencies = { invokeLocalRuntime, runtime, toolchain };
+export async function loadBusinessEnvironment(dependencies = existingBridgeDependencies) {
+  check(process.env.TASK9_READONLY_WAITING === undefined);
+  return loadSharedBusinessEnvironment(dependencies, false);
+}
+export async function loadReadOnlyWaitingEnvironment(dependencies = existingBridgeDependencies) {
+  requireReadOnlyWaitingAcceptance();
+  const environment = await loadSharedBusinessEnvironment(dependencies, true);
+  const folder = dependencies.runtime, journal = join(folder, 'task9-contact-wait-operation.json'), checkpoint = join(folder, 'task96p-wait-checkpoint.json');
+  const guard = async () => { await dependencies.invokeLocalRuntime('protect'); noLinks(folder); };
+  const bytes = (file: string) => { noLinks(file); check(!existsSync(file + '.pending') && !existsSync(file + '.completion.pending')); return readFileSync(file); };
+  const assertFiles = () => {
+    check(sha(bytes(join(folder, 'task9-identity-operation.json'))) === IDENTITY_PREDECESSOR.journalSha256);
+    const raw = bytes(journal); check(sha(raw) === READONLY_WAITING_PIN.journalSha256);
+    const data = JSON.parse(raw.toString('utf8'));
+    check(exact(data, ['identity','commands','stages']) && data.identity.runId === READONLY_WAITING_PIN.runId && data.identity.buildSha === BUSINESS_PIN.buildSha);
+    check(data.identity.predecessorRunId === CONTACT_WAIT_PREDECESSOR.runId && data.identity.predecessorSha256 === CONTACT_WAIT_PREDECESSOR.journalSha256);
+    const steps = ['capture-manual','assign-draft','assign-submit','contact-draft','contact-submit'];
+    check(data.commands.length === 5 && data.stages.length === 1 && data.commands.every((entry: any, index: number) => entry.step === steps[index] && entry.status === 'CONFIRMED'));
+    const stage = data.stages[0], prefix = `task9-contact-wait-${READONLY_WAITING_PIN.runId}-T9-W09-contact-wait-preparation-`;
+    check(stage.caseIdentity === 'T9-W09-contact-wait-preparation' && stage.status === 'PASSED_SUBSCENARIO' && stage.exitCode === 0);
+    check(dirname(stage.reportPath) === folder && basename(stage.reportPath).startsWith(prefix) && stage.reportPath.endsWith('.json') && UUID.test(basename(stage.reportPath).slice(prefix.length, -5)));
+    const report = bytes(stage.reportPath); check(sha(report) === stage.reportSha256);
+    const evidence = JSON.parse(report.toString('utf8'));
+    check(evidence.runId === READONLY_WAITING_PIN.runId && evidence.buildSha === BUSINESS_PIN.buildSha && evidence.caseIdentity === stage.caseIdentity && evidence.status === 'ACTIONS_VERIFIED' && evidence.exitCode === null);
+    check(evidence.predecessorRunId === CONTACT_WAIT_PREDECESSOR.runId && evidence.predecessorSha256 === CONTACT_WAIT_PREDECESSOR.journalSha256);
+    const saved = bytes(checkpoint); check(sha(saved) === READONLY_WAITING_PIN.checkpointSha256);
+    const proof = JSON.parse(saved.toString('utf8')), task = proof.waitingTask, receipt = proof.waitReceipt;
+    check(proof.profile === 'TASK9_CONTACT_WAIT_CHECKPOINT_V1' && proof.runId === READONLY_WAITING_PIN.runId && proof.journalSha256 === READONLY_WAITING_PIN.journalSha256);
+    check(task.state === 'WAITING' && task.revision === 1 && uuid.test(task.task_occurrence_id) && task.owner_appointment_id === environment.resources['appointment-contact']);
+    check(receipt.task_occurrence_id === task.task_occurrence_id && receipt.task_revision === 1 && receipt.recorded_by_appointment_id === task.owner_appointment_id && Date.parse(receipt.resume_due_at) === Date.parse(READONLY_WAITING_PIN.dueAt));
+  };
+  await guard(); assertFiles(); await environment.assertUnchanged(); await guard(); assertFiles();
+  const accounts = Object.freeze(Object.fromEntries(Object.entries(environment.accounts).map(([alias, account]) => [alias, Object.freeze({ ...account })]))) as typeof environment.accounts;
+  return { ...environment, accounts, bootstrap: Object.freeze({ ...environment.bootstrap }), predecessor: Object.freeze({ ...environment.predecessor }), readonlyProof: READONLY_WAITING_PIN, outputDirectory: resolve(folder, '../output'),
+    async assertUnchanged() { requireReadOnlyWaitingAcceptance(); await guard(); assertFiles(); await environment.assertUnchanged(); await guard(); assertFiles(); } };
+}
+export function requireReadOnlyWaitingAcceptance(): void {
+  check(process.env.TASK9_LOCAL_ACCEPTANCE === 'APPROVED_SYNTHETIC_ONLY' && process.env.TASK9_READONLY_WAITING === 'APPROVED_EXISTING_WAIT_ONLY');
+  for (const key of ['TASK9_BUSINESS_ACCEPTANCE','TASK9_BUSINESS_RUN_ID','TASK9_BUSINESS_CONTINUE_RUN_ID','TASK9_BUSINESS_RESTART_SHA256','TASK9_BUSINESS_RECOVER_COMMAND_ID','TASK9_BUSINESS_RECOVER_JOURNAL_SHA256','TASK9_RUN_ID','TASK9_CONTINUE_RUN_ID','TASK9_RECOVER_COMMAND_ID']) check(process.env[key] === undefined);
+  for (const key of ['DEBUG','PWDEBUG','PW_TEST_DEBUG']) check(process.env[key] === undefined);
+  check(process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0');
+}
+async function loadSharedBusinessEnvironment(dependencies: typeof existingBridgeDependencies, readonly: boolean) {
   const contactWait = process.env.TASK9_BUSINESS_ACCEPTANCE === 'APPROVED_CONTACT_WAIT_CHAIN';
-  if (contactWait) requireContactWaitAcceptance();
+  if (readonly) requireReadOnlyWaitingAcceptance();
+  else if (contactWait) requireContactWaitAcceptance();
   else requireBusinessAcceptance(process.env.TASK9_LOCAL_ACCEPTANCE, process.env.TASK9_BUSINESS_ACCEPTANCE, process.env.TASK9_BUSINESS_RUN_ID, process.env.TASK9_BUSINESS_CONTINUE_RUN_ID);
   check(!process.env.DEBUG && !process.env.PWDEBUG && !process.env.PW_TEST_DEBUG);
   const expectedRestartSha = process.env.TASK9_BUSINESS_RESTART_SHA256;
@@ -89,16 +134,18 @@ export async function loadBusinessEnvironment(dependencies = { invokeLocalRuntim
   const tools = dependencies.toolchain();
   const snapshot = await dependencies.invokeLocalRuntime('snapshot');
   validateBusinessArtifact({ ...snapshot, ...tools });
-  const loaded = await dependencies.invokeLocalRuntime('business');
+  const bridged = await dependencies.invokeLocalRuntime('business');
+  const loaded = readonly ? structuredClone(bridged) : bridged;
   validateBusinessEnvironment({ ...loaded, ...tools });
   for (const key of ['apiIdentity', 'processIdentity', 'releaseIdentity']) check(HASH.test(snapshot[key]) && snapshot[key] === loaded[key]);
   validateAccounts(loaded.original, loaded.credentials, loaded.operation);
   check(loaded.bootstrap && exact(loaded.bootstrap, ['tenantId', 'rootId', 'founderId', 'appointmentId']));
   check(loaded.resources && exact(loaded.resources, [...IDENTITY_RESOURCE_STEPS]));
   for (const id of Object.values(loaded.resources)) check(typeof id === 'string' && /^[0-9a-f-]{36}$/.test(id));
+  if (readonly) for (const id of [...Object.values(loaded.resources), ...Object.values(loaded.bootstrap)]) check(typeof id === 'string' && uuid.test(id));
   const current: Record<string, unknown> = { ...BUSINESS_PIN, ...tools, apiIdentity: snapshot.apiIdentity, processIdentity: snapshot.processIdentity, releaseIdentity: snapshot.releaseIdentity };
   const environmentDigest = (await import('node:crypto')).createHash('sha256').update(JSON.stringify(current)).digest('hex');
-  const waitingPredecessor = contactWait ? await contactWaitPredecessor(dependencies.runtime, () => dependencies.invokeLocalRuntime('protect')) : undefined;
+  const waitingPredecessor = contactWait || readonly ? await contactWaitPredecessor(dependencies.runtime, () => dependencies.invokeLocalRuntime('protect')) : undefined;
   const restart = expectedRestartSha === undefined ? undefined : await loadBusinessRestart(dependencies.runtime, {
     runId: process.env.TASK9_BUSINESS_RUN_ID!, environmentDigest, buildSha: BUSINESS_PIN.buildSha,
     predecessorRunId: IDENTITY_PREDECESSOR.runId, predecessorSha256: IDENTITY_PREDECESSOR.journalSha256,
@@ -107,11 +154,20 @@ export async function loadBusinessEnvironment(dependencies = { invokeLocalRuntim
     ...BUSINESS_PIN, environmentDigest, apiIdentity: snapshot.apiIdentity, runtime: dependencies.runtime, restart, waitingPredecessor,
     bootstrap: loaded.bootstrap as { tenantId: string; rootId: string; founderId: string; appointmentId: string },
     accounts: { ...loaded.original, ...loaded.credentials.accounts } as Record<'founder' | 'unmapped' | 'intake' | 'supervisor' | 'contact' | 'delegate', Account>,
-    resources: loaded.resources as Record<typeof IDENTITY_RESOURCE_STEPS[number], string>,
+    resources: (readonly ? Object.freeze({ ...loaded.resources }) : loaded.resources) as Record<typeof IDENTITY_RESOURCE_STEPS[number], string>,
     predecessor: structuredClone(loaded.predecessor) as { runId: string; journalSha256: string; commandCount: 16; stageCount: 7; pendingCount: 0 },
     verifyBrowser(actual: string) { check(actual === BUSINESS_PIN.browserVersion); },
     async assertUnchanged() {
+      if (readonly) {
+        await dependencies.invokeLocalRuntime('protect');
+        const refreshed = await dependencies.invokeLocalRuntime('snapshot'); validateBusinessArtifact({ ...refreshed, ...dependencies.toolchain() });
+        for (const key of ['apiIdentity', 'processIdentity', 'releaseIdentity']) check(refreshed[key] === current[key]);
+      }
       const now = await dependencies.invokeLocalRuntime('business'); validateBusinessEnvironment({ ...now, ...tools });
+      if (readonly) {
+        validateAccounts(now.original, now.credentials, now.operation);
+        for (const key of ['resources','bootstrap','predecessor','original','credentials','operation']) check(JSON.stringify(now[key]) === JSON.stringify(loaded[key]));
+      }
       for (const key of ['apiIdentity', 'processIdentity', 'releaseIdentity']) check(now[key] === current[key]);
       check(JSON.stringify(now.resources) === JSON.stringify(loaded.resources));
       restart?.assertUnchanged();

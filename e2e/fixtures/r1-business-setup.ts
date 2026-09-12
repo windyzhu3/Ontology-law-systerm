@@ -9,6 +9,7 @@ import { check, exact, ORIGIN, ISSUER, protect, sha, uuid } from './local-enviro
 import { GRANTS, matchFact, NAMES } from './identity-setup';
 import { businessFailureCode } from '../reporters/business-reporter';
 import { candidate, parseEnvelope, sameValues } from '../../apps/workbench/src/features/workcard/contract';
+import { exactHeaderTokens, workbenchETag, validateWorkbenchCache, type WorkbenchCache } from './workbench-cache';
 
 const SELF = '/api/v1/session/context';
 const CURRENT = '/api/v1/workcards/current';
@@ -17,7 +18,7 @@ const TASK_TYPES = ['COMPLETE_LEAD_INGRESS', 'RESOLVE_LEAD_ROUTING_GAP', 'ACK_SO
 type Alias = 'founder' | 'intake' | 'supervisor' | 'contact' | 'delegate';
 type Session = {
   alias: Alias; context: BrowserContext; page: Page; self: any; auth: Record<string, string>; appointmentId: string;
-  workbenchCache?: { actorScopeKey: string; etag: string; generation: number };
+  workbenchCache?: WorkbenchCache;
   workbenchGeneration?: number; workbenchPending?: Map<number, Promise<void>>;
   identityReady?: Promise<void>; workbenchObservation?: Promise<void>;
 };
@@ -31,16 +32,6 @@ class WorkbenchIdentityError extends Error {}
 
 function workbenchIdentity(value: unknown): asserts value {
   if (!value) throw new WorkbenchIdentityError('T9_BUSINESS_BOUNDARY');
-}
-
-function exactHeaderTokens(value: string | undefined, expected: readonly string[]): boolean {
-  if (!value) return false;
-  const actual = new Set(value.split(',').map(token => token.trim().toLowerCase()).filter(Boolean));
-  return actual.size === expected.length && expected.every(token => actual.has(token));
-}
-
-function workbenchETag(value: string | undefined): value is string {
-  return /^"wb\.[A-Za-z0-9_-]{43}"$/.test(value ?? '');
 }
 
 function requestSelectors(session: Session, card?: any, body?: Record<string, unknown>) {
@@ -182,13 +173,10 @@ export class BusinessSetup {
     if (response.status() === 200) {
       const envelope = await response.json();
       check(currentActor()); if (snapshot.generation !== session.workbenchGeneration) return;
-      parseEnvelope(envelope);
-      session.workbenchCache = { actorScopeKey: snapshot.actorScopeKey, etag: responseHeaders.etag, generation: snapshot.generation };
+      session.workbenchCache = validateWorkbenchCache({ status: 200, headers: responseHeaders, body: envelope, actorScopeKey: snapshot.actorScopeKey, generation: snapshot.generation });
       return;
     }
-    const cached = session.workbenchCache;
-    check(response.status() === 304 && cached !== undefined && cached.actorScopeKey === snapshot.actorScopeKey && cached.generation < snapshot.generation
-      && requestHeaders['if-none-match'] === cached.etag && responseHeaders.etag === cached.etag);
+    session.workbenchCache = validateWorkbenchCache({ status: response.status(), headers: responseHeaders, requestHeaders, actorScopeKey: snapshot.actorScopeKey, generation: snapshot.generation }, session.workbenchCache);
   }
   private observeWorkbenchResponse(response: Response, session: Session): Promise<void> {
     const existing = this.workbenchObservations.get(response); if (existing) return existing;
