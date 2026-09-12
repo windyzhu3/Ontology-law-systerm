@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { chromium, expect, test } from '@playwright/test';
 import * as environments from '../fixtures/business-environment';
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -14,6 +14,20 @@ const runLogout = (...args: any[]) => {
   return logoutFixture.runReadOnlyLogout(...args);
 };
 
+test('shared logout confirmation consumer matches the locked Keycloak container form and visible submit control', async () => {
+  expect(typeof logoutFixture.submitKeycloakLogoutConfirmation).toBe('function');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ offline: true, serviceWorkers: 'block', ignoreHTTPSErrors: false });
+    await context.route('**/*', route => route.abort());
+    const page = await context.newPage();
+    await page.setContent(`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; form-action https://localhost:19443"><div id="kc-logout-confirm"><form class="form-actions" action="https://localhost:19443/realms/local-r1/protocol/openid-connect/logout/logout-confirm?session_code=private-never-read" method="post"><input type="hidden" name="session_code" value="private-never-read"><input type="submit" name="confirmLogout" id="kc-logout" value="Yes, sign me out"></form></div>`);
+    const requested = page.waitForRequest(request => new URL(request.url()).pathname.endsWith('/logout-confirm'));
+    await logoutFixture.submitKeycloakLogoutConfirmation(page); const request = await requested;
+    expect(`${request.method()} ${new URL(request.url()).pathname}`).toBe('POST /realms/local-r1/protocol/openid-connect/logout/logout-confirm');
+  } finally { await browser.close(); }
+});
+
 test('logout loader is a distinct guarded entry before any external bridge access', () => {
   expect(typeof environments.loadReadOnlyLogoutEnvironment).toBe('function');
 });
@@ -27,7 +41,7 @@ function transport(failure = '') {
   const wall = Date.parse(environments.READONLY_WAITING_PIN.dueAt) - 3_600_000;
   let elapsed = 0, closed = false, opened = false, guardCalls = 0, routeHandler: any;
   const forwarded: string[] = [], sleeps: number[] = [], probes: Array<{ path: string; status: number }> = [];
-  const pages: any[] = [];
+  const pages: any[] = [], pendingClears: Array<{ due: number; page: any; message: string | null }> = [];
   const token = (page: any) => {
     const expiry = failure === 'expired-token' ? Math.floor((wall - 1_000) / 1000) : Math.floor((wall + 1_800_000) / 1000);
     return `Bearer e30.${Buffer.from(JSON.stringify({ exp: expiry, page: page.index, login: page.logins })).toString('base64url')}.signature`;
@@ -35,11 +49,12 @@ function transport(failure = '') {
   function clearPeer(source: any, message: string) {
     for (const page of pages) if (page !== source) {
       if (failure === 'peer-not-cleared' && source.logouts === 1) continue;
+      if (failure === 'peer-delayed') { pendingClears.push({ due: elapsed + 500, page, message }); continue; }
       page.stage = 'login'; page.currentUrl = environments.BUSINESS_PIN.origin + '/login';
       page.message = failure === 'peer-success-message' && source.logouts === 1 ? '统一会话退出成功。' : message;
     }
   }
-  async function emit(page: any, path: string, method = 'GET') {
+  async function emit(page: any, path: string, method = 'GET', defer = false) {
     const isApi = path.startsWith('/api/'), isCurrent = path === '/api/v1/workcards/current';
     const url = (path.startsWith('/realms/') ? new URL(environments.BUSINESS_PIN.issuer).origin + path : environments.BUSINESS_PIN.origin + path) + (failure === 'id-token-hint' && path.endsWith('/protocol/openid-connect/logout') && page.logouts === 2 ? '?id_token_hint=forbidden' : '');
     const headers: Record<string,string> = isApi ? { authorization: token(page), 'x-appointment-id': appointment, ...(failure === 'reentry-304' && isCurrent && page.logins > 1 ? { 'if-none-match': '"wb.' + 'b'.repeat(43) + '"' } : {}) } : {};
@@ -48,11 +63,11 @@ function transport(failure = '') {
     await routeHandler({ request: () => request, continue: async () => { forwarded.push(`${method} ${path}`); continued = true; }, abort: async () => { aborted = true; if (failure !== 'fault-no-requestfailed') page.listeners.requestfailed?.(request); } });
     if (aborted || !continued) return false;
     if (path.endsWith('/protocol/openid-connect/logout')) { page.stage = 'keycloak'; page.currentUrl = url; }
-    if (path.endsWith('/logout/logout-confirm')) { page.stage = 'login'; page.currentUrl = environments.BUSINESS_PIN.origin + '/login'; page.message = null; }
-    const status = path.endsWith('/logout/logout-confirm') ? 302 : failure === 'reentry-304' && isCurrent && page.logins > 1 ? 304 : 200;
+    if (path.endsWith('/logout/logout-confirm') && method === 'POST') { page.stage = 'login'; page.currentUrl = environments.BUSINESS_PIN.origin + '/login'; page.message = null; }
+    const status = path.endsWith('/logout/logout-confirm') && method === 'POST' ? 302 : failure === 'reentry-304' && isCurrent && page.logins > 1 ? 304 : 200;
     const value = path === '/api/v1/session/context' ? { state: 'READY', selectedAppointmentId: appointment, selectedOnBehalfAppointmentId: null, appointmentChoices: [{ id: appointment, label: '原合成任职' }], delegatedAppointmentChoices: [], actorScopeKey: failure === 'identity-drift' && page.logins > 1 ? 'ask1.' + 'z'.repeat(43) : actor, canEnterWorkbench: true, canEnterIdentityAdmin: false, displayName: failure === 'identity-drift' && page.logins > 1 ? '漂移身份' : '原合成联系人' } : isCurrent ? waiting() : {};
     const response: any = { url: () => url, request: () => request, status: () => status, allHeaders: async () => isApi ? (isCurrent ? { 'cache-control': 'private, no-cache', vary: 'Authorization', etag: '"wb.' + 'b'.repeat(43) + '"' } : { 'cache-control': 'no-store' }) : {}, json: async () => structuredClone(value) };
-    page.listeners.response?.(response);
+    if (defer) page.deferred.push(() => page.listeners.response?.(response)); else page.listeners.response?.(response);
     return true;
   }
   function locator(page: any, selector: string, role?: string, name?: string): any {
@@ -62,7 +77,7 @@ function transport(failure = '') {
       if (role === 'button' && name === '退出') return page.stage === 'workbench';
       if (role === 'heading') return page.stage === 'chooser' ? name === '请选择本次办理身份' : page.stage === 'workbench' && name === '当前无可处理责任，另有等待事项';
       if (selector === 'input[name="username"]' || selector === 'input[name="password"]' || selector.includes('[type="submit"]')) return page.stage === 'keycloak-login';
-      if (selector === 'form#kc-logout' || selector === '#kc-logout') return page.stage === 'keycloak';
+      if (selector === '#kc-logout-confirm' || selector === 'form.form-actions' || selector === '#kc-logout') return page.stage === 'keycloak';
       if (selector === '.session-actions > span' || selector === '.waiting-count > span' || selector === '.today-summary p') return page.stage === 'workbench';
       if (selector === 'article.current-card' || selector === '.next-summary' || selector === 'textarea, input:not([type="hidden"])') return false;
       if (selector.startsWith('text=')) return page.message === selector.slice(5);
@@ -70,17 +85,25 @@ function transport(failure = '') {
     };
     const item: any = { first: () => item, locator: (child: string) => locator(page, child), isVisible: async () => visible(), waitFor: async () => { if (!visible()) throw Error('not visible'); }, count: async () => visible() ? 1 : 0,
       textContent: async () => selector === '.session-actions > span' ? '原合成联系人 · 原合成任职' : selector === '.waiting-count > span' ? '等待 1' : selector === '.today-summary p' ? waiting().todaySummary : selector === '.choice-account > span' ? '原合成联系人' : page.message,
-      inputValue: async () => appointment, getAttribute: async (key: string) => selector === 'form#kc-logout' && key === 'action' ? environments.BUSINESS_PIN.issuer + '/protocol/openid-connect/logout/logout-confirm?session_code=private-never-read' : null,
+      inputValue: async () => appointment, getAttribute: async (key: string) => selector === 'form.form-actions' && key === 'action' ? environments.BUSINESS_PIN.issuer + '/protocol/openid-connect/logout/logout-confirm?session_code=private-never-read' : selector === 'form.form-actions' && key === 'method' ? 'post' : selector === '#kc-logout' && key === 'type' ? 'submit' : selector === '#kc-logout' && key === 'name' ? 'confirmLogout' : null,
       fill: async () => {}, click: async () => {
         if (role === 'button' && name === '登录工作台') {
           page.logins++; page.stage = page.logins === 1 && page.index === 0 ? 'keycloak-login' : 'chooser';
           page.currentUrl = page.stage === 'keycloak-login' ? environments.BUSINESS_PIN.issuer + '/protocol/openid-connect/auth' : environments.BUSINESS_PIN.origin + '/workbench';
-          if (page.stage === 'chooser') { await emit(page, '/realms/local-r1/protocol/openid-connect/token', 'POST'); await emit(page, '/api/v1/session/context'); }
+          if (page.stage === 'chooser') {
+            await emit(page, '/realms/local-r1/protocol/openid-connect/token', 'POST');
+            if (failure === 'delayed-previous-entry' && page.logins === 2) for (const deliver of page.deferred.splice(0)) deliver();
+            else await emit(page, '/api/v1/session/context');
+          }
         } else if (selector.includes('[type="submit"]') && page.stage === 'keycloak-login') {
           page.stage = 'chooser'; page.currentUrl = environments.BUSINESS_PIN.origin + '/workbench'; await emit(page, '/realms/local-r1/protocol/openid-connect/token', 'POST'); await emit(page, '/api/v1/session/context');
         } else if (role === 'button' && name === '确认本次身份') {
-          page.stage = 'workbench'; page.currentUrl = environments.BUSINESS_PIN.origin + '/workbench'; await emit(page, '/api/v1/workcards/current');
+          page.stage = 'workbench'; page.currentUrl = environments.BUSINESS_PIN.origin + '/workbench';
+          if (!(failure === 'delayed-previous-entry' && page.logins === 2)) await emit(page, '/api/v1/workcards/current');
+          if (failure === 'delayed-previous-entry' && page.logins === 1) { await emit(page, '/api/v1/session/context', 'GET', true); await emit(page, '/api/v1/workcards/current', 'GET', true); }
           if (failure === 'unexpected-write' && page.index === 0 && page.logins === 1) await emit(page, '/api/v1/leads', 'POST');
+          if (failure === 'unrelated-realm-get' && page.index === 0 && page.logins === 1) await emit(page, '/realms/local-r1/admin/serverinfo');
+          if (failure === 'logout-confirm-get' && page.index === 0 && page.logins === 1) await emit(page, '/realms/local-r1/protocol/openid-connect/logout/logout-confirm');
         } else if (role === 'button' && name === '退出') {
           page.logouts++; page.stage = 'login'; page.currentUrl = environments.BUSINESS_PIN.origin + '/login'; page.message = '已退出本页面，统一会话退出尚未确认。'; clearPeer(page, '已退出本页面，请重新登录。');
           if (failure === 'fault-as-success' && page.logouts === 2) return;
@@ -90,13 +113,25 @@ function transport(failure = '') {
     return item;
   }
   function makePage(index: number) {
-    const page: any = { index, logins: 0, logouts: 0, stage: 'login', message: null, currentUrl: environments.BUSINESS_PIN.origin + '/login', listeners: {} as Record<string,Function>,
+    const page: any = { index, logins: 0, logouts: 0, stage: 'login', message: null, currentUrl: environments.BUSINESS_PIN.origin + '/login', listeners: {} as Record<string,Function>, deferred: [] as Function[],
       on(event: string, callback: Function) { page.listeners[event] = callback; }, url: () => page.currentUrl, async goto(url: string) { page.currentUrl = url; page.stage = 'login'; },
       async waitForURL(predicate: any) { if (typeof predicate === 'function' ? !predicate(new URL(page.currentUrl)) : false) throw Error('wrong URL'); },
       getByRole: (role: string, options: any) => locator(page, '', role, options.name), getByText: (name: string) => locator(page, 'text=' + name), locator: (selector: string) => locator(page, selector),
-      async bringToFront() {}, async waitForEvent(event: string) { expect(event).toBe('framenavigated'); if (failure === 'history-none') throw Error('no history'); return new Promise(resolve => { page.navigation = resolve; }); },
-      async goBack() { if (failure === 'history-none') return null; page.stage = failure === 'history-revival' ? 'workbench' : 'login'; page.currentUrl = environments.BUSINESS_PIN.origin + (page.stage === 'workbench' ? '/workbench' : '/login'); page.navigation?.({}); return failure === 'history-same-document' ? null : {}; },
+      async bringToFront() {}, mainFrame: () => page.main,
+      async waitForEvent(event: string, options: any) { expect(event).toBe('framenavigated'); if (failure === 'history-none') throw Error('no history'); return new Promise((resolve, reject) => { page.navigation = (frame: any) => options?.predicate && !options.predicate(frame) ? reject(Error('unrelated history')) : resolve(frame); }); },
+      async goBack() {
+        if (failure === 'history-none') return null;
+        const target = environments.BUSINESS_PIN.origin + '/workbench';
+        const frame = failure === 'history-subframe' ? { page: () => page, url: () => environments.BUSINESS_PIN.origin + '/workbench' } : page.main;
+        if (failure === 'history-unrelated') page.main.historyUrl = new URL(environments.BUSINESS_PIN.issuer).origin + '/unrelated';
+        else page.main.historyUrl = target;
+        page.navigation?.(frame);
+        page.stage = failure === 'history-revival' || failure === 'history-delayed-safe-redirect' ? 'workbench' : 'login'; page.currentUrl = environments.BUSINESS_PIN.origin + (page.stage === 'workbench' ? '/workbench' : '/login'); page.main.historyUrl = page.currentUrl;
+        if (failure === 'history-delayed-safe-redirect') pendingClears.push({ due: elapsed + 500, page, message: page.message });
+        return failure === 'history-same-document' ? null : {};
+      },
     };
+    page.main = { page: () => page, url: () => page.main.historyUrl ?? page.currentUrl };
     pages.push(page); return page;
   }
   const context: any = { on() {}, async route(_pattern: string, handler: any) { routeHandler = handler; }, async newPage() { return makePage(pages.length); }, request: { async get(url: string, options: any) {
@@ -104,10 +139,17 @@ function transport(failure = '') {
     expect(options.maxRedirects).toBe(0); expect(options.failOnStatusCode).toBe(false); expect(options.headers.Authorization).toMatch(/^Bearer /);
     const status = failure === 'old-token-200' && probes.length === 0 ? 200 : 401; probes.push({ path: new URL(url).pathname, status }); return { status: () => status };
   } }, close: async () => {} };
-  const browser: any = { version: () => environments.BUSINESS_PIN.browserVersion, async newContext(options: any) { opened = true; expect(options).toMatchObject({ serviceWorkers: 'block', ignoreHTTPSErrors: false }); return context; }, async close() { closed = true; } };
+  const browser: any = { version: () => environments.BUSINESS_PIN.browserVersion, async newContext(options: any) { opened = true; expect(options).toMatchObject({ serviceWorkers: 'block', ignoreHTTPSErrors: false }); return context; }, async close() {
+    if (failure === 'cleanup-late-response' && pages[0]) {
+      const page = pages[0], headers = { authorization: token(page), 'x-appointment-id': appointment };
+      const request: any = { url: () => environments.BUSINESS_PIN.origin + '/api/v1/session/context', method: () => 'GET', allHeaders: async () => headers, frame: () => ({ page: () => page }) };
+      page.listeners.response?.({ url: request.url, request: () => request, status: () => 200, allHeaders: async () => ({ 'cache-control': 'no-store' }), json: async () => ({}) });
+    }
+    closed = true;
+  } };
   const environment: any = { ...environments.BUSINESS_PIN, environmentDigest: 'c'.repeat(64), apiIdentity: 'd'.repeat(64), outputDirectory: folder, readonlyProof: { ...environments.READONLY_WAITING_PIN }, accounts: { contact: { username: 'synthetic-contact', password: 'ephemeral' } }, resources: { 'appointment-contact': appointment },
     verifyBrowser(actual: string) { expect(actual).toBe(environments.BUSINESS_PIN.browserVersion); }, async assertUnchanged() { guardCalls++; if (closed && failure === 'final-guard') throw Error('private final guard'); } };
-  const clock: any = { now: () => elapsed, wallNow: () => wall + elapsed, async sleep(ms: number) { sleeps.push(ms); expect(ms).toBeGreaterThan(0); expect(ms).toBeLessThanOrEqual(30_000); elapsed += ms; }, deadline: 510_000 };
+  const clock: any = { now: () => elapsed, wallNow: () => wall + elapsed, async sleep(ms: number) { sleeps.push(ms); expect(ms).toBeGreaterThan(0); expect(ms).toBeLessThanOrEqual(30_000); elapsed += ms; for (let index = pendingClears.length - 1; index >= 0; index--) if (pendingClears[index].due <= elapsed) { const [clear] = pendingClears.splice(index, 1); clear.page.stage = 'login'; clear.page.currentUrl = environments.BUSINESS_PIN.origin + '/login'; clear.page.message = clear.message; } }, deadline: 510_000 };
   return { browser, environment, clock, folder, forwarded, probes, sleeps, pages, opened: () => opened, closed: () => closed, guardCalls: () => guardCalls };
 }
 
@@ -123,7 +165,7 @@ test('actual logout consumer distinguishes the held network failure from confirm
   const { result, value } = await execute();
   expect(result.status).toBe('PASSED_READ_ONLY_SUBSCENARIO');
   expect(result.scenarios).toEqual({ faultLogout: 'PASSED', confirmedLogout: 'PASSED', tokenRejection: 'PASSED', historySafety: 'PASSED' });
-  expect(result.counts).toMatchObject({ successfulSelf: 4, faultedLogoutRequests: 1, forwardedLogoutGets: 1, confirmPosts: 1, requestFailed: 1, tokenProbes: 4, blockedRequests: 0, businessWrites: 0 });
+  expect(result.counts).toMatchObject({ successfulSelf: 6, faultedLogoutRequests: 1, forwardedLogoutGets: 1, confirmPosts: 1, requestFailed: 1, tokenProbes: 4, blockedRequests: 0, businessWrites: 0 });
   expect(value.probes).toEqual([{ path: '/api/v1/session/context', status: 401 }, { path: '/api/v1/workcards/current', status: 401 }, { path: '/api/v1/session/context', status: 401 }, { path: '/api/v1/workcards/current', status: 401 }]);
   expect(Math.max(...value.sleeps, 0)).toBeLessThanOrEqual(30_000);
 });
@@ -133,21 +175,39 @@ test('actual logout consumer treats a same-document history event as triggered e
   expect(result.status).toBe('PASSED_READ_ONLY_SUBSCENARIO'); expect(result.scenarios.historySafety).toBe('PASSED');
 });
 
+test('actual logout consumer allows a recorded application history visit to finish its safe redirect', async () => {
+  const { result } = await execute('history-delayed-safe-redirect');
+  expect(result.status).toBe('PASSED_READ_ONLY_SUBSCENARIO'); expect(result.scenarios.historySafety).toBe('PASSED');
+});
+
+test('actual logout consumer waits for delayed peer logout delivery and rendering', async () => {
+  const { result } = await execute('peer-delayed');
+  expect(result.status).toBe('PASSED_READ_ONLY_SUBSCENARIO'); expect(result.checks.peerCleared).toBe(true);
+});
+
+test('actual logout consumer stops late response production before cleanup and remains sanitized', async () => {
+  const { result } = await execute('cleanup-late-response');
+  expect(result.status).toBe('PASSED_READ_ONLY_SUBSCENARIO'); expect(result.failureStep).toBeNull();
+});
+
 test('actual logout consumer reuses the verified same-Actor workbench cache for a matching reentry 304', async () => {
   const { result } = await execute('reentry-304');
   expect(result.status).toBe('PASSED_READ_ONLY_SUBSCENARIO');
-  expect(result.http.filter((event: any) => event.kind === 'CURRENT').map((event: any) => event.status)).toEqual([200, 200, 304, 304]);
+  expect(result.http.filter((event: any) => event.kind === 'CURRENT').map((event: any) => event.status)).toEqual([200, 200, 304, 304, 304, 304]);
 });
 
 for (const [failure, step] of [
   ['fault-as-success','CONFIRMED_LOGOUT'], ['old-token-200','TOKEN_REJECTION'], ['identity-drift','REENTRY'], ['peer-not-cleared','FAULT_LOCAL_CLEAR'], ['peer-success-message','FAULT_LOCAL_CLEAR'],
   ['history-none','HISTORY'], ['history-revival','HISTORY'], ['expired-token','TOKEN_REJECTION'], ['final-guard','FINAL_GUARD'], ['unexpected-write','NETWORK'], ['id-token-hint','NETWORK'], ['fault-no-requestfailed','FAULT_TRANSPORT'],
+  ['unrelated-realm-get','NETWORK'], ['logout-confirm-get','NETWORK'], ['history-unrelated','HISTORY'], ['history-subframe','HISTORY'], ['delayed-previous-entry','REENTRY'],
 ] as const) test(`actual logout consumer cannot pass ${failure}`, async () => {
   const { result, value } = await execute(failure);
   expect(result.status).not.toBe('PASSED_READ_ONLY_SUBSCENARIO'); expect(result.failureStep).toBe(step);
   if (failure === 'fault-as-success') expect(result.scenarios.confirmedLogout).not.toBe('PASSED');
   if (failure === 'old-token-200' || failure === 'expired-token') expect(result.scenarios.tokenRejection).not.toBe('PASSED');
   if (failure === 'unexpected-write') expect(value.forwarded).not.toContain('POST /api/v1/leads');
+  if (failure === 'unrelated-realm-get') expect(value.forwarded).not.toContain('GET /realms/local-r1/admin/serverinfo');
+  if (failure === 'logout-confirm-get') expect(value.forwarded).not.toContain('GET /realms/local-r1/protocol/openid-connect/logout/logout-confirm');
 });
 
 test('launch failure remains guarded, closes no context and publishes only sanitized FAILED evidence', async () => {

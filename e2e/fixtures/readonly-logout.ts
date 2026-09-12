@@ -53,8 +53,27 @@ function allowed(url: URL, method: string): boolean {
   const read = ['GET','HEAD','OPTIONS'].includes(method);
   if (url.origin === BUSINESS_PIN.origin) return read && (!(url.pathname === '/api' || url.pathname.startsWith('/api/')) || [SELF,CURRENT].includes(url.pathname));
   if (url.origin !== new URL(BUSINESS_PIN.issuer).origin) return false;
-  if (method === 'GET') return url.pathname === LOGOUT || url.pathname === '/realms/local-r1' || url.pathname.startsWith('/realms/local-r1/') || url.pathname.startsWith('/resources/');
+  if (method === 'GET') return [
+    '/realms/local-r1',
+    '/realms/local-r1/protocol/openid-connect/auth',
+    '/realms/local-r1/protocol/openid-connect/login-status-iframe.html',
+    '/realms/local-r1/protocol/openid-connect/3p-cookies/step1.html',
+    '/realms/local-r1/protocol/openid-connect/3p-cookies/step2.html',
+    LOGOUT,
+  ].includes(url.pathname) || url.pathname.startsWith('/resources/');
   return method === 'POST' && ([TOKEN,CONFIRM].includes(url.pathname) || url.pathname === '/realms/local-r1/login-actions/authenticate');
+}
+
+export async function submitKeycloakLogoutConfirmation(page: Page): Promise<void> {
+  const container = page.locator('#kc-logout-confirm');
+  await container.waitFor({ state: 'visible', timeout: 30_000 });
+  const form = container.locator('form.form-actions');
+  check(await form.isVisible() && (await form.getAttribute('method'))?.toLowerCase() === 'post');
+  const action = await form.getAttribute('action'); check(action); const actionUrl = new URL(action, BUSINESS_PIN.issuer);
+  check(actionUrl.origin === new URL(BUSINESS_PIN.issuer).origin && actionUrl.pathname === CONFIRM);
+  const submit = form.locator('#kc-logout');
+  check(await submit.isVisible() && (await submit.getAttribute('type'))?.toLowerCase() === 'submit' && await submit.getAttribute('name') === 'confirmLogout');
+  await submit.click({ timeout: 30_000, noWaitAfter: true });
 }
 
 // External browser transport, clock and UUID entropy may vary in offline tests.
@@ -71,10 +90,13 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
     counts: { successfulSelf: 0, current: 0, faultedLogoutRequests: 0, forwardedLogoutGets: 0, confirmPosts: 0, requestFailed: 0, tokenProbes: 0, blockedRequests: 0, businessWrites: 0 }, http: [], failureStep: null,
   };
   let browser = typeof browserSource === 'function' ? undefined : browserSource, source: Page | undefined, peer: Page | undefined;
-  let step: LogoutFailureStep = 'PRECHECK', stopped = false, observation = Promise.resolve(), faultArmed = false, faultReleased = false, faultRequest: Request | undefined;
+  let step: LogoutFailureStep = 'PRECHECK', stopped = false, observation = Promise.resolve(), acceptingObservations = true, faultArmed = false, faultReleased = false, faultRequest: Request | undefined;
+  let retainedOld: Array<{ authorization: string; expiresAt: number }> = [];
   let releaseFault!: () => void; const faultGate = new Promise<void>(resolve => { releaseFault = resolve; });
-  type Seen = { self: any; selfCount: number; currentCount: number; authorization: string; expiresAt: number; cache?: WorkbenchCache };
-  const seen = new Map<Page, Seen>(), baseline: { self?: any } = {};
+  type Seen = { self: any; selfCount: number; currentCount: number; authorization: string; expiresAt: number; cache?: WorkbenchCache; entry: number; entrySelf: boolean; entryCurrent: boolean; requestGeneration: number };
+  type ApiRequestEvidence = { kind: 'SELF' | 'CURRENT'; entry: number; generation: number; authorization: string; appointmentId?: string; actorScopeKey?: string };
+  const seen = new Map<Page, Seen>(), historyOpportunity = new Map<Page, string>(), baseline: { self?: any } = {};
+  const requestEvidence = new Map<Request, ApiRequestEvidence>();
   const fail = (at: LogoutFailureStep) => { report.failureStep ??= at; stopped = true; };
   const healthy = () => check(!stopped && clock.now() < deadline);
   const settle = async () => { await observation; healthy(); };
@@ -82,6 +104,11 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
   const until = async (done: () => boolean, maximum = 30_000) => {
     const end = clock.now() + maximum;
     while (!done()) { healthy(); check(clock.now() < end); await delay(Math.min(250, end - clock.now())); }
+    await settle();
+  };
+  const untilAsync = async (done: () => Promise<boolean>, maximum = 30_000) => {
+    const end = clock.now() + maximum;
+    while (!(await done())) { healthy(); check(clock.now() < end); await delay(Math.min(250, end - clock.now())); }
     await settle();
   };
   const pageFor = (request: Request) => request.frame().page();
@@ -96,30 +123,38 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
   const observe = async (response: Response) => {
     const request = response.request(), url = new URL(response.url()), page = pageFor(request), state = seen.get(page); check(state);
     if (url.origin === BUSINESS_PIN.origin && url.pathname === SELF) {
+      const evidence = requestEvidence.get(request); check(evidence?.kind === 'SELF');
       check(request.method() === 'GET' && response.status() === 200);
       const headers = lowerHeaders(await response.allHeaders()); check(headers['cache-control']?.toLowerCase() === 'no-store');
-      const value = await response.json(); identity(value); state.self = structuredClone(value); state.selfCount++; report.counts.successfulSelf++;
-      const requestHeaders = await request.allHeaders(), authorization = requestHeaders.authorization ?? requestHeaders.Authorization; check(authorization); state.authorization = authorization; state.expiresAt = expiry(authorization);
+      const value = await response.json(); identity(value); state.selfCount++; report.counts.successfulSelf++;
+      if (evidence.entry === state.entry) { state.self = structuredClone(value); state.entrySelf = true; state.authorization = evidence.authorization; state.expiresAt = expiry(evidence.authorization); }
       report.http.push({ kind: 'SELF', status: 200, offsetMs: clock.now() - started });
     } else if (url.origin === BUSINESS_PIN.origin && url.pathname === CURRENT) {
-      check(request.method() === 'GET' && [200,304].includes(response.status()) && state.self);
-      const requestHeaders = lowerHeaders(await request.allHeaders()), authorization = requestHeaders.authorization;
-      check(authorization && requestHeaders['x-appointment-id'] === state.self.selectedAppointmentId && !requestHeaders['x-on-behalf-appointment-id']);
-      state.cache = validateWorkbenchCache({ status: response.status(), headers: lowerHeaders(await response.allHeaders()), requestHeaders, body: response.status() === 200 ? await response.json() : undefined, actorScopeKey: state.self.actorScopeKey, generation: state.currentCount + 1 }, state.cache);
+      const evidence = requestEvidence.get(request); check(evidence?.kind === 'CURRENT' && evidence.actorScopeKey);
+      check(request.method() === 'GET' && [200,304].includes(response.status()));
+      const requestHeaders = lowerHeaders(await request.allHeaders());
+      check(requestHeaders.authorization === evidence.authorization && requestHeaders['x-appointment-id'] === evidence.appointmentId && !requestHeaders['x-on-behalf-appointment-id']);
+      state.cache = validateWorkbenchCache({ status: response.status(), headers: lowerHeaders(await response.allHeaders()), requestHeaders, body: response.status() === 200 ? await response.json() : undefined, actorScopeKey: evidence.actorScopeKey, generation: evidence.generation }, state.cache);
       const value = state.cache.envelope; check(exact(value, ['todaySummary','currentCard','nextSummaries','waitingCount','chatComposer']));
       check(typeof value.todaySummary === 'string' && value.currentCard === null && Array.isArray(value.nextSummaries) && value.nextSummaries.length === 0 && value.waitingCount === 1);
       check(value.chatComposer?.enabled === false && value.chatComposer.targetTaskId === null);
-      state.authorization = authorization; state.expiresAt = expiry(authorization); state.currentCount++; report.counts.current++;
+      state.currentCount++; report.counts.current++;
+      if (evidence.entry === state.entry && state.entrySelf) { state.authorization = evidence.authorization; state.expiresAt = expiry(evidence.authorization); state.entryCurrent = true; }
       report.http.push({ kind: 'CURRENT', status: response.status(), offsetMs: clock.now() - started });
     } else if (url.origin === new URL(BUSINESS_PIN.issuer).origin && url.pathname === TOKEN) check(response.status() === 200);
     else if (url.origin === new URL(BUSINESS_PIN.issuer).origin && url.pathname === LOGOUT) report.http.push({ kind: 'LOGOUT_GET', status: response.status(), offsetMs: clock.now() - started });
     else if (url.origin === new URL(BUSINESS_PIN.issuer).origin && url.pathname === CONFIRM) report.http.push({ kind: 'LOGOUT_CONFIRM', status: response.status(), offsetMs: clock.now() - started });
   };
   const cleared = async (page: Page, message: string) => {
-    check(new URL(page.url()).origin !== BUSINESS_PIN.origin || new URL(page.url()).pathname === '/login');
-    check(await page.getByText(message, { exact: true }).isVisible());
-    check(await page.locator('.session-actions > span').count() === 0 && await page.locator('article.current-card').count() === 0 && await page.locator('.next-summary').count() === 0);
-    check(await page.locator('textarea, input:not([type="hidden"])').count() === 0);
+    await untilAsync(async () => {
+      const url = new URL(page.url());
+      return (url.origin !== BUSINESS_PIN.origin || url.pathname === '/login')
+        && await page.getByText(message, { exact: true }).isVisible()
+        && await page.locator('.session-actions > span').count() === 0
+        && await page.locator('article.current-card').count() === 0
+        && await page.locator('.next-summary').count() === 0
+        && await page.locator('textarea, input:not([type="hidden"])').count() === 0;
+    });
   };
   const waitingUi = async (page: Page, state: Seen) => {
     check(state.self && state.currentCount > 0);
@@ -128,9 +163,10 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
     check((await page.locator('.session-actions > span').textContent())?.trim() === `${state.self.displayName} · ${state.self.appointmentChoices[0].label}`);
     check(await page.locator('article.current-card').count() === 0 && await page.locator('.next-summary').count() === 0 && await page.locator('textarea, input:not([type="hidden"])').count() === 0);
   };
-  const enter = async (page: Page, credentials: boolean) => {
-    const state = seen.get(page)!; const priorSelf = state.selfCount, priorCurrent = state.currentCount;
-    await page.goto(BUSINESS_PIN.origin + '/login', { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  const enter = async (page: Page, credentials: boolean, navigate = true) => {
+    const state = seen.get(page)!; const entry = ++state.entry; state.entrySelf = false; state.entryCurrent = false;
+    if (navigate) await page.goto(BUSINESS_PIN.origin + '/login', { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    else { const url = new URL(page.url()); check(url.origin === BUSINESS_PIN.origin && url.pathname === '/login'); }
     await page.getByRole('button', { name: '登录工作台', exact: true }).click({ timeout: 30_000 });
     if (credentials) {
       await page.waitForURL(url => url.origin === new URL(BUSINESS_PIN.issuer).origin && url.pathname.startsWith('/realms/local-r1/'), { timeout: 30_000 });
@@ -138,11 +174,17 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
       await page.locator('input[name="password"]').fill(environment.accounts.contact.password);
       await page.locator('input[type="submit"],button[type="submit"]').click({ timeout: 30_000 });
     }
-    await until(() => state.selfCount > priorSelf);
+    await until(() => state.entry === entry && state.entrySelf);
     await page.getByRole('heading', { name: '请选择本次办理身份', exact: true }).waitFor({ state: 'visible', timeout: 30_000 });
     check((await page.locator('.choice-account > span').textContent())?.trim() === state.self.displayName && await page.locator('#choice-own').inputValue() === state.self.selectedAppointmentId);
     await page.getByRole('button', { name: '确认本次身份', exact: true }).click({ timeout: 30_000 });
-    await until(() => state.currentCount > priorCurrent); await waitingUi(page, state);
+    await until(() => state.entry === entry && state.entryCurrent); await waitingUi(page, state);
+  };
+  const prepareHistory = async (page: Page) => {
+    const url = new URL(page.url()); check(url.origin === BUSINESS_PIN.origin && url.pathname === '/workbench');
+    await waitingUi(page, seen.get(page)!); historyOpportunity.set(page, url.href);
+    await page.goto(BUSINESS_PIN.origin + '/login', { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await enter(page, false, false);
   };
   try {
     check(JSON.stringify(environment.readonlyProof) === JSON.stringify(READONLY_WAITING_PIN));
@@ -156,6 +198,16 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
       const request = route.request(), url = new URL(request.url()), method = request.method();
       try {
         healthy(); check(!request.serviceWorker() && allowed(url, method));
+        if (url.origin === BUSINESS_PIN.origin && [SELF,CURRENT].includes(url.pathname)) {
+          const state = seen.get(pageFor(request)); check(state && method === 'GET');
+          const headers = lowerHeaders(await request.allHeaders()), authorization = headers.authorization; check(authorization);
+          const evidence: ApiRequestEvidence = { kind: url.pathname === SELF ? 'SELF' : 'CURRENT', entry: state.entry, generation: ++state.requestGeneration, authorization };
+          if (evidence.kind === 'CURRENT') {
+            check(state.entrySelf && state.self && headers['x-appointment-id'] === state.self.selectedAppointmentId && !headers['x-on-behalf-appointment-id']);
+            evidence.appointmentId = state.self.selectedAppointmentId; evidence.actorScopeKey = state.self.actorScopeKey;
+          }
+          requestEvidence.set(request, evidence);
+        }
         if (url.pathname === TOKEN && method === 'POST') check(['authorization_code','refresh_token'].includes(new URLSearchParams(request.postData() ?? '').get('grant_type') ?? ''));
         if (url.pathname === LOGOUT && method === 'GET') check(!url.searchParams.has('id_token_hint'));
         if (url.pathname === LOGOUT && method === 'GET' && faultArmed) {
@@ -172,9 +224,9 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
     });
     source = await context.newPage(); peer = await context.newPage();
     for (const page of [source,peer]) {
-      seen.set(page, { self: undefined, selfCount: 0, currentCount: 0, authorization: '', expiresAt: 0 });
-      page.on('response', response => { observation = observation.then(() => observe(response)).catch(() => fail(step)); });
-      page.on('requestfailed', request => { report.counts.requestFailed++; if (!(faultReleased && request === faultRequest)) fail('NETWORK'); });
+      seen.set(page, { self: undefined, selfCount: 0, currentCount: 0, authorization: '', expiresAt: 0, entry: 0, entrySelf: false, entryCurrent: false, requestGeneration: 0 });
+      page.on('response', response => { if (acceptingObservations) observation = observation.then(() => observe(response)).catch(() => fail(step)); });
+      page.on('requestfailed', request => { if (acceptingObservations) { report.counts.requestFailed++; if (!(faultReleased && request === faultRequest)) fail('NETWORK'); } });
     }
     step = 'LOGIN'; await enter(source, true); step = 'IDENTITY'; await enter(peer, false); step = 'WAITING';
     check(report.counts.successfulSelf >= 2 && report.counts.current >= 2);
@@ -189,21 +241,19 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
     check(report.counts.faultedLogoutRequests === 1 && report.counts.requestFailed === 1 && report.counts.forwardedLogoutGets === 0); report.checks.faultRequestFailed = true; report.scenarios.faultLogout = 'PASSED';
 
     step = 'REENTRY'; faultArmed = false; await enter(peer, false); await enter(source, false); report.checks.bothReentered = true;
-    check(report.counts.successfulSelf >= 4); const old = [seen.get(source)!, seen.get(peer)!].map(value => ({ authorization: value.authorization, expiresAt: value.expiresAt }));
+    check(report.counts.successfulSelf >= 4);
+    await prepareHistory(peer); await prepareHistory(source);
+    check(report.counts.successfulSelf >= 6); retainedOld = [seen.get(source)!, seen.get(peer)!].map(value => ({ authorization: value.authorization, expiresAt: value.expiresAt }));
 
     step = 'CONFIRMED_LOGOUT'; await source.getByRole('button', { name: '退出', exact: true }).click({ timeout: 30_000, noWaitAfter: true });
     await source.waitForURL(url => url.origin === new URL(BUSINESS_PIN.issuer).origin && url.pathname === LOGOUT, { timeout: 30_000 });
     await cleared(peer, PEER_MESSAGE);
-    const form = source.locator('form#kc-logout'); await form.waitFor({ state: 'visible', timeout: 30_000 });
-    const action = await form.getAttribute('action'); check(action); const actionUrl = new URL(action, BUSINESS_PIN.issuer);
-    check(actionUrl.origin === new URL(BUSINESS_PIN.issuer).origin && actionUrl.pathname === CONFIRM);
-    const confirm = source.locator('#kc-logout'); check(await confirm.isVisible()); report.checks.confirmFormVisible = true;
-    await confirm.click({ timeout: 30_000 });
+    await submitKeycloakLogoutConfirmation(source); report.checks.confirmFormVisible = true;
     await source.waitForURL(url => url.origin === BUSINESS_PIN.origin && url.pathname === '/login', { timeout: 30_000 });
     check(Number(report.counts.forwardedLogoutGets) === 1 && Number(report.counts.confirmPosts) === 1); report.checks.serverLogoutConfirmed = true; report.scenarios.confirmedLogout = 'PASSED';
 
     step = 'TOKEN_REJECTION';
-    for (const state of old) for (const [path, kind] of [[SELF,'OLD_SELF'],[CURRENT,'OLD_CURRENT']] as const) {
+    for (const state of retainedOld) for (const [path, kind] of [[SELF,'OLD_SELF'],[CURRENT,'OLD_CURRENT']] as const) {
       check(clock.wallNow() < state.expiresAt);
       const response = await context.request.get(BUSINESS_PIN.origin + path, { headers: { Authorization: state.authorization, 'X-Appointment-Id': environment.resources['appointment-contact'] }, maxRedirects: 0, failOnStatusCode: false });
       check(clock.wallNow() < state.expiresAt); const status = response.status(); report.counts.tokenProbes++; report.http.push({ kind, status, offsetMs: clock.now() - started }); check(status === 401);
@@ -212,22 +262,36 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
 
     step = 'HISTORY';
     for (const page of [source,peer]) {
+      const expected = historyOpportunity.get(page);
+      if (!expected) { report.status = 'NOT_TRIGGERED'; report.scenarios.historySafety = 'NOT_TRIGGERED'; throw Error(); }
       await page.bringToFront();
-      const navigated = page.waitForEvent('framenavigated', { timeout: 30_000 }).then(() => true).catch(() => false);
+      const navigated = page.waitForEvent('framenavigated', { timeout: 30_000, predicate: frame => frame === page.mainFrame() && frame.url() === expected }).then(() => true).catch(() => false);
       const navigation = await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30_000 });
-      if (navigation === null && !(await navigated)) { report.status = 'NOT_TRIGGERED'; report.scenarios.historySafety = 'NOT_TRIGGERED'; throw Error(); }
-      await page.bringToFront(); const url = new URL(page.url()); check(url.origin !== BUSINESS_PIN.origin || url.pathname !== '/workbench');
-      check(await page.locator('.session-actions > span').count() === 0 && await page.locator('article.current-card').count() === 0 && await page.locator('.next-summary').count() === 0 && await page.locator('textarea, input:not([type="hidden"])').count() === 0);
-      check(await page.getByText(baseline.self.displayName, { exact: true }).count() === 0);
+      const visited = await navigated;
+      if (navigation === null && !visited) { report.status = 'NOT_TRIGGERED'; report.scenarios.historySafety = 'NOT_TRIGGERED'; throw Error(); }
+      check(visited);
+      await page.bringToFront(); const displayName = baseline.self?.displayName; check(typeof displayName === 'string');
+      await untilAsync(async () => {
+        const url = new URL(page.url());
+        return (url.origin !== BUSINESS_PIN.origin || url.pathname !== '/workbench')
+          && await page.locator('.session-actions > span').count() === 0
+          && await page.locator('article.current-card').count() === 0
+          && await page.locator('.next-summary').count() === 0
+          && await page.locator('textarea, input:not([type="hidden"])').count() === 0
+          && await page.getByText(displayName, { exact: true }).count() === 0;
+      });
     }
-    report.checks.historyDidNotRevive = true; report.scenarios.historySafety = 'PASSED'; report.status = 'PASSED_READ_ONLY_SUBSCENARIO'; report.failureStep = null;
+    report.checks.historyDidNotRevive = true; report.scenarios.historySafety = 'PASSED'; report.status = 'PASSED_READ_ONLY_SUBSCENARIO';
   } catch {
     report.failureStep ??= step;
     if (report.status === 'PASSED_READ_ONLY_SUBSCENARIO') report.status = 'FAILED';
   } finally {
+    acceptingObservations = false;
     try { await browser?.close(); } catch { fail('CLEANUP'); }
-    for (const state of seen.values()) { state.authorization = ''; state.expiresAt = 0; state.self = undefined; }
     await observation;
+    for (const state of seen.values()) { state.authorization = ''; state.expiresAt = 0; state.self = undefined; state.cache = undefined; state.entrySelf = false; state.entryCurrent = false; }
+    for (const value of retainedOld) { value.authorization = ''; value.expiresAt = 0; }
+    retainedOld = []; baseline.self = undefined; requestEvidence.clear(); historyOpportunity.clear(); faultRequest = undefined;
     try { await environment.assertUnchanged(); report.checks.environmentUnchanged = true; report.checks.journalUnchanged = true; report.checks.checkpointUnchanged = true; } catch { fail('FINAL_GUARD'); }
     if (stopped) report.status = 'FAILED';
   }
