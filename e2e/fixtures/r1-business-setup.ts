@@ -142,6 +142,11 @@ export class BusinessSetup {
       void completion.finally(() => { session.workbenchPending?.delete(generation); }).catch(() => {});
     }
   }
+  private settleWorkbenchFailure(session: Session, snapshot: WorkbenchRequestSnapshot, error: unknown): void {
+    const sameActor = snapshot.actorScopeKey === session.self?.actorScopeKey && snapshot.appointmentId === session.appointmentId
+      && session.self?.selectedAppointmentId === snapshot.appointmentId;
+    if (sameActor && snapshot.generation !== session.workbenchGeneration) snapshot.resolve(); else snapshot.reject(error);
+  }
   private async validateWorkbenchResponse(response: Response, session: Session, snapshot: WorkbenchRequestSnapshot): Promise<void> {
     await session.identityReady;
     const url = new URL(response.url()), request = response.request();
@@ -171,7 +176,7 @@ export class BusinessSetup {
     const snapshot = this.workbenchRequests.get(response.request());
     if (!snapshot) return Promise.reject(new Error('T9_BUSINESS_BOUNDARY'));
     const validation = this.validateWorkbenchResponse(response, session, snapshot);
-    void validation.then(snapshot.resolve, snapshot.reject);
+    void validation.then(snapshot.resolve, error => this.settleWorkbenchFailure(session, snapshot, error));
     this.workbenchObservations.set(response, snapshot.completion); session.workbenchObservation = snapshot.completion;
     return snapshot.completion;
   }
@@ -181,7 +186,8 @@ export class BusinessSetup {
       if (url.origin === ORIGIN && url.pathname === CURRENT && response.request().method() === 'GET') this.observeWorkbenchResponse(response, session);
     });
     session.page.on('requestfailed', request => {
-      const snapshot = this.workbenchRequests.get(request); if (snapshot) snapshot.reject(new Error('T9_BUSINESS_BOUNDARY'));
+      const snapshot = this.workbenchRequests.get(request);
+      if (snapshot) this.settleWorkbenchFailure(session, snapshot, new Error('T9_BUSINESS_BOUNDARY'));
     });
   }
   private async awaitWorkbenchIdle(session: Session): Promise<void> {
@@ -244,7 +250,9 @@ export class BusinessSetup {
         check(url.origin === ORIGIN && url.pathname.startsWith('/api/') && !this.dispatchFailed && (session.workbenchPending?.size ?? 0) === 0);
         const headers = request.headers(), bytes = request.postDataBuffer(); check(bytes);
         check(headers['x-appointment-id'] === session.appointmentId && !headers['x-on-behalf-appointment-id']);
-        await this.gate.dispatch({ method, path: url.pathname, bodyBytes: bytes, commandId: headers['idempotency-key'], actorScopeKey: session.self?.actorScopeKey }, async () => { check(!this.dispatchFailed); await route.continue(); });
+        await this.gate.dispatch({ method, path: url.pathname, bodyBytes: bytes, commandId: headers['idempotency-key'], actorScopeKey: session.self?.actorScopeKey }, async () => {
+          check(!this.dispatchFailed && (session.workbenchPending?.size ?? 0) === 0); await route.continue();
+        });
       } catch { this.dispatchFailed = true; await route.abort().catch(() => {}); }
     });
     const account = this.environment.accounts[alias];
@@ -297,13 +305,25 @@ export class BusinessSetup {
     const data = await this.read(session, path + '?limit=50'); check(exact(data, ['items','nextCursor']) && data.nextCursor === null && Array.isArray(data.items)); return data.items;
   }
   private async current(session: Session): Promise<any | null> {
-    await this.awaitWorkbenchIdle(session);
-    check(!this.dispatchFailed && session.self?.selectedAppointmentId === session.appointmentId && /^Bearer \S+$/.test(session.auth.Authorization ?? ''));
-    const response = await session.context.request.get(ORIGIN + CURRENT, { headers: session.auth, failOnStatusCode: false, maxRedirects: 0 });
-    const headers = response.headers(), status = response.status(); this.http.push({ path: CURRENT, status });
-    check(!this.dispatchFailed && status === 200 && exactHeaderTokens(headers['cache-control'], ['private', 'no-cache'])
-      && exactHeaderTokens(headers.vary, ['authorization']) && workbenchETag(headers.etag));
-    const body = JSON.parse(await response.text()); parseEnvelope(body); return body.currentCard;
+    try {
+      await this.awaitWorkbenchIdle(session);
+      const actorScopeKey = session.self?.actorScopeKey, appointmentId = session.appointmentId;
+      const authorization = session.auth.Authorization, generation = session.workbenchGeneration ?? 0;
+      const unchanged = () => !this.dispatchFailed && (session.workbenchPending?.size ?? 0) === 0
+        && session.workbenchGeneration === generation && session.self?.actorScopeKey === actorScopeKey
+        && session.self?.selectedAppointmentId === appointmentId && session.appointmentId === appointmentId
+        && session.auth.Authorization === authorization && session.auth['X-Appointment-Id'] === appointmentId;
+      check(typeof actorScopeKey === 'string' && /^Bearer \S+$/.test(authorization ?? '') && unchanged());
+      const response = await session.context.request.get(ORIGIN + CURRENT, { headers: session.auth, failOnStatusCode: false, maxRedirects: 0 });
+      check(unchanged());
+      const headers = response.headers(), status = response.status(); this.http.push({ path: CURRENT, status });
+      check(status === 200 && exactHeaderTokens(headers['cache-control'], ['private', 'no-cache'])
+        && exactHeaderTokens(headers.vary, ['authorization']) && workbenchETag(headers.etag));
+      const body = JSON.parse(await response.text()); check(unchanged()); parseEnvelope(body); return body.currentCard;
+    } catch {
+      session.auth = {}; session.workbenchCache = undefined; this.dispatchFailed = true;
+      throw new Error('T9_BUSINESS_BOUNDARY');
+    }
   }
   private async refreshUi(session: Session): Promise<any | null> {
     const waiting = session.page.waitForResponse(response => new URL(response.url()).origin === ORIGIN && new URL(response.url()).pathname === CURRENT && response.request().method() === 'GET');

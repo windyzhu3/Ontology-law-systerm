@@ -558,6 +558,25 @@ test('offline BusinessSetup blocks arm and dispatch while the initial UI respons
   expect(setup.dispatchFailed).toBe(true);
 });
 
+test('offline BusinessSetup rechecks pending UI observations at the final route send boundary', async () => {
+  const { setup, routeHandler, beginCurrent } = await syntheticSetupRoute();
+  const counts = { continues: 0, aborts: 0 };
+  let enteredDispatch!: () => void, releaseDispatch!: () => void;
+  const entered = new Promise<void>(resolve => { enteredDispatch = resolve; });
+  const held = new Promise<void>(resolve => { releaseDispatch = resolve; });
+  setup.gate = { dispatch: async (_request: unknown, send: () => Promise<void>) => { enteredDispatch(); await held; await send(); } };
+  const dispatch = routeHandler({
+    request: () => ({ url: () => 'https://localhost:19444/api/v1/leads', method: () => 'POST',
+      headers: () => ({ 'x-appointment-id': setup.sessions.get('intake').appointmentId, 'idempotency-key': '00000000-0000-4000-8000-000000000191' }), postDataBuffer: () => Buffer.from('{}') }),
+    continue: async () => { counts.continues++; }, abort: async () => { counts.aborts++; },
+  });
+  await entered;
+  const pending = await beginCurrent(validEmptyEnvelope(), false);
+  releaseDispatch(); await dispatch;
+  expect(counts).toEqual({ continues: 0, aborts: 1 });
+  pending.fail();
+});
+
 test('offline BusinessSetup fails closed when an initial UI request ends without a response', async () => {
   const { setup, beginCurrent } = await syntheticSetupRoute();
   const initial = await beginCurrent(validEmptyEnvelope(), false);
@@ -608,6 +627,42 @@ test('offline BusinessSetup ignores an older UI response delivered after a newer
   await expect(setup.workbench('intake')).resolves.toBe(session);
 });
 
+test('offline BusinessSetup ignores a superseded same-Actor request failure after the newer UI response succeeds', async () => {
+  const NEWEST_TAG = '"wb.' + 'n'.repeat(43) + '"';
+  const { setup, session, beginUi } = cachedRefreshSetup('intake', {
+    installObserver: true,
+    responses: [{ status: 304, etag: NEWEST_TAG, ifNoneMatch: NEWEST_TAG }],
+  });
+  const older = await beginUi({ etag: OTHER_WORKBENCH_TAG });
+  const newer = await beginUi({ etag: NEWEST_TAG }); await newer.deliver();
+  older.fail(); await older.completion;
+  expect(setup.dispatchFailed).toBe(false);
+  expect(session.auth).toEqual({ Authorization: 'Bearer synthetic-current', 'X-Appointment-Id': session.appointmentId });
+  await expect(setup.workbench('intake')).resolves.toBe(session);
+});
+
+test('offline BusinessSetup ignores a superseded same-Actor body rejection after a newer UI request begins', async () => {
+  const NEWEST_TAG = '"wb.' + 'n'.repeat(43) + '"';
+  let markBodyStarted!: () => void, rejectOlder!: (error: Error) => void;
+  const bodyStarted = new Promise<void>(resolve => { markBodyStarted = resolve; });
+  const heldBody = new Promise((_resolve, reject) => { rejectOlder = reject; });
+  const olderBody = { then: (resolve: (value: unknown) => void, reject: (error: unknown) => void) => {
+    markBodyStarted(); return heldBody.then(resolve, reject);
+  } };
+  const { setup, session, beginUi } = cachedRefreshSetup('intake', {
+    installObserver: true,
+    responses: [{ status: 304, etag: NEWEST_TAG, ifNoneMatch: NEWEST_TAG }],
+  });
+  const older = await beginUi({ etag: OTHER_WORKBENCH_TAG, body: olderBody }); const olderObservation = older.deliver();
+  await bodyStarted;
+  const newer = await beginUi({ etag: NEWEST_TAG });
+  rejectOlder(new Error('SYNTHETIC_SUPERSEDED_BODY_ABORT')); await olderObservation;
+  expect(setup.dispatchFailed).toBe(false);
+  await newer.deliver();
+  expect(session.auth).toEqual({ Authorization: 'Bearer synthetic-current', 'X-Appointment-Id': session.appointmentId });
+  await expect(setup.workbench('intake')).resolves.toBe(session);
+});
+
 test('offline BusinessSetup rejects a response when its request Actor snapshot is no longer current', async () => {
   const { setup, session, counts, beginUi } = cachedRefreshSetup('intake', { installObserver: true });
   let releaseEnvelope!: (value: any) => void;
@@ -618,6 +673,40 @@ test('offline BusinessSetup rejects a response when its request Actor snapshot i
   await expect(observation).rejects.toThrow();
   expect(() => setup.arm(session, 'capture-auto', 'POST', '/api/v1/leads', {})).toThrow();
   expect(counts.arms).toBe(0);
+});
+
+test('offline BusinessSetup poisons writes after a dedicated CURRENT response fails', async () => {
+  const { setup, session, counts, beginUi } = cachedRefreshSetup('intake', { installObserver: true, harnessResponse: { status: 401 } });
+  const initial = await beginUi({ etag: WORKBENCH_TAG }); await initial.deliver();
+  await expect(setup.current(session)).rejects.toThrow();
+  expect(session.auth).toEqual({});
+  expect(session.workbenchCache).toBeUndefined();
+  expect(setup.dispatchFailed).toBe(true);
+  expect(() => setup.arm(session, 'capture-auto', 'POST', '/api/v1/leads', {})).toThrow();
+  expect(counts.arms).toBe(0);
+});
+
+test('offline BusinessSetup rechecks Actor and pending UI state when a dedicated CURRENT read completes', async () => {
+  for (const change of ['actor', 'pending'] as const) {
+    const { setup, session, counts, beginUi } = cachedRefreshSetup('intake', { installObserver: true });
+    const initial = await beginUi({ etag: WORKBENCH_TAG }); await initial.deliver();
+    let enteredRead!: () => void, releaseRead!: () => void;
+    const entered = new Promise<void>(resolve => { enteredRead = resolve; });
+    const held = new Promise<void>(resolve => { releaseRead = resolve; });
+    const originalGet = session.context.request.get;
+    session.context.request.get = async (...args: any[]) => { enteredRead(); await held; return originalGet(...args); };
+    const read = setup.current(session);
+    await entered;
+    let pending: any;
+    if (change === 'actor') session.self.actorScopeKey = 'ask1.' + 'd'.repeat(43);
+    else pending = await beginUi({ etag: OTHER_WORKBENCH_TAG });
+    releaseRead(); await expect(read, change).rejects.toThrow();
+    expect(session.auth, change).toEqual({});
+    expect(session.workbenchCache, change).toBeUndefined();
+    expect(() => setup.arm(session, 'capture-auto', 'POST', '/api/v1/leads', {}), change).toThrow();
+    expect(counts.arms, change).toBe(0);
+    pending?.fail();
+  }
 });
 
 test('offline BusinessSetup invalidates cached workbench proof after an Actor change', async () => {
@@ -1121,7 +1210,7 @@ function cachedRefreshSetup(alias: 'founder' | 'intake', input: string | { failu
     };
   };
   const response = () => makeResponse(configured[Math.min(refreshIndex++, Math.max(0, configured.length - 1))] ?? {});
-  let responseListener: ((response: any) => void) | undefined;
+  let responseListener: ((response: any) => void) | undefined, requestFailedListener: ((request: any) => void) | undefined;
   session.page = {
     url: () => 'https://localhost:19444' + pagePath,
     getByRole: (role: string, options: { name: string }) => role === 'main' ? { count: async () => 1 } : {
@@ -1137,7 +1226,10 @@ function cachedRefreshSetup(alias: 'founder' | 'intake', input: string | { failu
       },
     },
     waitForResponse: (predicate: (response: any) => boolean) => new Promise((resolve, reject) => { waiter = { predicate, resolve, reject }; }),
-    on: (event: string, listener: (response: any) => void) => { if (event === 'response') responseListener = listener; },
+    on: (event: string, listener: (value: any) => void) => {
+      if (event === 'response') responseListener = listener;
+      if (event === 'requestfailed') requestFailedListener = listener;
+    },
     evaluate: async (_fn: unknown, value: { auth: Record<string, string> }) => {
       counts.reads++;
       const selected = typeof input === 'string' ? {} : input.harnessResponse ?? {};
@@ -1159,7 +1251,11 @@ function cachedRefreshSetup(alias: 'founder' | 'intake', input: string | { failu
     beginUi: async (wire: CachedRefreshWire) => {
       expect(responseListener).toBeDefined(); const uiResponse = makeResponse(wire);
       await setup.observe(uiResponse.request(), session);
-      return { deliver: () => { responseListener!(uiResponse); return session.workbenchObservation as Promise<void>; } };
+      const completion = session.workbenchPending.get(session.workbenchGeneration) as Promise<void>;
+      return {
+        deliver: () => { responseListener!(uiResponse); return session.workbenchObservation as Promise<void>; },
+        fail: () => requestFailedListener!(uiResponse.request()), completion,
+      };
     },
   };
 }
