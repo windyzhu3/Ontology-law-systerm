@@ -46,7 +46,8 @@ function expiryHint(bearer: string): number {
 
 // Only clock/entropy and the external Playwright transport vary offline. All validation,
 // observation, route decisions, lifecycle and exclusive report publication stay real.
-export async function runReadOnlyWaiting(browser: Browser | undefined, environment: Environment, dependencies: WaitingDependencies = {}): Promise<WaitingReport> {
+export async function runReadOnlyWaiting(browserSource: Browser | (() => Promise<Browser>) | undefined, environment: Environment, dependencies: WaitingDependencies = {}): Promise<WaitingReport> {
+  let browser = typeof browserSource === 'function' ? undefined : browserSource;
   const clock = dependencies.clock ?? realClock, started = clock.now();
   const deadline = Math.min(started + 510_000, clock.deadline ?? Infinity);
   const id = (dependencies.reportId ?? randomUUID)(); check(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id));
@@ -120,6 +121,7 @@ export async function runReadOnlyWaiting(browser: Browser | undefined, environme
     check(sameValues(environment.readonlyProof, READONLY_WAITING_PIN));
     await environment.assertUnchanged();
     if (Date.parse(READONLY_WAITING_PIN.dueAt) - clock.wallNow() < 600_000) { report.status = 'NOT_EXECUTED'; throw Error(); }
+    if (typeof browserSource === 'function') browser = await browserSource();
     check(browser); environment.verifyBrowser(browser.version());
     const context = await browser.newContext({ serviceWorkers: 'block', ignoreHTTPSErrors: false, locale: 'zh-CN', timezoneId: 'Asia/Shanghai' });
     context.on('serviceworker', () => fail('NETWORK'));

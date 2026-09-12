@@ -108,8 +108,23 @@ for (const failure of ['seventh','budget-reset','wrong-ui','wait11','same-bearer
 
 test('readonly refusal at due boundary writes NOT_EXECUTED before opening any browser context', async () => {
   const transport = fakeTransport(); transport.clock.wallNow = () => Date.parse(environments.READONLY_WAITING_PIN.dueAt) - 599_999;
-  const result = await runReadOnlyWaiting(transport.browser, transport.environment, { clock: transport.clock });
+  let launches = 0;
+  const result = await runReadOnlyWaiting(async () => { launches++; return transport.browser; }, transport.environment, { clock: transport.clock });
   expect(result.status).toBe('NOT_EXECUTED'); expect(result.counts.current).toBe(0); expect(transport.opened()).toBe(false);
+  expect(launches).toBe(0);
+});
+test('actual readonly lifecycle consumes browser launch rejection and publishes guarded environment-bound FAILED evidence', async () => {
+  const transport = fakeTransport(), lifecycle: string[] = [];
+  transport.environment.assertUnchanged = async () => { lifecycle.push('guard'); };
+  const launch = async () => { lifecycle.push('launch'); throw Error('private browser launch detail'); };
+  const result = await runReadOnlyWaiting(launch, transport.environment, { clock: transport.clock });
+  expect(lifecycle).toEqual(['guard','launch','guard']);
+  expect(result.status).toBe('FAILED'); expect(result.failureStep).toBe('PRECHECK');
+  expect(result).toMatchObject({ buildSha: environments.BUSINESS_PIN.buildSha, environmentDigest: 'c'.repeat(64), apiIdentity: 'd'.repeat(64), counts: { current: 0, automatic: 0, manual: 0 }, checks: { environmentUnchanged: true, journalUnchanged: true, checkpointUnchanged: true } });
+  expect(transport.opened()).toBe(false); expect(transport.forwarded).toEqual([]);
+  expect(readdirSync(transport.folder)).toEqual([result.reportPath.split(/[\\/]/).pop()]);
+  expect(JSON.parse(readFileSync(result.reportPath,'utf8'))).toEqual(result);
+  expect(readFileSync(result.reportPath,'utf8')).not.toContain('private browser launch detail');
 });
 test('exclusive report collision preserves original bytes and cannot publish a replacement pass', async () => {
   const transport = fakeTransport(), id = '00000000-0000-4000-8000-000000000999';
