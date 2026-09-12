@@ -79,12 +79,18 @@ export function validateBusinessArtifact(value: unknown): void {
 
 const existingBridgeDependencies = { invokeLocalRuntime, runtime, toolchain };
 export async function loadBusinessEnvironment(dependencies = existingBridgeDependencies) {
-  check(process.env.TASK9_READONLY_WAITING === undefined);
-  return loadSharedBusinessEnvironment(dependencies, false);
+  check(process.env.TASK9_READONLY_WAITING === undefined && process.env.TASK9_READONLY_LOGOUT === undefined);
+  return loadSharedBusinessEnvironment(dependencies);
 }
 export async function loadReadOnlyWaitingEnvironment(dependencies = existingBridgeDependencies) {
-  requireReadOnlyWaitingAcceptance();
-  const environment = await loadSharedBusinessEnvironment(dependencies, true);
+  return loadPinnedReadOnlyEnvironment(dependencies, requireReadOnlyWaitingAcceptance);
+}
+export async function loadReadOnlyLogoutEnvironment(dependencies = existingBridgeDependencies) {
+  return loadPinnedReadOnlyEnvironment(dependencies, requireReadOnlyLogoutAcceptance);
+}
+async function loadPinnedReadOnlyEnvironment(dependencies: typeof existingBridgeDependencies, acceptance: () => void) {
+  acceptance();
+  const environment = await loadSharedBusinessEnvironment(dependencies, acceptance);
   const folder = dependencies.runtime, journal = join(folder, 'task9-contact-wait-operation.json'), checkpoint = join(folder, 'task96p-wait-checkpoint.json');
   const guard = async () => { await dependencies.invokeLocalRuntime('protect'); noLinks(folder); };
   const bytes = (file: string) => { noLinks(file); check(!existsSync(file + '.pending') && !existsSync(file + '.completion.pending')); return readFileSync(file); };
@@ -112,17 +118,24 @@ export async function loadReadOnlyWaitingEnvironment(dependencies = existingBrid
   await guard(); assertFiles(); await environment.assertUnchanged(); await guard(); assertFiles();
   const accounts = Object.freeze(Object.fromEntries(Object.entries(environment.accounts).map(([alias, account]) => [alias, Object.freeze({ ...account })]))) as typeof environment.accounts;
   return { ...environment, accounts, bootstrap: Object.freeze({ ...environment.bootstrap }), predecessor: Object.freeze({ ...environment.predecessor }), readonlyProof: READONLY_WAITING_PIN, outputDirectory: resolve(folder, '../output'),
-    async assertUnchanged() { requireReadOnlyWaitingAcceptance(); await guard(); assertFiles(); await environment.assertUnchanged(); await guard(); assertFiles(); } };
+    async assertUnchanged() { acceptance(); await guard(); assertFiles(); await environment.assertUnchanged(); await guard(); assertFiles(); } };
 }
 export function requireReadOnlyWaitingAcceptance(): void {
   check(process.env.TASK9_LOCAL_ACCEPTANCE === 'APPROVED_SYNTHETIC_ONLY' && process.env.TASK9_READONLY_WAITING === 'APPROVED_EXISTING_WAIT_ONLY');
-  for (const key of ['TASK9_BUSINESS_ACCEPTANCE','TASK9_BUSINESS_RUN_ID','TASK9_BUSINESS_CONTINUE_RUN_ID','TASK9_BUSINESS_RESTART_SHA256','TASK9_BUSINESS_RECOVER_COMMAND_ID','TASK9_BUSINESS_RECOVER_JOURNAL_SHA256','TASK9_RUN_ID','TASK9_CONTINUE_RUN_ID','TASK9_RECOVER_COMMAND_ID']) check(process.env[key] === undefined);
+  for (const key of ['TASK9_READONLY_LOGOUT','TASK9_BUSINESS_ACCEPTANCE','TASK9_BUSINESS_RUN_ID','TASK9_BUSINESS_CONTINUE_RUN_ID','TASK9_BUSINESS_RESTART_SHA256','TASK9_BUSINESS_RECOVER_COMMAND_ID','TASK9_BUSINESS_RECOVER_JOURNAL_SHA256','TASK9_RUN_ID','TASK9_CONTINUE_RUN_ID','TASK9_RECOVER_COMMAND_ID']) check(process.env[key] === undefined);
   for (const key of ['DEBUG','PWDEBUG','PW_TEST_DEBUG']) check(process.env[key] === undefined);
   check(process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0');
 }
-async function loadSharedBusinessEnvironment(dependencies: typeof existingBridgeDependencies, readonly: boolean) {
+export function requireReadOnlyLogoutAcceptance(): void {
+  check(process.env.TASK9_LOCAL_ACCEPTANCE === 'APPROVED_SYNTHETIC_ONLY' && process.env.TASK9_READONLY_LOGOUT === 'APPROVED_EXISTING_SESSION_LOGOUT_ONLY');
+  for (const key of ['TASK9_READONLY_WAITING','TASK9_READONLY_SESSION','TASK9_BUSINESS_ACCEPTANCE','TASK9_BUSINESS_RUN_ID','TASK9_BUSINESS_CONTINUE_RUN_ID','TASK9_BUSINESS_RESTART_SHA256','TASK9_BUSINESS_RECOVER_COMMAND_ID','TASK9_BUSINESS_RECOVER_JOURNAL_SHA256','TASK9_RUN_ID','TASK9_CONTINUE_RUN_ID','TASK9_RECOVER_COMMAND_ID']) check(process.env[key] === undefined);
+  for (const key of ['DEBUG','PWDEBUG','PW_TEST_DEBUG']) check(process.env[key] === undefined);
+  check(process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0');
+}
+async function loadSharedBusinessEnvironment(dependencies: typeof existingBridgeDependencies, readonlyAcceptance?: () => void) {
+  const readonly = readonlyAcceptance !== undefined;
   const contactWait = process.env.TASK9_BUSINESS_ACCEPTANCE === 'APPROVED_CONTACT_WAIT_CHAIN';
-  if (readonly) requireReadOnlyWaitingAcceptance();
+  if (readonlyAcceptance) readonlyAcceptance();
   else if (contactWait) requireContactWaitAcceptance();
   else requireBusinessAcceptance(process.env.TASK9_LOCAL_ACCEPTANCE, process.env.TASK9_BUSINESS_ACCEPTANCE, process.env.TASK9_BUSINESS_RUN_ID, process.env.TASK9_BUSINESS_CONTINUE_RUN_ID);
   check(!process.env.DEBUG && !process.env.PWDEBUG && !process.env.PW_TEST_DEBUG);

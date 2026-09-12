@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { requireLocalAcceptance, validateEnvironment, validateAccounts, LOCAL_RUNTIME_BRIDGE } from '../fixtures/local-environment';
+import * as localEnvironment from '../fixtures/local-environment';
 import { safeFailureCode } from '../reporters/safe-reporter';
 import { OperationJournal, type PhaseEvidence } from '../fixtures/operation-journal';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs';
@@ -195,6 +196,12 @@ test('offline explicit-local gate', async () => {
   expect(() => requireLocalAcceptance('APPROVED_SYNTHETIC_ONLY')).not.toThrow();
   expect(() => requireLocalAcceptance('production')).toThrow();
   expect(safeFailureCode('password=do-not-log')).not.toContain('do-not-log');
+});
+
+test('offline identity write gate rejects readonly logout authority before runtime access', () => {
+  expect(typeof localEnvironment.requireIdentityWriteAcceptance).toBe('function');
+  expect(() => localEnvironment.requireIdentityWriteAcceptance('APPROVED_SYNTHETIC_ONLY', 'APPROVED_EXISTING_SESSION_LOGOUT_ONLY')).toThrow();
+  expect(() => localEnvironment.requireIdentityWriteAcceptance('APPROVED_SYNTHETIC_ONLY', undefined)).not.toThrow();
 });
 
 test('offline unmapped SELF contract accepts only the deployed 401 denial', async () => {

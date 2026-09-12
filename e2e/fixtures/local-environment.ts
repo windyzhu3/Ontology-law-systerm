@@ -18,6 +18,9 @@ export const PIN = {
   browserVersion: '153.0.8010.12', browserRevision: '1243',
 } as const;
 export function requireLocalAcceptance(value: string | undefined): void { check(value === 'APPROVED_SYNTHETIC_ONLY'); }
+export function requireIdentityWriteAcceptance(local: string | undefined, readonlyLogout: string | undefined): void {
+  requireLocalAcceptance(local); check(readonlyLogout === undefined);
+}
 export function validateEnvironment(value: unknown): void {
   check(value && typeof value === 'object');
   for (const [key, expected] of Object.entries(PIN)) check((value as Record<string, unknown>)[key] === expected);
@@ -179,7 +182,7 @@ export function toolchain(): { browserRevision: string; browserVersion: string }
   return { browserRevision: browser.revision, browserVersion: browser.browserVersion };
 }
 export async function loadLocalEnvironment() {
-  requireLocalAcceptance(process.env.TASK9_LOCAL_ACCEPTANCE);
+  requireIdentityWriteAcceptance(process.env.TASK9_LOCAL_ACCEPTANCE, process.env.TASK9_READONLY_LOGOUT);
   check(!process.env.DEBUG && !process.env.PWDEBUG && !process.env.PW_TEST_DEBUG);
   const tools = toolchain();
   const snapshot = await invokeLocalRuntime('snapshot'); validateEnvironment({ ...snapshot, ...tools });
