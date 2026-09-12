@@ -557,7 +557,53 @@ test("offline explicit-local gate", () => {
 - [ ] 同一最终环境证据包括应用buildSha（从真实二进制provenance继承，不冒充测试提交）、environmentDigest、执行时间、原测试case identity、退出码、status、reportPath。收集真实HTTP成功／拒绝、准确Receipt与resultFact关系及API进程不变；更深的Fact／Audit／Slot实库闭包由控制者具名只读核对，不授浏览器Owner凭据。用户尚未操作，U01～U03始终NOT_EXECUTED。
 - [ ] 固定npm11.9.0／Node24.20.0及锁中Playwright完整integrity；运行离线harness RED/GREEN、类型／测试列表和受影响前端回归（根依赖变动需确认既有445项不退化），保留命令／输出／退出码。不得运行实际本地项目、自评后提交并交独立spec／quality评审；控制者随后执行已批准真实链并如实记录失败。这一单元不测十四管理生命周期全覆盖、IdP禁用／撤销、七卡／代办／等待恢复或人工签认；它们仍是后续既定9.6项目。
 
+## Task 9.6k: 真实六卡链（七卡中的可执行子集）
+
+**实际执行检查点：** 当前`db7fe38`源码完成第5轮限定复审，43项离线测试通过，但真实续验仍退出1。原run已记录9／15条命令（前7条不变、首联授权和MANUAL接入新增确认）、2阶段报告，无pending；分配草稿尚未派发。工作台缓存会话刷新被错误套用管理端`no-store`要求；冻结工作台合同为`private, no-cache`、`Vary: Authorization`和200／304。该缺陷真实且影响后续验收，不以源码绿色关闭Step 6；五轮上限后先独立诊断并审定合同消费修正，不直接追加第6轮或改产品合同。原身份／数据／部署保持，续验不得换run或重放9条已确认命令。
+
+**运行器澄清：** 首次真实启动发现Playwright工作进程重载配置时没有主进程argv，动态增删project无法执行。内部project身份改为稳定；未通过准确的`--project approved-local-business`或`--project=approved-local-business`选择时，真实项目不匹配任何测试，默认发现／执行仍只有离线测试。该澄清覆盖下文“仅显式选择时注册”的实现方式，不改变显式选择、安全授权、固定制品、无录制或15次写入边界；同名值出现在其他参数中不得启用真实项目。须以消费实际配置的无浏览器子进程测试证明默认拒绝及显式选中可跨工作进程执行。
+
+用户于2026-09-10要求继续自动验收、人工暂缓并完整推进R1。本单元执行既有计划中的可构造六卡，不降低七卡完成门；重复确认卡的历史数据准备仍待具名授权。U01～U03保持NOT_EXECUTED且延期，不阻挡独立自动项推进。容量资源不足仍为未满足，R1不能提前宣告验收完成。
+
+**Files:** Create `e2e/fixtures/business-environment.ts`、`business-journal.ts`、`business-session.ts`、`r1-business-setup.ts`、`e2e/tests/task9-business-harness.spec.ts`、`task9-six-workcards.spec.ts`、`e2e/business.config.ts`、`e2e/reporters/business-reporter.ts`。Modify `e2e/fixtures/local-environment.ts`仅提取可复用受保护invoke／toolchain边界并保留旧PIN／旧load语义，`e2e/README.md`记录新独立入口。不改旧身份journal／CA／密钥／凭据／部署／Java／SPA／合同／依赖。Root独占计划／验收／进度文档。
+
+**Interfaces and fixed evidence:** 复用`LOCAL_RUNTIME_BRIDGE`与原异步protect，不复制Python边界。新`loadBusinessEnvironment()`返回当前制品身份、原bootstrap IDs、内存账号、`assertUnchanged()`及原已完成身份记录中的精确resource IDs；当前release `6411135a52094b6ba16a80df80b025a1`，build `421ca57aed3d2f364fea2af64b12b5c9d6226c7d`，gate12，Jar `d496603eaeda6e7893f002e4c1ade7c317369b743eec21fd39210cde43bec586`，manifest `051010dfc50c3259cb52ae5af09f5cb1013639e0a91fdba8773893ceba2d61eb`。来源是当前controlled-local-release，不重新发布AUTO。旧身份run `74a496f6-494e-417d-9abd-69a85c94f165`，journal SHA256 `44c95f59853fa552d2d7ba933dcb80a4877464fe26dab7c34202d3e1fb0ad9a1`；旧build不同是已批准发布的前驱关系，不要求旧environmentDigest等于新值，也不重写旧记录。原7阶段报告逐个原SHA检查、16命令全CONFIRMED；所有实际操作前后检查原文件不变。
+
+**Binding constraints copied from Global Constraints:**
+
+- 一个响应式业务 SPA、一份业务 OpenAPI、一个模块化单体 Jar，`APP_ROLE=api|worker` 互斥。
+- 业务数据库保持 13 Schema、52 应用表＋2 技术表、当前 `52-plus-2-v1.2`；Keycloak 独立拥有其外部身份存储，拓扑修订须明示这一基础设施依赖。
+- 仅受控 ADM-01～04 HUMAN 子集；不实现 ADM-05～07、SERVICE 管理、附件、通知中心、语音、AI、R2 业务。
+- 原 R1 七种 Task、完成 Fact、事件、Worker 权限和业务锁序不变；Identity writer 必须接入具名排他协议，不直接修复/迁移 Task。
+
+**Bounded sequence:** 依次三个具名真实测试，每一项显式核对前驱证据，不能serial自动skip或失败后继续新写入。
+
+1. `T9-W01-ingress-routing-ack`：intake真实登录，确认唯一原任职／DIRECT／工作台资格；founder只读核对原四人、组织、任职、七业务Grant的准确原ID及当前状态（ROOT合法revision1不回退）。contact/delegate仍无SALES_CONTACT_OWNER。真实POST `/api/v1/leads`准备一条`LOCAL_SYNTHETIC_AUTO`、缺phone/email的合成Lead，取得COMPLETE卡；页面填email和来源摘要，保存候选后明确提交，后继为主管ROUTING_GAP；主管页面选REQUEST_SOURCE_INTAKE_STOP保存／提交，再由intake保存／提交ACK。来源配置不变，不实际禁用。三张卡均记录准确Task/Lead/Owner、ETag/Draft确认、Receipt主Fact及后继。
+2. `T9-I06-contact-owner`：原founder登录ADM-04，只新增一个原contact任职的DIRECT `SALES_CONTACT_OWNER`、scope原ROOT、有效期在原任职有效期内；不授delegate、不新增人／组织／任职、不改原Grant。页面选择原资源、真实POST，精确Receipt／resource关联。不把已有同名或未知新Grant收养为本轮结果；存在未知结果只查原key。
+3. `T9-W01-assign-contact-review`：intake真实POST准备另一条有合成email的`LOCAL_SYNTHETIC` MANUAL Lead。主管ASSIGN卡选择刚获权contact原任职，保存／提交；contact页面CONTACT卡选`SUSPECT_INVALID`并保存／提交；主管REVIEW卡选`CONFIRM_INVALID`并保存／提交。原Task均DONE，末端没有后继。本单元不创建Opportunity或R2责任，也不提前扩大等待／代办分支。
+
+两次capture只作为真实API准备，使用本次真实浏览器登录获得的当前Bearer／Appointment，不注入JWT／SQL／测试Actor／mock fetch。没有capture页面，不新增页面或把API准备写成页面验收。合成email用`task96k-<runId>-auto@example.invalid`和`task96k-<runId>-manual@example.invalid`，sourceRecordKey同run固定准确值；不保存请求正文或真实人员资料。新run只允许以上2 capture＋1 Grant＋6 draft保存＋6明确提交，最多15个首次派发，不自动新key重跑。
+
+- [ ] **Step 1 — RED and independent current binding.** 离线合成输入测试current PIN、旧前驱SHA／报告缺失／pending、错误current build／进程、未经批准入口、跨run恢复、错误Actor／方法／路径／body、意外第二写入均拒绝；旧33项保持原行为。建立`loadBusinessEnvironment`消费测试先见缺能力失败，再最小提取旧模块边界。只允许受保护读取后取credentials，异步timeout60s／2MiB上限、隐藏窗口和错误脱敏不变。
+- [ ] **Step 2 — durable business journal.** 新路径固定`task9-business-operation.json`，不可打开旧OperationJournal写者；复用小型共享持久化原语或实现独立具名业务记录，不复制整个身份引擎。新记录绑定run UUID、当前build/environment/process摘要及前驱SHA。派发前持久保存原command UUID、step、method/path、准确请求bytes SHA、actorScopeKey和必要非秘密结果selectors；原子排他保护在第一个await前占用。PENDING／落盘不确定／报告隔离均禁止新命令，不自动删除。测试真实临时文件和异步竞争，不靠源码grep。
+- [ ] **Step 3 — real UI consumer.** `BusinessSetup.create(browser)`、`stage(caseId)`、`close()`提供上述三阶段。所有业务网络先白名单并验证armed准确body／Actor，再记录后派发；capture的API准备也走同一持久记录门，不从APIRequestContext绕过。对外IdP限原realm协议／resources，业务仅所需GET与15个具名写入。每卡确认当前Owner、准确类型、保存≠完成、保存后输入一致才启用主提交；不改DOM或直接调用React状态。首联结果无Evidence时保持零Evidence访问。最终结果仅用准确Receipt证据，不把刷新GET成功当POST成功。
+- [ ] **Step 4 — evidence and explicit continuation.** 每阶段独占新报告含固定case ID、UTC执行时刻、当前build/environment/API身份、前驱SHA、原命令引用／准确非秘密结果Fact、固定HTTP path/status和U01～U03 NOT_EXECUTED，不含token／密码／raw DOM／响应正文／subject／HMAC。阶段正文只标ACTIONS_VERIFIED，Root结合真实exit0与数据库闭包后才记通过；未知结果保留原key并停止。明确`TASK9_BUSINESS_CONTINUE_RUN_ID`与同环境同run只允许核对原Receipt/精确原资源再续未完成步骤，不重放完成步骤、不用404证明未提交。不实现无正文重发或跨制品迁移。覆盖报告写失败／串改／重复完成／前驱缺失／跳阶段等实际行为。
+- [ ] **Step 5 — offline verification and review.** 固定Node24.20.0／Playwright1.63.0／Chromium1243，workers1、retries0、trace/video/screenshot/storageState禁用，安全reporter不可替换；默认业务配置仅offline项目，真实项目需显式选`approved-local-business`、`TASK9_LOCAL_ACCEPTANCE=APPROVED_SYNTHETIC_ONLY`和`TASK9_BUSINESS_ACCEPTANCE=APPROVED_SIX_CARD_CHAIN`及新UUID `TASK9_BUSINESS_RUN_ID`。先focused RED/GREEN，最终一次全部e2e离线工具回归、strict tsc和list检查、diffcheck，提交owned源码并独立spec/quality评审。实现者不访问真实runtime／启动浏览器／运行真实项目，不spawn子代理；Root单独运行真实验收。
+- [ ] **Step 6 — Root actual acceptance.** 先fresh current-runtime gate、原身份闭包及54表/84IdP静态/原材料基线，后实际三阶段；以原command IDs只读核对Fact／Slot／Receipt／Task／Draft／Event／Outbox／Audit和明确Wait零增量、精确Owner与来源配置不变。保留全部原行，仅本次具名新增／CAS／投影／读取审计允许变化；不允许按表粗略放行。用原Actor／resultFact/审计与result引用证明闭包，不按显示名收养。Root读写工具仅保留闭合摘要和受保护证据。只有源码评审、真实退出、报告哈希及闭包均合格才关闭六卡子集；随后继续原9.6等待／安全／代办和Task10可独立自动项，人工暂缓不阻塞实施，完整七卡／容量／R1总验收不假报完成。
+
+Offline commands (prepend pinned Node/npm bin PATH):
+
+```powershell
+node node_modules/@playwright/test/cli.js test --config e2e/business.config.ts --project offline-business
+node node_modules/@playwright/test/cli.js test --config playwright.config.ts --project offline-harness
+node node_modules/typescript/bin/tsc --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --strict e2e/business.config.ts e2e/fixtures/business-environment.ts e2e/fixtures/business-journal.ts e2e/fixtures/business-session.ts e2e/fixtures/r1-business-setup.ts e2e/tests/task9-business-harness.spec.ts e2e/tests/task9-six-workcards.spec.ts e2e/reporters/business-reporter.ts
+node node_modules/@playwright/test/cli.js test --config e2e/business.config.ts --list --reporter list
+git diff --check
+```
+
 ## Task 9.6: 真实用户全链路与总验收
+
+2026-09-10执行顺序更新：用户明确先搁置人工验收、继续完整推进R1。U01～U03暂缓且NOT_EXECUTED，不再作为自动项之间停点；并不删除人工或容量完成条件。先9.6k可执行六卡，再等待／故障／撤权代办和最终同构建、Task10具名自动门。重复卡前置数据仍单独受范围约束，不因“完整推进”自动授权历史SQL造数／新Party功能。不中途重复询问是否继续原计划。
 
 ### 2026-09-10七卡前置核对与待确认边界
 
@@ -634,6 +680,26 @@ git diff --check
 使用仓库锁定工具链；Windows 使用 `mvnw.cmd` 或 Git Bash wrapper，不误用系统全局旧 Node/npm。每一环记录实际退出码，不把最后一个命令成功覆盖前序失败。
 
 上述全量命令属于最终验收入口，不表示已全部执行；当前部署及各分层证据以上方执行更新与本地整链进度为准。本文不是任何生产账号／权限写入的执行凭据；Task9.6真实整链与人工UAT仍有各自门禁。
+
+## Task 9.6l: 剩余三卡续验前置——按端点验证缓存合同
+
+**执行结果（2026-09-12）：源码前置单元完成，非真实三卡完成。** `1ea6ea3`及三轮修复`14bbb26`／`97d75b3`／`d77b553`经独立复审关闭全部Important；最终63项业务离线、33项身份测试、strict类型／默认离线发现／diff检查通过，Root复跑最终63项退出0。以下步骤是实施要求；实际真实写入门仍见后续门禁，未变更原九命令或宣布9.6k／Task9完成。历史失败及颜色环境警告保留。账号变化待用户确认，当前无任何新业务写入。
+
+2026-09-12 用户要求继续 Task9 剩余项。承接 9.6k 五轮上限后独立诊断的 R7，不清零旧迭代、不删除失败证据、不将 9.6k 标完成。本单元只修真实续验的测试消费者；后续实际运行仍受原 journal、同构建、进程身份及精确事实保全门禁约束。
+
+**Files:** 仅 `e2e/fixtures/r1-business-setup.ts`、`e2e/tests/task9-business-harness.spec.ts`、`e2e/README.md`。不改产品、合同、依赖、发布 PIN、journal 格式、身份权限或部署。控制者持有其余文档及所有 runtime 数据，子代理不得读取受保护 runtime、执行真实浏览器／数据库／IdP／部署／推送，也不得再派子代理。
+
+**Interfaces:** 消费 `R1-WORKBENCH-PRESENTATION-CONTRACT.md`、OpenAPI current workcard 200/304 与 IdentityNoStore；参照 `useCurrentCard.ts` 的同 Actor 缓存证据规则。`BusinessSetup.refreshCachedSession` 保留 UI 刷新和网络边界，成功后才允许后续读取／写入。BASE 为 `db7fe38b6b0244cfd067b2e59868f46d1cea4eae`。
+
+- [ ] 先阅读 `.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task-9.6k-postcap-diagnosis.md`。以真实 BusinessSetup 消费者测试复现 workbench `200`、`Cache-Control: private, no-cache`、`Vary: Authorization` 被误拒的行为 RED；保留实际退出码，不以源码字符串断言代替行为。
+- [ ] 增加合同保真用例：workbench 200；有同 Actor 先前 200 缓存且 prior/request/response ETag 精确一致的 304；无缓存、跨 Actor、ETag 缺失／不一致的 304 拒绝；缓存指令大小写／顺序合法变体；错误策略拒绝；admin 仍仅 200/no-store，拒绝 304 和 private/no-cache。保留原 401/403/503、错误请求身份和失败后不可写测试。
+- [ ] 最小实现按端点校验，指令/token 语义解析；工作台要求 private、no-cache、Vary Authorization、合法 Workbench ETag。304 证据仅从真实 UI 网络边界建立，必须属于当前原 Actor，准确串联旧 200 envelope、请求 If-None-Match 与响应 ETag。不能伪造响应体、访问 React 内部、注入 token、关闭缓存或修改产品规则。失败清除 auth 并关闭写门，禁止旧 token 回退。
+- [ ] 使用仓库固定 Node 执行离线 business harness、原 identity harness、strict E2E 类型检查、默认离线发现及 `git diff --check`；每项记录真实命令、数量、输出与退出码。先定向 RED/GREEN，再受影响全量一次，不运行真实 approved-local-business 项目。
+- [ ] 自评并仅提交上述拥有文件。报告写 `.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task-9.6l-report.md`，返回状态、提交、测试摘要、局限。控制者生成 BASE..HEAD 包进行独立规格／质量评审后，才评估真实续验门禁；离线通过不等于三卡完成。
+
+**控制者后续门禁：** 原 run `9848f4ee-5612-49df-9e10-a8c40c09bd3d` 已确认九命令不得重放。此次用户批准的服务重启改变进程身份，先只读核对并明确同构建续验的证据衔接，不改写旧 environmentDigest 或用新 run 绕过；另核对 ASSIGN 后 Lead revision 与后继卡断言，发现偏差先按冻结合同诊断，不借本缓存修正扩大文件范围。U01～U03仍搁置，附件／通知属于 R2，语音后置，Task10 不在本单元范围。
+
+**9.6l 第一次评审处置：** `1ea6ea3` 的50项离线回归通过但评审发现三项缺陷，未关闭本单元：初始异步校验未阻止写入、仅顶层键检查不能证明前端接受响应、测试自身读取／晚到响应会污染页面缓存证据。窄修复复用生产 `parseEnvelope`，给 UI 请求绑定原 Actor／请求代次并在初始及最终写入边界等待校验。仅允许 `current()` 自身只读查询改用现有 `BrowserContext.request.get`，准确 `ORIGIN+CURRENT`、原页面观察 Bearer／任职、严格 TLS、`maxRedirects:0`、GET无正文；保持环境及失败门和响应校验，不改变其他 fetch／写路由。此区分只为避免测试读伪装成 SPA 缓存，不增加生产能力。补实际消费者反例并独立复审后才关闭源码门。
 
 ## Task 9.6f: 管理命令成功响应的最小合同修复
 
