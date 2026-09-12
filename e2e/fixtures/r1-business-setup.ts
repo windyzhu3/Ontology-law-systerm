@@ -8,7 +8,7 @@ import { BusinessDispatchGate, allowBusinessRequest, canonicalBusinessJson } fro
 import { check, exact, ORIGIN, ISSUER, protect, sha, uuid } from './local-environment';
 import { GRANTS, matchFact, NAMES } from './identity-setup';
 import { businessFailureCode } from '../reporters/business-reporter';
-import { candidate } from '../../apps/workbench/src/features/workcard/contract';
+import { candidate, parseEnvelope } from '../../apps/workbench/src/features/workcard/contract';
 
 const SELF = '/api/v1/session/context';
 const CURRENT = '/api/v1/workcards/current';
@@ -17,11 +17,16 @@ const TASK_TYPES = ['COMPLETE_LEAD_INGRESS', 'RESOLVE_LEAD_ROUTING_GAP', 'ACK_SO
 type Alias = 'founder' | 'intake' | 'supervisor' | 'contact' | 'delegate';
 type Session = {
   alias: Alias; context: BrowserContext; page: Page; self: any; auth: Record<string, string>; appointmentId: string;
-  workbenchCache?: { actorScopeKey: string; etag: string };
+  workbenchCache?: { actorScopeKey: string; etag: string; generation: number };
+  workbenchGeneration?: number; workbenchPending?: Map<number, Promise<void>>;
   identityReady?: Promise<void>; workbenchObservation?: Promise<void>;
 };
 type Wire = { status: number; headers: Record<string, string>; body: any };
 type CardType = typeof TASK_TYPES[number];
+type WorkbenchRequestSnapshot = {
+  generation: number; actorScopeKey: string; appointmentId: string; authorization: string;
+  completion: Promise<void>; resolve: () => void; reject: (error: unknown) => void;
+};
 
 function exactHeaderTokens(value: string | undefined, expected: readonly string[]): boolean {
   if (!value) return false;
@@ -105,6 +110,7 @@ export class BusinessSetup {
   readonly environment: BusinessEnvironment; readonly runId: string; readonly journal: BusinessJournal;
   private gate: BusinessDispatchGate; private sessions = new Map<Alias, Session>(); private http: Array<{path: string; status: number}> = [];
   private workbenchObservations = new WeakMap<Response, Promise<void>>();
+  private workbenchRequests = new WeakMap<Request, WorkbenchRequestSnapshot>();
   private contactAppointment?: { effectiveFrom: string; effectiveUntil: string | null };
   private dispatchFailed = false;
   private constructor(private readonly browser: Browser, environment: BusinessEnvironment, journal: BusinessJournal) {
@@ -123,53 +129,89 @@ export class BusinessSetup {
   private async observe(request: Request, session: Session) {
     const headers = await request.allHeaders();
     if (headers.authorization) session.auth = { Authorization: headers.authorization, 'X-Appointment-Id': session.appointmentId };
+    const url = new URL(request.url());
+    if (url.origin === ORIGIN && url.pathname === CURRENT && request.method() === 'GET') {
+      const generation = (session.workbenchGeneration ?? 0) + 1, actorScopeKey = session.self?.actorScopeKey;
+      check(typeof actorScopeKey === 'string' && /^Bearer \S+$/.test(headers.authorization ?? ''));
+      let resolve!: () => void, reject!: (error: unknown) => void;
+      const completion = new Promise<void>((ok, fail) => { resolve = ok; reject = fail; });
+      const snapshot = { generation, actorScopeKey, appointmentId: session.appointmentId, authorization: headers.authorization!, completion, resolve, reject };
+      session.workbenchGeneration = generation; (session.workbenchPending ??= new Map()).set(generation, completion);
+      this.workbenchRequests.set(request, snapshot);
+      void completion.catch(() => { session.auth = {}; session.workbenchCache = undefined; this.dispatchFailed = true; });
+      void completion.finally(() => { session.workbenchPending?.delete(generation); }).catch(() => {});
+    }
   }
-  private async validateWorkbenchResponse(response: Response, session: Session): Promise<void> {
+  private async validateWorkbenchResponse(response: Response, session: Session, snapshot: WorkbenchRequestSnapshot): Promise<void> {
     await session.identityReady;
     const url = new URL(response.url()), request = response.request();
     check(url.origin === ORIGIN && url.pathname === CURRENT && request.method() === 'GET');
     const responseHeaders = await response.allHeaders(), requestHeaders = await request.allHeaders();
-    check(/^Bearer \S+$/.test(requestHeaders.authorization ?? '') && requestHeaders['x-appointment-id'] === session.appointmentId
-      && !requestHeaders['x-on-behalf-appointment-id'] && session.self?.selectedAppointmentId === session.appointmentId);
-    check(session.auth.Authorization === requestHeaders.authorization && session.auth['X-Appointment-Id'] === session.appointmentId);
+    const currentActor = () => snapshot.actorScopeKey === session.self?.actorScopeKey && snapshot.appointmentId === session.appointmentId
+      && session.self?.selectedAppointmentId === snapshot.appointmentId;
+    check(currentActor() && /^Bearer \S+$/.test(requestHeaders.authorization ?? '') && requestHeaders.authorization === snapshot.authorization
+      && requestHeaders['x-appointment-id'] === snapshot.appointmentId && !requestHeaders['x-on-behalf-appointment-id']);
+    if (snapshot.generation !== session.workbenchGeneration) return;
+    check(session.auth.Authorization === snapshot.authorization && session.auth['X-Appointment-Id'] === snapshot.appointmentId);
     check(exactHeaderTokens(responseHeaders['cache-control'], ['private', 'no-cache'])
       && exactHeaderTokens(responseHeaders.vary, ['authorization']) && workbenchETag(responseHeaders.etag));
     if (response.status() === 200) {
       const envelope = await response.json();
-      check(envelope && exact(envelope, ['todaySummary','currentCard','nextSummaries','waitingCount','chatComposer']));
-      session.workbenchCache = { actorScopeKey: session.self.actorScopeKey, etag: responseHeaders.etag };
+      check(currentActor()); if (snapshot.generation !== session.workbenchGeneration) return;
+      parseEnvelope(envelope);
+      session.workbenchCache = { actorScopeKey: snapshot.actorScopeKey, etag: responseHeaders.etag, generation: snapshot.generation };
       return;
     }
     const cached = session.workbenchCache;
-    check(response.status() === 304 && cached !== undefined && cached.actorScopeKey === session.self.actorScopeKey
+    check(response.status() === 304 && cached !== undefined && cached.actorScopeKey === snapshot.actorScopeKey && cached.generation < snapshot.generation
       && requestHeaders['if-none-match'] === cached.etag && responseHeaders.etag === cached.etag);
   }
   private observeWorkbenchResponse(response: Response, session: Session): Promise<void> {
     const existing = this.workbenchObservations.get(response); if (existing) return existing;
-    const previous = session.workbenchObservation ?? Promise.resolve();
-    const observation = previous.then(() => this.validateWorkbenchResponse(response, session));
-    this.workbenchObservations.set(response, observation); session.workbenchObservation = observation;
-    void observation.catch(() => { session.auth = {}; session.workbenchCache = undefined; this.dispatchFailed = true; });
-    return observation;
+    const snapshot = this.workbenchRequests.get(response.request());
+    if (!snapshot) return Promise.reject(new Error('T9_BUSINESS_BOUNDARY'));
+    const validation = this.validateWorkbenchResponse(response, session, snapshot);
+    void validation.then(snapshot.resolve, snapshot.reject);
+    this.workbenchObservations.set(response, snapshot.completion); session.workbenchObservation = snapshot.completion;
+    return snapshot.completion;
   }
   private installWorkbenchResponseObserver(session: Session): void {
     session.page.on('response', response => {
       const url = new URL(response.url());
       if (url.origin === ORIGIN && url.pathname === CURRENT && response.request().method() === 'GET') this.observeWorkbenchResponse(response, session);
     });
+    session.page.on('requestfailed', request => {
+      const snapshot = this.workbenchRequests.get(request); if (snapshot) snapshot.reject(new Error('T9_BUSINESS_BOUNDARY'));
+    });
+  }
+  private async awaitWorkbenchIdle(session: Session): Promise<void> {
+    try {
+      while ((session.workbenchPending?.size ?? 0) > 0) {
+        const pending = [...session.workbenchPending!.values()];
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('T9_BUSINESS_BOUNDARY')), SCREEN_TIMEOUT);
+          Promise.all(pending).then(() => { clearTimeout(timeout); resolve(); }, error => { clearTimeout(timeout); reject(error); });
+        });
+      }
+      check(!this.dispatchFailed);
+    } catch (error) {
+      session.auth = {}; session.workbenchCache = undefined; this.dispatchFailed = true; throw error;
+    }
   }
   private async refreshCachedSession(session: Session): Promise<void> {
     // Let the SPA validate/renew its own token before reusing an observed header after an idle phase.
     try {
-      await session.workbenchObservation;
+      await this.awaitWorkbenchIdle(session);
       session.auth = {};
       check(!this.dispatchFailed && session.self.selectedAppointmentId === session.appointmentId);
       const pageUrl = new URL(session.page.url()); check(pageUrl.origin === ORIGIN);
       const admin = session.alias === 'founder';
       if (admin) check(/^\/admin\/identity\/(principals|organizations|appointments|authority-grants)$/.test(pageUrl.pathname));
       const path = admin ? '/api/v1' + pageUrl.pathname : CURRENT;
+      const beforeGeneration = session.workbenchGeneration ?? 0;
       const [response] = await Promise.all([
-        session.page.waitForResponse(r => new URL(r.url()).origin === ORIGIN && new URL(r.url()).pathname === path && r.request().method() === 'GET', { timeout: SCREEN_TIMEOUT }),
+        session.page.waitForResponse(r => new URL(r.url()).origin === ORIGIN && new URL(r.url()).pathname === path && r.request().method() === 'GET'
+          && (admin || (this.workbenchRequests.get(r.request())?.generation ?? 0) > beforeGeneration), { timeout: SCREEN_TIMEOUT }),
         session.page.getByRole('button', { name: admin ? '刷新' : '刷新当前责任', exact: true }).click({ timeout: SCREEN_TIMEOUT }),
       ]);
       this.http.push({ path, status: response.status() });
@@ -199,7 +241,7 @@ export class BusinessSetup {
         if (allowBusinessRequest(url, method)) {
           await this.observe(request, session); await route.continue(); return;
         }
-        check(url.origin === ORIGIN && url.pathname.startsWith('/api/') && !this.dispatchFailed);
+        check(url.origin === ORIGIN && url.pathname.startsWith('/api/') && !this.dispatchFailed && (session.workbenchPending?.size ?? 0) === 0);
         const headers = request.headers(), bytes = request.postDataBuffer(); check(bytes);
         check(headers['x-appointment-id'] === session.appointmentId && !headers['x-on-behalf-appointment-id']);
         await this.gate.dispatch({ method, path: url.pathname, bodyBytes: bytes, commandId: headers['idempotency-key'], actorScopeKey: session.self?.actorScopeKey }, async () => { check(!this.dispatchFailed); await route.continue(); });
@@ -228,6 +270,7 @@ export class BusinessSetup {
       await session.page.getByRole('button', { name: '确认本次身份', exact: true }).click();
       await expect(session.page.getByRole('main', { name: '责任工作台', exact: true })).toBeVisible({ timeout: SCREEN_TIMEOUT });
     }
+    await this.awaitWorkbenchIdle(session);
     return session;
   }
   private async administrator(): Promise<Session> {
@@ -254,9 +297,13 @@ export class BusinessSetup {
     const data = await this.read(session, path + '?limit=50'); check(exact(data, ['items','nextCursor']) && data.nextCursor === null && Array.isArray(data.items)); return data.items;
   }
   private async current(session: Session): Promise<any | null> {
-    const result = await this.fetch(session, CURRENT); check(result.status === 200 && /^"wb\.[A-Za-z0-9_-]{43}"$/.test(result.headers.etag ?? ''));
-    check(result.body && exact(result.body, ['todaySummary','currentCard','nextSummaries','waitingCount','chatComposer']));
-    return result.body.currentCard;
+    await this.awaitWorkbenchIdle(session);
+    check(!this.dispatchFailed && session.self?.selectedAppointmentId === session.appointmentId && /^Bearer \S+$/.test(session.auth.Authorization ?? ''));
+    const response = await session.context.request.get(ORIGIN + CURRENT, { headers: session.auth, failOnStatusCode: false, maxRedirects: 0 });
+    const headers = response.headers(), status = response.status(); this.http.push({ path: CURRENT, status });
+    check(!this.dispatchFailed && status === 200 && exactHeaderTokens(headers['cache-control'], ['private', 'no-cache'])
+      && exactHeaderTokens(headers.vary, ['authorization']) && workbenchETag(headers.etag));
+    const body = JSON.parse(await response.text()); parseEnvelope(body); return body.currentCard;
   }
   private async refreshUi(session: Session): Promise<any | null> {
     const waiting = session.page.waitForResponse(response => new URL(response.url()).origin === ORIGIN && new URL(response.url()).pathname === CURRENT && response.request().method() === 'GET');
@@ -268,7 +315,9 @@ export class BusinessSetup {
     return envelope.currentCard;
   }
   private arm(session: Session, step: BusinessStep, method: string, path: string, body: Record<string, unknown>, card?: any) {
-    check(!this.dispatchFailed && session.self.actorScopeKey); this.gate.arm({ step, method, path, body, actorScopeKey: session.self.actorScopeKey, requestSelectors: requestSelectors(session, card, body) });
+    check(!this.dispatchFailed && (session.workbenchPending?.size ?? 0) === 0 && session.self.actorScopeKey);
+    if (session.alias !== 'founder') check(session.workbenchCache?.actorScopeKey === session.self.actorScopeKey);
+    this.gate.arm({ step, method, path, body, actorScopeKey: session.self.actorScopeKey, requestSelectors: requestSelectors(session, card, body) });
   }
   private async complete(step: BusinessStep, response: Wire | Response, result: any, selected: BusinessSelectors) {
     const entry = this.journal.pending(); check(entry?.step === step);

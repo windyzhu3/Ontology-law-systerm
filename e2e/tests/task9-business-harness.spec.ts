@@ -460,7 +460,7 @@ test('offline BusinessSetup refreshes the cached founder through UI before phase
     json: async () => ({ items: fixture.principals, nextCursor: null }) };
   const refresh = async () => {
     // Model only the browser/UI boundary. The real observer must capture the newly validated outgoing header.
-    await (setup as any).observe({ allHeaders: async () => currentHeaders }, admin);
+    await (setup as any).observe({ url: () => 'https://localhost:19444' + uiPath, method: () => 'GET', allHeaders: async () => currentHeaders }, admin);
     refreshed = true;
     if (responseWaiter?.predicate(uiResponse)) responseWaiter.resolve(uiResponse);
   };
@@ -519,19 +519,105 @@ test('offline BusinessSetup accepts a workbench 304 only after an exact same-Act
 });
 
 test('offline BusinessSetup records the initial UI 200 before the first cached refresh returns 304', async () => {
-  const { setup, session, counts, queueInitial } = cachedRefreshSetup('intake', {
+  const { setup, session, counts, beginUi } = cachedRefreshSetup('intake', {
     installObserver: true,
     responses: [{ status: 304, etag: WORKBENCH_TAG, ifNoneMatch: WORKBENCH_TAG }],
   });
   let releaseEnvelope!: (value: any) => void;
   const envelope = new Promise(resolve => { releaseEnvelope = resolve; });
-  const observation = queueInitial({ etag: WORKBENCH_TAG, body: envelope });
+  const initial = await beginUi({ etag: WORKBENCH_TAG, body: envelope });
+  const observation = initial.deliver();
   const refresh = setup.workbench('intake');
   await Promise.resolve(); expect(counts.refreshes).toBe(0);
-  releaseEnvelope({ todaySummary: '', currentCard: null, nextSummaries: [], waitingCount: 0, chatComposer: {} });
+  releaseEnvelope(validEmptyEnvelope());
   await observation;
   await expect(refresh).resolves.toBe(session);
   expect(counts).toEqual({ refreshes: 1, reads: 0, arms: 0 });
+});
+
+test('offline BusinessSetup blocks arm and dispatch while the initial UI response can still fail', async () => {
+  const { setup, routeHandler, beginCurrent } = await syntheticSetupRoute();
+  const counts = { arms: 0, dispatches: 0, aborts: 0 };
+  setup.gate = { arm: () => { counts.arms++; }, dispatch: async (_request: unknown, send: () => Promise<void>) => { counts.dispatches++; await send(); } };
+  let rejectEnvelope!: (error: Error) => void;
+  const initial = await beginCurrent(new Promise((_resolve, reject) => { rejectEnvelope = reject; }));
+  setup.login = async () => initial.session;
+  const advance = setup.workbench('intake').then(async (ready: any) => {
+    setup.arm(ready, 'capture-auto', 'POST', '/api/v1/leads', {});
+  });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  await routeHandler({
+    request: () => ({ url: () => 'https://localhost:19444/api/v1/leads', method: () => 'POST', allHeaders: async () => ({}),
+      headers: () => ({ 'x-appointment-id': initial.session.appointmentId, 'idempotency-key': '00000000-0000-4000-8000-000000000190' }), postDataBuffer: () => Buffer.from('{}') }),
+    continue: async () => {}, abort: async () => { counts.aborts++; },
+  });
+  expect(counts).toEqual({ arms: 0, dispatches: 0, aborts: 1 });
+  rejectEnvelope(new Error('SYNTHETIC_INVALID_INITIAL_ENVELOPE'));
+  await expect(advance).rejects.toThrow('SYNTHETIC_INVALID_INITIAL_ENVELOPE');
+  await expect(initial.observation).rejects.toThrow('SYNTHETIC_INVALID_INITIAL_ENVELOPE');
+  expect(setup.dispatchFailed).toBe(true);
+});
+
+test('offline BusinessSetup fails closed when an initial UI request ends without a response', async () => {
+  const { setup, beginCurrent } = await syntheticSetupRoute();
+  const initial = await beginCurrent(validEmptyEnvelope(), false);
+  setup.login = async () => initial.session;
+  const advance = setup.workbench('intake');
+  await Promise.resolve(); initial.fail();
+  await expect(advance).rejects.toThrow();
+  expect(() => setup.arm(initial.session, 'capture-auto', 'POST', '/api/v1/leads', {})).toThrow();
+  expect(setup.dispatchFailed).toBe(true);
+});
+
+test('offline BusinessSetup rejects envelopes the production SPA parser cannot cache', async () => {
+  for (const [name, body] of Object.entries({
+    'empty summary': { ...validEmptyEnvelope(), todaySummary: '' },
+    'incomplete composer': { ...validEmptyEnvelope(), chatComposer: {} },
+    'negative waiting count': { ...validEmptyEnvelope(), waitingCount: -1 },
+  })) {
+    const { setup, session, counts } = cachedRefreshSetup('intake', { responses: [{ body }] });
+    await expect(setup.workbench('intake'), name).rejects.toThrow('T9_BUSINESS_BOUNDARY');
+    expect(() => setup.arm(session, 'capture-auto', 'POST', '/api/v1/leads', {}), name).toThrow();
+    expect(counts, name).toEqual({ refreshes: 1, reads: 0, arms: 0 });
+  }
+});
+
+test('offline BusinessSetup keeps a harness CURRENT read out of the SPA cache proof', async () => {
+  const { setup, session, beginUi, harnessCalls } = cachedRefreshSetup('intake', {
+    installObserver: true,
+    harnessResponse: { etag: OTHER_WORKBENCH_TAG },
+    responses: [{ status: 304, etag: WORKBENCH_TAG, ifNoneMatch: WORKBENCH_TAG }],
+  });
+  const initial = await beginUi({ etag: WORKBENCH_TAG }); await initial.deliver();
+  await expect(setup.current(session)).resolves.toBeNull();
+  expect(harnessCalls).toEqual([{ url: 'https://localhost:19444/api/v1/workcards/current', options: {
+    headers: { Authorization: 'Bearer synthetic-current', 'X-Appointment-Id': session.appointmentId }, failOnStatusCode: false, maxRedirects: 0 } }]);
+  await expect(setup.workbench('intake')).resolves.toBe(session);
+});
+
+test('offline BusinessSetup ignores an older UI response delivered after a newer request', async () => {
+  const NEWEST_TAG = '"wb.' + 'n'.repeat(43) + '"';
+  const { setup, session, beginUi } = cachedRefreshSetup('intake', {
+    installObserver: true,
+    responses: [{ status: 304, etag: NEWEST_TAG, ifNoneMatch: NEWEST_TAG }],
+  });
+  const initial = await beginUi({ etag: WORKBENCH_TAG }); await initial.deliver();
+  const older = await beginUi({ etag: OTHER_WORKBENCH_TAG, body: validEmptyEnvelope('旧摘要') });
+  const newer = await beginUi({ etag: NEWEST_TAG, body: validEmptyEnvelope('新摘要') });
+  await newer.deliver(); await older.deliver();
+  await expect(setup.workbench('intake')).resolves.toBe(session);
+});
+
+test('offline BusinessSetup rejects a response when its request Actor snapshot is no longer current', async () => {
+  const { setup, session, counts, beginUi } = cachedRefreshSetup('intake', { installObserver: true });
+  let releaseEnvelope!: (value: any) => void;
+  const body = new Promise(resolve => { releaseEnvelope = resolve; });
+  const pending = await beginUi({ body }); const observation = pending.deliver();
+  session.self.actorScopeKey = 'ask1.' + 'd'.repeat(43);
+  releaseEnvelope(validEmptyEnvelope());
+  await expect(observation).rejects.toThrow();
+  expect(() => setup.arm(session, 'capture-auto', 'POST', '/api/v1/leads', {})).toThrow();
+  expect(counts.arms).toBe(0);
 });
 
 test('offline BusinessSetup invalidates cached workbench proof after an Actor change', async () => {
@@ -958,17 +1044,20 @@ async function seedCommands(journal: BusinessJournal, count: number) {
 }
 
 async function syntheticSetupRoute() {
-  let handler: any;
+  let handler: any, responseListener: ((response: any) => void) | undefined, requestFailedListener: ((request: any) => void) | undefined;
   const appointmentId = '00000000-0000-4000-8000-000000000108';
   const payload = Buffer.from(JSON.stringify({ iss: BUSINESS_PIN.issuer, preferred_username: 'task9-local-intake', sub: '00000000-0000-4000-8000-000000000109' })).toString('base64url');
   const tokenResponse = { status: () => 200, json: async () => ({ access_token: `e30.${payload}.signature` }) };
   const selfResponse = { status: () => 200, json: async () => ({ state: 'READY', selectedAppointmentId: appointmentId, selectedOnBehalfAppointmentId: null, appointmentChoices: [{ id: appointmentId }], actorScopeKey: 'ask1.' + 'c'.repeat(43), canEnterWorkbench: true, canEnterIdentityAdmin: false }) };
   let responseCall = 0;
-  const clickable = { click: async () => {}, fill: async () => {} };
+  const clickable = { click: async () => {}, fill: async () => {}, count: async () => 1 };
   const page = {
     goto: async () => {}, waitForURL: async () => {}, getByRole: () => clickable, locator: () => clickable,
     waitForResponse: () => Promise.resolve(responseCall++ === 0 ? tokenResponse : selfResponse),
-    on: () => {},
+    on: (event: string, listener: (value: any) => void) => {
+      if (event === 'response') responseListener = listener;
+      if (event === 'requestfailed') requestFailedListener = listener;
+    },
   };
   const context = { route: async (_pattern: string, value: any) => { handler = value; }, newPage: async () => page, close: async () => {} };
   const browser = { newContext: async () => context };
@@ -978,19 +1067,37 @@ async function syntheticSetupRoute() {
   };
   const setup = new (BusinessSetup as any)(browser, environment, {});
   await (setup as any).login('intake');
-  return { setup, routeHandler: handler as (route: any) => Promise<void> };
+  const session = setup.sessions.get('intake');
+  return {
+    setup, routeHandler: handler as (route: any) => Promise<void>,
+    beginCurrent: async (body: any, deliver = true) => {
+      const headers = { authorization: 'Bearer synthetic-current', 'x-appointment-id': appointmentId };
+      const request = { url: () => 'https://localhost:19444/api/v1/workcards/current', method: () => 'GET', allHeaders: async () => headers,
+        headers: () => headers, postDataBuffer: () => null };
+      const response = { url: request.url, status: () => 200, request: () => request,
+        allHeaders: async () => ({ 'cache-control': 'private, no-cache', vary: 'Authorization', etag: WORKBENCH_TAG }), json: async () => body };
+      await setup.observe(request, session); if (deliver) responseListener!(response);
+      return { session, observation: session.workbenchObservation as Promise<void>, fail: () => requestFailedListener!(request) };
+    },
+  };
 }
 
 const WORKBENCH_TAG = '"wb.' + 'a'.repeat(43) + '"';
 const OTHER_WORKBENCH_TAG = '"wb.' + 'b'.repeat(43) + '"';
 type CachedRefreshWire = { status?: number; cacheControl?: string; vary?: string | null; etag?: string | null; ifNoneMatch?: string; body?: any };
 
-function cachedRefreshSetup(alias: 'founder' | 'intake', input: string | { failure?: string; installObserver?: boolean; responses?: CachedRefreshWire[] } = '') {
+function validEmptyEnvelope(todaySummary = '今日暂无待处理责任。') {
+  return { todaySummary, currentCard: null, nextSummaries: [], waitingCount: 0,
+    chatComposer: { mode: 'ACTION_DRAFT', targetTaskId: null, placeholder: '当前没有候选内容', enabled: false } };
+}
+
+function cachedRefreshSetup(alias: 'founder' | 'intake', input: string | { failure?: string; installObserver?: boolean; harnessResponse?: CachedRefreshWire; responses?: CachedRefreshWire[] } = '') {
   const failure = typeof input === 'string' ? input : input.failure ?? '';
   const configured = typeof input === 'string' ? [] : input.responses ?? [];
   const appointmentId = '00000000-0000-4000-8000-000000000108';
   const setup = new (BusinessSetup as any)({}, { bootstrap: { appointmentId }, resources: { 'appointment-intake': appointmentId } }, {});
   const counts = { refreshes: 0, reads: 0, arms: 0 };
+  const harnessCalls: Array<{ url: string; options: any }> = [];
   const session: any = { ...syntheticSession(alias, appointmentId), auth: { Authorization: 'Bearer synthetic-expired' } };
   session.self.canEnterIdentityAdmin = alias === 'founder'; session.self.canEnterWorkbench = alias !== 'founder';
   const pagePath = alias === 'founder' ? '/admin/identity/principals' : '/workbench';
@@ -1004,11 +1111,13 @@ function cachedRefreshSetup(alias: 'founder' | 'intake', input: string | { failu
       ? { 'cache-control': selected.cacheControl ?? 'no-store', ...(selected.vary == null ? {} : { vary: selected.vary }), ...(selected.etag == null ? {} : { etag: selected.etag }) }
       : { 'cache-control': selected.cacheControl ?? 'private, no-cache', ...(selected.vary === null ? {} : { vary: selected.vary ?? 'Authorization' }), ...(selected.etag === null ? {} : { etag: selected.etag ?? WORKBENCH_TAG }) };
     const requestHeaders = { ...headers, ...(selected.ifNoneMatch === undefined ? {} : { 'if-none-match': selected.ifNoneMatch }) };
+    const request = { url: () => 'https://localhost:19444' + readPath, method: () => 'GET', allHeaders: async () => requestHeaders,
+      headers: () => requestHeaders, postDataBuffer: () => null };
     return {
       url: () => (failure === 'wrong-origin' ? 'https://invalid.example' : 'https://localhost:19444') + (failure === 'wrong-path' ? '/api/v1/session/context' : readPath),
       status: () => selected.status ?? (/^\d+$/.test(failure) ? Number(failure) : 200),
-      request: () => ({ method: () => 'GET', allHeaders: async () => requestHeaders }), allHeaders: async () => responseHeaders,
-      json: async () => selected.body === undefined ? { todaySummary: '', currentCard: null, nextSummaries: [], waitingCount: 0, chatComposer: {} } : selected.body,
+      request: () => request, allHeaders: async () => responseHeaders,
+      json: async () => selected.body === undefined ? validEmptyEnvelope() : selected.body,
     };
   };
   const response = () => makeResponse(configured[Math.min(refreshIndex++, Math.max(0, configured.length - 1))] ?? {});
@@ -1020,8 +1129,9 @@ function cachedRefreshSetup(alias: 'founder' | 'intake', input: string | { failu
         counts.refreshes++;
         if (failure === 'click') throw new Error('SYNTHETIC_REFRESH_FAILURE');
         expect(options.name).toBe(alias === 'founder' ? '刷新' : '刷新当前责任');
-        if (failure !== 'unobserved') await setup.observe({ allHeaders: async () => headers }, session);
         const currentResponse = response();
+        if (failure !== 'unobserved') await setup.observe(currentResponse.request(), session);
+        responseListener?.(currentResponse);
         if (waiter?.predicate(currentResponse)) waiter.resolve(currentResponse);
         else waiter?.reject(new Error('SYNTHETIC_NO_MATCHING_RESPONSE'));
       },
@@ -1030,20 +1140,26 @@ function cachedRefreshSetup(alias: 'founder' | 'intake', input: string | { failu
     on: (event: string, listener: (response: any) => void) => { if (event === 'response') responseListener = listener; },
     evaluate: async (_fn: unknown, value: { auth: Record<string, string> }) => {
       counts.reads++;
+      const selected = typeof input === 'string' ? {} : input.harnessResponse ?? {};
+      const harnessResponse = makeResponse(selected);
+      if (alias === 'intake') { await setup.observe(harnessResponse.request(), session); responseListener?.(harnessResponse); }
       return { status: value.auth.Authorization === 'Bearer synthetic-current' ? 200 : 401,
         headers: alias === 'founder' ? { 'cache-control': 'no-store' }
-          : { etag: WORKBENCH_TAG, 'cache-control': 'private, no-cache', vary: 'Authorization' },
-        body: alias === 'founder' ? { items: [], nextCursor: null } : { todaySummary: '', currentCard: null, nextSummaries: [], waitingCount: 0, chatComposer: {} } };
+          : { etag: selected.etag ?? WORKBENCH_TAG, 'cache-control': 'private, no-cache', vary: 'Authorization' },
+        body: alias === 'founder' ? { items: [], nextCursor: null } : selected.body ?? validEmptyEnvelope() };
     },
   };
+  session.context.request = { get: async (url: string, options: any) => { counts.reads++; harnessCalls.push({ url, options }); const selected = typeof input === 'string' ? {} : input.harnessResponse ?? {};
+    return { status: () => selected.status ?? 200, headers: () => ({ etag: selected.etag ?? WORKBENCH_TAG, 'cache-control': 'private, no-cache', vary: 'Authorization' }),
+      text: async () => JSON.stringify(selected.body ?? validEmptyEnvelope()) }; } };
   if (typeof input !== 'string' && input.installObserver) (setup as any).installWorkbenchResponseObserver(session);
   setup.sessions.set(alias, session); setup.gate = { arm: () => { counts.arms++; } };
   return {
-    setup, session, counts,
-    queueInitial: (wire: CachedRefreshWire) => {
-      expect(responseListener).toBeDefined(); const initial = makeResponse(wire);
-      session.auth = { Authorization: headers.authorization, 'X-Appointment-Id': appointmentId };
-      responseListener!(initial); return session.workbenchObservation as Promise<void>;
+    setup, session, counts, harnessCalls,
+    beginUi: async (wire: CachedRefreshWire) => {
+      expect(responseListener).toBeDefined(); const uiResponse = makeResponse(wire);
+      await setup.observe(uiResponse.request(), session);
+      return { deliver: () => { responseListener!(uiResponse); return session.workbenchObservation as Promise<void>; } };
     },
   };
 }
