@@ -38,6 +38,11 @@ export function validateBusinessArtifact(value: unknown): void {
 export async function loadBusinessEnvironment(dependencies = { invokeLocalRuntime, runtime, toolchain }) {
   requireBusinessAcceptance(process.env.TASK9_LOCAL_ACCEPTANCE, process.env.TASK9_BUSINESS_ACCEPTANCE, process.env.TASK9_BUSINESS_RUN_ID, process.env.TASK9_BUSINESS_CONTINUE_RUN_ID);
   check(!process.env.DEBUG && !process.env.PWDEBUG && !process.env.PW_TEST_DEBUG);
+  const expectedRestartSha = process.env.TASK9_BUSINESS_RESTART_SHA256;
+  const recoveryId = process.env.TASK9_BUSINESS_RECOVER_COMMAND_ID, recoverySha = process.env.TASK9_BUSINESS_RECOVER_JOURNAL_SHA256;
+  const hasRecovery = recoveryId !== undefined || recoverySha !== undefined;
+  if (expectedRestartSha !== undefined || hasRecovery) check(HASH.test(expectedRestartSha ?? '') && process.env.TASK9_BUSINESS_CONTINUE_RUN_ID === process.env.TASK9_BUSINESS_RUN_ID);
+  if (hasRecovery) check(UUID.test(recoveryId ?? '') && HASH.test(recoverySha ?? ''));
   const tools = dependencies.toolchain();
   const snapshot = await dependencies.invokeLocalRuntime('snapshot');
   validateBusinessArtifact({ ...snapshot, ...tools });
@@ -50,12 +55,10 @@ export async function loadBusinessEnvironment(dependencies = { invokeLocalRuntim
   for (const id of Object.values(loaded.resources)) check(typeof id === 'string' && /^[0-9a-f-]{36}$/.test(id));
   const current: Record<string, unknown> = { ...BUSINESS_PIN, ...tools, apiIdentity: snapshot.apiIdentity, processIdentity: snapshot.processIdentity, releaseIdentity: snapshot.releaseIdentity };
   const environmentDigest = (await import('node:crypto')).createHash('sha256').update(JSON.stringify(current)).digest('hex');
-  const expectedRestartSha = process.env.TASK9_BUSINESS_RESTART_SHA256;
-  if (expectedRestartSha !== undefined) check(process.env.TASK9_BUSINESS_CONTINUE_RUN_ID === process.env.TASK9_BUSINESS_RUN_ID);
   const restart = expectedRestartSha === undefined ? undefined : await loadBusinessRestart(dependencies.runtime, {
     runId: process.env.TASK9_BUSINESS_RUN_ID!, environmentDigest, buildSha: BUSINESS_PIN.buildSha,
     predecessorRunId: IDENTITY_PREDECESSOR.runId, predecessorSha256: IDENTITY_PREDECESSOR.journalSha256,
-  }, snapshot.apiIdentity, BUSINESS_PIN, expectedRestartSha, async () => { await dependencies.invokeLocalRuntime('protect'); });
+  }, snapshot.apiIdentity, BUSINESS_PIN, expectedRestartSha, async () => { await dependencies.invokeLocalRuntime('protect'); }, hasRecovery ? { commandId: recoveryId!, journalSha256: recoverySha! } : undefined);
   return {
     ...BUSINESS_PIN, environmentDigest, apiIdentity: snapshot.apiIdentity, runtime: dependencies.runtime, restart,
     bootstrap: loaded.bootstrap as { tenantId: string; rootId: string; founderId: string; appointmentId: string },

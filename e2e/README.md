@@ -1,5 +1,15 @@
 # Task 9.6e 受控本地身份链
 
+## Task 9.6o 具名草稿成功回执恢复
+
+草稿响应值与发送候选值使用生产 `sameValues` 比较：对象属性顺序不影响相等性，字段值、缺失或多余字段仍拒绝。其他 journal、身份、回执和字节完整性比较不变。
+
+9.6n 的普通 restart 仍拒绝 PENDING。仅控制者已批准核对原成功回执时，在原业务批准、原 run/CONTINUE 和原 `TASK9_BUSINESS_RESTART_SHA256` 之外，向本次子进程成对传入 `TASK9_BUSINESS_RECOVER_COMMAND_ID`（原 contact-draft UUID）与 `TASK9_BUSINESS_RECOVER_JOURNAL_SHA256`（核对前 journal 原始字节 SHA256）。任一个变量存在就必须两者合法；缺少 restart/CONTINUE 或只给部分参数不能回退。当前批准的原始 journal SHA 为 `1c35efc0cf060718439baed5ae1acc34bccda1ac8745faef2cad146c296612b5`，命令 UUID 由控制者从原受保护记录核对，不重新生成。
+
+该许可只接受准确12条命令中唯一第12条 `contact-draft` PENDING、前11条 CONFIRMED、原两阶段及原检查点/凭据/保全证明；任何 `.pending` 或 `.completion.pending` 均拒绝。当前进程与制品仍完整核验。打开时固定原前11条及 PENDING 原命令字段，后续不得从可变 journal 刷新这些绑定。恢复沿用原 contact 账号及 `reconcilePending`，只 GET 原命令回执和获权当前卡，核对 Actor、task/subject/revision、taskETag、draftRef/revision 与规范化意图摘要后，调用原 `journal.complete(originalId, 200, receipt, selectors)`；200只表示回执查询，不补造原 PUT 状态。
+
+404、失败或不匹配的回执、Actor/草稿漂移均保留原 PENDING 并阻断新写入；不重发、不换 key、不使用旧进程身份绕过。成功后本次 context 可继续原 `contact-submit`，保留原11条及两阶段。带旧恢复参数再次加载已变化 journal 必须失败；控制者成功后移除这两个 RECOVER 参数，普通无 PENDING restart 才能再次打开。恢复不是产品接口，也不替代独立评审、真实恢复前环境核对与操作后数据闭包。U01–U03延期、R2排除及完整Task9未完成的边界不变。
+
 ## Task 9.6n 原运行的同构建重启衔接
 
 只支持已批准的业务 run `9848f4ee-5612-49df-9e10-a8c40c09bd3d`。控制者在独立评审通过后独占创建同一受保护 runtime 内的 `task9-business-restart.json`，并保留 `task9-business-pre-restart.json` 原 journal 字节副本及 `task96n-idp-addition-proof.json` 精确新增用户保全证明；实现者只使用隔离临时合成文件。衔接凭据固定 profile `TASK9_SAME_BUILD_RESTART_V1`、当前 BUSINESS_PIN 制品、原检查点 SHA、原／当前环境和 API 身份、9条已确认命令、2个已提交阶段和第三 case。它是本次验收记录的完整性绑定，不是产品授权或通用迁移接口。

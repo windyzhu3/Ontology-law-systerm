@@ -127,7 +127,7 @@ export class BusinessJournal {
   private async initialize(identity: BusinessRunIdentity) {
     validIdentity(identity); await this.protect(); noLinks(dirname(this.path)); this.requireClear();
     if (existsSync(this.path)) { noLinks(this.path); this.text = readFileSync(this.path, 'utf8'); this.data = JSON.parse(this.text); validate(this.data);
-      if (this.restart) { this.restart.assertJournal(this.path, identity, this.data); check(!this.pending()); }
+      if (this.restart) { this.restart.assertJournal(this.path, identity, this.data); const pending = this.pending(); if (pending) this.restart.assertPending(pending, sha(this.text)); }
       else check(JSON.stringify(this.data.identity) === JSON.stringify(identity)); }
     else { check(!this.restart); this.data = { identity, commands: [], stages: [] }; validate(this.data); this.text = JSON.stringify(this.data); durableExclusive(this.path, this.text); await this.protect(); }
     this.verifyEvidence();

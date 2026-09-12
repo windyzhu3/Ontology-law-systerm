@@ -838,6 +838,35 @@ test('offline BusinessSetup fresh-process phase two reads the contact appointmen
   expect(reopened.confirmed('grant-contact-owner')?.selectors).toEqual({ resourceId: newId });
 });
 
+for (const variant of ['reordered', 'changed', 'missing', 'extra']) test(`contact draft semantic comparison ${variant} response reaches completion only for equal values`, async () => {
+  const session: any = syntheticSession('contact', command.requestSelectors.actorAppointmentId);
+  const values = { leadAssignmentId: '00000000-0000-4000-8000-000000000390', leadAssignmentRevision: 0, contactChannelCode: 'EMAIL', resultCode: 'SUSPECT_INVALID', resultSummary: 'Synthetic contact result.' };
+  const returned: Record<string, unknown> = { resultCode: values.resultCode, leadAssignmentId: values.leadAssignmentId, leadAssignmentRevision: 0, contactChannelCode: 'EMAIL', resultSummary: values.resultSummary };
+  if (variant === 'changed') returned.resultSummary = 'Changed result.';
+  if (variant === 'missing') delete returned.resultSummary;
+  if (variant === 'extra') returned.extra = 'unexpected';
+  const card = syntheticCard('CONTACT_LEAD', taskId, 'opaque-lead-ref-0001');
+  card.commandForm = { actionCode: 'RECORD_CONTACT_RESULT', fields: [], values } as any;
+  const draft = { ...syntheticDraft('00000000-0000-4000-8000-000000000391', returned), actionCode: 'RECORD_CONTACT_RESULT' };
+  const preconditions = { ...card.preconditions, draftETag: '"draft.' + 'f'.repeat(43) + '"' };
+  const draftReceipt = { ...receipt, resultFact: { factType: 'ACTION_DRAFT', factRef: 'x'.repeat(43), revision: 0 } };
+  const completions: any[] = [];
+  const journal = { pending: () => ({ ...command, step: 'contact-draft' }), confirmed: (step: string) => step === 'assign-submit' ? { selectors: successorEvidence(taskId, 'CONTACT_LEAD', session.appointmentId) } : undefined,
+    complete: async (...args: any[]) => { completions.push(args); } };
+  const setup = new (BusinessSetup as any)({}, { assertUnchanged: async () => {} }, journal);
+  setup.current = async () => card;
+  setup.arm = (_session: unknown, step: string) => { if (step === 'contact-submit') throw new Error('SYNTHETIC_STOP_BEFORE_SUBMIT'); };
+  session.page.locator = () => ({ _apiName: 'Locator', _expect: async () => ({ matches: true, received: 'expected', log: [], timeout: 0 }), fill: async () => {}, selectOption: async () => {} });
+  session.page.getByRole = () => ({ click: async () => {} });
+  session.page.waitForResponse = async () => ({ url: () => `https://localhost:19444/api/v1/tasks/${taskId}/draft`, status: () => 200,
+    allHeaders: async () => ({ etag: preconditions.draftETag, 'cache-control': 'no-store', location: `/api/v1/commands/${command.commandId}/receipt` }),
+    json: async () => ({ draft, preconditions, receipt: draftReceipt }) });
+  const result = setup.card(session, 'contact', 'CONTACT_LEAD', values, null, null);
+  await expect(result).rejects.toThrow(variant === 'reordered' ? 'SYNTHETIC_STOP_BEFORE_SUBMIT' : 'T9_BOUNDARY');
+  expect(completions).toHaveLength(variant === 'reordered' ? 1 : 0);
+  if (variant === 'reordered') expect(completions[0]).toMatchObject([command.commandId, 200, draftReceipt, { draftId: draft.draftId }]);
+});
+
 test('offline BusinessSetup refuses a different same-type task during confirmed-draft continuation', async () => {
   const originalTaskId = '00000000-0000-4000-8000-000000000270';
   const unrelatedTaskId = '00000000-0000-4000-8000-000000000271';

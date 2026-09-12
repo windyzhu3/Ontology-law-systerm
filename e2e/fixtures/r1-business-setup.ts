@@ -8,7 +8,7 @@ import { BusinessDispatchGate, allowBusinessRequest, canonicalBusinessJson } fro
 import { check, exact, ORIGIN, ISSUER, protect, sha, uuid } from './local-environment';
 import { GRANTS, matchFact, NAMES } from './identity-setup';
 import { businessFailureCode } from '../reporters/business-reporter';
-import { candidate, parseEnvelope } from '../../apps/workbench/src/features/workcard/contract';
+import { candidate, parseEnvelope, sameValues } from '../../apps/workbench/src/features/workcard/contract';
 
 const SELF = '/api/v1/session/context';
 const CURRENT = '/api/v1/workcards/current';
@@ -468,7 +468,7 @@ export class BusinessSetup {
       await session.page.getByRole('button', { name: '保存候选', exact: true }).click(); const response = await waiting; const result = await response.json();
       this.http.push({ path: new URL(response.url()).pathname, status: response.status() });
       card = { ...card, actionDraft: result.draft, preconditions: result.preconditions }; check(card.taskType === type && card.actionDraft && card.preconditions.draftETag === (await response.allHeaders()).etag);
-      check(JSON.stringify(card.actionDraft.values) === JSON.stringify(draftBody.values)); await expect(session.page.locator('#primary-confirm')).toBeEnabled();
+      check(sameValues(card.actionDraft.values, draftBody.values)); await expect(session.page.locator('#primary-confirm')).toBeEnabled();
       await this.complete(draftStep, response, result.receipt, selectors(session, card, null, card.actionDraft));
     } else {
       check(card.actionDraft); await expect(session.page.locator('#primary-confirm')).toBeEnabled();

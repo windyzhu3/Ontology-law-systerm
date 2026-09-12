@@ -7,6 +7,8 @@ import { BusinessJournal, BUSINESS_CASES, BUSINESS_STEPS, type BusinessCommand, 
 import { loadBusinessRestart } from '../fixtures/business-restart';
 import { BusinessSetup } from '../fixtures/r1-business-setup';
 import { sha } from '../fixtures/local-environment';
+import { BusinessDispatchGate, canonicalBusinessJson } from '../fixtures/business-session';
+import { createHash } from 'node:crypto';
 
 const runId = '9848f4ee-5612-49df-9e10-a8c40c09bd3d';
 const oldIdentity: BusinessRunIdentity = { runId, environmentDigest: 'a'.repeat(64), buildSha: BUSINESS_PIN.buildSha, predecessorRunId: IDENTITY_PREDECESSOR.runId, predecessorSha256: IDENTITY_PREDECESSOR.journalSha256 };
@@ -77,6 +79,61 @@ test('named verified restart preserves original journal and permits only the nex
 });
 
 type Fixture = Awaited<ReturnType<typeof fixture>>;
+const contactValues = { leadAssignmentId: id(710), leadAssignmentRevision: 0, contactChannelCode: 'EMAIL', resultCode: 'SUSPECT_INVALID', resultSummary: 'Synthetic pending contact.' };
+async function pendingFixture(index = 11) {
+  const f = await fixture(), journal = await BusinessJournal.open(f.path, activeIdentity, () => {}, await load(f));
+  for (let i = 9; i < index; i++) await confirm(journal, i);
+  const pending = command(index);
+  if (index === 11) pending.requestSelectors.intendedValuesSha256 = sha(canonicalBusinessJson(contactValues));
+  await journal.begin(pending);
+  return { ...f, pendingBytes: readFileSync(f.path), recovery: { commandId: command(index).commandId, journalSha256: sha(readFileSync(f.path)) } };
+}
+const recover = (f: Awaited<ReturnType<typeof pendingFixture>>, recovery = f.recovery) =>
+  loadBusinessRestart(f.folder, activeIdentity, activeApi, BUSINESS_PIN, sha(readFileSync(f.credentialPath)), () => {}, recovery);
+
+test('named contact draft recovery opens only the approved twelfth pending command', async () => {
+  const f = await pendingFixture(), restart = await recover(f);
+  const journal = await BusinessJournal.open(f.path, activeIdentity, () => {}, restart);
+  expect(journal.pending()).toMatchObject({ step: 'contact-draft', commandId: f.recovery.commandId });
+  expect(readFileSync(f.path)).toEqual(f.pendingBytes);
+});
+
+for (const failure of ['absent', 'wrong-id', 'wrong-sha', 'invalid-id', 'invalid-sha', 'partial', 'extra-field', 'wrong-step', 'extra-pending', 'wrong-count', 'wrong-stages', 'changed-prefix', 'pending-file', 'completion-file', 'raw-whitespace']) test(`named contact draft recovery rejects ${failure}`, async () => {
+  const f = await pendingFixture(failure === 'wrong-step' ? 9 : 11);
+  const recovery: any = { ...f.recovery };
+  if (failure === 'wrong-id') recovery.commandId = id(999);
+  if (failure === 'wrong-sha') recovery.journalSha256 = '0'.repeat(64);
+  if (failure === 'invalid-id') recovery.commandId = 'invalid';
+  if (failure === 'invalid-sha') recovery.journalSha256 = '';
+  if (failure === 'partial') delete recovery.commandId;
+  if (failure === 'extra-field') recovery.extra = true;
+  if (failure === 'pending-file' || failure === 'completion-file') writeFileSync(f.path + (failure === 'pending-file' ? '.pending' : '.completion.pending'), '{}');
+  if (['extra-pending', 'wrong-count', 'wrong-stages', 'changed-prefix'].includes(failure)) {
+    const data = JSON.parse(f.pendingBytes.toString());
+    if (failure === 'extra-pending') data.commands.push({ ...command(12), at: data.commands[11].at, status: 'PENDING' });
+    else if (failure === 'wrong-count') data.commands.splice(10, 1);
+    else if (failure === 'wrong-stages') data.stages.pop();
+    else data.commands[0].bodySha256 = '0'.repeat(64);
+    writeFileSync(f.path, JSON.stringify(data)); recovery.journalSha256 = sha(readFileSync(f.path));
+  }
+  if (failure === 'raw-whitespace') writeFileSync(f.path, Buffer.concat([f.pendingBytes, Buffer.from(' ')]));
+  const before = readFileSync(f.path);
+  await expect(failure === 'absent' ? load(f) : recover(f, recovery)).rejects.toThrow();
+  expect(readFileSync(f.path)).toEqual(before);
+});
+
+test('named contact draft recovery keeps pending writes fenced and pins the original eleven entries', async () => {
+  const f = await pendingFixture(), restart = await recover(f);
+  const journal = await BusinessJournal.open(f.path, activeIdentity, () => {}, restart);
+  const next = command(12), { commandId: _, bodySha256: _sha, ...armed } = next;
+  expect(() => new BusinessDispatchGate(journal).arm({ ...armed, body: {} })).toThrow();
+  await expect(journal.begin(next)).rejects.toThrow(); expect(readFileSync(f.path)).toEqual(f.pendingBytes);
+  for (const target of ['prefix', 'pending'] as const) {
+    const changed = JSON.parse(f.pendingBytes.toString()); changed.commands[target === 'prefix' ? 10 : 11].bodySha256 = '0'.repeat(64);
+    expect(() => restart.assertJournal(f.path, activeIdentity, changed)).toThrow();
+  }
+});
+
 const load = (f: Fixture, identity = activeIdentity, api = activeApi, digest = sha(readFileSync(f.credentialPath))) => loadBusinessRestart(f.folder, identity, api, BUSINESS_PIN, digest, () => {});
 function rewriteRecord(f: Fixture, patch: Record<string, unknown>) { writeFileSync(f.credentialPath, JSON.stringify({ ...f.record, ...patch })); }
 
@@ -156,7 +213,8 @@ function syntheticEnvironment(folder: string) {
   } };
 }
 async function withApproval(f: Fixture, action: () => Promise<void>, expectedSha: string | undefined = sha(readFileSync(f.credentialPath))) {
-  const patch = { TASK9_LOCAL_ACCEPTANCE: 'APPROVED_SYNTHETIC_ONLY', TASK9_BUSINESS_ACCEPTANCE: 'APPROVED_SIX_CARD_CHAIN', TASK9_BUSINESS_RUN_ID: runId, TASK9_BUSINESS_CONTINUE_RUN_ID: runId, TASK9_BUSINESS_RESTART_SHA256: expectedSha };
+  const patch = { TASK9_LOCAL_ACCEPTANCE: 'APPROVED_SYNTHETIC_ONLY', TASK9_BUSINESS_ACCEPTANCE: 'APPROVED_SIX_CARD_CHAIN', TASK9_BUSINESS_RUN_ID: runId, TASK9_BUSINESS_CONTINUE_RUN_ID: runId, TASK9_BUSINESS_RESTART_SHA256: expectedSha,
+    TASK9_BUSINESS_RECOVER_COMMAND_ID: undefined, TASK9_BUSINESS_RECOVER_JOURNAL_SHA256: undefined };
   const saved = Object.fromEntries(Object.keys(patch).map(key => [key, process.env[key]]));
   try { for (const [key, value] of Object.entries(patch)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } await action(); }
   finally { for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } }
@@ -173,6 +231,91 @@ test('environment consumer computes actual digest injects bridge into setup and 
     const setup = await BusinessSetup.create({ version: () => BUSINESS_PIN.browserVersion } as Browser, () => Promise.resolve(environment));
     await setup.journal.begin(command(9)); expect(JSON.parse(readFileSync(f.path, 'utf8')).commands[9].step).toBe('assign-draft');
     writeFileSync(f.proofPath, '{}'); await expect(environment.assertUnchanged()).rejects.toThrow();
+  });
+});
+
+for (const failure of ['no-restart', 'no-continue', 'id-only', 'sha-only', 'bad-id', 'bad-sha']) test(`environment named recovery cannot fall back with ${failure}`, async () => {
+  const f = await pendingFixture(), source = syntheticEnvironment(f.folder); rewriteRecord(f, { activeEnvironmentDigest: sha(JSON.stringify(source.snapshot)) });
+  await withApproval(f, async () => {
+    process.env.TASK9_BUSINESS_RECOVER_COMMAND_ID = f.recovery.commandId;
+    process.env.TASK9_BUSINESS_RECOVER_JOURNAL_SHA256 = f.recovery.journalSha256;
+    if (failure === 'no-restart') delete process.env.TASK9_BUSINESS_RESTART_SHA256;
+    if (failure === 'no-continue') delete process.env.TASK9_BUSINESS_CONTINUE_RUN_ID;
+    if (failure === 'id-only') delete process.env.TASK9_BUSINESS_RECOVER_JOURNAL_SHA256;
+    if (failure === 'sha-only') delete process.env.TASK9_BUSINESS_RECOVER_COMMAND_ID;
+    if (failure === 'bad-id') process.env.TASK9_BUSINESS_RECOVER_COMMAND_ID = 'invalid';
+    if (failure === 'bad-sha') process.env.TASK9_BUSINESS_RECOVER_JOURNAL_SHA256 = '';
+    await expect(loadBusinessEnvironment(source.dependencies)).rejects.toThrow(); expect(readFileSync(f.path)).toEqual(f.pendingBytes);
+  });
+});
+
+function contactRecoveryWire(source: ReturnType<typeof syntheticEnvironment>, failure: string) {
+  const reads: string[] = [], draftId = id(711), actionCode = 'RECORD_CONTACT_RESULT';
+  const { resultCode, ...otherValues } = contactValues, values = { resultCode, ...otherValues };
+  const draft = { draftId, draftRevision: 0, actionCode, schemaVersion: 1, values, digest: 'k'.repeat(43), updatedAt: '2026-09-12T00:00:00.000Z', editable: true };
+  const current: any = { taskId, taskType: 'CONTACT_LEAD', taskRevision: 0, versionStatus: 'CURRENT',
+    subject: { subjectType: 'LEAD', subjectRef: 'synthetic-lead-ref-0001', subjectRevision: 0, title: 'Synthetic lead' },
+    owner: { displayName: 'Synthetic contact', organizationLabel: 'Synthetic organization' }, businessPurpose: { code: 'CONTACT_LEAD', label: 'Contact lead' },
+    primaryCommand: { code: actionCode, label: 'Record contact', enabled: true }, expectedCompletionFact: 'LEAD_CONTACT_RESULT',
+    sla: { code: 'CONTACT', dueAt: '2026-09-12T00:00:00.000Z', status: 'ON_TRACK', timeHint: 'Synthetic due' }, actionDraft: draft,
+    commandForm: { actionCode, schemaVersion: 1, values: contactValues, fields: ['contactChannelCode','resultCode','resultSummary'].map(name => ({ name, label: name, control: name === 'resultSummary' ? 'TEXTAREA' : 'SELECT', required: true, readOnly: false,
+      options: name === 'resultSummary' ? [] : [{ value: name === 'resultCode' ? 'SUSPECT_INVALID' : 'EMAIL', label: 'Synthetic option', disabled: false }] })) },
+    preconditions: { taskETag, subjectETag: '"subject.' + 's'.repeat(43) + '"', draftETag: '"draft.' + 'i'.repeat(43) + '"' } };
+  const scope = { appointment: appointmentId, id: draftId, kind: 'HUMAN', onBehalfAppointment: null, onBehalfPrincipal: null, principal: source.loaded.resources['principal-contact'], profile: 'R1_PUBLIC_FACT_REF_V1', tenant: source.loaded.bootstrap.tenantId, type: 'responsibility.action_draft' };
+  const receipt: any = { commandId: id(111), receiptId: id(211), completedAt: '2026-09-12T00:00:00.000Z', outcome: 'SUCCEEDED', resultFact: { factType: 'ACTION_DRAFT', factRef: createHash('sha256').update(canonicalBusinessJson(scope)).digest('base64url'), revision: 0 } };
+  if (failure === 'wrong-receipt') receipt.commandId = id(999);
+  if (failure === 'failed-receipt') receipt.outcome = 'REJECTED';
+  if (failure === 'wrong-fact') receipt.resultFact.factRef = 'x'.repeat(43);
+  if (failure === 'wrong-fact-type') receipt.resultFact.factType = 'LEAD';
+  if (failure === 'revision') draft.draftRevision = 1;
+  if (failure === 'intent') draft.values.resultSummary = 'Changed contact.';
+  if (failure === 'task') current.taskId = id(998);
+  if (failure === 'subject') current.subject.subjectRef = 'different-lead-ref-0001';
+  if (failure === 'subject-revision') current.subject.subjectRevision = 1;
+  if (failure === 'task-etag') current.preconditions.taskETag = '"task.' + 'q'.repeat(43) + '"';
+  const session: any = { alias: 'contact', appointmentId, self: { actorScopeKey: 'ask1.' + (failure === 'actor' ? 'x' : 'g').repeat(43), selectedAppointmentId: appointmentId },
+    workbenchGeneration: 0, auth: { Authorization: 'Bearer synthetic-contact', 'X-Appointment-Id': appointmentId },
+    page: { evaluate: async (_fn: unknown, args: any) => { expect(args.init).toEqual({}); expect(args.path).toBe(`https://localhost:19444/api/v1/commands/${id(111)}/receipt`); expect(args.auth['X-Appointment-Id']).toBe(appointmentId); reads.push('receipt'); return { status: failure === '404' ? 404 : 200, headers: { 'cache-control': 'no-store' }, body: receipt }; } },
+    context: { request: { get: async (url: string, options: any) => { expect(url).toBe('https://localhost:19444/api/v1/workcards/current'); expect(options.headers['X-Appointment-Id']).toBe(appointmentId); reads.push('current'); return {
+      status: () => 200, headers: () => ({ 'cache-control': 'private, no-cache', vary: 'Authorization', etag: '"wb.' + 'w'.repeat(43) + '"' }),
+      text: async () => JSON.stringify({ todaySummary: 'Synthetic recovery', currentCard: current, nextSummaries: [], waitingCount: 0, chatComposer: { mode: 'ACTION_DRAFT', targetTaskId: current.taskId, placeholder: 'Synthetic candidate', enabled: true } }),
+    }; } } } };
+  return { session, reads };
+}
+
+for (const failure of ['success', '404', 'wrong-receipt', 'failed-receipt', 'wrong-fact', 'wrong-fact-type', 'actor', 'revision', 'intent', 'task', 'subject', 'subject-revision', 'task-etag']) test(`environment setup named contact recovery ${failure} preserves original command and receipt-only flow`, async () => {
+  const f = await pendingFixture(), source = syntheticEnvironment(f.folder), before = JSON.parse(f.pendingBytes.toString());
+  rewriteRecord(f, { activeEnvironmentDigest: sha(JSON.stringify(source.snapshot)) });
+  const oldReports = before.stages.map((stage: any) => readFileSync(stage.reportPath));
+  await withApproval(f, async () => {
+    process.env.TASK9_BUSINESS_RECOVER_COMMAND_ID = f.recovery.commandId;
+    process.env.TASK9_BUSINESS_RECOVER_JOURNAL_SHA256 = f.recovery.journalSha256;
+    const environment = await loadBusinessEnvironment(source.dependencies);
+    const setup = await BusinessSetup.create({ version: () => BUSINESS_PIN.browserVersion } as Browser, () => Promise.resolve(environment));
+    const wire = contactRecoveryWire(source, failure);
+    // Only authentication and browser transport are synthetic; validation, GET consumers and journal persistence run unchanged.
+    (setup as any).workbench = async (alias: string) => { expect(alias).toBe('contact'); return wire.session; };
+    if (failure !== 'success') {
+      await expect((setup as any).reconcilePending()).rejects.toThrow(); expect(readFileSync(f.path)).toEqual(f.pendingBytes);
+      expect(setup.journal.pending()?.commandId).toBe(f.recovery.commandId);
+      const next = command(12), { commandId: _, bodySha256: _sha, ...armed } = next;
+      expect(() => new BusinessDispatchGate(setup.journal).arm({ ...armed, body: {} })).toThrow();
+      return;
+    }
+    await (setup as any).reconcilePending(); expect(wire.reads).toEqual(['receipt', 'current']);
+    const after = JSON.parse(readFileSync(f.path, 'utf8'));
+    expect(after.commands).toHaveLength(12); expect(after.commands.slice(0, 11)).toEqual(before.commands.slice(0, 11)); expect(after.stages).toEqual(before.stages);
+    expect(after.commands[11]).toMatchObject({ ...before.commands[11], status: 'CONFIRMED', httpStatus: 200, receiptId: id(211) });
+    expect(after.commands[11].selectors.draftValuesSha256).toBe(before.commands[11].requestSelectors.intendedValuesSha256);
+    expect(setup.journal.pending()).toBeUndefined();
+    await expect(loadBusinessEnvironment(source.dependencies)).rejects.toThrow();
+    delete process.env.TASK9_BUSINESS_RECOVER_COMMAND_ID; delete process.env.TASK9_BUSINESS_RECOVER_JOURNAL_SHA256;
+    const normal = await loadBusinessEnvironment(source.dependencies);
+    await BusinessSetup.create({ version: () => BUSINESS_PIN.browserVersion } as Browser, () => Promise.resolve(normal));
+    // The same approved context can advance after its original pending is durably confirmed.
+    await setup.journal.begin(command(12)); expect(setup.journal.pending()?.step).toBe('contact-submit');
+    before.stages.forEach((stage: any, index: number) => expect(readFileSync(stage.reportPath)).toEqual(oldReports[index]));
+    expect(readFileSync(f.checkpointPath)).toEqual(f.checkpoint);
   });
 });
 
