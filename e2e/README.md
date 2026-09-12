@@ -20,6 +20,18 @@
 
 默认离线发现包含 `task9-business-restart.spec.ts`；环境和 setup 的可注入依赖仅用于离线控制外部读取，真实默认仍调用原 toolchain、runtime 与完整保护／快照。离线验证不表示真实续验、三卡或完整 Task9 已完成。
 
+## Task 9.6p 首联等待准备入口
+
+独立项目 `approved-local-contact-wait` 只匹配 `task9-contact-wait.spec.ts` 的 `T9-W09-contact-wait-preparation`。默认 `offline-business` 包含新增等待 harness；未明确选择该真实项目时不发现真实等待测试。项目选择使用原 Playwright CLI 已解析 options；grep、其他选项值与 `--` 后的文本不构成真实入口授权，真实项目拒绝 reporter 覆盖。
+
+控制者完成独立评审后，使用原严格 CA 和当前 BUSINESS_PIN，设置 `TASK9_LOCAL_ACCEPTANCE=APPROVED_SYNTHETIC_ONLY`、`TASK9_BUSINESS_ACCEPTANCE=APPROVED_CONTACT_WAIT_CHAIN`、全新 UUID `TASK9_BUSINESS_RUN_ID`，执行 `node node_modules/@playwright/test/cli.js test --config e2e/business.config.ts --project=approved-local-contact-wait`。显式 CONTINUE 只能等于该新 run；等待模式拒绝任何存在的 RESTART_SHA256、RECOVER_COMMAND_ID、RECOVER_JOURNAL_SHA256（包括空值）。不能通过原 `BusinessSetup.create` 进入，也不能在六卡模式调用 `createContactWait`。
+
+新 `task9-contact-wait-operation.json` 固定五步：manual capture、assign draft/submit、contact draft/submit；唯一阶段报告前缀为 `task9-contact-wait-<run>-<case>-<uuid>.json`。记录身份指向已闭合六卡 run `9848f4ee-5612-49df-9e10-a8c40c09bd3d`，原 raw SHA `841a4d275bf97bdb832bbb138f70efbc310dbbe10f532d6c4dbb435380d52333`。保护时只读核对其15条/3阶段、原三份报告哈希和旧 identity 前驱，并只复用第8条记录的准确 contact Grant ID。原六卡记录不追加或重放。
+
+真实准备使用原会话、四账号/任职、原12个 Grant、MANUAL 来源与 `task96p-<newrun>` 合成标识。capture 是 API 准备；两次候选保存和明确提交仍走原 UI 与 armed 网络门。`NOT_CONNECTED` + `EMAIL` 提交后必须同时确认真实回执、无 current/next 卡、waitingCount1、禁用 composer、准确等待标题、等待数和服务端今日摘要的页面文本，才发布唯一完成报告。未知 capture/submit 保留 PENDING 并禁止新 key；沿用安全的同 run 候选回执核对，不新增提交恢复或 restart 资格。
+
+离线用真实临时 journal、共享会话/派发/持久化消费者与外部浏览器 transport 验证。固定真实前驱 SHA 无法在不读取保护资料的前提下合成，完整 loader 的固定前驱正例留给控制者真实入口；离线不替代该门。控制者另行核对五个 Slot/Receipt/Audit、2 DONE + 1 WAITING、WaitReceipt、下一工作日10:00恢复与10:30 SLA，并保存准确等待 selector。这里只交付等待准备，不代表 Worker 到期恢复、W09重新打开或整个 W 组通过。
+
 ## Task 9.6l 续验缓存合同
 
 业务续验在复用已登录页面前仍由真实“刷新当前责任”UI请求建立网络证据。工作台响应按自身合同校验：`200`必须返回完整工作台 envelope、强`"wb.…"` ETag、`Cache-Control: private, no-cache`及`Vary: Authorization`；合法`304`还必须精确串联同一当前 Actor 的先前`200` envelope、请求`If-None-Match`与响应 ETag。缓存和 Vary 指令按不区分大小写的 token 语义解析，不依赖序列化顺序；缺失、冲突或错误策略均清空已观察凭据、失效缓存证据并关闭写门。

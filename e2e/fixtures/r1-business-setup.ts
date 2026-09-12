@@ -2,8 +2,8 @@ import { expect, type Browser, type BrowserContext, type Page, type Request, typ
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { BUSINESS_PIN, IDENTITY_PREDECESSOR, loadBusinessEnvironment, type BusinessEnvironment } from './business-environment';
-import { BusinessJournal, BUSINESS_CASES, type BusinessCaseId, type BusinessEntry, type BusinessSelectors, type BusinessStep, type CardSelectors, type RequestSelectors } from './business-journal';
+import { BUSINESS_PIN, IDENTITY_PREDECESSOR, CONTACT_WAIT_PREDECESSOR, loadBusinessEnvironment, requireContactWaitAcceptance, type BusinessEnvironment } from './business-environment';
+import { BusinessJournal, BUSINESS_CASES, CONTACT_WAIT_CASE, type BusinessCaseId, type BusinessEntry, type BusinessSelectors, type BusinessStep, type CardSelectors, type RequestSelectors } from './business-journal';
 import { BusinessDispatchGate, allowBusinessRequest, canonicalBusinessJson } from './business-session';
 import { check, exact, ORIGIN, ISSUER, protect, sha, uuid } from './local-environment';
 import { GRANTS, matchFact, NAMES } from './identity-setup';
@@ -118,16 +118,27 @@ export class BusinessSetup {
   private workbenchRequests = new WeakMap<Request, WorkbenchRequestSnapshot>();
   private contactAppointment?: { effectiveFrom: string; effectiveUntil: string | null };
   private dispatchFailed = false;
-  private constructor(private readonly browser: Browser, environment: BusinessEnvironment, journal: BusinessJournal) {
+  private constructor(private readonly browser: Browser, environment: BusinessEnvironment, journal: BusinessJournal, private readonly contactWait = false) {
     this.environment = environment; this.runId = process.env.TASK9_BUSINESS_RUN_ID!; this.journal = journal; this.gate = new BusinessDispatchGate(journal);
   }
   static async create(browser: Browser, loadEnvironment = loadBusinessEnvironment): Promise<BusinessSetup> {
+    check(process.env.TASK9_BUSINESS_ACCEPTANCE !== 'APPROVED_CONTACT_WAIT_CHAIN');
     const environment = await loadEnvironment(); environment.verifyBrowser(browser.version());
+    check(!environment.waitingPredecessor);
     const path = join(environment.runtime, 'task9-business-operation.json'), runId = process.env.TASK9_BUSINESS_RUN_ID!;
     check(!existsSync(path) || process.env.TASK9_BUSINESS_CONTINUE_RUN_ID === runId);
     const journal = await BusinessJournal.open(path, { runId, environmentDigest: environment.environmentDigest, buildSha: environment.buildSha,
       predecessorRunId: IDENTITY_PREDECESSOR.runId, predecessorSha256: IDENTITY_PREDECESSOR.journalSha256 }, environment.assertUnchanged, environment.restart);
     return new BusinessSetup(browser, environment, journal);
+  }
+  static async createContactWait(browser: Browser, loadEnvironment = loadBusinessEnvironment): Promise<BusinessSetup> {
+    requireContactWaitAcceptance(); const environment = await loadEnvironment(); environment.verifyBrowser(browser.version());
+    check(environment.waitingPredecessor && !environment.restart);
+    const path = join(environment.runtime, 'task9-contact-wait-operation.json'), runId = process.env.TASK9_BUSINESS_RUN_ID!;
+    check(!existsSync(path) || process.env.TASK9_BUSINESS_CONTINUE_RUN_ID === runId);
+    const journal = await BusinessJournal.openContactWait(path, { runId, environmentDigest: environment.environmentDigest, buildSha: environment.buildSha,
+      predecessorRunId: CONTACT_WAIT_PREDECESSOR.runId, predecessorSha256: CONTACT_WAIT_PREDECESSOR.journalSha256 }, environment.assertUnchanged);
+    return new BusinessSetup(browser, environment, journal, true);
   }
   async close() { for (const session of this.sessions.values()) await session.context.close(); this.sessions.clear(); }
   private expectedAppointment(alias: Alias): string { return alias === 'founder' ? this.environment.bootstrap.appointmentId : this.environment.resources[`appointment-${alias}` as keyof typeof this.environment.resources]; }
@@ -312,7 +323,8 @@ export class BusinessSetup {
   private async rows(session: Session, path: string): Promise<any[]> {
     const data = await this.read(session, path + '?limit=50'); check(exact(data, ['items','nextCursor']) && data.nextCursor === null && Array.isArray(data.items)); return data.items;
   }
-  private async current(session: Session): Promise<any | null> {
+  private async current(session: Session): Promise<any | null> { return (await this.currentEnvelope(session)).currentCard; }
+  private async currentEnvelope(session: Session): Promise<ReturnType<typeof parseEnvelope>> {
     try {
       await this.awaitWorkbenchIdle(session);
       const actorScopeKey = session.self?.actorScopeKey, appointmentId = session.appointmentId;
@@ -327,7 +339,7 @@ export class BusinessSetup {
       const headers = response.headers(), status = response.status(); this.http.push({ path: CURRENT, status });
       check(status === 200 && exactHeaderTokens(headers['cache-control'], ['private', 'no-cache'])
         && exactHeaderTokens(headers.vary, ['authorization']) && workbenchETag(headers.etag));
-      const body = JSON.parse(await response.text()); check(unchanged()); parseEnvelope(body); return body.currentCard;
+      const body = JSON.parse(await response.text()); check(unchanged()); return parseEnvelope(body);
     } catch {
       session.auth = {}; session.workbenchCache = undefined; this.dispatchFailed = true;
       throw new Error('T9_BUSINESS_BOUNDARY');
@@ -339,7 +351,7 @@ export class BusinessSetup {
     const response = await waiting; this.http.push({ path: CURRENT, status: response.status() }); check(response.status() === 200);
     const envelope = await response.json(); check(envelope && exact(envelope, ['todaySummary','currentCard','nextSummaries','waitingCount','chatComposer']));
     if (envelope.currentCard) await expect(session.page.locator('article.current-card')).toBeVisible({ timeout: SCREEN_TIMEOUT });
-    else await expect(session.page.getByRole('heading', { name: '当前暂无可处理责任', exact: true })).toBeVisible({ timeout: SCREEN_TIMEOUT });
+    else await expect(session.page.getByRole('heading', { name: envelope.waitingCount > 0 ? '当前无可处理责任，另有等待事项' : '当前暂无可处理责任', exact: true })).toBeVisible({ timeout: SCREEN_TIMEOUT });
     return envelope.currentCard;
   }
   private arm(session: Session, step: BusinessStep, method: string, path: string, body: Record<string, unknown>, card?: any) {
@@ -378,7 +390,8 @@ export class BusinessSetup {
   private async verifyPredecessor() {
     const admin = await this.administrator(), resources = this.environment.resources;
     const principals = await this.rows(admin, '/api/v1/admin/identity/principals'), organizations = await this.rows(admin, '/api/v1/admin/identity/organizations');
-    const appointments = await this.rows(admin, '/api/v1/admin/identity/appointments'), grants = await this.rows(admin, '/api/v1/admin/identity/authority-grants');
+    const appointments = await this.rows(admin, '/api/v1/admin/identity/appointments');
+    let grants = await this.rows(admin, '/api/v1/admin/identity/authority-grants');
     const root = organizations.find(row => row.id === this.environment.bootstrap.rootId);
     check(root && exact(root, ['id','parentOrganizationId','code','displayName','state','etag']) && root.code === 'ROOT' && root.parentOrganizationId === null && root.state === 'ACTIVE' && /^"identity\.[A-Za-z0-9_-]{43}"$/.test(root.etag));
     const originalOrganization = organizations.find(row => row.id === resources.organization);
@@ -389,6 +402,9 @@ export class BusinessSetup {
       const appointment = this.requireAppointment(appointments, alias);
       if (alias === 'contact') this.contactAppointment = appointment;
     }
+    if (this.contactWait) {
+      this.verifyOriginalContactGrant(grants); grants = grants.filter(row => row.id !== this.environment.waitingPredecessor!.contactGrantId);
+    }
     const expected = [...GRANTS.intake, ...GRANTS.supervisor];
     const businessSteps = ['grant-intake-0','grant-intake-1','grant-intake-2','grant-intake-3','grant-supervisor-0','grant-supervisor-1','grant-supervisor-2'] as const;
     const business = grants.filter(row => expected.includes(row.authorityCode));
@@ -398,6 +414,28 @@ export class BusinessSetup {
       && row.appointment.id === resources[step.startsWith('grant-intake-') ? 'appointment-intake' : 'appointment-supervisor'])));
     check(management.every(code => grants.some(row => row.authorityCode === code && row.appointment.id === this.environment.bootstrap.appointmentId && row.scopeOrganization.id === this.environment.bootstrap.rootId && row.state === 'ACTIVE')));
     check(grants.every(row => ![resources['appointment-contact'], resources['appointment-delegate']].includes(row.appointment.id)));
+  }
+  private verifyOriginalContactGrant(grants: any[]) {
+    const predecessor = this.environment.waitingPredecessor; check(predecessor && this.contactAppointment);
+    predecessor.assertUnchanged(); check(grants.length === 12);
+    const owned = grants.filter(row => row.appointment.id === this.environment.resources['appointment-contact']);
+    check(owned.length === 1); const row = owned[0];
+    check(exact(row, ['id','appointment','authorityCode','scopeOrganization','validFrom','validUntil','state','etag']) && row.id === predecessor.contactGrantId && row.authorityCode === 'SALES_CONTACT_OWNER' && row.state === 'ACTIVE' && row.scopeOrganization.id === this.environment.bootstrap.rootId && /^"identity\.[A-Za-z0-9_-]{43}"$/.test(row.etag));
+    const from = Date.parse(row.validFrom), until = row.validUntil === null ? null : Date.parse(row.validUntil);
+    check(Number.isFinite(from) && from >= Date.parse(this.contactAppointment.effectiveFrom) && from <= Date.now());
+    check(until === null || Number.isFinite(until) && until > Date.now() && until > from);
+    check(this.contactAppointment.effectiveUntil === null || until !== null && until <= Date.parse(this.contactAppointment.effectiveUntil));
+  }
+  private async requireWaitingUi(session: Session, value: unknown) {
+    const envelope = parseEnvelope(value);
+    check(envelope.currentCard === null && envelope.nextSummaries.length === 0 && envelope.waitingCount === 1 && envelope.chatComposer.targetTaskId === null && envelope.chatComposer.enabled === false);
+    await expect(session.page.getByRole('heading', { name: '当前无可处理责任，另有等待事项', exact: true })).toBeVisible({ timeout: SCREEN_TIMEOUT });
+    await expect(session.page.locator('article.current-card')).toHaveCount(0);
+    await expect(session.page.locator('.next-summary')).toHaveCount(0);
+    await expect(session.page.locator('.waiting-count > span').first()).toHaveText('等待 1');
+    await expect(session.page.locator('.today-summary p')).toHaveText(envelope.todaySummary);
+    await expect(session.page.locator('#primary-confirm')).toHaveCount(0);
+    await expect(session.page.getByRole('button', { name: '保存候选', exact: true })).toBeDisabled();
   }
   private validateCard(card: any, type: CardType, session: Session, allowDraft = false) {
     check(card?.taskType === type && uuid.test(card.taskId) && card.taskRevision >= 0 && card.subject?.subjectType === 'LEAD' && typeof card.subject.subjectRef === 'string');
@@ -437,9 +475,10 @@ export class BusinessSetup {
     if (await this.verifyRecorded(step, session)) return;
     const owner = taskOwner === session.alias ? session : await this.workbench(taskOwner);
     check(await this.current(owner) === null);
-    const body: Record<string, unknown> = { sourceChannelCode: 'LOCAL_SYNTHETIC', sourceAccountCode: account, sourceRecordKey: `task96k-${this.runId}-${step === 'capture-auto' ? 'auto' : 'manual'}`,
-      capturedAt: new Date().toISOString(), serviceCategoryCode: 'LOCAL_ACCEPTANCE', jurisdictionCode: 'CN', urgencyCode: 'NORMAL', legalNeedSummary: 'Task 9.6k synthetic acceptance lead.' };
-    if (withEmail) body.email = `task96k-${this.runId}-manual@example.invalid`;
+    const prefix = this.contactWait ? 'task96p' : 'task96k';
+    const body: Record<string, unknown> = { sourceChannelCode: 'LOCAL_SYNTHETIC', sourceAccountCode: account, sourceRecordKey: `${prefix}-${this.runId}-${step === 'capture-auto' ? 'auto' : 'manual'}`,
+      capturedAt: new Date().toISOString(), serviceCategoryCode: 'LOCAL_ACCEPTANCE', jurisdictionCode: 'CN', urgencyCode: 'NORMAL', legalNeedSummary: this.contactWait ? 'Task 9.6p synthetic acceptance lead.' : 'Task 9.6k synthetic acceptance lead.' };
+    if (withEmail) body.email = `${prefix}-${this.runId}-manual@example.invalid`;
     const commandId = randomUUID(); this.arm(session, step, 'POST', '/api/v1/leads', body);
     const response = await this.fetch(session, '/api/v1/leads', { method: 'POST', body, commandId });
     const card = await this.refreshUi(owner);
@@ -485,6 +524,11 @@ export class BusinessSetup {
     this.http.push({ path: new URL(response.url()).pathname, status: response.status() });
     const successorResponse = await successorWaiting; this.http.push({ path: CURRENT, status: successorResponse.status() }); check(successorResponse.status() === 200);
     const originEnvelope = await successorResponse.json(); check(originEnvelope.currentCard === null);
+    if (this.contactWait && submitStep === 'contact-submit') {
+      await this.observeWorkbenchResponse(successorResponse, session);
+      await this.requireWaitingUi(session, originEnvelope);
+      await this.requireWaitingUi(session, await this.currentEnvelope(session));
+    }
     let successor: any | null = null;
     if (successorType && successorTarget) {
       successor = await this.refreshUi(successorTarget);
@@ -550,11 +594,23 @@ export class BusinessSetup {
     await this.journal.complete(pending.commandId, 200, receipt, result);
   }
   async stage(id: BusinessCaseId) {
-    const at = new Date().toISOString(), reportPath = join(this.environment.runtime, `task9-business-${this.runId}-${id}-${randomUUID()}.json`);
+    check(this.contactWait ? id === CONTACT_WAIT_CASE : BUSINESS_CASES.includes(id as typeof BUSINESS_CASES[number]));
+    const predecessor = this.contactWait ? CONTACT_WAIT_PREDECESSOR : IDENTITY_PREDECESSOR;
+    const at = new Date().toISOString(), reportPath = join(this.environment.runtime, `${this.contactWait ? 'task9-contact-wait' : 'task9-business'}-${this.runId}-${id}-${randomUUID()}.json`);
     let completing = false;
     try {
       await this.reconcilePending(); this.journal.requirePrevious(id); await this.environment.assertUnchanged();
-      if (id === BUSINESS_CASES[0]) {
+      if (id === CONTACT_WAIT_CASE) {
+        await this.verifyPredecessor();
+        const intake = await this.workbench('intake'), supervisor = await this.workbench('supervisor'), contact = await this.workbench('contact');
+        if (!this.journal.confirmed('capture-manual')) for (const session of [supervisor, contact]) {
+          const envelope = await this.currentEnvelope(session); check(envelope.currentCard === null && envelope.nextSummaries.length === 0 && envelope.waitingCount === 0);
+        }
+        await this.capture(intake, 'capture-manual', 'LOCAL_SYNTHETIC', true, 'ASSIGN_LEAD', 'supervisor');
+        await this.card(supervisor, 'assign', 'ASSIGN_LEAD', { ownerAppointmentId: this.environment.resources['appointment-contact'] }, 'CONTACT_LEAD', 'contact');
+        await this.card(contact, 'contact', 'CONTACT_LEAD', { resultCode: 'NOT_CONNECTED', contactChannelCode: 'EMAIL', resultSummary: 'Task 9.6p synthetic contact not connected.' }, null, null);
+        await this.requireWaitingUi(contact, await this.currentEnvelope(contact));
+      } else if (id === BUSINESS_CASES[0]) {
         await this.verifyPredecessor(); const intake = await this.workbench('intake');
         await this.capture(intake, 'capture-auto', 'LOCAL_SYNTHETIC_AUTO', false, 'COMPLETE_LEAD_INGRESS', 'intake');
         await this.card(intake, 'complete', 'COMPLETE_LEAD_INGRESS', { email: `task96k-${this.runId}-auto@example.invalid`, sourceCode: 'OWNER_CONFIRMED', sourceSummary: 'Task 9.6k synthetic source confirmation.' }, 'RESOLVE_LEAD_ROUTING_GAP', 'supervisor');
@@ -573,14 +629,15 @@ export class BusinessSetup {
       }
       await this.environment.assertUnchanged(); const http = this.http; this.http = []; completing = true;
       await this.journal.finishStage(id, { runId: this.runId, environmentDigest: this.environment.environmentDigest, buildSha: this.environment.buildSha,
-        predecessorRunId: IDENTITY_PREDECESSOR.runId, predecessorSha256: IDENTITY_PREDECESSOR.journalSha256, apiIdentity: this.environment.apiIdentity,
+        predecessorRunId: predecessor.runId, predecessorSha256: predecessor.journalSha256, apiIdentity: this.environment.apiIdentity,
         executedAt: at, caseIdentity: id, status: 'ACTIONS_VERIFIED', exitCode: null, reportPath, commands: this.journal.reportCommands(id), http,
         U01: 'NOT_EXECUTED', U02: 'NOT_EXECUTED', U03: 'NOT_EXECUTED' });
     } catch {
       if (!completing) {
-        await protect(); writeFileSync(reportPath, JSON.stringify({ runId: this.runId, buildSha: BUSINESS_PIN.buildSha, predecessorRunId: IDENTITY_PREDECESSOR.runId,
-          predecessorSha256: IDENTITY_PREDECESSOR.journalSha256, executedAt: at, caseIdentity: id, status: 'FAILED', exitCode: 1,
-          reportPath, U01: 'NOT_EXECUTED', U02: 'NOT_EXECUTED', U03: 'NOT_EXECUTED' }), { flag: 'wx', mode: 0o600 }); await protect();
+        const guard = this.contactWait ? this.environment.assertUnchanged : protect;
+        await guard(); writeFileSync(reportPath, JSON.stringify({ runId: this.runId, buildSha: BUSINESS_PIN.buildSha, predecessorRunId: predecessor.runId,
+          predecessorSha256: predecessor.journalSha256, executedAt: at, caseIdentity: id, status: 'FAILED', exitCode: 1,
+          reportPath, U01: 'NOT_EXECUTED', U02: 'NOT_EXECUTED', U03: 'NOT_EXECUTED' }), { flag: 'wx', mode: 0o600 }); await guard();
       }
       throw new Error(businessFailureCode(id));
     }
