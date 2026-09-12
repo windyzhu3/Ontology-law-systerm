@@ -904,3 +904,33 @@ Scope closure: only W06 manual+real304+unchangedwaiting envelope and W08 sixbudg
 - [x] Implement offline RED/GREEN and single affected-suite gate. Source38bbc19, single215gate; later local fixes only affected harness/strict, final34GREEN. Initial missing-exportRED limitation and inheritedcolorwarnings disclosed, not rewritten.
 - [x] Independent task review and any scoped fixes. Launchfailure lifecycle dd3bc43 and exactwaiting numeral selector1b9de81 independently re-reviewed with no remaining finding. The latter allowed three pinnedChromium offline syntheticDOM tests with no networking/credentials to reproduce actual strictlocator behavior; no realenvironment testing by implementer.
 - [x] Root real read-only run and database/audit preservation closure. FirstFAILED INITIAL_UI preserved with exact1SELF/0businesswrites; explicit02 actualexit0 and independentclosuree1b12d exit0:8CURRENT(1+6+1),7actual304,1refresh,quiet>=60s,53nonAudit/590oldAudit/84IdP/materials/processes/journals unchanged,1newcontactSELF. Only the specified W06/W08 subset closes; completeTask9/W09 remainopen. Detailed evidence in docs/progress/2026-09-09-task9-local-chain-acceptance.md.
+
+## Task 9.6r: 既有合成账号的真实退出边界验收
+
+执行原批准T9-L09，不新增产品功能。U01～U03按用户签认关闭，q及原成功业务命令不重放。仅原contact账号及WAITING事实，正常登录／注销本轮自己的浏览器会话；不涉及其他会话、账号、权限、业务事实、管理接口。Worker到期时间保持。下面是验收工具实施要求，不是已通过记录。
+
+**Files:** 新增`e2e/fixtures/readonly-logout.ts`、`e2e/readonly/logout.spec.ts`、`e2e/readonly-logout.config.ts`、`e2e/reporters/readonly-logout-reporter.ts`、`e2e/tests/task9-readonly-logout-harness.spec.ts`；最小修改`e2e/fixtures/business-environment.ts`、对应现有环境门禁测试、`e2e/README.md`。Root负责计划、进度和独立保全工具；实现者不读私密runtime、不运行真实环境。禁止产品代码／冻结UI／OIDC方案／API／DDL／依赖变更，不修改q流。
+
+独立入口`loadReadOnlyLogoutEnvironment`：要求`TASK9_READONLY_LOGOUT=APPROVED_EXISTING_SESSION_LOGOUT_ONLY`及`TASK9_LOCAL_ACCEPTANCE=APPROVED_SYNTHETIC_ONLY`；与q标志及全部身份／业务写入、续验、恢复标志互斥，所有旧写入入口也拒绝新只读标志。为落实此要求，允许在`e2e/fixtures/local-environment.ts`原身份写入loader及其现有测试中添加最小互斥门，不改通用只读protect/snapshot桥。拒绝调试、关闭TLS、录屏/trace/storageState、重试/并行/repeat。默认发现0真实用例；显式项目`approved-local-readonly-logout`运行`T9-L09-existing-session-logout`。通过私有共用loader复用原准确WAITING检查点、hash和环境保全，不伪造q环境变量、不开放hash配置，不扩大旧入口。
+
+真实流使用同一context的两页。原contact真正Keycloak UI登录，第二页允许正常SSO；两页分别核验实际SELF、确认原任职并显示准确WAITING工作台。凭据/token只存内存，SELF是身份权威。正常app API只允许SELF/CURRENT读取；IdP仅固定issuer正常认证/token、GET logout与实际确认表单POST `/realms/local-r1/protocol/openid-connect/logout/logout-confirm`，其他写入/来源全部中止且失败。禁止伪造响应、SDK注入、SQL造数、直接grant、管理端注销。旧Bearer探针仅固定origin的SELF/CURRENT GET，strictTLS、禁重定向，不计UI请求。
+
+一次流程先故障再成功注销：
+
+1. 两页入场后，只暂停源页精确GET logout运输，点击真实“退出”。请求未转发时验收本地任职/责任/输入区清除与“已退出本页面，统一会话退出尚未确认。”；peer无需手动退出即清屏到/login及“已退出本页面，请重新登录。”。随后只对此一个请求注入网络失败，记录requestfailed及未转发；其他requestfailed仍失败。源页可能成为浏览器错误页，不冒充错误后SPA提示仍在；peer不得宣称统一退出成功。此分支不要求旧token401、不声称服务器注销。
+2. 移除故障规则，从peer可见登录入口正常SSO重进，源页正常导航/login并重登，仍核验原contact。再点击源页“退出”并真正到达Keycloak；无id_token_hint的正常确认页操作可见提交控件，不能绕过或记录CSRF字段。完成正常确认后固定回跳/login，peer再次自动清屏。
+3. 成功注销前两页真实Bearer仅内存保留，以原任职逐一GET SELF/CURRENT，全部要求401；不能以403/空页/自然到期替代活动性拒绝。探针必须在原token exp前，exp仅是时序条件。真实浏览器后退、切换聚焦旧页，确认旧任职/卡/草稿不复活、不自动入场；无可回退应用历史则NOT_TRIGGERED，不伪造history使其通过。允许登录前真实导航/login→/workbench建立正常历史，不用evaluate/pushState。无BroadcastChannel降级与非空卡/dirty缓存不在本次具名子项内。
+
+实施澄清：为确实形成曾入场的应用历史，可在两页分别验证工作台后，通过正常导航到/login并正常SSO重进，再执行确认注销；额外SELF/CURRENT必须计入真实报告及审计，不使用pushState/evaluate伪造历史。回退证据须绑定该主框架应用历史，包括正常安全重定向；任意空白／错误页或子框架事件不算触发。仅本地断网的真实Chromium合成DOM回归允许验证真实确认表单消费者，不涉及Keycloak或凭据。
+
+保护与报告：启动距原WAITING到期至少10分钟；总540秒，等待分片<=30秒。browser launch及异常纳入finally：关闭浏览器、丢弃Bearer、核验环境/材料/journal/checkpoint后，独占fsync写`output/task96r-readonly-logout-<uuid>.json`。仅固定case/status、buildSha/environmentDigest/apiIdentity、时间、原证据hash、具名场景状态/布尔、安全HTTP状态/计数、closed-enum failureStep、reportPath；不记录凭据/头/正文/DOM/subject/HMAC/原异常。失败不得发布PASS，故障与成功注销分别记证据。Root保留实际退出与独立DB闭包，不覆盖q证据；仅关闭真实观察子项，不关闭完整Task9。
+
+TDD：实际门禁和流消费者行为RED后最小实现。外部browser/transport/clock可替身，但验证器/报告出版真实。覆盖错误标志、意外写入先阻断、launch失败保全、故障不能当成功、成功后旧token200、身份漂移、peer未清/错提示、后退未触发、过期token伪401、最终guard失败、报告碰撞。合成DOM仅断网无凭据。运行新harness及受影响共享loader门禁一次、CLI发现门、strict检查；不重跑215业务/q真实/后端/UI全量。界面不符先报告，不放宽断言或修改产品迎合测试。
+
+- [x] 实现与定向RED/GREEN，保留命令、实际退出和限制。最终`5d1af36`新harness33项、strict退出0；原共享门只执行一次，后续修复不重复旧套件。
+- [x] 独立规格/质量评审，修复仅复核受影响范围。原评审者两轮范围复核最终Approved；真实证据不由离线测试代替。
+- [x] Root执行一次受控真实流程，不自动重试，失败原样保留。`a38d01/session88023→37ed31`实际退出1、无场景报告；启动记录保留，不能确认具体失败步骤或关闭退出子项。
+- [x] 独立核对53非审计表、全部原审计、84IdP静态表和原材料不变，准确分类新增SELF审计，更新实际子项状态。`132c06/session77258→32c516`退出0：591条原审计等保留，新增2条准确SELF，0业务写入。
+- [ ] Task9.6r真实退出子项通过。首轮缺少报告，失败闭包正确拒绝发布；先离线定位清理/报告问题，原基线及启动文件不得覆盖，不能自动再次运行。
+
+**首轮失败后的最小工具修复：** 离线真实流消费者已复现“清屏失败→持有route未释放→close等待→报告未发布”，不将其冒充真实运行首因。第三轮仅修退出流清理：所有出口幂等释放持有的故障请求并中止运输，停止观察、排空、清除敏感引用、最终保全后发布失败报告；不得通过timeout race遗弃会回写的敏感观察任务。必要有界DOM/observer处理仍限该脚本，不改产品、共享loader或其他验收工具。定向RED/GREEN、最终新harness/strict及原评审者范围复核后才可考虑另立明确的新尝试；当前不授权自动重试或覆盖首轮文件。
