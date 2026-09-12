@@ -92,7 +92,8 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
   let browser = typeof browserSource === 'function' ? undefined : browserSource, source: Page | undefined, peer: Page | undefined;
   let step: LogoutFailureStep = 'PRECHECK', stopped = false, observation = Promise.resolve(), acceptingObservations = true, faultArmed = false, faultReleased = false, faultRequest: Request | undefined;
   let retainedOld: Array<{ authorization: string; expiresAt: number }> = [];
-  let releaseFault!: () => void; const faultGate = new Promise<void>(resolve => { releaseFault = resolve; });
+  let resolveFault!: () => void; const faultGate = new Promise<void>(resolve => { resolveFault = resolve; });
+  const releaseHeldFault = () => { if (!faultReleased) { faultReleased = true; resolveFault(); } };
   type Seen = { self: any; selfCount: number; currentCount: number; authorization: string; expiresAt: number; cache?: WorkbenchCache; entry: number; entrySelf: boolean; entryCurrent: boolean; requestGeneration: number };
   type ApiRequestEvidence = { kind: 'SELF' | 'CURRENT'; entry: number; generation: number; authorization: string; appointmentId?: string; actorScopeKey?: string };
   const seen = new Map<Page, Seen>(), historyOpportunity = new Map<Page, string>(), baseline: { self?: any } = {};
@@ -237,7 +238,7 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
     await cleared(peer, PEER_MESSAGE); report.checks.peerCleared = true;
     check(await peer.getByText(SUCCESS_CLAIM, { exact: true }).count() === 0); report.checks.peerDidNotClaimSuccess = true;
     check(report.counts.forwardedLogoutGets === 0); report.checks.faultNotForwarded = true;
-    step = 'FAULT_TRANSPORT'; faultReleased = true; releaseFault(); await faultClick; await until(() => report.counts.requestFailed === 1);
+    step = 'FAULT_TRANSPORT'; releaseHeldFault(); await faultClick; await until(() => report.counts.requestFailed === 1);
     check(report.counts.faultedLogoutRequests === 1 && report.counts.requestFailed === 1 && report.counts.forwardedLogoutGets === 0); report.checks.faultRequestFailed = true; report.scenarios.faultLogout = 'PASSED';
 
     step = 'REENTRY'; faultArmed = false; await enter(peer, false); await enter(source, false); report.checks.bothReentered = true;
@@ -291,6 +292,7 @@ export async function runReadOnlyLogout(browserSource: BrowserSource, environmen
     if (report.status === 'PASSED_READ_ONLY_SUBSCENARIO') report.status = 'FAILED';
   } finally {
     acceptingObservations = false;
+    releaseHeldFault();
     try { await browser?.close(); } catch { fail('CLEANUP'); }
     await observation;
     for (const state of seen.values()) { state.authorization = ''; state.expiresAt = 0; state.self = undefined; state.cache = undefined; state.entrySelf = false; state.entryCurrent = false; }

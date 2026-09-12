@@ -39,7 +39,7 @@ const waiting = () => ({ todaySummary: '今日等待事项', currentCard: null, 
 function transport(failure = '') {
   const folder = mkdtempSync(join(tmpdir(), 'task96r-logout-'));
   const wall = Date.parse(environments.READONLY_WAITING_PIN.dueAt) - 3_600_000;
-  let elapsed = 0, closed = false, opened = false, guardCalls = 0, routeHandler: any;
+  let elapsed = 0, closed = false, opened = false, guardCalls = 0, routeHandler: any, pendingRoute: Promise<unknown> | undefined;
   const forwarded: string[] = [], sleeps: number[] = [], probes: Array<{ path: string; status: number }> = [];
   const pages: any[] = [], pendingClears: Array<{ due: number; page: any; message: string | null }> = [];
   const token = (page: any) => {
@@ -48,7 +48,7 @@ function transport(failure = '') {
   };
   function clearPeer(source: any, message: string) {
     for (const page of pages) if (page !== source) {
-      if (failure === 'peer-not-cleared' && source.logouts === 1) continue;
+      if ((failure === 'peer-not-cleared' || failure === 'held-local-clear-failure') && source.logouts === 1) continue;
       if (failure === 'peer-delayed') { pendingClears.push({ due: elapsed + 500, page, message }); continue; }
       page.stage = 'login'; page.currentUrl = environments.BUSINESS_PIN.origin + '/login';
       page.message = failure === 'peer-success-message' && source.logouts === 1 ? '统一会话退出成功。' : message;
@@ -60,7 +60,9 @@ function transport(failure = '') {
     const headers: Record<string,string> = isApi ? { authorization: token(page), 'x-appointment-id': appointment, ...(failure === 'reentry-304' && isCurrent && page.logins > 1 ? { 'if-none-match': '"wb.' + 'b'.repeat(43) + '"' } : {}) } : {};
     const request: any = { url: () => url, method: () => method, allHeaders: async () => headers, headers: () => headers, postData: () => method === 'POST' && path.endsWith('/token') ? 'grant_type=authorization_code' : null, serviceWorker: () => null, frame: () => ({ page: () => page }) };
     let continued = false, aborted = false;
-    await routeHandler({ request: () => request, continue: async () => { forwarded.push(`${method} ${path}`); continued = true; }, abort: async () => { aborted = true; if (failure !== 'fault-no-requestfailed') page.listeners.requestfailed?.(request); } });
+    const routing = routeHandler({ request: () => request, continue: async () => { forwarded.push(`${method} ${path}`); continued = true; }, abort: async () => { aborted = true; if (failure !== 'fault-no-requestfailed') page.listeners.requestfailed?.(request); } });
+    if (failure === 'held-local-clear-failure' && path.endsWith('/protocol/openid-connect/logout') && page.logouts === 1) pendingRoute = routing;
+    await routing;
     if (aborted || !continued) return false;
     if (path.endsWith('/protocol/openid-connect/logout')) { page.stage = 'keycloak'; page.currentUrl = url; }
     if (path.endsWith('/logout/logout-confirm') && method === 'POST') { page.stage = 'login'; page.currentUrl = environments.BUSINESS_PIN.origin + '/login'; page.message = null; }
@@ -142,6 +144,7 @@ function transport(failure = '') {
     const status = failure === 'old-token-200' && probes.length === 0 ? 200 : 401; probes.push({ path: new URL(url).pathname, status }); return { status: () => status };
   } }, close: async () => {} };
   const browser: any = { version: () => environments.BUSINESS_PIN.browserVersion, async newContext(options: any) { opened = true; expect(options).toMatchObject({ serviceWorkers: 'block', ignoreHTTPSErrors: false }); return context; }, async close() {
+    if (failure === 'held-local-clear-failure') await pendingRoute;
     if (failure === 'cleanup-late-response' && pages[0]) {
       const page = pages[0], headers = { authorization: token(page), 'x-appointment-id': appointment };
       const request: any = { url: () => environments.BUSINESS_PIN.origin + '/api/v1/session/context', method: () => 'GET', allHeaders: async () => headers, frame: () => ({ page: () => page }) };
@@ -162,6 +165,19 @@ async function execute(failure = '') {
   expect(JSON.stringify(saved)).not.toMatch(/Bearer |ephemeral|原合成联系人|ask1\.|session_code|private final guard/);
   return { result, value };
 }
+
+test('actual logout consumer publishes failure after releasing a held route before faithful browser close', async () => {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const execution = execute('held-local-clear-failure').then(value => ({ kind: 'result' as const, value }));
+  const outcome = await Promise.race([execution, new Promise<{ kind: 'timeout' }>(resolve => { timeout = setTimeout(() => resolve({ kind: 'timeout' }), 500); })]);
+  if (timeout) clearTimeout(timeout);
+  expect(outcome.kind).toBe('result');
+  if (outcome.kind === 'result') {
+    expect(outcome.value.result).toMatchObject({ status: 'FAILED', failureStep: 'FAULT_LOCAL_CLEAR', scenarios: { faultLogout: 'FAILED', confirmedLogout: 'FAILED', tokenRejection: 'FAILED', historySafety: 'FAILED' } });
+    expect(outcome.value.result.counts).toMatchObject({ faultedLogoutRequests: 1, forwardedLogoutGets: 0, confirmPosts: 0 });
+    expect(outcome.value.value.forwarded).not.toContain('GET /realms/local-r1/protocol/openid-connect/logout');
+  }
+});
 
 test('actual logout consumer distinguishes the held network failure from confirmed logout and rejects four active old bearer probes', async () => {
   const { result, value } = await execute();
