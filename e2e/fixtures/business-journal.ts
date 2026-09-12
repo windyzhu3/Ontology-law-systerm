@@ -1,6 +1,7 @@
 import { closeSync, existsSync, fsyncSync, openSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 import { check, exact, noLinks, sha, uuid } from './local-environment';
+import { requireVerifiedBusinessRestart, type BusinessRestart } from './business-restart';
 
 export const BUSINESS_CASES = ['T9-W01-ingress-routing-ack', 'T9-I06-contact-owner', 'T9-W01-assign-contact-review'] as const;
 export type BusinessCaseId = typeof BUSINESS_CASES[number];
@@ -117,14 +118,18 @@ function durableExclusive(path: string, bytes: string): void { const fd = openSy
 
 export class BusinessJournal {
   private text = ''; private data!: Journal; private busy = false; private failed = false;
-  private constructor(readonly path: string, private readonly protect: () => void | Promise<void>) {}
-  static async open(path: string, identity: BusinessRunIdentity, protect: () => void | Promise<void>): Promise<BusinessJournal> {
-    const journal = new BusinessJournal(path, protect); await journal.initialize(structuredClone(identity)); return journal;
+  private constructor(readonly path: string, private readonly guard: () => void | Promise<void>, private readonly restart?: BusinessRestart) {}
+  private async protect() { await this.guard(); this.restart?.assertUnchanged(); }
+  static async open(path: string, identity: BusinessRunIdentity, protect: () => void | Promise<void>, restart?: BusinessRestart): Promise<BusinessJournal> {
+    if (restart) requireVerifiedBusinessRestart(restart);
+    const journal = new BusinessJournal(path, protect, restart); await journal.initialize(structuredClone(identity)); return journal;
   }
   private async initialize(identity: BusinessRunIdentity) {
     validIdentity(identity); await this.protect(); noLinks(dirname(this.path)); this.requireClear();
-    if (existsSync(this.path)) { noLinks(this.path); this.text = readFileSync(this.path, 'utf8'); this.data = JSON.parse(this.text); validate(this.data); check(JSON.stringify(this.data.identity) === JSON.stringify(identity)); }
-    else { this.data = { identity, commands: [], stages: [] }; validate(this.data); this.text = JSON.stringify(this.data); durableExclusive(this.path, this.text); await this.protect(); }
+    if (existsSync(this.path)) { noLinks(this.path); this.text = readFileSync(this.path, 'utf8'); this.data = JSON.parse(this.text); validate(this.data);
+      if (this.restart) { this.restart.assertJournal(this.path, identity, this.data); check(!this.pending()); }
+      else check(JSON.stringify(this.data.identity) === JSON.stringify(identity)); }
+    else { check(!this.restart); this.data = { identity, commands: [], stages: [] }; validate(this.data); this.text = JSON.stringify(this.data); durableExclusive(this.path, this.text); await this.protect(); }
     this.verifyEvidence();
   }
   private requireClear() { check(!existsSync(this.path + '.pending') && !existsSync(this.path + '.completion.pending')); }
@@ -136,15 +141,17 @@ export class BusinessJournal {
   private validateEvidencePath(path: string, id: BusinessCaseId) { const prefix = `task9-business-${this.data.identity.runId}-${id}-`; check(dirname(path) === dirname(this.path) && basename(path).startsWith(prefix) && basename(path).endsWith('.json') && uuid.test(basename(path).slice(prefix.length, -5))); }
   private validateEvidence(evidence: BusinessEvidence, id: BusinessCaseId) {
     check(exact(evidence, ['runId','environmentDigest','buildSha','predecessorRunId','predecessorSha256','apiIdentity','executedAt','caseIdentity','status','exitCode','reportPath','commands','http','U01','U02','U03']));
-    for (const key of ['runId','environmentDigest','buildSha','predecessorRunId','predecessorSha256'] as const) check(evidence[key] === this.data.identity[key]);
+    const identity = this.restart && id === BUSINESS_CASES[2] ? this.restart.activeIdentity : this.data.identity;
+    for (const key of ['runId','environmentDigest','buildSha','predecessorRunId','predecessorSha256'] as const) check(evidence[key] === identity[key]);
+    if (this.restart) check(evidence.apiIdentity === (id === BUSINESS_CASES[2] ? this.restart.activeApiIdentity : this.restart.originalApiIdentity));
     check(HASH.test(evidence.apiIdentity) && new Date(evidence.executedAt).toISOString() === evidence.executedAt && evidence.caseIdentity === id && evidence.status === 'ACTIONS_VERIFIED' && evidence.exitCode === null);
     this.validateEvidencePath(evidence.reportPath, id); check(JSON.stringify(evidence.commands) === JSON.stringify(this.reportCommands(id)));
     check(Array.isArray(evidence.http) && evidence.http.length <= 100 && evidence.http.every(x => exact(x, ['path','status']) && x.path.startsWith('/api/v1/') && Number.isInteger(x.status) && x.status >= 100 && x.status <= 599));
     check(evidence.U01 === 'NOT_EXECUTED' && evidence.U02 === 'NOT_EXECUTED' && evidence.U03 === 'NOT_EXECUTED');
   }
-  private verifyEvidence() { for (const stage of this.data.stages) { this.validateEvidencePath(stage.reportPath, stage.caseIdentity); noLinks(stage.reportPath); const bytes = readFileSync(stage.reportPath, 'utf8'); check(sha(bytes) === stage.reportSha256); this.validateEvidence(JSON.parse(bytes), stage.caseIdentity); } }
+  private verifyEvidence() { this.restart?.assertUnchanged(); this.restart?.assertJournal(this.path, this.restart.activeIdentity, this.data); for (const stage of this.data.stages) { this.validateEvidencePath(stage.reportPath, stage.caseIdentity); noLinks(stage.reportPath); const bytes = readFileSync(stage.reportPath, 'utf8'); check(sha(bytes) === stage.reportSha256); this.validateEvidence(JSON.parse(bytes), stage.caseIdentity); } }
   private async save(next: Journal) {
-    this.requireClear(); this.verifyEvidence(); await this.protect(); this.requireClear(); noLinks(this.path); validate(next);
+    this.requireClear(); this.verifyEvidence(); await this.protect(); this.requireClear(); noLinks(this.path); validate(next); this.restart?.assertJournal(this.path, this.restart.activeIdentity, next);
     const bytes = JSON.stringify(next), pending = this.path + '.pending'; const fd = openSync(pending, 'wx', 0o600);
     try { check(readFileSync(this.path, 'utf8') === this.text); writeFileSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
     await this.protect(); noLinks(this.path); noLinks(pending); check(readFileSync(this.path, 'utf8') === this.text && readFileSync(pending, 'utf8') === bytes);

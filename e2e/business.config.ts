@@ -15,7 +15,7 @@ export default defineConfig({
   outputDir: join(tmpdir(), 'ontology-law-task96k-business'), reporter: [['./reporters/business-reporter.ts']],
   use: { trace: 'off', video: 'off', screenshot: 'off', serviceWorkers: 'block' },
   projects: [
-    { name: 'offline-business', testMatch: 'task9-business-harness.spec.ts' },
+    { name: 'offline-business', testMatch: ['task9-business-harness.spec.ts', 'task9-business-restart.spec.ts'] },
     { name: 'approved-local-business', testMatch: 'task9-six-workcards.spec.ts', testIgnore: approvedSelected ? [] : ['**/*'] },
   ],
 });

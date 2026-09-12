@@ -1,4 +1,5 @@
 import { check, exact, invokeLocalRuntime, runtime, toolchain, validateAccounts, type Account } from './local-environment';
+import { loadBusinessRestart } from './business-restart';
 
 export const BUSINESS_PIN = {
   origin: 'https://localhost:19444', issuer: 'https://localhost:19443/realms/local-r1',
@@ -34,13 +35,13 @@ export function validateBusinessArtifact(value: unknown): void {
   for (const [key, expected] of Object.entries(BUSINESS_PIN)) check(data[key] === expected);
 }
 
-export async function loadBusinessEnvironment() {
+export async function loadBusinessEnvironment(dependencies = { invokeLocalRuntime, runtime, toolchain }) {
   requireBusinessAcceptance(process.env.TASK9_LOCAL_ACCEPTANCE, process.env.TASK9_BUSINESS_ACCEPTANCE, process.env.TASK9_BUSINESS_RUN_ID, process.env.TASK9_BUSINESS_CONTINUE_RUN_ID);
   check(!process.env.DEBUG && !process.env.PWDEBUG && !process.env.PW_TEST_DEBUG);
-  const tools = toolchain();
-  const snapshot = await invokeLocalRuntime('snapshot');
+  const tools = dependencies.toolchain();
+  const snapshot = await dependencies.invokeLocalRuntime('snapshot');
   validateBusinessArtifact({ ...snapshot, ...tools });
-  const loaded = await invokeLocalRuntime('business');
+  const loaded = await dependencies.invokeLocalRuntime('business');
   validateBusinessEnvironment({ ...loaded, ...tools });
   for (const key of ['apiIdentity', 'processIdentity', 'releaseIdentity']) check(HASH.test(snapshot[key]) && snapshot[key] === loaded[key]);
   validateAccounts(loaded.original, loaded.credentials, loaded.operation);
@@ -49,17 +50,24 @@ export async function loadBusinessEnvironment() {
   for (const id of Object.values(loaded.resources)) check(typeof id === 'string' && /^[0-9a-f-]{36}$/.test(id));
   const current: Record<string, unknown> = { ...BUSINESS_PIN, ...tools, apiIdentity: snapshot.apiIdentity, processIdentity: snapshot.processIdentity, releaseIdentity: snapshot.releaseIdentity };
   const environmentDigest = (await import('node:crypto')).createHash('sha256').update(JSON.stringify(current)).digest('hex');
+  const expectedRestartSha = process.env.TASK9_BUSINESS_RESTART_SHA256;
+  if (expectedRestartSha !== undefined) check(process.env.TASK9_BUSINESS_CONTINUE_RUN_ID === process.env.TASK9_BUSINESS_RUN_ID);
+  const restart = expectedRestartSha === undefined ? undefined : await loadBusinessRestart(dependencies.runtime, {
+    runId: process.env.TASK9_BUSINESS_RUN_ID!, environmentDigest, buildSha: BUSINESS_PIN.buildSha,
+    predecessorRunId: IDENTITY_PREDECESSOR.runId, predecessorSha256: IDENTITY_PREDECESSOR.journalSha256,
+  }, snapshot.apiIdentity, BUSINESS_PIN, expectedRestartSha, async () => { await dependencies.invokeLocalRuntime('protect'); });
   return {
-    ...BUSINESS_PIN, environmentDigest, apiIdentity: snapshot.apiIdentity, runtime,
+    ...BUSINESS_PIN, environmentDigest, apiIdentity: snapshot.apiIdentity, runtime: dependencies.runtime, restart,
     bootstrap: loaded.bootstrap as { tenantId: string; rootId: string; founderId: string; appointmentId: string },
     accounts: { ...loaded.original, ...loaded.credentials.accounts } as Record<'founder' | 'unmapped' | 'intake' | 'supervisor' | 'contact' | 'delegate', Account>,
     resources: loaded.resources as Record<typeof IDENTITY_RESOURCE_STEPS[number], string>,
     predecessor: structuredClone(loaded.predecessor) as { runId: string; journalSha256: string; commandCount: 16; stageCount: 7; pendingCount: 0 },
     verifyBrowser(actual: string) { check(actual === BUSINESS_PIN.browserVersion); },
     async assertUnchanged() {
-      const now = await invokeLocalRuntime('business'); validateBusinessEnvironment({ ...now, ...tools });
+      const now = await dependencies.invokeLocalRuntime('business'); validateBusinessEnvironment({ ...now, ...tools });
       for (const key of ['apiIdentity', 'processIdentity', 'releaseIdentity']) check(now[key] === current[key]);
       check(JSON.stringify(now.resources) === JSON.stringify(loaded.resources));
+      restart?.assertUnchanged();
     },
   };
 }

@@ -121,12 +121,12 @@ export class BusinessSetup {
   private constructor(private readonly browser: Browser, environment: BusinessEnvironment, journal: BusinessJournal) {
     this.environment = environment; this.runId = process.env.TASK9_BUSINESS_RUN_ID!; this.journal = journal; this.gate = new BusinessDispatchGate(journal);
   }
-  static async create(browser: Browser): Promise<BusinessSetup> {
-    const environment = await loadBusinessEnvironment(); environment.verifyBrowser(browser.version());
+  static async create(browser: Browser, loadEnvironment = loadBusinessEnvironment): Promise<BusinessSetup> {
+    const environment = await loadEnvironment(); environment.verifyBrowser(browser.version());
     const path = join(environment.runtime, 'task9-business-operation.json'), runId = process.env.TASK9_BUSINESS_RUN_ID!;
     check(!existsSync(path) || process.env.TASK9_BUSINESS_CONTINUE_RUN_ID === runId);
     const journal = await BusinessJournal.open(path, { runId, environmentDigest: environment.environmentDigest, buildSha: environment.buildSha,
-      predecessorRunId: IDENTITY_PREDECESSOR.runId, predecessorSha256: IDENTITY_PREDECESSOR.journalSha256 }, environment.assertUnchanged);
+      predecessorRunId: IDENTITY_PREDECESSOR.runId, predecessorSha256: IDENTITY_PREDECESSOR.journalSha256 }, environment.assertUnchanged, environment.restart);
     return new BusinessSetup(browser, environment, journal);
   }
   async close() { for (const session of this.sessions.values()) await session.context.close(); this.sessions.clear(); }

@@ -1,5 +1,15 @@
 # Task 9.6e 受控本地身份链
 
+## Task 9.6n 原运行的同构建重启衔接
+
+只支持已批准的业务 run `9848f4ee-5612-49df-9e10-a8c40c09bd3d`。控制者在独立评审通过后独占创建同一受保护 runtime 内的 `task9-business-restart.json`，并保留 `task9-business-pre-restart.json` 原 journal 字节副本及 `task96n-idp-addition-proof.json` 精确新增用户保全证明；实现者只使用隔离临时合成文件。衔接凭据固定 profile `TASK9_SAME_BUILD_RESTART_V1`、当前 BUSINESS_PIN 制品、原检查点 SHA、原／当前环境和 API 身份、9条已确认命令、2个已提交阶段和第三 case。它是本次验收记录的完整性绑定，不是产品授权或通用迁移接口。
+
+控制者必须继续设置原业务批准标记及相同的 `TASK9_BUSINESS_RUN_ID`／`TASK9_BUSINESS_CONTINUE_RUN_ID`，另外显式传入凭据原始字节 SHA256 `TASK9_BUSINESS_RESTART_SHA256`，只选择 `T9-W01-assign-contact-review`。没有该变量时仍执行原严格同环境检查；变量存在但不合法时拒绝，不回退。凭据、检查点、保全证明、历史报告或原九命令／两阶段前缀变化，任何 PENDING、`.pending` 或 `.completion.pending`，以及再次进程／制品漂移均拒绝继续。不得更换 run、刷新检查点摘要或重放已成功步骤。
+
+内存与磁盘 journal 的原 identity 保持不变；环境消费者始终计算实际当前三进程环境摘要。历史两个报告仍使用原环境及原 API；第三报告绑定当前环境及当前 API，沿用第三 case 的7条报告命令（原 capture-manual 加剩余6步），完整 journal 必须为准确顺序的15条命令。原 capture-manual 不声称在重启后重执行，因果边界由原始检查点和9条保全命令明确记录。所有后续写入沿用原互斥、fsync、字节比较与原子发布围栏，未生成新的恢复／派发通道。
+
+默认离线发现包含 `task9-business-restart.spec.ts`；环境和 setup 的可注入依赖仅用于离线控制外部读取，真实默认仍调用原 toolchain、runtime 与完整保护／快照。离线验证不表示真实续验、三卡或完整 Task9 已完成。
+
 ## Task 9.6l 续验缓存合同
 
 业务续验在复用已登录页面前仍由真实“刷新当前责任”UI请求建立网络证据。工作台响应按自身合同校验：`200`必须返回完整工作台 envelope、强`"wb.…"` ETag、`Cache-Control: private, no-cache`及`Vary: Authorization`；合法`304`还必须精确串联同一当前 Actor 的先前`200` envelope、请求`If-None-Match`与响应 ETag。缓存和 Vary 指令按不区分大小写的 token 语义解析，不依赖序列化顺序；缺失、冲突或错误策略均清空已观察凭据、失效缓存证据并关闭写门。
@@ -24,7 +34,7 @@
 $env:PATH='C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64;C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/npm-11.9.0/node_modules/.bin;' + $env:PATH
 node node_modules/@playwright/test/cli.js test --config e2e/business.config.ts --project offline-business
 node node_modules/@playwright/test/cli.js test --config playwright.config.ts --project offline-harness
-node node_modules/typescript/bin/tsc --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --strict e2e/business.config.ts e2e/fixtures/business-environment.ts e2e/fixtures/business-journal.ts e2e/fixtures/business-session.ts e2e/fixtures/r1-business-setup.ts e2e/tests/task9-business-harness.spec.ts e2e/tests/task9-six-workcards.spec.ts e2e/reporters/business-reporter.ts
+node node_modules/typescript/bin/tsc --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --strict e2e/business.config.ts e2e/fixtures/business-environment.ts e2e/fixtures/business-restart.ts e2e/fixtures/business-journal.ts e2e/fixtures/business-session.ts e2e/fixtures/r1-business-setup.ts e2e/tests/task9-business-harness.spec.ts e2e/tests/task9-business-restart.spec.ts e2e/tests/task9-six-workcards.spec.ts e2e/reporters/business-reporter.ts
 node node_modules/@playwright/test/cli.js test --config e2e/business.config.ts --list --reporter list
 ```
 
