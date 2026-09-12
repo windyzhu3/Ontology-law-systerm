@@ -1,5 +1,11 @@
 # Task 9.6e 受控本地身份链
 
+## Task 9.6l 续验缓存合同
+
+业务续验在复用已登录页面前仍由真实“刷新当前责任”UI请求建立网络证据。工作台响应按自身合同校验：`200`必须返回完整工作台 envelope、强`"wb.…"` ETag、`Cache-Control: private, no-cache`及`Vary: Authorization`；合法`304`还必须精确串联同一当前 Actor 的先前`200` envelope、请求`If-None-Match`与响应 ETag。缓存和 Vary 指令按不区分大小写的 token 语义解析，不依赖序列化顺序；缺失、冲突或错误策略均清空已观察凭据、失效缓存证据并关闭写门。
+
+首次进入工作台的真实 UI `200`通过页面 response 边界排队记录；复用前等待该观察完成，避免首个缓存刷新已返回`304`时丢失先前证据。身份管理刷新保持独立的严格`200`/`no-store`合同，不接受工作台缓存策略或`304`。这是剩余真实续验的测试消费者前置，不重置原 journal、不授权重放，也不表示三卡、U01–U03或完整 Task9 已完成。
+
 ## Task 9.6k 独立六卡业务入口
 
 `e2e/business.config.ts` 是独立入口，并以稳定名称定义 `offline-business` 和 `approved-local-business`，以便控制者与 worker 重载同一项目身份；默认发现和运行仍只有 `offline-business`，真实项目保持惰性且只有命令行明确选择 `--project approved-local-business` 时才匹配测试。实现者仅运行离线项目；离线通过不代表真实浏览器、数据库闭包、U01–U03、完整七卡、容量或R1总验收通过。

@@ -15,9 +15,23 @@ const CURRENT = '/api/v1/workcards/current';
 const SCREEN_TIMEOUT = 30_000;
 const TASK_TYPES = ['COMPLETE_LEAD_INGRESS', 'RESOLVE_LEAD_ROUTING_GAP', 'ACK_SOURCE_INTAKE_STOP_REQUEST', 'ASSIGN_LEAD', 'CONTACT_LEAD', 'REVIEW_LEAD_VALIDITY'] as const;
 type Alias = 'founder' | 'intake' | 'supervisor' | 'contact' | 'delegate';
-type Session = { alias: Alias; context: BrowserContext; page: Page; self: any; auth: Record<string, string>; appointmentId: string };
+type Session = {
+  alias: Alias; context: BrowserContext; page: Page; self: any; auth: Record<string, string>; appointmentId: string;
+  workbenchCache?: { actorScopeKey: string; etag: string };
+  identityReady?: Promise<void>; workbenchObservation?: Promise<void>;
+};
 type Wire = { status: number; headers: Record<string, string>; body: any };
 type CardType = typeof TASK_TYPES[number];
+
+function exactHeaderTokens(value: string | undefined, expected: readonly string[]): boolean {
+  if (!value) return false;
+  const actual = new Set(value.split(',').map(token => token.trim().toLowerCase()).filter(Boolean));
+  return actual.size === expected.length && expected.every(token => actual.has(token));
+}
+
+function workbenchETag(value: string | undefined): value is string {
+  return /^"wb\.[A-Za-z0-9_-]{43}"$/.test(value ?? '');
+}
 
 function requestSelectors(session: Session, card?: any, body?: Record<string, unknown>) {
   if (!card) return { actorAppointmentId: session.appointmentId, taskId: null, subjectRef: null, subjectRevision: null, taskETag: null, draftId: null, draftRevision: null, draftDigest: null, draftETag: null, intendedValuesSha256: null };
@@ -90,6 +104,7 @@ function predecessorStep(step: BusinessStep): BusinessStep | undefined {
 export class BusinessSetup {
   readonly environment: BusinessEnvironment; readonly runId: string; readonly journal: BusinessJournal;
   private gate: BusinessDispatchGate; private sessions = new Map<Alias, Session>(); private http: Array<{path: string; status: number}> = [];
+  private workbenchObservations = new WeakMap<Response, Promise<void>>();
   private contactAppointment?: { effectiveFrom: string; effectiveUntil: string | null };
   private dispatchFailed = false;
   private constructor(private readonly browser: Browser, environment: BusinessEnvironment, journal: BusinessJournal) {
@@ -109,10 +124,45 @@ export class BusinessSetup {
     const headers = await request.allHeaders();
     if (headers.authorization) session.auth = { Authorization: headers.authorization, 'X-Appointment-Id': session.appointmentId };
   }
+  private async validateWorkbenchResponse(response: Response, session: Session): Promise<void> {
+    await session.identityReady;
+    const url = new URL(response.url()), request = response.request();
+    check(url.origin === ORIGIN && url.pathname === CURRENT && request.method() === 'GET');
+    const responseHeaders = await response.allHeaders(), requestHeaders = await request.allHeaders();
+    check(/^Bearer \S+$/.test(requestHeaders.authorization ?? '') && requestHeaders['x-appointment-id'] === session.appointmentId
+      && !requestHeaders['x-on-behalf-appointment-id'] && session.self?.selectedAppointmentId === session.appointmentId);
+    check(session.auth.Authorization === requestHeaders.authorization && session.auth['X-Appointment-Id'] === session.appointmentId);
+    check(exactHeaderTokens(responseHeaders['cache-control'], ['private', 'no-cache'])
+      && exactHeaderTokens(responseHeaders.vary, ['authorization']) && workbenchETag(responseHeaders.etag));
+    if (response.status() === 200) {
+      const envelope = await response.json();
+      check(envelope && exact(envelope, ['todaySummary','currentCard','nextSummaries','waitingCount','chatComposer']));
+      session.workbenchCache = { actorScopeKey: session.self.actorScopeKey, etag: responseHeaders.etag };
+      return;
+    }
+    const cached = session.workbenchCache;
+    check(response.status() === 304 && cached !== undefined && cached.actorScopeKey === session.self.actorScopeKey
+      && requestHeaders['if-none-match'] === cached.etag && responseHeaders.etag === cached.etag);
+  }
+  private observeWorkbenchResponse(response: Response, session: Session): Promise<void> {
+    const existing = this.workbenchObservations.get(response); if (existing) return existing;
+    const previous = session.workbenchObservation ?? Promise.resolve();
+    const observation = previous.then(() => this.validateWorkbenchResponse(response, session));
+    this.workbenchObservations.set(response, observation); session.workbenchObservation = observation;
+    void observation.catch(() => { session.auth = {}; session.workbenchCache = undefined; this.dispatchFailed = true; });
+    return observation;
+  }
+  private installWorkbenchResponseObserver(session: Session): void {
+    session.page.on('response', response => {
+      const url = new URL(response.url());
+      if (url.origin === ORIGIN && url.pathname === CURRENT && response.request().method() === 'GET') this.observeWorkbenchResponse(response, session);
+    });
+  }
   private async refreshCachedSession(session: Session): Promise<void> {
     // Let the SPA validate/renew its own token before reusing an observed header after an idle phase.
-    session.auth = {};
     try {
+      await session.workbenchObservation;
+      session.auth = {};
       check(!this.dispatchFailed && session.self.selectedAppointmentId === session.appointmentId);
       const pageUrl = new URL(session.page.url()); check(pageUrl.origin === ORIGIN);
       const admin = session.alias === 'founder';
@@ -123,12 +173,14 @@ export class BusinessSetup {
         session.page.getByRole('button', { name: admin ? '刷新' : '刷新当前责任', exact: true }).click({ timeout: SCREEN_TIMEOUT }),
       ]);
       this.http.push({ path, status: response.status() });
-      check(response.status() === 200 && (await response.allHeaders())['cache-control']?.includes('no-store'));
-      const headers = await response.request().allHeaders();
-      check(/^Bearer \S+$/.test(headers.authorization ?? '') && headers['x-appointment-id'] === session.appointmentId && !headers['x-on-behalf-appointment-id']);
-      check(session.auth.Authorization === headers.authorization && session.auth['X-Appointment-Id'] === session.appointmentId);
+      if (admin) {
+        const responseHeaders = await response.allHeaders(), headers = await response.request().allHeaders();
+        check(response.status() === 200 && exactHeaderTokens(responseHeaders['cache-control'], ['no-store']));
+        check(/^Bearer \S+$/.test(headers.authorization ?? '') && headers['x-appointment-id'] === session.appointmentId && !headers['x-on-behalf-appointment-id']);
+        check(session.auth.Authorization === headers.authorization && session.auth['X-Appointment-Id'] === session.appointmentId);
+      } else await this.observeWorkbenchResponse(response, session);
     } catch {
-      session.auth = {}; this.dispatchFailed = true;
+      session.auth = {}; session.workbenchCache = undefined; this.dispatchFailed = true;
       throw new Error('T9_BUSINESS_BOUNDARY');
     }
   }
@@ -137,7 +189,10 @@ export class BusinessSetup {
     await this.environment.assertUnchanged();
     const context = await this.browser.newContext({ serviceWorkers: 'block', ignoreHTTPSErrors: false, locale: 'zh-CN', timezoneId: 'Asia/Shanghai' });
     const page = await context.newPage(), appointmentId = this.expectedAppointment(alias);
-    const session: Session = { alias, context, page, self: null, auth: {}, appointmentId }; this.sessions.set(alias, session);
+    let identityReady!: () => void;
+    const session: Session = { alias, context, page, self: null, auth: {}, appointmentId,
+      identityReady: new Promise(resolve => { identityReady = resolve; }) };
+    this.sessions.set(alias, session); this.installWorkbenchResponseObserver(session);
     await context.route('**/*', async route => {
       const request = route.request(), url = new URL(request.url()), method = request.method();
       try {
@@ -164,6 +219,7 @@ export class BusinessSetup {
     const selfResponse = await selfWaiting; this.http.push({ path: SELF, status: selfResponse.status() }); check(selfResponse.status() === 200);
     session.self = await selfResponse.json();
     check(session.self.state === 'READY' && session.self.selectedAppointmentId === appointmentId && session.self.selectedOnBehalfAppointmentId === null && session.self.appointmentChoices.length === 1 && session.self.actorScopeKey.startsWith('ask1.'));
+    identityReady();
     return session;
   }
   private async workbench(alias: 'intake' | 'supervisor' | 'contact'): Promise<Session> {
