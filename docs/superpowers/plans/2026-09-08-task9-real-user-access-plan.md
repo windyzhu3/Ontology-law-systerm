@@ -701,6 +701,56 @@ git diff --check
 
 **9.6l 第一次评审处置：** `1ea6ea3` 的50项离线回归通过但评审发现三项缺陷，未关闭本单元：初始异步校验未阻止写入、仅顶层键检查不能证明前端接受响应、测试自身读取／晚到响应会污染页面缓存证据。窄修复复用生产 `parseEnvelope`，给 UI 请求绑定原 Actor／请求代次并在初始及最终写入边界等待校验。仅允许 `current()` 自身只读查询改用现有 `BrowserContext.request.get`，准确 `ORIGIN+CURRENT`、原页面观察 Bearer／任职、严格 TLS、`maxRedirects:0`、GET无正文；保持环境及失败门和响应校验，不改变其他 fetch／写路由。此区分只为避免测试读伪装成 SPA 缓存，不增加生产能力。补实际消费者反例并独立复审后才关闭源码门。
 
+## Task 9.6m: ASSIGN 后继卡版本的最小验收修正
+
+**执行结果（2026-09-12）：** `f08158d` 已通过行为 RED／3 项定向 GREEN／66 项完整业务离线及严格类型检查；控制者复跑 66 项通过，独立规格／质量 Approved。真实续验后 ASSIGN 草稿与提交已确认成功。本单元源码门关闭，不等于三卡或 Task9 总验收完成。
+
+**Scope:** 用户2026-09-12确认继续真实写入和Task9验收；新增Keycloak用户仅为用户建号测试，原身份及业务权限保持。9.6l已完成，不重开其修复循环。本单元只改既有消费者错误断言，不改产品分配逻辑。
+
+**Files:** 仅 `e2e/fixtures/r1-business-setup.ts` 和 `e2e/tests/task9-business-harness.spec.ts`。不改缓存、journal、PIN、部署、身份、DTO、迁移或产品代码。子代理无受保护runtime／数据库／IdP／真实浏览器／推送／再委派权限。BASE `9027ce4`；工作目录 `C:/Users/Jacob/.cache/codex-worktrees/ontology-law-r1-business`。
+
+**Interfaces:** `requireKnownSuccessor(step, original, receipt, successor)` 用于已知成功提交之后。`LeadCommands.java` ASSIGN 在更新Lead后用新selector创建CONTACT；`lead/internal/persistence/JooqLeadRepository.java` update执行revision+1；Assignment新建revision0。冻结 `R1-TASK-COMPLETION-MATRIX.md` P0-03 与 `R1-COMMAND-POLICY-EVENT-CONTRACT.md` 为依据，诊断在同SDD目录 `task-9.6l-continuation-diagnosis.md`。
+
+- [ ] 先用实际BusinessSetup消费者复现：原ASSIGN Lead revision0、成功Receipt为LEAD_ASSIGNMENT revision0、后继CONTACT subjectRevision1被旧断言拒绝。保存行为RED退出码，不使用源码字符串断言。
+- [ ] 最小修正ASSIGN分支：原revision必须为非负安全整数且小于Number.MAX_SAFE_INTEGER，后继revision必须准确+1；Receipt类型LEAD_ASSIGNMENT、revision0，后继表单leadAssignmentRevision与该Receipt一致且leadAssignmentId为合法UUID。保留已有Task／Owner／Actor及前后记录关联，不跨Actor比较opaque hash。参考逻辑：
+
+```typescript
+const revision = original.subject.subjectRevision;
+check(Number.isSafeInteger(revision) && revision >= 0 && revision < Number.MAX_SAFE_INTEGER);
+check(successor.subject.subjectRevision === revision + 1);
+```
+
+- [ ] 覆盖0→1及非零→+1正确，未递增／跳跃／负值／非整数／超安全上界拒绝，错误Receipt类型或新Assignment非0版本拒绝；保留COMPLETE按Lead Receipt新版本、ROUTING／CONTACT不变版本的既有成功和拒绝行为。只测试该实际消费者和最小必要边界，不新建通用测试框架。
+- [ ] 使用固定Node `C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe` 先跑定向RED/GREEN，再完整offline-business一次、strict E2E类型检查和diff检查。命令沿用 `e2e/business.config.ts --project offline-business`；不执行approved-local-business。原有颜色警告如实保留。
+- [ ] 自评并只提交拥有的两文件，报告写 `.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task-9.6m-report.md`，包含命令／实际数量／RED与GREEN退出／提交／局限。独立规格＋质量评审通过后才进入真实续验；不宣布本单元等于三卡或Task9完成。
+
+**后续控制者工作：** 以准确新增IdP用户排除证明原84表不变，不恢复／收养用户；以不可变原run和九命令记录建立明确重启衔接，不重写原摘要或换key。之后仅续未完成的分配／首联／复核。人工UAT延期，附件通知R2、语音后置，范围不变。
+
+## Task 9.6n: 同构建重启后的原运行衔接
+
+**执行结果（2026-09-12）：** `3343524` 完成，51 项定向、117 项完整业务离线、33 项身份测试、严格类型及离线发现通过；控制者复跑 117 项通过，独立规格／质量 Approved。当前运行与原材料、精确新增用户排除后原 84 张身份静态表核验通过，实际独占衔接凭据已生成并验证。续验保留原九命令／两阶段，推进至 ASSIGN 提交成功；随后 CONTACT 草稿已有成功数据库回执但 journal 仍 PENDING，真实进程退出 1。按本单元明确约束拒绝 PENDING 重开写入，未重放、删除或改写记录；只读保全通过。源码衔接门关闭，首联结果／复核与完整 Task9 验收未完成，详见[当前整链进度](../../progress/2026-09-09-task9-local-chain-acceptance.md)。
+
+**Approved design:** 用户2026-09-12已明确同意：原验收记录、原run和九条成功命令保持，另存旧检查点与当前同构建进程的绑定，只续剩余步骤，任何不符拒绝写入。沿用现有BusinessJournal，不重写历史identity／报告，不生成新run／key、不重放已成功操作。此单元是现有测试记录的小范围衔接，不是产品恢复接口。
+
+**Files:** 新增 `e2e/fixtures/business-restart.ts`、`e2e/tests/task9-business-restart.spec.ts`；修改 `e2e/fixtures/business-environment.ts`、`business-journal.ts`、`r1-business-setup.ts`（仅create注入）、`e2e/business.config.ts`（仅默认离线测试发现）、`e2e/README.md`。不得改产品／合同／依赖／已有63+测试断言来迁就实现。若既有离线类型检查需加入新入口，以报告命令说明，不扩大package脚本。本单元实施者不接触任何受保护runtime、真实浏览器、数据库、IdP、Docker、发布或推送；Root写实际证据。
+
+**Fixed runtime files:** `task9-business-restart.json` 是独占写入的衔接凭据，`task9-business-pre-restart.json` 是原journal原始字节副本，`task96n-idp-addition-proof.json` 是Root已验证的精确新增用户保全证明。只接受同runtime内这些固定文件，noLinks／protect保持。显式 `TASK9_BUSINESS_RESTART_SHA256` 必须为凭据原始字节SHA256；不存在时维持原严格同环境行为，存在但不合法不能回退忽略。
+
+**Record shape:** 仅以下字段（字符串除计数／gateRevision）：`profile=TASK9_SAME_BUILD_RESTART_V1`、`runId=9848f4ee-5612-49df-9e10-a8c40c09bd3d`、`buildSha`、`releaseId`、`jarSha256`、`manifestHash`、`gateRevision`、`checkpointSha256`、`originalEnvironmentDigest`、`originalApiIdentity`、`activeEnvironmentDigest`、`activeApiIdentity`、`idpAdditionProofSha256`、`preservedCommandCount=9`、`preservedStageCount=2`、`continuationCase=T9-W01-assign-contact-review`。版本／制品与已验证BUSINESS_PIN全部准确对应；原／当前环境摘要必须不同。只支持这个明确已批准的重启，不做通用迁移／任意前缀导入。
+
+**Interfaces:** 新模块提供加载／验证及不可变文件复验，返回只读的原checkpoint和旧／当前身份绑定；可用接口 `loadBusinessRestart(runtime, activeIdentity, activeApiIdentity, artifact, expectedSha)`，类型与现有BusinessRunIdentity一致。加载前protect，读取后验证固定文件SHA与精确结构、原run/build/predecessor、九CONFIRMED／两PASSED_SUBSCENARIO及阶段报告hash／旧apiIdentity；checkpoint及原journal均不能有pending标记，加载新绑定时原journal前九命令／前两阶段／identity准确等于checkpoint。原始checkpointSHA为Root传入凭据的固定值，不能由当前可变journal自动刷新。
+
+- [ ] TDD：真实BusinessJournal消费路径先复现仅进程重启时原环境摘要不等导致拒绝；给具名、合法凭据支持建立明确RED。用隔离临时目录合成原九命令／两阶段，禁止读本地runtime。不Mock journal校验／持久化或直接赋私有state。
+- [ ] `loadBusinessEnvironment` 继续算实际当前环境摘要并校验全部当前三进程／制品，不把旧摘要伪装成当前摘要；可选加载凭据。其 `assertUnchanged` 在原检查之外复验凭据／checkpoint／IdP保全证明文件SHA。无显式凭据时原行为不变。接口没有返回或落盘任何token／密码。
+- [ ] `BusinessJournal.open` 增加可选的受验证重启上下文。内存及磁盘 `data.identity` 仍是原identity；始终核对原九命令和前两阶段前缀不变。只有activeIdentity的run/build/predecessor与原完全相同、environmentDigest精准等于凭据当前摘要，才接受重启。后续begin／complete／finishStage仍走原互斥、pending、fsync、CAS字节复验和原子发布，不新建可跳过未知结果的通道。
+- [ ] 历史两阶段仍按原identity／原apiIdentity校验，后续第三阶段按实际当前identity／activeApiIdentity校验。新报告记录实际当前环境，不能声称旧capture-manual在新进程重新执行；凭据的九命令边界和原checkpoint体现跨进程因果。新报告／第三阶段依旧要求15条准确顺序命令，原stage与report字节绝不改写。
+- [ ] `BusinessSetup.create` 仅把环境提供的重启上下文交journal，不改card／缓存／身份逻辑；原CONTINUE_RUN_ID等批准标记仍必需。只选择第三case续验，成功的前两case不可重跑。
+- [ ] 覆盖：默认同环境成功／重启无凭据拒绝；合法凭据打开后原前缀字节内容不变、只可追加assign-draft；错误SHA／profile／run／build／制品／旧或当前环境／当前api拒绝；篡改checkpoint／旧stage报告／原prefix／IdPproof拒绝；已有pending／completion.pending拒绝；运行中凭据改变拒绝；重开进程依旧验证；第三报告旧环境或旧api拒绝、准确当前报告成功且历史报告不变。使用真正journal API和真实临时文件，配合真实environment消费者验证注入和复验，不用源码字符串断言。
+- [ ] 固定Node执行新测试定向RED/GREEN，完整默认离线business及原identity33、strict E2E类型／默认离线发现／diff检查各一次。默认不得发现approved-local-business；workers1、retries0、关闭敏感记录器等现有条件不变。独立规格／质量评审后Root才创建实际凭据并执行真实第三case。
+- [ ] 只提交拥有文件，完整报告写 `.superpowers/sdd/2026-09-08-task9-real-user-access-plan/task-9.6n-report.md`，包含SHA、命令／退出／RED/GREEN与局限。原颜色警告保留。不得标记整个Task9或三卡完成。
+
+**Root evidence:** 精确新增IdP用户排除已重建原84表；原release／材料不变，原9命令2阶段无pending。当前环境原始证据 `task96n-current-environment.json` 已产生，checkpointSHA `a87fc15835d82617716f40ccc6c434ee6bddfd0fdce836ddae549dc6a2184a38`，当前environmentDigest `010adc3161df7d407e861a6d00d6a21be6bc19f8055e5a1807b7e3d1c93d3a86`，当前apiIdentity `a491e38d8a89f15f3cba40c0550884affd2d9cd1e4904e8f9eeb016770b42243`。这些是准备记录，Root运行前必须再验证，不让实施者读取实际文件。未知追加／环境再次变化必须拒绝，不重新绑定或换run。
+
 ## Task 9.6f: 管理命令成功响应的最小合同修复
 
 本单元解决9.6e源代码联通检查发现的既有缺陷，不修改冻结设计。9.6e代码门完成后串行实施；9.6e真实写入依赖本修复部署完成。用户既定的完整功能修复与本地更新范围不扩大。
