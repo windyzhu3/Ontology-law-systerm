@@ -112,11 +112,15 @@ services:
     depends_on:
       flyway: {condition: service_completed_successfully}
     entrypoint: ["/bin/sh", "/r1/provision-runtime-logins.sh"]
+    environment:
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /r1/ca.pem
     secrets: [business-superuser-password, api-db-password, worker-db-password]
     volumes:
       - ./runtime/provision-runtime-logins.sh:/r1/provision-runtime-logins.sh:ro
       - ../backend/src/test/resources/db/bootstrap-runtime-logins.sql:/r1/bootstrap-runtime-logins.sql:ro
       - ${R1_RUNTIME:?prepared runtime required}/deployment-state.sql:/r1/deployment-state.sql:ro
+      - ${R1_RUNTIME:?prepared runtime required}/certs/ca.pem:/r1/ca.pem:ro
     networks: [business]
     restart: "no"
 

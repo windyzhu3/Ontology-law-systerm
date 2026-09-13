@@ -6,6 +6,8 @@
 
 准备器固定使用 Java 25.0.4.1+1、Node 24.20.0 与 Git 自带 OpenSSL，生成随机合成凭据、独立用途密钥、临时 CA、准确 SAN 证书及应用私有 PKCS12。秘密先进入只允许当前 Windows 用户与 SYSTEM（POSIX 为 0700/0600）的 run 目录，再通过 Compose file secrets 注入；不安装全局信任、不关闭 TLS、不在命令行或普通 manifest 中保存秘密。准备器复制并摘要现有唯一 Jar 与 SPA dist，但会明确把二者标为 `UNPROVEN_EXISTING_ARTIFACT`；仅有字节摘要不证明它们来自当前 HEAD。
 
+Windows 默认使用本机固定 runtime 根和 Git OpenSSL；可用绝对路径环境变量 `R1_E2E_TOOLCHAIN_ROOT`、`R1_E2E_OPENSSL` 显式替换。Linux runner 必须显式提供 `R1_E2E_TOOLCHAIN_ROOT`，目录内固定包含 `jdk-25.0.4.1+1`、`node-v24.20.0-linux-x64` 和 `openssl-3.5.4` 布局。准备会运行并精确核对 Java/keytool build `25.0.4.1+1-LTS`、Node `24.20.0` 和 OpenSSL `3.5.4`，路径缺失、链接、相对路径或版本漂移均停止。
+
 ```powershell
 D:/soft/python3/python.exe e2e/runtime/r1_environment.py prepare <run>
 # 仅在独立评审后由控制者执行：

@@ -23,17 +23,15 @@ import subprocess
 import sys
 import time
 import urllib.request
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Mapping
 
 
 ROOT = Path(__file__).resolve().parents[2]
-TOOLS = Path("C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb")
-JAVA = TOOLS / "jdk-25.0.4.1+1/bin/java.exe"
-KEYTOOL = JAVA.with_name("keytool.exe")
-NODE = TOOLS / "node-v24.20.0-win-x64/node.exe"
-OPENSSL = Path("C:/Program Files/Git/usr/bin/openssl.exe")
+WINDOWS_TOOLCHAIN_ROOT = Path("C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb")
+WINDOWS_OPENSSL = Path("C:/Program Files/Git/usr/bin/openssl.exe")
 RUN_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,31}")
 PORTS = {"keycloak": 29443, "spa": 29444, "api": 29445, "businessDatabase": 29446}
 REALM = "r1-e2e"
@@ -48,6 +46,16 @@ SECRET_NAMES = (
     "actor-scope-hmac", "bootstrap-key", "online-candidate-key", "etag-key",
     "api-cursor-key", "admin-cursor-key", "offline-key", "source-key",
 )
+REQUIRED_RUNTIME_FILES = (
+    *(f"secrets/{name}.txt" for name in SECRET_NAMES),
+    "certs/ca.key", "certs/ca.pem",
+    "certs/identity-db.key", "certs/identity-db.crt",
+    "certs/business-db.key", "certs/business-db.crt",
+    "certs/keycloak.key", "certs/keycloak.crt",
+    "certs/host.key", "certs/host.crt",
+    "certs/application-trust.p12", "certs/application-server.p12",
+    "keycloak/r1-e2e-realm.json", "deployment-state.sql", "compose.env",
+)
 SOURCE_PATHS = (
     "e2e/compose.yaml", "e2e/fixtures/r1-fixture.json",
     "e2e/runtime/postgres-entrypoint.sh", "e2e/runtime/init-business-db.sh",
@@ -60,6 +68,16 @@ SOURCE_PATHS = (
     "backend/src/test/resources/db/bootstrap-runtime-logins.sql",
 )
 CommandRunner = Callable[..., subprocess.CompletedProcess]
+
+
+@dataclass(frozen=True)
+class HostToolchain:
+    platform: str
+    runtime_root: Path
+    java: Path
+    keytool: Path
+    node: Path
+    openssl: Path
 
 
 def utc_now() -> str:
@@ -96,6 +114,59 @@ def validate_run_id(value: str) -> str:
 def _is_link(path: Path) -> bool:
     junction = getattr(path, "is_junction", None)
     return path.is_symlink() or bool(junction and junction())
+
+
+def _plain_file(path: Path, label: str) -> Path:
+    if not path.is_file() or _is_link(path):
+        raise RuntimeError(f"{label} executable missing or linked")
+    return path
+
+
+def resolve_host_toolchain(
+    environment: Mapping[str, str] | None = None, *, platform: str | None = None,
+) -> HostToolchain:
+    environment = os.environ if environment is None else environment
+    platform = sys.platform if platform is None else platform
+    configured_root = environment.get("R1_E2E_TOOLCHAIN_ROOT")
+    if platform == "win32":
+        runtime_root = Path(configured_root) if configured_root else WINDOWS_TOOLCHAIN_ROOT
+        java_name, keytool_name = "java.exe", "keytool.exe"
+        node_relative = Path("node-v24.20.0-win-x64/node.exe")
+        configured_openssl = environment.get("R1_E2E_OPENSSL")
+        openssl = Path(configured_openssl) if configured_openssl else WINDOWS_OPENSSL
+        platform_name = "windows-x64"
+    elif platform.startswith("linux"):
+        if not configured_root or not Path(configured_root).is_absolute():
+            raise RuntimeError("Linux requires an explicit absolute pinned runtime root")
+        runtime_root = Path(configured_root)
+        java_name, keytool_name = "java", "keytool"
+        node_relative = Path("node-v24.20.0-linux-x64/bin/node")
+        openssl = runtime_root / "openssl-3.5.4/bin/openssl"
+        platform_name = "linux-x64"
+    else:
+        raise RuntimeError(f"unsupported R1 E2E host platform: {platform}")
+    if not runtime_root.is_absolute():
+        raise RuntimeError("toolchain requires an explicit absolute pinned runtime root")
+    if not runtime_root.is_dir() or _is_link(runtime_root):
+        raise RuntimeError("pinned runtime root missing or linked")
+    if not openssl.is_absolute():
+        raise RuntimeError("OpenSSL path must be absolute")
+    java_bin = runtime_root / "jdk-25.0.4.1+1/bin"
+    return HostToolchain(
+        platform_name, runtime_root,
+        _plain_file(java_bin / java_name, "java"),
+        _plain_file(java_bin / keytool_name, "keytool"),
+        _plain_file(runtime_root / node_relative, "node"),
+        _plain_file(openssl, "openssl"),
+    )
+
+
+def validate_java_version(output: str) -> str:
+    version = re.search(r'(?m)^openjdk version "([^"]+)"(?:\s|$)', output)
+    runtime_build = re.search(r'(?m)^OpenJDK Runtime Environment .*\(build ([^)]+)\)$', output)
+    if not version or version.group(1) != "25.0.4.1" or not runtime_build or runtime_build.group(1) != "25.0.4.1+1-LTS":
+        raise RuntimeError("exact Java build mismatch; require 25.0.4.1+1-LTS")
+    return "25.0.4.1+1-LTS"
 
 
 def _runtime(root: Path, run: str, *, may_not_exist: bool = False) -> Path:
@@ -146,10 +217,16 @@ def _verify_private_boundary(runtime: Path) -> None:
     if os.name == "nt":
         environment = os.environ.copy()
         environment["R1_E2E_ACL_PATH"] = str(runtime)
+        environment["R1_E2E_ALLOWED_SID"] = _current_windows_sid()
         script = (
-            "$a=Get-Acl -LiteralPath $env:R1_E2E_ACL_PATH;"
+            "$root=Get-Item -Force -LiteralPath $env:R1_E2E_ACL_PATH;"
+            "$items=@($root)+@(Get-ChildItem -Force -Recurse -LiteralPath $root.FullName);"
+            "$allowed=@($env:R1_E2E_ALLOWED_SID,'S-1-5-18');$bad=@();"
+            "foreach($item in $items){$a=Get-Acl -LiteralPath $item.FullName;"
             "$ids=@($a.Access|ForEach-Object{$_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value});"
-            "@{protected=$a.AreAccessRulesProtected;ids=$ids}|ConvertTo-Json -Compress"
+            "if($ids.Count -eq 0 -or @($ids|Where-Object{$_ -notin $allowed}).Count -ne 0){$bad+=$item.FullName}};"
+            "$rootAcl=Get-Acl -LiteralPath $root.FullName;"
+            "@{protected=$rootAcl.AreAccessRulesProtected;bad=$bad}|ConvertTo-Json -Compress"
         )
         completed = subprocess.run(
             ["pwsh.exe", "-NoProfile", "-NonInteractive", "-Command", script],
@@ -158,11 +235,10 @@ def _verify_private_boundary(runtime: Path) -> None:
         if completed.returncode or (completed.stderr or "").strip():
             raise RuntimeError("cannot verify protected run directory ACL")
         acl = json.loads(completed.stdout)
-        identities = acl.get("ids", [])
-        if isinstance(identities, str):
-            identities = [identities]
-        allowed = {_current_windows_sid(), "S-1-5-18"}
-        if not acl.get("protected") or not identities or not set(identities).issubset(allowed):
+        failures = acl.get("bad", [])
+        if isinstance(failures, str):
+            failures = [failures]
+        if not acl.get("protected") or failures:
             raise RuntimeError("run directory ACL permits an unauthorized principal")
         return
     for path in [runtime, *runtime.rglob("*")]:
@@ -242,17 +318,34 @@ def _require_sources(root: Path) -> None:
         raise RuntimeError("locked infrastructure version mismatch")
 
 
-def _check_host_tools(root: Path, runtime: Path) -> dict[str, str]:
-    for label, executable in (("java", JAVA), ("keytool", KEYTOOL), ("node", NODE)):
-        if not executable.is_file():
-            raise RuntimeError(f"fixed {label} executable missing")
-    java = _run([str(JAVA), "-version"], root, runtime, "java-version")
-    node = _run([str(NODE), "--version"], root, runtime, "node-version")
-    if java.returncode or "25.0.4.1" not in ((java.stderr or "") + (java.stdout or "")):
-        raise RuntimeError("fixed Java version mismatch")
+def _check_host_tools(root: Path, runtime: Path, toolchain: HostToolchain) -> dict[str, object]:
+    for label, executable in (
+        ("java", toolchain.java), ("keytool", toolchain.keytool),
+        ("node", toolchain.node), ("openssl", toolchain.openssl),
+    ):
+        _plain_file(executable, label)
+    java = _run([str(toolchain.java), "-version"], root, runtime, "java-version")
+    keytool = _run([str(toolchain.keytool), "-J-version"], root, runtime, "keytool-java-version")
+    node = _run([str(toolchain.node), "--version"], root, runtime, "node-version")
+    openssl = _run([str(toolchain.openssl), "version"], root, runtime, "openssl-version")
+    if java.returncode:
+        raise RuntimeError("fixed Java executable failed")
+    java_build = validate_java_version((java.stderr or "") + (java.stdout or ""))
+    if keytool.returncode:
+        raise RuntimeError("fixed keytool executable failed")
+    keytool_build = validate_java_version((keytool.stderr or "") + (keytool.stdout or ""))
     if node.returncode or (node.stdout or "").strip() != "v24.20.0":
         raise RuntimeError("fixed Node version mismatch")
-    return {"java": "25.0.4.1+1", "node": "24.20.0"}
+    openssl_version = (openssl.stdout or "").strip()
+    if openssl.returncode or not openssl_version.startswith("OpenSSL 3.5.4 "):
+        raise RuntimeError("fixed OpenSSL version mismatch")
+    return {
+        "platform": toolchain.platform, "runtimeRoot": str(toolchain.runtime_root),
+        "java": {"path": str(toolchain.java), "build": java_build},
+        "keytool": {"path": str(toolchain.keytool), "javaBuild": keytool_build},
+        "node": {"path": str(toolchain.node), "version": "24.20.0"},
+        "openssl": {"path": str(toolchain.openssl), "version": openssl_version},
+    }
 
 
 def _create_secrets(runtime: Path) -> dict[str, str]:
@@ -266,19 +359,17 @@ def _create_secrets(runtime: Path) -> dict[str, str]:
     return values
 
 
-def _openssl(root: Path, runtime: Path, label: str, arguments: list[str]) -> None:
-    completed = _run([str(OPENSSL), *arguments], root, runtime, label)
+def _openssl(root: Path, runtime: Path, toolchain: HostToolchain, label: str, arguments: list[str]) -> None:
+    completed = _run([str(toolchain.openssl), *arguments], root, runtime, label)
     if completed.returncode:
         raise RuntimeError(f"{label} failed; inspect protected diagnostics")
 
 
-def _create_crypto(root: Path, runtime: Path) -> None:
-    if not OPENSSL.is_file():
-        raise RuntimeError("openssl executable missing")
+def _create_crypto(root: Path, runtime: Path, toolchain: HostToolchain) -> None:
     certs = runtime / "certs"
     _mkdir_secure(certs)
     ca_key, ca_cert = certs / "ca.key", certs / "ca.pem"
-    _openssl(root, runtime, "openssl-ca", [
+    _openssl(root, runtime, toolchain, "openssl-ca", [
         "req", "-x509", "-newkey", "rsa:3072", "-sha256", "-nodes", "-days", "14",
         "-subj", "/CN=R1 E2E isolated CA", "-keyout", str(ca_key), "-out", str(ca_cert),
         "-addext", "basicConstraints=critical,CA:TRUE,pathlen:0", "-addext", "keyUsage=critical,keyCertSign,cRLSign",
@@ -294,11 +385,11 @@ def _create_crypto(root: Path, runtime: Path) -> None:
             certs / f"{name}.key", certs / f"{name}.csr", certs / f"{name}.crt", certs / f"{name}.ext"
         )
         _write(extension, "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\n" + extensions)
-        _openssl(root, runtime, f"openssl-{name}-request", [
+        _openssl(root, runtime, toolchain, f"openssl-{name}-request", [
             "req", "-new", "-newkey", "rsa:3072", "-nodes", "-sha256", "-subj", f"/CN={name}",
             "-keyout", str(key), "-out", str(request),
         ])
-        _openssl(root, runtime, f"openssl-{name}-certificate", [
+        _openssl(root, runtime, toolchain, f"openssl-{name}-certificate", [
             "x509", "-req", "-sha256", "-days", "14", "-in", str(request), "-CA", str(ca_cert),
             "-CAkey", str(ca_key), "-set_serial", str(serial), "-extfile", str(extension), "-out", str(certificate),
         ])
@@ -307,12 +398,12 @@ def _create_crypto(root: Path, runtime: Path) -> None:
     password_file = runtime / "secrets/trust-password.txt"
     truststore = certs / "application-trust.p12"
     keytool = _run([
-        str(KEYTOOL), "-importcert", "-noprompt", "-alias", "r1-e2e-ca", "-file", str(ca_cert),
+        str(toolchain.keytool), "-importcert", "-noprompt", "-alias", "r1-e2e-ca", "-file", str(ca_cert),
         "-keystore", str(truststore), "-storetype", "PKCS12", "-storepass:file", str(password_file),
     ], root, runtime, "keytool-truststore")
     if keytool.returncode:
         raise RuntimeError("keytool truststore failed; inspect protected diagnostics")
-    _openssl(root, runtime, "openssl-host-keystore", [
+    _openssl(root, runtime, toolchain, "openssl-host-keystore", [
         "pkcs12", "-export", "-name", "r1-e2e-host", "-inkey", str(certs / "host.key"),
         "-in", str(certs / "host.crt"), "-certfile", str(ca_cert), "-out", str(certs / "application-server.p12"),
         "-passout", f"file:{password_file}",
@@ -435,7 +526,10 @@ def _git_snapshot(root: Path) -> dict[str, object]:
     return {"commit": head.stdout.strip(), "trackedProductSourcesClean": not bool(status.stdout.strip())}
 
 
-def prepare_environment(root: Path, run: str, command_runner: CommandRunner = subprocess.run) -> Path:
+def prepare_environment(
+    root: Path, run: str, command_runner: CommandRunner = subprocess.run,
+    *, toolchain: HostToolchain | None = None,
+) -> Path:
     root = Path(root).resolve(strict=True)
     runtime = _runtime(root, run, may_not_exist=True)
     runtime.parent.mkdir(parents=True, exist_ok=True)
@@ -453,11 +547,12 @@ def prepare_environment(root: Path, run: str, command_runner: CommandRunner = su
     try:
         _require_sources(root)
         stage = "tools"
-        versions = _check_host_tools(root, runtime)
+        resolved_toolchain = toolchain or resolve_host_toolchain()
+        versions = _check_host_tools(root, runtime, resolved_toolchain)
         stage = "secrets"
         values = _create_secrets(runtime)
         stage = "crypto"
-        _create_crypto(root, runtime)
+        _create_crypto(root, runtime, resolved_toolchain)
         stage = "realm"
         _realm(root, run, runtime, values)
         stage = "artifacts"
@@ -468,17 +563,7 @@ def prepare_environment(root: Path, run: str, command_runner: CommandRunner = su
         project = "ontology-law-r1-e2e-" + run
         _validate_compose(root, runtime, project, command_runner)
         _verify_private_boundary(runtime)
-        required = {
-            "certs/ca.pem": sha256_file(runtime / "certs/ca.pem"),
-            "certs/identity-db.crt": sha256_file(runtime / "certs/identity-db.crt"),
-            "certs/business-db.crt": sha256_file(runtime / "certs/business-db.crt"),
-            "certs/keycloak.crt": sha256_file(runtime / "certs/keycloak.crt"),
-            "certs/application-trust.p12": sha256_file(runtime / "certs/application-trust.p12"),
-            "certs/application-server.p12": sha256_file(runtime / "certs/application-server.p12"),
-            "keycloak/r1-e2e-realm.json": sha256_file(runtime / "keycloak/r1-e2e-realm.json"),
-            "deployment-state.sql": sha256_file(runtime / "deployment-state.sql"),
-            "compose.env": sha256_file(runtime / "compose.env"),
-        }
+        required = {relative: sha256_file(runtime / relative) for relative in REQUIRED_RUNTIME_FILES}
         manifest = {
             "profile": "R1_E2E_ENVIRONMENT_V1", "run": run, "createdAt": utc_now(),
             "composeProject": project, "ports": PORTS, "realm": REALM, "issuer": ISSUER,
@@ -517,8 +602,14 @@ def _load_prepared(root: Path, run: str) -> tuple[Path, dict, dict]:
 def _assert_unchanged(root: Path, runtime: Path, manifest: dict) -> None:
     if _source_digests(root) != manifest.get("sourceDigests"):
         raise RuntimeError("required source digest drift")
-    for relative, expected in manifest.get("requiredFiles", {}).items():
+    required = manifest.get("requiredFiles")
+    if not isinstance(required, dict) or set(required) != set(REQUIRED_RUNTIME_FILES):
+        raise RuntimeError("required file manifest mismatch")
+    for relative in REQUIRED_RUNTIME_FILES:
+        expected = required[relative]
         path = runtime / relative
+        if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+            raise RuntimeError("required file manifest mismatch")
         if not path.is_file() or _is_link(path) or sha256_file(path) != expected:
             raise RuntimeError(f"prepared file drift: {relative}")
     jar = runtime / manifest["artifacts"]["jar"]["path"]
@@ -535,6 +626,7 @@ def preflight_start(root: Path, run: str,
     root = Path(root).resolve(strict=True)
     runtime, state, manifest = _load_prepared(root, run)
     _assert_unchanged(root, runtime, manifest)
+    _verify_private_boundary(runtime)
     for port in PORTS.values():
         with socket.socket() as probe:
             try:
