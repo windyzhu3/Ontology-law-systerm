@@ -155,14 +155,13 @@ def _deployment_query() -> bytes:
     ).encode("utf-8")
 
 
-def _validate_environment(
-    root: Path, run: str, command_runner: CommandRunner, *, verified_phase: bool = False,
+def _validate_environment_impl(
+    root: Path, run: str, command_runner: CommandRunner, expected_phase: str,
 ) -> tuple[Path, dict, dict, Path]:
     root = Path(root).resolve(strict=True)
     runtime = environment._runtime(root, run)
     state = _read_json(runtime / "state.json", "run state")
     manifest = _read_json(runtime / "manifest.json", "environment manifest")
-    expected_phase = "IDENTITY_BOOTSTRAP_VERIFIED" if verified_phase else "INFRASTRUCTURE_READY"
     if (
         state.get("profile") != "R1_E2E_RUN_STATE_V1"
         or state.get("run") != run
@@ -218,6 +217,21 @@ def _validate_environment(
     if _read_json(runtime / "state.json", "run state") != state:
         raise RuntimeError("run state changed during bootstrap preflight")
     return runtime, state, manifest, java_path
+
+
+def _validate_environment(
+    root: Path, run: str, command_runner: CommandRunner, *, verified_phase: bool = False,
+) -> tuple[Path, dict, dict, Path]:
+    expected_phase = "IDENTITY_BOOTSTRAP_VERIFIED" if verified_phase else "INFRASTRUCTURE_READY"
+    return _validate_environment_impl(root, run, command_runner, expected_phase)
+
+
+def _validate_failed_bootstrap_environment(
+    root: Path, run: str, command_runner: CommandRunner,
+) -> tuple[Path, dict, dict, Path]:
+    return _validate_environment_impl(
+        root, run, command_runner, "IDENTITY_BOOTSTRAP_FAILED_OR_UNCERTAIN",
+    )
 
 
 def _fixture_values(root: Path, run: str) -> tuple[str, dict[str, str]]:

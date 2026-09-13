@@ -52,13 +52,16 @@ def process_records(project):
 
 class ControlledProcess:
     def __init__(self, module, manifest, *, fail_mode=None, invalid_utf8_mode=None,
-                 deployment_override=None, dry_run_role="IDENTITY_ADMIN"):
+                 deployment_override=None, dry_run_role="IDENTITY_ADMIN", fail_tenant_code=None,
+                 fail_exit=19):
         self.module = module
         self.manifest = manifest
         self.fail_mode = fail_mode
         self.invalid_utf8_mode = invalid_utf8_mode
         self.deployment_override = deployment_override
         self.dry_run_role = dry_run_role
+        self.fail_tenant_code = fail_tenant_code
+        self.fail_exit = fail_exit
         self.calls = []
         self.fact_calls = 0
 
@@ -101,16 +104,17 @@ class ControlledProcess:
 
         marker = "org.springframework.boot.loader.launch.PropertiesLauncher"
         mode = command[command.index(marker) + 1]
-        if mode == self.fail_mode:
-            return subprocess.CompletedProcess(command, 19, stdout=b"", stderr=b"synthetic failure")
+        settings = json.loads(Path(command[command.index(marker) + 2]).read_text(encoding="utf-8"))
+        if mode == self.fail_mode and (
+            self.fail_tenant_code is None or settings["tenantCode"] == self.fail_tenant_code
+        ):
+            return subprocess.CompletedProcess(command, self.fail_exit, stdout=b"", stderr=b"synthetic failure")
         if mode == self.invalid_utf8_mode:
             return subprocess.CompletedProcess(command, 0, stdout=b"\xff", stderr=b"")
         if mode == "candidate":
-            settings = json.loads(Path(command[-2]).read_text(encoding="utf-8"))
             result = {"providerUserSelector": "selector-secret-" + settings["tenantCode"]}
         elif mode == "dry-run":
             original = json.loads(Path(command[-1]).read_text(encoding="utf-8"))
-            settings = json.loads(Path(command[-2]).read_text(encoding="utf-8"))
             result = {"mode": "DRY_RUN", "plannedDelta": self.module.EXPECTED_DELTA, "preview": {
                 "tenant": {"id": settings["tenantId"], "code": original["tenantCode"], "displayName": original["tenantDisplayName"]},
                 "rootOrganization": {"code": "ROOT", "displayName": original["rootDisplayName"]},
