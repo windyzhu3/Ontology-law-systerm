@@ -62,6 +62,12 @@ Root随后使用全新`task102-utf8-20260913`：prepare退出0（b5b5aa），复
 
 停止新三个服务后再次采样freeVirtualMemory=873172KiB（约853MiB）。为避免盲目恢复后再次触发资源失败，已请求用户仅临时停止旧`ontology-law-local-login-keycloak`并在验收后恢复同一原容器的具名授权；未获批准前不操作。期间旧登录/续期将不可用，旧DB、账号、realm、卷、配置保持不变。该授权与此前新网络批准不同，不能混用；在此文更新时仍待回复。
 
+## Task10.3代码评审收口（非真实初始化通过）
+
+实现`1bf8708`独立评审发现两项Important：保护输出写失败可能漏记已知退出码，原stage stdout/stderr未全部纳入摘要校验。限定修复`cb92f197581a873b8a794b141a37c0b644e0291e`完成：输出持久化异常携带已知退出码并停下；两个Tenant全部stage原始输出的准确路径/摘要在任何original verify调用前校验。最终14项本单元测试通过（4.011秒），编译及diff检查退出0；独立复核两项均ADDRESSED、无新缺陷，没有重跑环境模块。
+
+代码/评审门已通过，真实bootstrap仍未运行，Task10.3不能整体记为运行验收通过。下一步为资源授权后恢复同一新容器并完成实际bootstrap，再实施Task10.4同Jar API/Worker及同SPA装配，之后补黄金/失败路径。旧环境、W09延期、UAT关闭、R2排除及其他待授权测试范围不变；本轮未推送仓库。
+
 ## 上游核对
 
 2026-09-13复核[官方26.7.3发布页](https://github.com/keycloak/keycloak/releases/tag/26.7.3)与[官方安全公告目录](https://github.com/keycloak/keycloak/security/advisories)。当前发布页列出26.7.3及其安全修复；检查的[DCR角色伪造公告](https://github.com/keycloak/keycloak/security/advisories/GHSA-95cx-vmr5-3cmr)列26.7.1为修复版本。另核对[reset-credentials问题记录](https://github.com/keycloak/keycloak/issues/51833)，已关闭并标注26.7.2等版本。此为部署前具名上游核对，不是全量漏洞扫描或“无CVE”保证；不升级锁定制品，不开启重置密码、动态客户端注册或扩大目录权限。
