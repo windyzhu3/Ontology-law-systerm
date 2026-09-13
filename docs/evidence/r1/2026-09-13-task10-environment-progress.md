@@ -92,6 +92,16 @@ Root核验精确新项目标签后停止新KC `6c84bc51d725`和两库`215ad4b953
 
 恢复旧服务后本机freeVirtualMemory仅525960KiB。已请求用户释放资源（建议开始前至少3GiB可用虚拟内存）或提供独立环境，并另行批准仅续建未写入哨兵的最小入口：先验证原主Tenant完整闭包及哨兵零写入，保留全部失败证据，只对未写入哨兵重新取得候选，不重发主Tenant。此方案在批准前不实施；不通过继续新建整套run丢弃已成功主Tenant。Task10.4保持未实施，R1/R2门禁不推进。
 
+## 限定续建实施中（同日后续）
+
+用户随后指示继续，按此前明确提出的限定续建范围推进。再次只读检查可用虚拟内存为452528KiB（约442MiB，741d46），因此仅开展工具实现和定点离线测试，不启动服务、不再次尝试真实引导。原主Tenant成功证据、失败哨兵记录及原状态文件保持不变；单独续建记录绑定原文件摘要，先只读验证主Tenant及哨兵零事实，再仅对未写入哨兵取得新候选。实现后独立评审；实际运行仍待资源恢复。Task10.4应用装配尚未开始，未将实现中状态写成验收通过。
+
+## 限定续建代码与评审完成，真实执行仍未开始
+
+实现`eb31e22`新增隔离哨兵专用续建入口和只读组合核验。独立评审指出失败阶段输出摘要缺失、正常/续建证据规则重复两项Important；修复`a5cdf48`逐阶段保存AVAILABLE/MISSING、原始输出摘要及已知退出码，并提取共用纯校验函数。29项Python-only定点测试通过（14.922s），编译/差异检查通过；同一评审者限定复核确认两项均解决，无新Critical/Important。未重跑JVM probe、环境模块或旧业务链。一个畸形列表成员导致CLI非统一错误类型的Minor留待最终分支评审，不涉及写入授权绕过。
+
+Root最终检查170954：原bootstrap树摘要、原state及record摘要与本轮开始完全一致；旧Keycloak严格系统CA HTTPS discovery返回200；backend/apps/contracts/已摘要环境源文件相对本轮BASE无差异。可用虚拟内存788772KiB（约770MiB），仍不启动新服务。当前仅代码/评审门关闭，哨兵实际续建、Task10.4应用装配及后续R1黄金/失败路径仍未完成。下一步先由用户释放资源，再恢复同一保留环境、执行一次受控哨兵续建；不另建整套run、不重发主Tenant、不把离线测试写成真实验收PASS。本轮未推送仓库。
+
 ## 上游核对
 
 2026-09-13复核[官方26.7.3发布页](https://github.com/keycloak/keycloak/releases/tag/26.7.3)与[官方安全公告目录](https://github.com/keycloak/keycloak/security/advisories)。当前发布页列出26.7.3及其安全修复；检查的[DCR角色伪造公告](https://github.com/keycloak/keycloak/security/advisories/GHSA-95cx-vmr5-3cmr)列26.7.1为修复版本。另核对[reset-credentials问题记录](https://github.com/keycloak/keycloak/issues/51833)，已关闭并标注26.7.2等版本。此为部署前具名上游核对，不是全量漏洞扫描或“无CVE”保证；不升级锁定制品，不开启重置密码、动态客户端注册或扩大目录权限。

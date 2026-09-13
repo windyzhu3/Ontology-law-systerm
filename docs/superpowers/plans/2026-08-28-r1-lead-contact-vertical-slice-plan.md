@@ -573,6 +573,10 @@ TDD覆盖真实准备/阶段调度的副作用和停止行为：错误环境/摘
 
 ## Task 10.4: 新隔离环境的既有应用装配
 
+2026-09-13前置衔接补充：用户已批准限定续建未写入的哨兵；Task10.3新增`r1_bootstrap_continuation.py`及定点测试。仅接受原主Tenant五阶段成功、哨兵candidate成功/dry-run失败且没有execute的精确状态。操作员提供原state/record摘要；原树保持不变，单独保护记录绑定原证据，先只读验证主Tenant和哨兵零事实，再仅对哨兵取得新候选、保存新的独立manifest并执行一次原引导链。失败/不确定不重试、不重发主Tenant，不修改业务合同或已摘要环境源文件。实际续建仍以独立评审及资源恢复为前提。
+
+该来源由Task10.4显式选择`r1_bootstrap_continuation.verify_combined(root, run)`，返回下文同一安全投影；正常成功来源仍用`verify_original`，不得在失败后自动fallback。准备记录须冻结核验来源，后续start/verify一致使用；不复制核验算法，不改原FAILED状态冒充整体成功。
+
 承接Task10.3实际原始引导核验，只装配当前唯一Jar的API/Worker和当前唯一SPA，不新增业务端点、前端页面、身份能力或通用部署平台。HUMAN主体、组织、任职、业务DIRECT授权仍由后继真实管理API建立，本单元不得用SQL提前填入。尚未获准的历史Party/Delegation/账号禁用及故障注入仍不执行。
 
 **Files:** 新增`e2e/runtime/r1_applications.py`、`e2e/runtime/r1_server.mjs`、`tests/test_r1_applications.py`、`e2e/runtime/r1_server.test.mjs`；允许更新`e2e/README.md`。不改Task10.2已摘要的源文件、旧部署脚本、业务Java、DDL、OpenAPI、SPA源代码或依赖。
