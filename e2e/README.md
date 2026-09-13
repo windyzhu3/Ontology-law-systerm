@@ -172,3 +172,26 @@ Evidence is exclusively and fsynchronously created as `output/task96r-readonly-l
 The first operation is exclusive and cannot be replayed. Confidential settings, selector output, original command manifests, per-Tenant subject HMAC files, stage exits, every stage stdout/stderr relative path and SHA-256, and verified Fact references remain under the run's protected `identity-bootstrap/` directory. The Fact reference query uses only the existing `law_app_query` capability and `audit.audit_entry_classified_v` inside a read-only transaction. `verify-original <run>` validates both Tenants' complete state-bound evidence before executing any existing command read-only original verification; it does not repair, replace, or rewrite evidence. Programmatic consumers use `verify_original(root, run)` and receive only the in-memory `R1_E2E_VERIFIED_IDENTITY_BOOTSTRAP_INPUT_V1` projection: exact Tenant/ROOT/founder/appointment/grant IDs, each protected subject-HMAC relative path, and the original verification evidence digest. It does not return selectors, command IDs, keys, passwords, or tokens. A later application assembler must register HUMAN trust only for the main Tenant/provider code `R1_E2E_MAIN`; the isolation Tenant is a database boundary sentinel and is not a second online trust registration.
 
 The separately authorized `r1_bootstrap_continuation.py continue-isolation <run> --expected-original-state-sha256 <digest> --expected-original-record-sha256 <digest>` entry accepts only the exact retained pattern of completed MAIN plus isolation candidate success/dry-run exit 1 with no isolation execute. It verifies MAIN read-only, proves the isolation Tenant and both old/new command identities absent through `law_app_query`, and stores the single renewed isolation attempt under the exclusive sibling `identity-bootstrap-isolation-continuation/`; the failed state and original bootstrap tree remain immutable. A failed continuation is never replayable. Task 10.4 may explicitly call `verify_combined(root, run)` (or the `verify-combined <run>` CLI) to validate both evidence trees before issuing only the two original `verify` commands and receiving the same safe projection as `verify_original`. There is no automatic fallback from `verify_original`, whose verified-state contract is unchanged.
+
+## Task 10.4: existing application assembly for the isolated R1 run
+
+`e2e/runtime/r1_applications.py` consumes exactly one controller-selected bootstrap verification source. Preparation requires `--bootstrap-source original` for an ordinarily completed bootstrap or `--bootstrap-source continued` for the separately approved isolation continuation. The selection is stored in the protected `applications/` manifest and every later start/verify reuses it; there is no automatic fallback.
+
+Preparation creates one main-Tenant `SERVICE/LOCAL_SERVICE` identity, its ROOT SERVICE appointment, and only the three DIRECT infrastructure grants `R1_PROJECTION_CONSUME`, `CONTACT_TASK_RECOVER`, and `ROUTING_REVIEW_TASK_RECOVER`. The immutable inventory precedes the single database transaction. Any missing/changed bootstrap input, existing `applications/` directory, pending transaction, or uncertain transaction result blocks replay. This unit does not create HUMAN principals, business organizations, accounts, or business facts.
+
+The same prepared Jar is started once in mutually exclusive API and Worker roles with `-Xmx384m`. The original prepared SPA bytes are served by the fixed loopback HTTPS host on 29444, and the API listens only on loopback 29445. Worker has no listener. A partial or uncertain start is retained and is never automatically stopped or restarted. Only current process identity, post-creation API/Worker isolation and READY logs, strict SPA 200, proxied unauthenticated SELF 401, and mTLS SERVICE readiness 204 with an empty body, no ETag, and `Cache-Control: no-store` can publish `APPLICATION_INFRASTRUCTURE_READY` under `applications/`; no existing environment or bootstrap state file is changed.
+
+Controller-only entry points (credentials remain in protected files, never command arguments):
+
+```powershell
+D:/soft/python3/python.exe -X utf8 e2e/runtime/r1_applications.py prepare <run> --bootstrap-source continued
+D:/soft/python3/python.exe -X utf8 e2e/runtime/r1_applications.py start <run>
+D:/soft/python3/python.exe -X utf8 e2e/runtime/r1_applications.py verify <run>
+```
+
+Scoped offline unit checks:
+
+```powershell
+D:/soft/python3/python.exe -m unittest tests.test_r1_applications
+C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe --test e2e/runtime/r1_server.test.mjs
+```
