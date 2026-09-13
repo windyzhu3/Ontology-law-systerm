@@ -15,6 +15,32 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PYTHON = Path(sys.executable)
 CLI = ROOT / "e2e/runtime/r1_environment.py"
+BUSINESS_CONTAINER_ID = "a" * 64
+KEYCLOAK_CONTAINER_ID = "b" * 64
+
+
+def successful_start_command(command):
+    if command[:2] == ["docker", "compose"] and "ps" in command:
+        if "-q" in command:
+            container_id = {
+                "business-db": BUSINESS_CONTAINER_ID,
+                "keycloak": KEYCLOAK_CONTAINER_ID,
+            }[command[-1]]
+            return subprocess.CompletedProcess(command, 0, stdout=container_id + "\n", stderr="")
+        return subprocess.CompletedProcess(command, 0, stdout="[]", stderr="")
+    if command[:2] == ["docker", "inspect"]:
+        ports = {
+            BUSINESS_CONTAINER_ID: {
+                "5432/tcp": [{"HostIp": "127.0.0.1", "HostPort": "29446"}],
+                "9999/tcp": None,
+            },
+            KEYCLOAK_CONTAINER_ID: {
+                "8443/tcp": [{"HostIp": "127.0.0.1", "HostPort": "29443"}],
+                "8080/tcp": [],
+            },
+        }[command[-1]]
+        return subprocess.CompletedProcess(command, 0, stdout=json.dumps(ports) + "\n", stderr="")
+    return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
 
 def load_module():
@@ -223,6 +249,39 @@ class R1EnvironmentPreparationTest(unittest.TestCase):
         self.assertEqual(3221225472, manifest["memoryFeasibility"]["boundedConcurrentLimitBytes"])
         self.assertFalse(manifest["memoryFeasibility"]["capacityAcceptance"])
 
+    def test_published_services_have_separate_host_bridges_without_exposing_identity_db(self) -> None:
+        completed = subprocess.run(
+            [
+                "docker", "compose", "--env-file", str(self.runtime / "compose.env"),
+                "-f", str(ROOT / "e2e/compose.yaml"), "-p", "ontology-law-r1-e2e-test",
+                "config", "--format", "json",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        config = json.loads(completed.stdout)
+        services = config["services"]
+        self.assertEqual({"identity"}, set(services["identity-db"]["networks"]))
+        self.assertEqual({"identity"}, set(services["keycloak-files"]["networks"]))
+        self.assertEqual({"identity", "identity-host"}, set(services["keycloak"]["networks"]))
+        self.assertEqual({"business", "business-host"}, set(services["business-db"]["networks"]))
+        self.assertEqual({"business"}, set(services["flyway"]["networks"]))
+        self.assertEqual({"business"}, set(services["runtime-logins"]["networks"]))
+        self.assertTrue(config["networks"]["identity"]["internal"])
+        self.assertTrue(config["networks"]["business"]["internal"])
+        self.assertFalse(config["networks"]["identity-host"].get("internal", False))
+        self.assertFalse(config["networks"]["business-host"].get("internal", False))
+        self.assertEqual(
+            [{"mode": "ingress", "protocol": "tcp", "target": 8443, "published": "29443", "host_ip": "127.0.0.1"}],
+            services["keycloak"]["ports"],
+        )
+        self.assertEqual(
+            [{"mode": "ingress", "protocol": "tcp", "target": 5432, "published": "29446", "host_ip": "127.0.0.1"}],
+            services["business-db"]["ports"],
+        )
+
 
 class R1EnvironmentFailureTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -311,11 +370,9 @@ class R1EnvironmentFailureTest(unittest.TestCase):
         def fail_flyway(*args, **kwargs):
             command = args[0]
             seen.append(command)
-            if command[:2] == ["docker", "info"]:
-                return subprocess.CompletedProcess(command, 0, stdout="8183173120\n", stderr="")
             if "run" in command and command[-1] == "flyway":
                 return subprocess.CompletedProcess(command, 19, stdout="", stderr="synthetic flyway failure")
-            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+            return successful_start_command(command)
 
         with self.assertRaisesRegex(RuntimeError, "flyway one-shot failed"):
             self.module.start_infrastructure(
@@ -335,11 +392,7 @@ class R1EnvironmentFailureTest(unittest.TestCase):
         def successful_compose(*args, **kwargs):
             command = args[0]
             seen.append(command)
-            if command[:2] == ["docker", "info"]:
-                return subprocess.CompletedProcess(command, 0, stdout="8183173120\n", stderr="")
-            if "ps" in command and "compose" in command:
-                return subprocess.CompletedProcess(command, 0, stdout="[]", stderr="")
-            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+            return successful_start_command(command)
 
         self.module.start_infrastructure(
             ROOT, self.run_id, command_runner=successful_compose, discovery_probe=lambda runtime: None
@@ -359,9 +412,82 @@ class R1EnvironmentFailureTest(unittest.TestCase):
             ],
             compose_commands,
         )
+        port_commands = [
+            command for command in seen
+            if (command[:2] == ["docker", "compose"] and "ps" in command and "-q" in command)
+            or command[:2] == ["docker", "inspect"]
+        ]
+        prefix = port_commands[0][:-3]
+        self.assertEqual(
+            [
+                prefix + ["ps", "-q", "business-db"],
+                ["docker", "inspect", "--format", "{{json .NetworkSettings.Ports}}", BUSINESS_CONTAINER_ID],
+                prefix + ["ps", "-q", "keycloak"],
+                ["docker", "inspect", "--format", "{{json .NetworkSettings.Ports}}", KEYCLOAK_CONTAINER_ID],
+            ],
+            port_commands,
+        )
         state = json.loads((self.runtime / "state.json").read_text(encoding="utf-8"))
         self.assertEqual("INFRASTRUCTURE_READY", state["phase"])
         self.assertFalse(state["applicationReady"])
+
+    def test_missing_business_database_mapping_stops_before_oneshot_writes(self) -> None:
+        self.module.prepare_environment(ROOT, self.run_id)
+        seen = []
+
+        def missing_mapping(*args, **kwargs):
+            command = args[0]
+            seen.append(command)
+            if command[:2] == ["docker", "inspect"] and command[-1] == BUSINESS_CONTAINER_ID:
+                return subprocess.CompletedProcess(command, 0, stdout='{"5432/tcp": []}\n', stderr="")
+            return successful_start_command(command)
+
+        discovery_called = False
+
+        def forbidden_discovery(runtime):
+            nonlocal discovery_called
+            discovery_called = True
+
+        with self.assertRaisesRegex(RuntimeError, "business-db published port verification failed"):
+            self.module.start_infrastructure(
+                ROOT, self.run_id, command_runner=missing_mapping, discovery_probe=forbidden_discovery
+            )
+        state = json.loads((self.runtime / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual("START_FAILED", state["phase"])
+        self.assertEqual("business-db-port-mapping", state["failedStage"])
+        self.assertFalse(discovery_called)
+        self.assertFalse(any("run" in command for command in seen))
+
+    def test_wrong_keycloak_mapping_stops_before_tls_discovery_and_ready_state(self) -> None:
+        self.module.prepare_environment(ROOT, self.run_id)
+        seen = []
+
+        def wrong_mapping(*args, **kwargs):
+            command = args[0]
+            seen.append(command)
+            if command[:2] == ["docker", "inspect"] and command[-1] == KEYCLOAK_CONTAINER_ID:
+                wrong = {"8443/tcp": [{"HostIp": "0.0.0.0", "HostPort": "29443"}]}
+                return subprocess.CompletedProcess(command, 0, stdout=json.dumps(wrong) + "\n", stderr="")
+            return successful_start_command(command)
+
+        discovery_called = False
+
+        def forbidden_discovery(runtime):
+            nonlocal discovery_called
+            discovery_called = True
+
+        with self.assertRaisesRegex(RuntimeError, "keycloak published port verification failed"):
+            self.module.start_infrastructure(
+                ROOT, self.run_id, command_runner=wrong_mapping, discovery_probe=forbidden_discovery
+            )
+        state = json.loads((self.runtime / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual("START_FAILED", state["phase"])
+        self.assertEqual("keycloak-port-mapping", state["failedStage"])
+        self.assertFalse(discovery_called)
+        self.assertFalse(any(
+            command[:2] == ["docker", "compose"] and "-a" in command and "ps" in command
+            for command in seen
+        ))
 
 
 class R1EnvironmentToolchainTest(unittest.TestCase):

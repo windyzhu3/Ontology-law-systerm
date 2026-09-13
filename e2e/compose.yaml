@@ -60,7 +60,7 @@ services:
     volumes:
       - keycloak-config:/opt/keycloak/conf/r1:ro
       - keycloak-import:/opt/keycloak/data/import:ro
-    networks: [identity]
+    networks: [identity, identity-host]
     restart: "no"
 
   business-db:
@@ -83,7 +83,7 @@ services:
       - business-db-data:/var/lib/postgresql
       - ./runtime/postgres-entrypoint.sh:/r1/postgres-entrypoint.sh:ro
       - ./runtime/init-business-db.sh:/docker-entrypoint-initdb.d/010-r1-roles.sh:ro
-    networks: [business]
+    networks: [business, business-host]
     restart: "no"
 
   flyway:
@@ -134,6 +134,8 @@ services:
 networks:
   identity: {internal: true}
   business: {internal: true}
+  identity-host: {}
+  business-host: {}
 
 volumes:
   identity-db-data:

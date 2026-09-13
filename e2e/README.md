@@ -2,7 +2,7 @@
 
 `e2e/runtime/r1_environment.py` 只准备新的 R1 环境并为控制者提供独立的基础设施启动入口；它不读取或接管 Task 9 runtime，也不执行身份 bootstrap、业务 fixture 或黄金链。每个 run 必须使用规范的小写 ID，并且只会在 `.artifacts/r1-e2e/<run>` 首次独占创建一次。发现既存、残缺、链接或发生漂移的目录时保留现场并停止。
 
-固定拓扑为 `ontology-law-r1-e2e-<run>` Compose project：锁定 PostgreSQL 18 的独立身份库和业务库、Keycloak 26.7.3、Flyway 13.4.0，以及 project 自有网络和卷。Keycloak、SPA、API、业务 PostgreSQL 分别预留 `127.0.0.1:29443`–`29446`；身份库不发布主机端口。数据库迁移只运行当前生成迁移的 `migrate validate`，不会 clean、baseline、重写 DDL 或绕过能力角色。一次性数据库登录装配不创建 HUMAN 身份事实。
+固定拓扑为 `ontology-law-r1-e2e-<run>` Compose project：锁定 PostgreSQL 18 的独立身份库和业务库、Keycloak 26.7.3、Flyway 13.4.0，以及 project 自有网络和卷。身份与业务内部流量仍分别使用 `internal` 网络；只有 Keycloak 和业务 PostgreSQL 各自额外连接一个互不共享的普通 bridge，以允许 Docker 发布环回端口。Keycloak、SPA、API、业务 PostgreSQL 分别预留 `127.0.0.1:29443`–`29446`；身份库不发布主机端口。普通 bridge 具备 Docker 默认出站能力，但本装配不增加任何外网业务请求。数据库迁移只运行当前生成迁移的 `migrate validate`，不会 clean、baseline、重写 DDL 或绕过能力角色。一次性数据库登录装配不创建 HUMAN 身份事实。
 
 准备器固定使用 Java 25.0.4.1+1、Node 24.20.0 与 Git 自带 OpenSSL，生成随机合成凭据、独立用途密钥、临时 CA、准确 SAN 证书及应用私有 PKCS12。秘密先进入只允许当前 Windows 用户与 SYSTEM（POSIX 为 0700/0600）的 run 目录，再通过 Compose file secrets 注入；不安装全局信任、不关闭 TLS、不在命令行或普通 manifest 中保存秘密。准备器复制并摘要现有唯一 Jar 与 SPA dist，但会明确把二者标为 `UNPROVEN_EXISTING_ARTIFACT`；仅有字节摘要不证明它们来自当前 HEAD。
 
@@ -16,7 +16,7 @@ D:/soft/python3/python.exe e2e/runtime/r1_environment.py start-infra <run>
 
 `prepare` 会实际执行 OpenSSL、keytool 和 `docker compose config --quiet`，但不启动服务。Compose 给两库分别设置 768MiB、本地 Keycloak 设置 1536MiB（其中 Java heap 最大 768MiB），并给三个一次性服务设置更小的硬上限；稳定常驻组合上限为 3GiB。manifest 只报告该本地功能边界，不探测宿主容量、不构成容量验收，也不证明宿主页文件故障的根因。
 
-`start-infra` 在重验所有摘要、固定端口及 project 无既存容器/网络/卷后，先等待两库健康，再逐个用前台 `docker compose run --no-deps` 要求 keycloak-files、Flyway 和 runtime-logins 正常退出（不使用会把成功 leaf 退出误判为整体失败的聚合 `up --wait`），最后启动 Keycloak 并以严格 CA discovery 确认 readiness。任一常驻 readiness 或一次性退出失败都会保留现场、记录准确阶段并拒绝同 run 重试，不会忽略 Compose 非零退出或重放未知写入。即使基础设施就绪，状态也只能是 `BLOCKED_IDENTITY_BOOTSTRAP_REQUIRED`。本单元的 `start-apps` 始终拒绝：后续 Task 10 单元必须消费真实 IdentityBootstrapCommand/身份管理 API 的当前-run绑定结果，不能靠可手写 marker、SQL HUMAN 记录或本工具伪造 `APP_READY`。
+`start-infra` 在重验所有摘要、固定端口及 project 无既存容器/网络/卷后，先等待两库健康，并从实际容器 `NetworkSettings.Ports` 的非空发布集合精确确认业务库只有 `127.0.0.1:29446 -> 5432/tcp`；再逐个用前台 `docker compose run --no-deps` 要求 keycloak-files、Flyway 和 runtime-logins 正常退出（不使用会把成功 leaf 退出误判为整体失败的聚合 `up --wait`）。最后启动 Keycloak、从相同实际边界确认只有 `127.0.0.1:29443 -> 8443/tcp`，才执行严格 CA discovery。镜像 EXPOSE 产生的 `null`/`[]` 占位不算发布；缺失、错误或额外非空映射均在后继阶段前失败。任一常驻 readiness、映射或一次性退出失败都会保留现场、记录准确阶段并拒绝同 run 重试，不会忽略 Compose 非零退出或重放未知写入。即使基础设施就绪，状态也只能是 `BLOCKED_IDENTITY_BOOTSTRAP_REQUIRED`。本单元的 `start-apps` 始终拒绝：后续 Task 10 单元必须消费真实 IdentityBootstrapCommand/身份管理 API 的当前-run绑定结果，不能靠可手写 marker、SQL HUMAN 记录或本工具伪造 `APP_READY`。
 
 # Task 9.6e 受控本地身份链
 

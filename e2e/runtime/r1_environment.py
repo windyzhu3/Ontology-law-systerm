@@ -682,6 +682,44 @@ def _probe_keycloak(runtime: Path) -> None:
     raise RuntimeError("Keycloak discovery did not become ready") from last_error
 
 
+def _verify_published_port(
+    root: Path, runtime: Path, prefix: list[str], service: str,
+    container_port: int, host_port: int, command_runner: CommandRunner,
+) -> None:
+    selected = _run(
+        prefix + ["ps", "-q", service], root, runtime,
+        f"compose-{service}-container", command_runner,
+    )
+    container_ids = (selected.stdout or "").splitlines()
+    if (
+        selected.returncode
+        or len(container_ids) != 1
+        or not re.fullmatch(r"[0-9a-f]{12,64}", container_ids[0])
+    ):
+        raise RuntimeError(f"cannot identify the running {service} container")
+    inspected = _run(
+        [
+            "docker", "inspect", "--format", "{{json .NetworkSettings.Ports}}",
+            container_ids[0],
+        ],
+        root, runtime, f"inspect-{service}-ports", command_runner,
+    )
+    try:
+        actual = json.loads(inspected.stdout or "")
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"cannot parse {service} NetworkSettings port mapping") from error
+    expected = {
+        f"{container_port}/tcp": [
+            {"HostIp": "127.0.0.1", "HostPort": str(host_port)},
+        ],
+    }
+    if not isinstance(actual, dict):
+        raise RuntimeError(f"{service} NetworkSettings port mapping mismatch")
+    published = {port: bindings for port, bindings in actual.items() if bindings not in (None, [])}
+    if inspected.returncode or published != expected:
+        raise RuntimeError(f"{service} NetworkSettings port mapping mismatch")
+
+
 def start_infrastructure(
     root: Path, run: str, command_runner: CommandRunner = subprocess.run,
     *, discovery_probe: Callable[[Path], None] | None = None,
@@ -703,10 +741,26 @@ def start_infrastructure(
             )
             raise RuntimeError(message + "; protected resources retained without retry")
 
+    def verify_port_stage(service: str, container_port: int, host_port: int) -> None:
+        try:
+            _verify_published_port(
+                root, runtime, prefix, service, container_port, host_port, command_runner,
+            )
+        except RuntimeError as error:
+            _record(
+                state_path, state, "START_FAILED", failedStage=f"{service}-port-mapping",
+                errorType=type(error).__name__,
+            )
+            raise RuntimeError(
+                f"{service} published port verification failed; "
+                "protected resources retained without retry"
+            ) from error
+
     run_stage(
         ["up", "-d", "--wait", "--wait-timeout", "180", "--no-build", "identity-db", "business-db"],
         "compose-databases-ready", "databases-ready", "database services failed readiness",
     )
+    verify_port_stage("business-db", 5432, PORTS["businessDatabase"])
     for service in ("keycloak-files", "flyway", "runtime-logins"):
         run_stage(
             ["run", "--no-deps", "-T", service],
@@ -716,6 +770,7 @@ def start_infrastructure(
         ["up", "-d", "--no-deps", "--wait", "--wait-timeout", "180", "--no-build", "keycloak"],
         "compose-keycloak-ready", "keycloak-ready", "Keycloak service failed readiness",
     )
+    verify_port_stage("keycloak", 8443, PORTS["keycloak"])
     try:
         (discovery_probe or _probe_keycloak)(runtime)
     except Exception as error:
