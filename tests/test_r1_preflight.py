@@ -17,21 +17,21 @@ DRIVER = ROOT / "scripts" / "ci" / "r1-preflight.sh"
 WORKFLOW = ROOT / ".github" / "workflows" / "r1-vertical-slice.yml"
 
 EXPECTED_CALLS = [
-    "python3 scripts/baseline/verify_baseline.py",
-    "python3 database/schema-contract-52-plus-2/generate.py --check",
-    "python3 -m unittest discover -s database/schema-contract-52-plus-2/tests -v",
-    "python3 database/schema-contract-52-plus-2/scripts/verify_generated_sql.py",
-    "python3 -m unittest discover -s database/schema-contract-52-plus-2/runtime/tests -v",
-    "python3 database/schema-contract-52-plus-2/runtime/verify_runtime.py validate-promoted-evidence",
-    "python3 database/schema-contract-52-plus-2/runtime/verify_runtime.py verify --ci-only --runs 2 --evidence-dir .artifacts/schema-runtime",
-    "python3 database/schema-contract-52-plus-2/runtime/verify_runtime.py validate-ci-artifact",
-    "mvnw -f backend/pom.xml verify -Pit",
-    "generate-jooq.sh --check",
-    "npm run openapi:check",
-    "npm run typecheck",
-    "npm test",
-    "npm run build",
-    "npm run test:e2e:offline",
+    "root | python3 scripts/baseline/verify_baseline.py",
+    "schema | python3 generate.py --check",
+    "schema | python3 -m unittest discover -s tests -v",
+    "schema | python3 scripts/verify_generated_sql.py",
+    "schema | python3 -m unittest discover -s runtime/tests -v",
+    "schema | python3 runtime/verify_runtime.py validate-promoted-evidence",
+    "schema | python3 runtime/verify_runtime.py verify --ci-only --runs 2 --evidence-dir ../../.artifacts/schema-runtime",
+    "schema | python3 runtime/verify_runtime.py validate-ci-artifact",
+    "root | mvnw -f backend/pom.xml verify -Pit",
+    "root | generate-jooq.sh --check",
+    "root | npm run openapi:check",
+    "root | npm run typecheck",
+    "root | npm test",
+    "root | npm run build",
+    "root | npm run test:e2e:offline",
 ]
 
 
@@ -47,6 +47,9 @@ class R1PreflightDriverTest(unittest.TestCase):
         self.bin = self.repository / "bin"
         self.bin.mkdir()
         (self.repository / ".preflight-test-root").write_text("bounded\n", encoding="utf-8")
+        schema = self.repository / "database" / "schema-contract-52-plus-2"
+        schema.mkdir(parents=True)
+        (schema / ".preflight-test-schema").write_text("bounded\n", encoding="utf-8")
 
         if not DRIVER.is_file():
             self.fail("R1 preflight driver is missing")
@@ -71,11 +74,17 @@ class R1PreflightDriverTest(unittest.TestCase):
             textwrap.dedent(
                 f"""\
                 #!/usr/bin/env bash
-                if [[ ! -f "$PWD/.preflight-test-root" ]]; then
+                if [[ -f "$PWD/.preflight-test-root" ]]; then
+                  location=root
+                elif [[ -f "$PWD/.preflight-test-schema" ]]; then
+                  location=schema
+                else
                   exit 97
                 fi
-                printf '%s %s\\n' '{command_name}' "$*" >> "$R1_PREFLIGHT_TEST_LOG"
-                if [[ "${{R1_PREFLIGHT_TEST_FAIL:-}}" == '{command_name}' ]]; then
+                invocation='{command_name}'
+                if [[ -n "$*" ]]; then invocation="$invocation $*"; fi
+                printf '%s | %s\\n' "$location" "$invocation" >> "$R1_PREFLIGHT_TEST_LOG"
+                if [[ "${{R1_PREFLIGHT_TEST_FAIL:-}}" == "$invocation" ]]; then
                   exit "${{R1_PREFLIGHT_TEST_FAIL_CODE:-1}}"
                 fi
                 """
@@ -123,12 +132,23 @@ class R1PreflightDriverTest(unittest.TestCase):
 
     def test_intermediate_failure_preserves_exit_code_and_stops_later_stages(self) -> None:
         """Break caught: a failed backend gate is masked or later consumers still run."""
-        result = self._run_driver(fail="mvnw", fail_code=23)
+        result = self._run_driver(fail="mvnw -f backend/pom.xml verify -Pit", fail_code=23)
 
         self.assertEqual(23, result.returncode)
         self.assertEqual(EXPECTED_CALLS[:9], self._calls())
         self.assertNotIn("OpenAPI generation drift", result.stdout)
         self.assertNotIn("R1 preflight passed", result.stdout)
+
+    def test_schema_failure_preserves_exit_code_and_stops_before_runtime(self) -> None:
+        """Break caught: a schema import failure is masked or runtime verification starts."""
+        result = self._run_driver(
+            fail="python3 -m unittest discover -s runtime/tests -v",
+            fail_code=19,
+        )
+
+        self.assertEqual(19, result.returncode)
+        self.assertEqual(EXPECTED_CALLS[:5], self._calls())
+        self.assertNotIn("PostgreSQL 18 runtime", result.stdout)
 
 
 class R1PreflightWorkflowTest(unittest.TestCase):

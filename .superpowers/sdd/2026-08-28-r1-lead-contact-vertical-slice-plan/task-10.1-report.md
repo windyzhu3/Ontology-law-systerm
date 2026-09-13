@@ -95,3 +95,44 @@ Output: R1 topology verification passed
 - Real golden/failure browser paths remain unimplemented here. W09 remains deferred
   by the user. A green preflight is not R1 runtime acceptance, does not mark any row
   `RUNTIME_VERIFIED`, and does not admit R2.
+
+## Review round 1 correction
+
+Review 01 found that the schema/static and runtime unittest discovery commands ran
+from the repository root, where their top-level `contract` and `runtime` imports
+are unavailable. The schema block now runs in
+`database/schema-contract-52-plus-2` inside a subshell. The runtime evidence argument
+is `../../.artifacts/schema-runtime`, which still resolves to the repository-root
+artifact directory, and the parent shell remains at the repository root afterward.
+
+Regression RED against commit `b0ffd32`:
+
+```text
+Command: D:\soft\python3\python.exe -m unittest \
+         tests.test_r1_preflight.R1PreflightDriverTest -v
+Exit: 1
+Result: 3 failures. Expected schema CWD differed from actual root CWD; the injected
+        runtime-test discovery failure was not reached and returned 0 instead of 19.
+```
+
+GREEN after the minimal CWD correction:
+
+```text
+Command: D:\soft\python3\python.exe -m unittest \
+         tests.test_r1_preflight.R1PreflightDriverTest -v
+Exit: 0
+Result: Ran 3 tests in 2.057s; OK.
+
+Command: D:\soft\python3\python.exe -c \
+         "import contract.schema_contract; import runtime.tests.test_hosted_evidence_promotion; print('schema package imports: OK')"
+Working directory: database/schema-contract-52-plus-2
+Exit: 0
+Output: schema package imports: OK
+
+Command: C:\Program Files\Git\bin\bash.exe -n scripts/ci/r1-preflight.sh
+Exit: 0
+Output: none
+```
+
+No full schema suite, database runtime, Playwright run/listing, topology suite,
+private runtime, account, service, or hosted workflow was executed in this fix round.

@@ -7,17 +7,20 @@ cd "$root"
 printf '%s\n' '[r1-preflight] baseline'
 python3 scripts/baseline/verify_baseline.py
 
-printf '%s\n' '[r1-preflight] schema static'
-python3 database/schema-contract-52-plus-2/generate.py --check
-python3 -m unittest discover -s database/schema-contract-52-plus-2/tests -v
-python3 database/schema-contract-52-plus-2/scripts/verify_generated_sql.py
-python3 -m unittest discover -s database/schema-contract-52-plus-2/runtime/tests -v
+(
+  cd database/schema-contract-52-plus-2
+  printf '%s\n' '[r1-preflight] schema static'
+  python3 generate.py --check
+  python3 -m unittest discover -s tests -v
+  python3 scripts/verify_generated_sql.py
+  python3 -m unittest discover -s runtime/tests -v
 
-printf '%s\n' '[r1-preflight] PostgreSQL 18 runtime (two clean runs)'
-python3 database/schema-contract-52-plus-2/runtime/verify_runtime.py validate-promoted-evidence
-python3 database/schema-contract-52-plus-2/runtime/verify_runtime.py \
-  verify --ci-only --runs 2 --evidence-dir .artifacts/schema-runtime
-python3 database/schema-contract-52-plus-2/runtime/verify_runtime.py validate-ci-artifact
+  printf '%s\n' '[r1-preflight] PostgreSQL 18 runtime (two clean runs)'
+  python3 runtime/verify_runtime.py validate-promoted-evidence
+  python3 runtime/verify_runtime.py \
+    verify --ci-only --runs 2 --evidence-dir ../../.artifacts/schema-runtime
+  python3 runtime/verify_runtime.py validate-ci-artifact
+)
 
 printf '%s\n' '[r1-preflight] backend unit, architecture, integration'
 ./mvnw -f backend/pom.xml verify -Pit
