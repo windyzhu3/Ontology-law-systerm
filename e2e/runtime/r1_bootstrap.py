@@ -95,8 +95,13 @@ def _invoke(
         raise ProcessFailure(label, None, f"{label} could not execute") from error
     stdout, stderr = completed.stdout, completed.stderr
     if output_directory is not None:
-        environment._write(output_directory / f"{label}.stdout", stdout if isinstance(stdout, bytes) else b"")
-        environment._write(output_directory / f"{label}.stderr", stderr if isinstance(stderr, bytes) else b"")
+        try:
+            environment._write(output_directory / f"{label}.stdout", stdout if isinstance(stdout, bytes) else b"")
+            environment._write(output_directory / f"{label}.stderr", stderr if isinstance(stderr, bytes) else b"")
+        except (OSError, RuntimeError) as error:
+            raise ProcessFailure(
+                label, completed.returncode, f"{label} protected output persistence failed",
+            ) from error
     if not isinstance(stdout, bytes) or not isinstance(stderr, bytes):
         raise ProcessFailure(label, completed.returncode, f"{label} capture missing or not bytes")
     try:
@@ -240,6 +245,20 @@ def _append_stage(operation_path: Path, mode: str, exit_code: int | None) -> Non
     operation = _read_json(operation_path, "bootstrap operation")
     operation["stages"].append({"mode": mode, "exitCode": exit_code, "at": environment.utc_now()})
     environment._atomic_json(operation_path, operation)
+
+
+def _stage_output_manifest(runtime: Path, folder: Path) -> dict:
+    outputs = {}
+    for mode in ("candidate", "dry-run", "execute", "verify", "fact-query"):
+        streams = {}
+        for stream in ("stdout", "stderr"):
+            path = folder / f"{mode}.{stream}"
+            if not path.is_file() or environment._is_link(path):
+                raise RuntimeError("original stage output is missing or linked")
+            streams[f"{stream}Path"] = path.relative_to(runtime).as_posix()
+            streams[f"{stream}Sha256"] = _sha256(path)
+        outputs[mode] = streams
+    return outputs
 
 
 def _run_stage(
@@ -561,6 +580,7 @@ def bootstrap_identities(
                 "originalManifestSha256": _sha256(original_path),
                 "operationPath": operation_path.relative_to(runtime).as_posix(),
                 "operationSha256": _sha256(operation_path),
+                "stageOutputs": _stage_output_manifest(runtime, folder),
                 "factReferencesPath": facts_path.relative_to(runtime).as_posix(),
                 "factReferencesSha256": _sha256(facts_path),
             })
@@ -607,7 +627,7 @@ def verify_original(
         raise RuntimeError("original bootstrap tenant inventory mismatch")
     jar = runtime / manifest["artifacts"]["jar"]["path"]
     base = _java_command(java_path, jar)
-    verified_tenants = {}
+    validated_entries = []
     for entry in entries:
         paths = {
             "settings": runtime / entry["settingsPath"],
@@ -626,6 +646,34 @@ def verify_original(
         for key, path in paths.items():
             if not path.is_file() or environment._is_link(path) or _sha256(path) != expected_hashes[key]:
                 raise RuntimeError("original bootstrap evidence mismatch")
+        stage_outputs = entry.get("stageOutputs")
+        expected_modes = {"candidate", "dry-run", "execute", "verify", "fact-query"}
+        if not isinstance(stage_outputs, dict) or set(stage_outputs) != expected_modes:
+            raise RuntimeError("original bootstrap evidence mismatch")
+        evidence_parent = Path(entry["settingsPath"]).parent
+        for mode in expected_modes:
+            streams = stage_outputs[mode]
+            if not isinstance(streams, dict) or set(streams) != {
+                "stdoutPath", "stdoutSha256", "stderrPath", "stderrSha256",
+            }:
+                raise RuntimeError("original bootstrap evidence mismatch")
+            for stream in ("stdout", "stderr"):
+                expected_relative = (evidence_parent / f"{mode}.{stream}").as_posix()
+                if streams[f"{stream}Path"] != expected_relative:
+                    raise RuntimeError("original bootstrap evidence mismatch")
+                path = runtime / expected_relative
+                digest = streams[f"{stream}Sha256"]
+                if (
+                    not isinstance(digest, str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", digest)
+                    or not path.is_file()
+                    or environment._is_link(path)
+                    or _sha256(path) != digest
+                ):
+                    raise RuntimeError("original bootstrap evidence mismatch")
+        validated_entries.append((entry, paths))
+    verified_tenants = {}
+    for entry, paths in validated_entries:
         exit_code, stdout, _ = _invoke(
             [*base, "verify", str(paths["settings"]), str(paths["original"])],
             root, "verify", command_runner,

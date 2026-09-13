@@ -265,7 +265,20 @@ class R1BootstrapTest(unittest.TestCase):
     def test_bootstrap_preserves_stage_exits_and_redacted_fact_references(self):
         self.run_bootstrap()
         bootstrap = self.runtime / "identity-bootstrap"
+        record = json.loads((bootstrap / "record.json").read_text())
         for key, digest in (("main", "a" * 64), ("isolation", "b" * 64)):
+            entry = next(value for value in record["tenants"] if value["tenantCode"] == (
+                "R1_E2E_MAIN" if key == "main" else "R1_E2E_ISOLATION"
+            ))
+            self.assertEqual(
+                {"candidate", "dry-run", "execute", "verify", "fact-query"},
+                set(entry["stageOutputs"]),
+            )
+            for mode, streams in entry["stageOutputs"].items():
+                for stream in ("stdout", "stderr"):
+                    path = bootstrap / key / f"{mode}.{stream}"
+                    self.assertEqual(path.relative_to(self.runtime).as_posix(), streams[f"{stream}Path"])
+                    self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), streams[f"{stream}Sha256"])
             operation = json.loads((bootstrap / key / "operation.json").read_text())
             self.assertEqual(
                 [(mode, 0) for mode in ("candidate", "dry-run", "execute", "verify", "fact-query")],
@@ -315,6 +328,25 @@ class R1BootstrapTest(unittest.TestCase):
         process = ControlledProcess(self.module, self.manifest, fail_mode="candidate")
         with self.assertRaisesRegex(RuntimeError, "candidate failed"):
             self.run_bootstrap(process)
+        self.assertEqual(["candidate"], process.java_modes())
+        self.assertFalse((self.runtime / "identity-bootstrap/main/original-manifest.json").exists())
+
+    def test_candidate_output_persistence_failure_records_the_known_exit_and_stops(self):
+        process = ControlledProcess(self.module, self.manifest)
+        original_write = self.module.environment._write
+
+        def fail_candidate_stdout(path, value):
+            if Path(path).name == "candidate.stdout":
+                raise OSError("synthetic protected file failure")
+            return original_write(path, value)
+
+        with patch.object(self.module.environment, "_write", side_effect=fail_candidate_stdout):
+            with self.assertRaisesRegex(RuntimeError, "persist"):
+                self.run_bootstrap(process)
+        operation = json.loads((self.runtime / "identity-bootstrap/main/operation.json").read_text())
+        self.assertEqual([{"mode": "candidate", "exitCode": 0}], [
+            {"mode": stage["mode"], "exitCode": stage["exitCode"]} for stage in operation["stages"]
+        ])
         self.assertEqual(["candidate"], process.java_modes())
         self.assertFalse((self.runtime / "identity-bootstrap/main/original-manifest.json").exists())
 
@@ -369,6 +401,28 @@ class R1BootstrapTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "record mismatch"):
             self.module.verify_original(self.root, self.run, command_runner=process)
         self.assertEqual([], process.java_modes())
+
+    def test_verify_original_rejects_deleted_or_modified_original_stage_output_before_java(self):
+        self.run_bootstrap()
+        for tenant in ("main", "isolation"):
+            folder = self.runtime / f"identity-bootstrap/{tenant}"
+            for mode in ("candidate", "dry-run", "execute", "verify"):
+                for stream in ("stdout", "stderr"):
+                    for mutation in ("delete", "modify"):
+                        with self.subTest(tenant=tenant, mode=mode, stream=stream, mutation=mutation):
+                            path = folder / f"{mode}.{stream}"
+                            original = path.read_bytes()
+                            if mutation == "delete":
+                                path.unlink()
+                            else:
+                                path.write_bytes(original + b"tampered")
+                            try:
+                                process = ControlledProcess(self.module, self.manifest)
+                                with self.assertRaisesRegex(RuntimeError, "evidence mismatch"):
+                                    self.module.verify_original(self.root, self.run, command_runner=process)
+                                self.assertEqual([], process.java_modes())
+                            finally:
+                                path.write_bytes(original)
 
     def test_cli_output_never_contains_selector_key_password_or_token_material(self):
         output, errors = io.StringIO(), io.StringIO()
