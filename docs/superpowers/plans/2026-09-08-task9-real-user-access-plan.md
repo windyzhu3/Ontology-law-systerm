@@ -12,6 +12,8 @@
 
 **Status:** APPROVED。用户于 2026-09-08 确认详细设计及计划；当前交付位置见下节最新进度。后续功能与实际用户/权限变更仍按各单元门禁，不将设计批准当成完成证据。
 
+**2026-09-13 执行顺序调整（用户明确要求）：** T9-W09真实到期恢复暂缓`DEFERRED_BY_USER`，不阻塞Task10实施。保留原等待事实和未通过状态，不等日期、不改时钟/数据。Task9剩余必需项与Task10重叠验收统一补缺、引用已有证据，不重跑已关闭项，不将延期扩展成安全/权限/恢复门豁免。Task10可先推进独立的证据、CI及端到端缺口；完整Task9/R1发布/R2门须如实保留未决项。
+
 **Execution:** Task9.1/9.2a合同、Task9.2身份接入后端、Task9.3受控身份管理后端、Task9.4会话源码及Task9.5a/b/c/d均已阶段验收；9.5前端源码阶段关闭，9.6真实整链与人工UAT尚未完成。见[运行时证据](../../progress/2026-09-09-task9-identity-runtime-acceptance.md)、[9.3记录](../../progress/2026-09-09-task9-identity-admin-acceptance.md)与[当前前端进度](../../progress/2026-09-09-task9-identity-frontend-integration.md)。保留完整用户名精确候选0～1项、其他管理列表正常分页；未扩展功能／权限，Task10/R1发布不晋级。
 
 ## Global Constraints

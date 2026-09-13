@@ -477,6 +477,8 @@ git commit -m "feat(web): implement the R1 workbench"
 
 ## Task 10: 真实端到端验收和R2门禁
 
+**2026-09-13 执行衔接：** 用户要求加速R1并暂缓既有等待记录的真实到期Worker恢复（T9-W09=`DEFERRED_BY_USER`）。该时间项不阻塞本Task实施；不得将暂缓记为运行通过。先核对/复用Task9已有真实身份链、六卡及等待刷新证据，补齐下列黄金/关键失败路径、可复现环境与CI缺口。Task9其他安全/授权/恢复必需项不豁免，最终报告明确区分已证实、缺失及用户延期项，不自动推进R1/R2状态。原本节是2026-08-28计划，实施必须服从后续批准的Keycloak/OIDC、动态身份管理、当前OpenAPI和物理合同，不能回退旧身份假设或照抄旧版本值。
+
 **Files:**
 
 - Create: `e2e/compose.yaml`
