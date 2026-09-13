@@ -520,3 +520,21 @@ git commit -m "test: verify the R1 vertical slice end to end"
 - [ ] R1黄金与关键失败路径有浏览器/API/数据库联合证据。
 - [ ] R1不包含报价、冲突、合同、签署、付款、转案、AI或通用平台扩张。
 - [ ] 只有R1三层`IMPLEMENTED`且黄金/失败路径`RUNTIME_VERIFIED`后，R2计划才可进入执行。
+
+## Task 10.1: 串联既有CI预检入口（非R1运行验收）
+
+这是原Task10 CI顺序的首批接线，用户已要求继续，不新增产品或测试框架。真实compose/黄金/失败浏览器仍待后续；本单元绿色仅为preflight，不是R1 runtime或R2准入。W09延期、原本地私密runtime/服务/账号/证据不动。
+
+Files: 新增`.github/workflows/r1-vertical-slice.yml`、`scripts/ci/r1-preflight.sh`、`tests/test_r1_preflight.py`；修改根`package.json`仅新增具名离线E2E脚本；可在`e2e/README.md`追加简短CI入口说明。Root负责本计划、总索引和进度。禁止业务/UI/合同/DDL/依赖版本/已有workflow/现有E2E消费者修改，不创建空真实测试或假runtime报告。
+
+实现一个短小固定顺序Bash驱动，不建调度/配置引擎：baseline→schema static→当前PG18两轮runtime→backend unit/architecture/integration→OpenAPI生成漂移→SPA typecheck/test/build→明确offline Playwright。调用仓库已有命令和锁定工具，任何阶段非零即非零退出、不执行后续阶段。Maven用一次`verify -Pit`按生命周期覆盖unit/integration，不再提前重复unit全套；jOOQ漂移按现有foundation命令核对。schema runtime沿现有workflow的`verify_runtime.py verify --ci-only --runs 2`和有效证据检查，不用旧v1.1覆写当前v1.2。各阶段简短输出名称，不导出秘密或成功runtime报告。
+
+新增npm离线入口必须显式`--config playwright.config.ts --project offline-harness`及`--config e2e/business.config.ts --project offline-business`，不能调用默认包含approved-local的Task9入口、不添加任何真实授权环境变量。受控发现两配置只选择上述项目；需要Chromium的纯合成DOM由CI安装锁定Playwright所属Chromium，不使用系统Chrome或连接原本地runtime。
+
+新workflow明确命名R1 preflight（not runtime acceptance），pull_request/push main/workflow_dispatch，contents read，checkout无持久凭据且完整历史；复用现有固定action SHA与Python3.12.14、Java25.0.4.1精确build、Node24.20.0/npm11.9.0、已锁PyYAML/pglast/仓库依赖，不用新浮动action、不升级依赖。setup/install后调用同一个Bash驱动。失败不continue-on-error、不绕过步骤；不给任何R1/R2交付行写权限，不触发push/deploy，不上传私密文件。summary明确本次只预检，真实E2E仍未执行/W09按用户延期，绿色不等于runtime通过。
+
+TDD验证真正Bash驱动行为：使用临时目录/PATH的外部命令替身，记录实际调用和退出；固定期望阶段顺序；至少一个中间失败验证原非零退出且后续没有运行；正例走完且仅声称preflight；参数/路径不越界。不要只grep脚本/YAML文本、不要复制整个调度器到测试、不要实际运行数据库或业务服务来测试失败顺序。若需要校验workflow接线，解析真实YAML取实际run命令/工作目录并运行相关消费者，静态检查的限制如实说明，不模拟GitHub Actions成功。
+
+最终只跑本单元新测试、shell语法、两个实际Playwright离线项目`--list`及必要既有topology核对；不重跑backend/SPA/215业务/identity全套或任何真实本地链。完整CI执行留到托管runner，不能声称本地已跑通GitHub。先RED再GREEN，报告命令/退出/限制，提交仅ownedfiles，独立评审后由Root更新完成状态。
+
+状态（2026-09-13）：Task10.1范围内完成，实现`b0ffd32`、工作目录修复`5b7e663`；4项新增测试通过，独立评审唯一Important修复后限定复核APPROVED。托管CI/完整驱动未执行；Task10整体仍开放。下一批是隔离环境和受控fixture，再补黄金/关键失败真实链，W09不在当前关键路径。详见[统一证据索引](../../evidence/r1/README.md)。

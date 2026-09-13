@@ -1,6 +1,6 @@
 # R1 总验收证据与收口入口
 
-更新：2026-09-13。状态：Task10准备/证据归并已开始，**不是R1总验收通过报告**。
+更新：2026-09-13。状态：Task10.1统一CI预检入口已实现并通过独立复核；真实端到端验收仍待实施，**不是R1总验收通过报告**。
 
 ## 当前决定
 
@@ -28,13 +28,13 @@
 | `r1-golden-path.spec.ts` | 不存在；已有六卡链只是指定子集 | 核对自动分配→有效接通→Opportunity→原回执恢复的缺口，只补尚无有效证据部分 |
 | `r1-failure-paths.spec.ts` | 不存在；后端测试及Task9场景分散 | 按当前BranchID与安全要求映射已覆盖项，集中实现剩余真实场景 |
 | `r1-waiting-path.spec.ts` | 不存在；已有等待准备/刷新证据 | 实际到期恢复按用户延期记录，不排入当前关键路径，不生成空测试声称覆盖 |
-| `.github/workflows/r1-vertical-slice.yml` | 不存在；已有baseline/schema/scaffold/foundation独立门 | 复用已有真实命令，按计划顺序联通；未接通真实Playwright时不得生成绿色总验收门 |
+| `.github/workflows/r1-vertical-slice.yml` | Task10.1已实现明确命名的preflight与统一Bash入口；托管CI尚未执行 | 后续接入隔离真实E2E；现有offline Playwright及预检绿色不代表总验收通过 |
 | 本README | 已建立 | 作为单一收口入口，更新当前状态，不再无限叠加“当前”历史段落 |
 | 最终runtime report与交付状态晋级 | 尚未具备条件 | 完成后据实生成，不倒填2026-08-28的成功报告、不自动晋级R2 |
 
 ## 执行优先顺序
 
-1. 完成Task10环境/CI复用设计与缺口映射，批量实施一个可运行的端到端入口；安全身份配置、准确制品绑定和失败退出优先。
+1. 在已实现的CI预检入口基础上，实施隔离的PG18/API/Worker/SPA/Keycloak环境与受控fixture；复用锁定制品，不连接原本地私密runtime，不修改原账号或数据。
 2. 归并Task9未闭合的安全/恢复/授权与七卡缺口到总验收执行清单。退出首轮无报告仍未通过，工具修复不等于真实通过；重复确认历史候选仍须受控准备。
 3. 同一最终适用构建上补齐黄金与关键失败路径，按改动范围回归一次，独立评审只复核实际修复，不为未改代码反复运行全套。
 4. 出具R1总结果：分别列通过、失败、未执行、用户延期和外部环境待提供。W09及参考容量环境独立列项；没有证据时不宣称全部R1发布门完成。
@@ -43,4 +43,11 @@
 
 ## 本轮检查
 
-2026-09-13只读盘点已完成，未重跑业务场景。`python -B scripts/baseline/verify_baseline.py`退出0：baseline consistency PASS，R2 readiness仍有7项原有未满足条件，不冒充R2可进入；`git diff --check`退出0。此轮建立索引和调整执行顺序，没有新增黄金/失败路径运行通过。
+Task10.1实现提交`b0ffd32`，schema工作目录修复`5b7e663`。统一入口按baseline、schema/PG18、后端、OpenAPI、SPA、offline Playwright顺序执行，任一失败即停止；只读workflow不部署、不晋级交付状态。
+
+独立评审唯一Important项（schema包工作目录）已修复，同一评审者限定复核APPROVED，无新增缺陷。Task10.1范围内交付关闭，不代表整个Task10关闭。
+
+- 新增编排/接线测试：`python -m unittest tests.test_r1_preflight -v`，4项通过，退出0；覆盖固定顺序、schema目录、根目录证据输出、失败退出及后续停止。
+- schema真实包导入与Bash语法检查退出0。两个离线Playwright项目实际`--list`分别发现34/220项，topology检查退出0；发现数量不是浏览器执行通过数量。
+- 未运行完整预检、托管GitHub Actions或真实业务链；没有新增黄金/失败路径PASS，没有关闭新的Task9业务验收项。
+- 先前baseline检查退出0，仍有7项原有R2 readiness未满足条件。本轮不以工具测试数量计算业务完成率。

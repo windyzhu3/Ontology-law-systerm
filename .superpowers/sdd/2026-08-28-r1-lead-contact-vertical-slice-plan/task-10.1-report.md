@@ -136,3 +136,34 @@ Output: none
 
 No full schema suite, database runtime, Playwright run/listing, topology suite,
 private runtime, account, service, or hosted workflow was executed in this fix round.
+
+Final fix-round test and diff evidence (captured before commit, not rerun for this
+report-only update):
+
+```text
+Command: D:\soft\python3\python.exe -m unittest tests.test_r1_preflight -v
+Exit: 0
+Output:
+test_intermediate_failure_preserves_exit_code_and_stops_later_stages (tests.test_r1_preflight.R1PreflightDriverTest.test_intermediate_failure_preserves_exit_code_and_stops_later_stages)
+Break caught: a failed backend gate is masked or later consumers still run. ... ok
+test_schema_failure_preserves_exit_code_and_stops_before_runtime (tests.test_r1_preflight.R1PreflightDriverTest.test_schema_failure_preserves_exit_code_and_stops_before_runtime)
+Break caught: a schema import failure is masked or runtime verification starts. ... ok
+test_success_runs_the_fixed_bounded_order_and_claims_only_preflight (tests.test_r1_preflight.R1PreflightDriverTest.test_success_runs_the_fixed_bounded_order_and_claims_only_preflight)
+Break caught: a stage is skipped, reordered, widened, or reported as acceptance. ... ok
+test_workflow_uses_pinned_tools_and_the_single_driver_without_write_authority (tests.test_r1_preflight.R1PreflightWorkflowTest.test_workflow_uses_pinned_tools_and_the_single_driver_without_write_authority)
+Break caught: CI bypasses the driver, floats a toolchain, or gains write authority. ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 1.922s
+
+OK
+
+Command: git diff --check; git status --short
+Combined exit: 0
+git diff --check output: none
+git status --short output:
+ M docs/superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md
+```
+
+The status line is the pre-existing Root-owned plan modification; it was not staged
+or changed by this task.
