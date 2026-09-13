@@ -22,6 +22,7 @@ import org.springframework.core.env.SimpleCommandLinePropertySource;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.mock.env.MockEnvironment;
 
+/** Pure role parsing/selection/lease tests. Real production startup is exercised by RuntimeRoleIT. */
 class RuntimeRoleTest {
     @Test
     void missing_role_fails_startup() {
@@ -42,11 +43,8 @@ class RuntimeRoleTest {
 
     @Test
     void identical_values_from_independent_sources_are_allowed() {
-        try (ConfigurableApplicationContext context = application()
-                .properties("ols.runtime-role=api")
-                .run("--ols.runtime-role=api")) {
-            assertNotNull(context.getBean(ApiRuntimeProbe.class));
-        }
+        var environment=environment("--ols.runtime-role=api");environment.getPropertySources().addLast(new MapPropertySource("configuration",Map.of("ols.runtime-role","api")));
+        assertEquals(RuntimeRole.API,RuntimeRoleConfiguration.resolveRole(environment));
     }
 
     @Test
@@ -85,62 +83,43 @@ class RuntimeRoleTest {
 
     @Test
     void conflicting_property_sources_fail_startup() {
-        assertThrows(Exception.class, () -> application()
-                .properties("ols.runtime-role=worker")
-                .run("--ols.runtime-role=api"));
+        var environment=environment("--ols.runtime-role=api");environment.getPropertySources().addLast(new MapPropertySource("configuration",Map.of("ols.runtime-role","worker")));
+        assertThrows(IllegalStateException.class,()->RuntimeRoleConfiguration.resolveRole(environment));
     }
 
     @Test
-    void api_context_scans_only_the_api_assembly() {
-        try (ConfigurableApplicationContext context = start("--ols.runtime-role=api")) {
-            assertNotNull(context.getBean(ApiRuntimeProbe.class));
-            assertThrows(Exception.class, () -> context.getBean(WorkerRuntimeProbe.class));
-        }
+    void api_role_selects_only_the_api_assembly() {
+        var names=assemblies("api");org.junit.jupiter.api.Assertions.assertTrue(names.contains(io.github.windyzhu3.ontologylaw.api.ApiRuntimeAssembly.class.getName()));org.junit.jupiter.api.Assertions.assertFalse(names.contains(io.github.windyzhu3.ontologylaw.worker.WorkerRuntimeAssembly.class.getName()));
     }
 
     @Test
-    void worker_context_scans_only_the_worker_assembly() {
-        try (ConfigurableApplicationContext context = start("--ols.runtime-role=worker")) {
-            assertNotNull(context.getBean(WorkerRuntimeProbe.class));
-            assertThrows(Exception.class, () -> context.getBean(ApiRuntimeProbe.class));
-        }
+    void worker_role_selects_only_the_worker_assembly() {
+        var names=assemblies("worker");org.junit.jupiter.api.Assertions.assertTrue(names.contains(io.github.windyzhu3.ontologylaw.worker.WorkerRuntimeAssembly.class.getName()));org.junit.jupiter.api.Assertions.assertFalse(names.contains(io.github.windyzhu3.ontologylaw.api.ApiRuntimeAssembly.class.getName()));
     }
 
     @Test
     void api_and_worker_contexts_cannot_live_in_the_same_jvm_but_release_on_close() {
-        ConfigurableApplicationContext api = start("--ols.runtime-role=api");
+        var configuration=new RuntimeRoleConfiguration();var api=configuration.runtimeRoleLease(new RuntimeRoleConfiguration.RuntimeRoleSelection(RuntimeRole.API));
         try {
-            assertThrows(Exception.class, () -> start("--ols.runtime-role=worker"));
+            assertThrows(IllegalStateException.class,()->configuration.runtimeRoleLease(new RuntimeRoleConfiguration.RuntimeRoleSelection(RuntimeRole.WORKER)));
         } finally {
             api.close();
         }
-        try (ConfigurableApplicationContext worker = start("--ols.runtime-role=worker")) {
-            assertNotNull(worker.getBean(WorkerRuntimeProbe.class));
+        try(var worker=configuration.runtimeRoleLease(new RuntimeRoleConfiguration.RuntimeRoleSelection(RuntimeRole.WORKER))) {
+            assertNotNull(worker);
         }
     }
 
-    private ConfigurableApplicationContext start(String... arguments) {
-        return application().run(arguments);
+    private RuntimeRole start(String... arguments) {
+        return RuntimeRoleConfiguration.resolveRole(environment(arguments));
     }
 
     private void assertStartupFails(String... arguments) {
-        ConfigurableApplicationContext unexpectedContext = null;
-        try {
-            unexpectedContext = start(arguments);
-            throw new AssertionError("application startup unexpectedly succeeded");
-        } catch (Exception expected) {
-            // Expected startup rejection.
-        } finally {
-            if (unexpectedContext != null) {
-                unexpectedContext.close();
-            }
-        }
+        assertThrows(IllegalStateException.class,()->start(arguments));
     }
 
-    private SpringApplicationBuilder application() {
-        return new SpringApplicationBuilder(OntologyLawApplication.class)
-                .web(WebApplicationType.NONE)
-                .logStartupInfo(false)
-                .properties("spring.main.banner-mode=off", "logging.level.root=OFF");
+    private MockEnvironment environment(String... arguments) {
+        var environment=new MockEnvironment();environment.getPropertySources().addFirst(new SimpleCommandLinePropertySource("arguments",arguments));return environment;
     }
+    private java.util.List<String> assemblies(String role){var selector=new RuntimeRoleConfiguration.RuntimeRoleImportSelector();selector.setEnvironment(environment("--ols.runtime-role="+role));return java.util.List.of(selector.selectImports(org.springframework.core.type.AnnotationMetadata.introspect(RuntimeRoleConfiguration.class)));}
 }

@@ -5,7 +5,9 @@ import io.github.windyzhu3.ontologylaw.identity.AuthorizationService.PrincipalKi
 import java.util.*;
 
 /** Created by a trusted adapter after authentication and input schema validation. */
-public record CommandEnvelope(Type type, UUID commandId, UUID correlationId, Actor actor, Object payload, TaskPrecondition taskPrecondition, DraftPrecondition draftPrecondition) {
+public record CommandEnvelope(Type type, UUID commandId, UUID correlationId, Actor actor, Object payload, TaskPrecondition taskPrecondition, DraftPrecondition draftPrecondition, IdentityPrecondition identityPrecondition) {
+    public record IdentityPrecondition(UUID id,String ifMatch) {}
+    public CommandEnvelope(Type type,UUID commandId,UUID correlationId,Actor actor,Object payload,TaskPrecondition task,DraftPrecondition draft){this(type,commandId,correlationId,actor,payload,task,draft,null);}
     /** Trusted path/header carrier, deliberately outside the canonical request-body digest. */
     public record TaskPrecondition(UUID taskId,String ifMatch) {public TaskPrecondition {Objects.requireNonNull(taskId);}}
     public record DraftPrecondition(UUID taskId,String ifMatch,String ifNoneMatch) {public DraftPrecondition {Objects.requireNonNull(taskId);}}
@@ -15,12 +17,17 @@ public record CommandEnvelope(Type type, UUID commandId, UUID correlationId, Act
     public enum Type {
         RESOLVE_DUPLICATE_LEAD, COMPLETE_LEAD_INGRESS, ASSIGN_LEAD, RECORD_ROUTING_DISPOSITION,
         ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST, RECORD_CONTACT_RESULT, REVIEW_LEAD_VALIDITY,
-        CAPTURE_LEAD, SAVE_ACTION_DRAFT, REOPEN_DUE_CONTACT_TASKS, REOPEN_DUE_ROUTING_REVIEW_TASKS;
+        CAPTURE_LEAD, SAVE_ACTION_DRAFT, REOPEN_DUE_CONTACT_TASKS, REOPEN_DUE_ROUTING_REVIEW_TASKS,
+        CREATE_IDENTITY_PRINCIPAL, RENAME_IDENTITY_PRINCIPAL, SUSPEND_IDENTITY_PRINCIPAL, RESUME_IDENTITY_PRINCIPAL, DISABLE_IDENTITY_PRINCIPAL,
+        CREATE_ORGANIZATION_UNIT, RENAME_ORGANIZATION_UNIT, CLOSE_ORGANIZATION_UNIT,
+        CREATE_APPOINTMENT, SUSPEND_APPOINTMENT, RESUME_APPOINTMENT, END_APPOINTMENT, CREATE_AUTHORITY_GRANT, REVOKE_AUTHORITY_GRANT;
+        public boolean identity(){return io.github.windyzhu3.ontologylaw.identity.IdentityCommands.registered(name());}
         public boolean recovery() {return this==REOPEN_DUE_CONTACT_TASKS || this==REOPEN_DUE_ROUTING_REVIEW_TASKS;}
     }
     public CommandEnvelope { Objects.requireNonNull(type);Objects.requireNonNull(commandId);Objects.requireNonNull(correlationId);Objects.requireNonNull(actor);mapping(type,actor.principalKind());payload=CanonicalJson.freeze(payload); }
     public Envelope envelope(){return mapping(type,actor.principalKind());}
     private static Envelope mapping(Type type,PrincipalKind kind) {
+        if(type.identity()){if(kind!=PrincipalKind.HUMAN)throw new IllegalArgumentException("Identity commands require HUMAN");return Envelope.INTERNAL_ADMIN;}
         return switch(type) {
             case CAPTURE_LEAD -> kind==PrincipalKind.SERVICE?Envelope.SERVICE_ACTOR:Envelope.INTERNAL_ADMIN;
             case REOPEN_DUE_CONTACT_TASKS,REOPEN_DUE_ROUTING_REVIEW_TASKS -> {
@@ -32,6 +39,7 @@ public record CommandEnvelope(Type type, UUID commandId, UUID correlationId, Act
                 if(kind!=PrincipalKind.HUMAN)throw new IllegalArgumentException("Task commands require HUMAN");
                 yield Envelope.INTERNAL_TASK;
             }
+            default -> throw new IllegalArgumentException("Unregistered envelope");
         };
     }
     @Override public String toString(){return "CommandEnvelope["+type+", "+commandId+"]";}

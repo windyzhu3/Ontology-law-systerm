@@ -9,12 +9,20 @@ public final class CommandScope {
     private final CommandEnvelope.Type type;
     private final String canonical;
     private final UUID taskId;
-    private CommandScope(UUID tenantId,CommandEnvelope.Type type,Map<String,?> fields){this.tenantId=Objects.requireNonNull(tenantId);this.type=Objects.requireNonNull(type);this.canonical=CanonicalJson.encode(fields);this.taskId=fields.containsKey("taskId")?UUID.fromString((String)fields.get("taskId")):null;}
+    private final Map<String,Object> fields;
+    @SuppressWarnings("unchecked")
+    private CommandScope(UUID tenantId,CommandEnvelope.Type type,Map<String,?> fields){this.tenantId=Objects.requireNonNull(tenantId);this.type=Objects.requireNonNull(type);this.canonical=CanonicalJson.encode(fields);this.fields=(Map<String,Object>)CanonicalJson.freeze(fields);this.taskId=fields.containsKey("taskId")?UUID.fromString((String)fields.get("taskId")):null;}
     public UUID tenantId(){return tenantId;}
     public CommandEnvelope.Type type(){return type;}
     public String canonical(){return canonical;}
+    /** Immutable server-resolved tree; identical bytes remain the scope digest authority. */
+    public Map<String,Object> fields(){return fields;}
     public UUID taskId(){return taskId;}
     public byte[] digest(){return CanonicalJson.digest(canonical);}
+    public static CommandScope identity(CommandEnvelope e,Map<String,Object> target){
+        if(!e.type().identity()||e.actor().onBehalfAppointmentId()!=null)throw new IllegalArgumentException("Not a direct Identity command");
+        return new CommandScope(e.actor().tenantId(),e.type(),Map.of("profile","R1_IDENTITY_COMMAND_SCOPE_V1","tenantId",e.actor().tenantId().toString(),"commandType",e.type().name(),"principalId",e.actor().principalId().toString(),"appointmentId",e.actor().appointmentId().toString(),"target",target));
+    }
     public static CommandScope capture(UUID tenant,String sourceAccountCode,String sourceRecordKeyDigest){
         if(sourceAccountCode==null || sourceAccountCode.isEmpty() || sourceAccountCode.length()>128)throw new IllegalArgumentException("Invalid source account code");
         new Subject("lead.lead",tenant,null,sourceRecordKeyDigest);

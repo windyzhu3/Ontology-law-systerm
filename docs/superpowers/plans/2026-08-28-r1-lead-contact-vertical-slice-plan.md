@@ -477,6 +477,8 @@ git commit -m "feat(web): implement the R1 workbench"
 
 ## Task 10: 真实端到端验收和R2门禁
 
+**2026-09-13 执行衔接：** 用户要求加速R1并暂缓既有等待记录的真实到期Worker恢复（T9-W09=`DEFERRED_BY_USER`）。该时间项不阻塞本Task实施；不得将暂缓记为运行通过。先核对/复用Task9已有真实身份链、六卡及等待刷新证据，补齐下列黄金/关键失败路径、可复现环境与CI缺口。Task9其他安全/授权/恢复必需项不豁免，最终报告明确区分已证实、缺失及用户延期项，不自动推进R1/R2状态。原本节是2026-08-28计划，实施必须服从后续批准的Keycloak/OIDC、动态身份管理、当前OpenAPI和物理合同，不能回退旧身份假设或照抄旧版本值。
+
 **Files:**
 
 - Create: `e2e/compose.yaml`
@@ -518,3 +520,104 @@ git commit -m "test: verify the R1 vertical slice end to end"
 - [ ] R1黄金与关键失败路径有浏览器/API/数据库联合证据。
 - [ ] R1不包含报价、冲突、合同、签署、付款、转案、AI或通用平台扩张。
 - [ ] 只有R1三层`IMPLEMENTED`且黄金/失败路径`RUNTIME_VERIFIED`后，R2计划才可进入执行。
+
+## Task 10.1: 串联既有CI预检入口（非R1运行验收）
+
+这是原Task10 CI顺序的首批接线，用户已要求继续，不新增产品或测试框架。真实compose/黄金/失败浏览器仍待后续；本单元绿色仅为preflight，不是R1 runtime或R2准入。W09延期、原本地私密runtime/服务/账号/证据不动。
+
+Files: 新增`.github/workflows/r1-vertical-slice.yml`、`scripts/ci/r1-preflight.sh`、`tests/test_r1_preflight.py`；修改根`package.json`仅新增具名离线E2E脚本；可在`e2e/README.md`追加简短CI入口说明。Root负责本计划、总索引和进度。禁止业务/UI/合同/DDL/依赖版本/已有workflow/现有E2E消费者修改，不创建空真实测试或假runtime报告。
+
+实现一个短小固定顺序Bash驱动，不建调度/配置引擎：baseline→schema static→当前PG18两轮runtime→backend unit/architecture/integration→OpenAPI生成漂移→SPA typecheck/test/build→明确offline Playwright。调用仓库已有命令和锁定工具，任何阶段非零即非零退出、不执行后续阶段。Maven用一次`verify -Pit`按生命周期覆盖unit/integration，不再提前重复unit全套；jOOQ漂移按现有foundation命令核对。schema runtime沿现有workflow的`verify_runtime.py verify --ci-only --runs 2`和有效证据检查，不用旧v1.1覆写当前v1.2。各阶段简短输出名称，不导出秘密或成功runtime报告。
+
+新增npm离线入口必须显式`--config playwright.config.ts --project offline-harness`及`--config e2e/business.config.ts --project offline-business`，不能调用默认包含approved-local的Task9入口、不添加任何真实授权环境变量。受控发现两配置只选择上述项目；需要Chromium的纯合成DOM由CI安装锁定Playwright所属Chromium，不使用系统Chrome或连接原本地runtime。
+
+新workflow明确命名R1 preflight（not runtime acceptance），pull_request/push main/workflow_dispatch，contents read，checkout无持久凭据且完整历史；复用现有固定action SHA与Python3.12.14、Java25.0.4.1精确build、Node24.20.0/npm11.9.0、已锁PyYAML/pglast/仓库依赖，不用新浮动action、不升级依赖。setup/install后调用同一个Bash驱动。失败不continue-on-error、不绕过步骤；不给任何R1/R2交付行写权限，不触发push/deploy，不上传私密文件。summary明确本次只预检，真实E2E仍未执行/W09按用户延期，绿色不等于runtime通过。
+
+TDD验证真正Bash驱动行为：使用临时目录/PATH的外部命令替身，记录实际调用和退出；固定期望阶段顺序；至少一个中间失败验证原非零退出且后续没有运行；正例走完且仅声称preflight；参数/路径不越界。不要只grep脚本/YAML文本、不要复制整个调度器到测试、不要实际运行数据库或业务服务来测试失败顺序。若需要校验workflow接线，解析真实YAML取实际run命令/工作目录并运行相关消费者，静态检查的限制如实说明，不模拟GitHub Actions成功。
+
+最终只跑本单元新测试、shell语法、两个实际Playwright离线项目`--list`及必要既有topology核对；不重跑backend/SPA/215业务/identity全套或任何真实本地链。完整CI执行留到托管runner，不能声称本地已跑通GitHub。先RED再GREEN，报告命令/退出/限制，提交仅ownedfiles，独立评审后由Root更新完成状态。
+
+状态（2026-09-13）：Task10.1范围内完成，实现`b0ffd32`、工作目录修复`5b7e663`；4项新增测试通过，独立评审唯一Important修复后限定复核APPROVED。托管CI/完整驱动未执行；Task10整体仍开放。下一批是隔离环境和受控fixture，再补黄金/关键失败真实链，W09不在当前关键路径。详见[统一证据索引](../../evidence/r1/README.md)。
+
+## Task 10.2: 隔离端到端环境装配
+
+实施原Task10的一次性环境要求，复用现有local-login的真实服务装配方式，不复用其runtime或旧验收记录。用户已要求继续完整实施验收；本单元不改产品、UI、OpenAPI、权限或迁移。现有本机Docker约8GiB且旧环境运行中，禁止停止旧服务释放容量；新环境为功能验收，不代表参考容量验收。
+
+Files: 新建`e2e/compose.yaml`、`e2e/fixtures/r1-fixture.json`、`e2e/runtime/`下职责明确的准备/启动工具及必要HTTPS静态代理、`tests/test_r1_environment.py`；可更新`e2e/README.md`。Root负责计划/总证据索引，不修改已有Task9消费者或私密目录。不增加npm/Maven依赖或第二SPA/Jar，不建通用部署框架。
+
+Topology: 使用现有锁定PG18、Flyway、Keycloak镜像，以新的`ontology-law-r1-e2e-<run>` compose project隔离两个数据库、网络和卷，无container_name或external volume；所有对主机发布端口绑定127.0.0.1，与旧19443–19446分离。API和Worker复用同一个从本工作树构建的Jar、同版本宿主Java25.0.4.1+1，SPA由既有固定Node24.20.0运行的HTTPS静态代理托管同一构建产物；此本地/CI宿主模式无需新增Java/Node镜像。compose负责PG/Keycloak/Flyway，启动工具负责三宿主进程，未来Linux runner同构装配，不声称所有进程均容器化。
+
+Preparation: 仅接受本worktree内gitignored的专用`.artifacts/r1-e2e/<run>`目录，规范run ID、路径/链接检查；首次独占创建且拒绝覆盖/接管既存或不完整run。秘密文件先保护再写（Windows仅当前用户与SYSTEM，POSIX0700/0600），不得接收旧Task9runtime或打印秘密。准备工具产生随机合成账号密码、独立tenant密钥、PG角色密码、临时CA及准确SAN服务器证书/Java truststore；不安装全局信任、不关闭TLS。Secret通过文件注入，不入命令行或提交。模板仅非秘密角色/来源场景：主Tenant、隔离哨兵Tenant、founder、销售、主管、来源负责人、撤销任职、自动/人工/零候选来源；fixture是准备输入，不是业务结果或PASS声明。Keycloak复用realm-template安全参数和只读目录角色，准确issuer/redirect/origin，账号只在新realm合成导入，不修改旧Keycloak、不引入默认管理员。
+
+Startup: 完整校验锁定版本、所需文件/摘要、空闲端口与精确project隔离后才启动。只启动本run新基础设施；schema用当前生成迁移migrate→validate，不重写DDL、关闭guard或绕过能力角色；应用数据库与IdP数据库独立TLS及凭据。原子保存run manifest、命令阶段和实际进程/制品信息；失败不自动重试未知写入、不删除卷或原证据。API/Worker配置和身份前置若尚未具备，明确状态止于基础设施就绪，不生成“全环境READY”；真实HUMAN仍走现有IdentityBootstrapCommand/Identity管理API，不用SQL伪造HUMAN事实。后续fixture装载和黄金链执行属于原Task10后续步骤，须消费这些准确准备产物，不能把环境工具测试冒充真实验收。
+
+Verification: 先RED→GREEN覆盖实际准备器输出/文件副作用、重复run拒绝、路径/秘密边界、真实compose config解析、失败阶段停止；外部openssl/keytool/docker进程可在失败用例替换，不能只grep源代码或证明mock存在。尽量使用当前工具实际生成一次临时合成准备产物，并`docker compose config --quiet`，不输出完整配置/凭据。实现者不启动服务、不执行bootstrap/业务写入；Root在独立评审后执行新隔离环境，记录真实退出与就绪阶段，再进入业务fixture及黄金/失败路径。W09延期、UAT关闭、R2/附件通知/语音范围均不变。提交owned source files，完整报告命令/退出/差距，不伪称托管CI通过。
+
+2026-09-13实际运行网络澄清（用户已明确批准，仅新隔离环境）：Docker29.4.3下仅internal网络的服务出现声明端口但实际映射为空。保留identity/business两个internal网络，只给Keycloak和business-db分别增加独立的identity-host/business-host普通bridge；两个host桥不得共享，不使用host网络模式，身份数据库仍只有internal网络。发布仍严格127.0.0.1:29443/29446；普通bridge具备出站能力，但不增加外网业务请求、不更改旧环境或宿主防火墙。启动工具必须核对实际NetworkSettings.Ports而不只看声明配置，映射缺失或错误立即失败并保留现场，不继续等TLS。失败run只停止保留，源变更后新建run，不在线修改旧网络或manifest。
+
+## Task 10.3: 消费隔离环境的受控身份引导
+
+这是原Task10 fixture前置，不新增身份产品能力。只消费Task10.2新环境，使用已有同一Jar的`IdentityBootstrapCommand`完成主Tenant和隔离哨兵Tenant的受控初始化。API/Worker/SPA进程装配及人类业务授权由后续消费者完成，本单元不得把bootstrap成功写成应用READY或黄金链PASS。
+
+Files: 新增`e2e/runtime/r1_bootstrap.py`和`tests/test_r1_bootstrap.py`；仅必要时向`e2e/runtime/r1_environment.py`增加可复用的已准备输入验证入口，不修改既有manifest或接管旧run；可更新`e2e/README.md`。不改业务Java、DDL、OpenAPI、前端、依赖、Task9消费者或旧私密目录。Root负责计划/证据索引。
+
+输入只接受本工作树`.artifacts/r1-e2e/<run>`且真实状态为`INFRASTRUCTURE_READY`。首先验证其精确Compose项目、输入摘要、受保护目录和当前制品，验证数据库部署状态与Jar/schema摘要一致。环境manifest保持原样，新引导记录独占建立在该run内的受保护子目录。所有秘密只引用本run已有文件；为两个Tenant分别生成UUID及独立subject HMAC，不能与bootstrap签名密钥或其他用途密钥混用。主Tenant代码`R1_E2E_MAIN`，哨兵`R1_E2E_ISOLATION`；ROOT组织，创始管理员仅`IDENTITY_ADMIN`及现有四项管理授权，语义基线`MVP-2026-09-08.3`、物理合同`52-plus-2-v1.2`。创始账号使用本run已导入的founder合成账号；哨兵与主Tenant可以映射同一个IdP账号，但分别绑定Tenant及独立HMAC，本步骤不配置浏览器的跨租户选择或新增信任规则。
+
+命令固定复用`IdentityBootstrapCommand`的candidate→dry-run→execute --confirm-bootstrap→verify；本地离线Java明确使用`-Xmx256m`避免按整机内存推导堆，不作为参考容量配置。所有selector、settings、original manifest和原commandId只保存在受保护文件。candidate标准输出必须捕获至秘密文件，不写普通日志；不打印selector、subject HMAC、密码或令牌。保留原操作manifest与每阶段退出码，失败/不确定停止，不创建替代command或重发execute；重复入口拒绝覆盖，另有只读verify-original入口只能复用原文件和原command，不修复/篡改证据。不得SQL创建HUMAN/组织/任职/授权，不使用管理员密码grant或绕过目录服务。两个Tenant都通过实际original verify后只标记`IDENTITY_BOOTSTRAP_VERIFIED`（applicationReady仍false）；保留每Tenant精确Fact ID的脱敏引用，来源须是原bootstrap验证或受约束只读DB查询，不凭测试构造猜测ID。
+
+固定引导字段：两个Tenant的`identityProviderCode`分别等于其`tenantCode`；共同`operatorAssertion=Controlled R1 isolated synthetic identity bootstrap`、`node=R1_E2E_BOOTSTRAP`、`activeBootstrapKeyId=r1-e2e-bootstrap-v1`。Tenant展示名取公开fixture，两个ROOT展示名分别为`R1 synthetic firm root`与`R1 isolation sentinel root`，管理员展示名为`Synthetic Founder`。后继API仅对主Tenant使用`R1_E2E_MAIN` HUMAN trust，不因哨兵bootstrap重复注册相同issuer/audience。
+
+Java标准输出/错误在调用源头固定`-Dstdout.encoding=UTF-8`与`-Dstderr.encoding=UTF-8`，以bytes捕获再严格UTF-8解码；秘密输出原始字节仅留受保护文件，解码/JSON异常必须失败关闭，不使用替换或猜测编码。Task10.2已由真实固定keytool使用相应`-J-D…`参数验证Windows输出边界；本命令调用Java本体不加`-J`。离线日志通过新增`e2e/runtime/r1-bootstrap-logback.xml`及其受保护副本定向stderr，两份精确路径/摘要绑定原记录，stdout仍要求完整单JSON，不从混合输出里挑最后一行。新增`tests/fixtures/R1BootstrapLoggingProbe.java`仅为无数据库的真实JVM日志分流测试，不进入业务Jar。Fact核验使用现有`audit.audit_entry_classified_v`和`law_app_query`，不直读审计原表、不增加权限。
+
+TDD覆盖真实准备/阶段调度的副作用和停止行为：错误环境/摘要/权限在任何candidate前拒绝；重复初始化不重放；candidate失败、execute非零不进入后续写入；验证入口只执行verify；两个Tenant参数和独立密钥确切；普通输出无秘密。外部Java/数据库可用进程替身验证调度，不复制实现逻辑，不把替身结果当真实bootstrap。只运行本单元定点测试和必要受影响环境测试；实现者不执行真实bootstrap，由Root在独立评审通过后运行并记录实际命令/退出/阶段。W09延期、UAT关闭以及待授权的历史Party/Delegation/账号禁用/故障注入均保持原状态。
+
+## Task 10.4: 新隔离环境的既有应用装配
+
+2026-09-13前置衔接补充：用户已批准限定续建未写入的哨兵；Task10.3新增`r1_bootstrap_continuation.py`及定点测试。仅接受原主Tenant五阶段成功、哨兵candidate成功/dry-run失败且没有execute的精确状态。操作员提供原state/record摘要；原树保持不变，单独保护记录绑定原证据，先只读验证主Tenant和哨兵零事实，再仅对哨兵取得新候选、保存新的独立manifest并执行一次原引导链。失败/不确定不重试、不重发主Tenant，不修改业务合同或已摘要环境源文件。实际续建仍以独立评审及资源恢复为前提。
+
+该来源由Task10.4显式选择`r1_bootstrap_continuation.verify_combined(root, run)`，返回下文同一安全投影；正常成功来源仍用`verify_original`，不得在失败后自动fallback。准备记录须冻结核验来源，后续start/verify一致使用；不复制核验算法，不改原FAILED状态冒充整体成功。
+
+承接Task10.3实际原始引导核验，只装配当前唯一Jar的API/Worker和当前唯一SPA，不新增业务端点、前端页面、身份能力或通用部署平台。HUMAN主体、组织、任职、业务DIRECT授权仍由后继真实管理API建立，本单元不得用SQL提前填入。尚未获准的历史Party/Delegation/账号禁用及故障注入仍不执行。
+
+**Files:** 新增`e2e/runtime/r1_applications.py`、`e2e/runtime/r1_server.mjs`、`tests/test_r1_applications.py`、`e2e/runtime/r1_server.test.mjs`；允许更新`e2e/README.md`。不改Task10.2已摘要的源文件、旧部署脚本、业务Java、DDL、OpenAPI、SPA源代码或依赖。
+
+**接口和输入：** `prepare_applications(root: Path, run: str) -> Path`独占建立本run下受保护`applications/`；`start_applications(root: Path, run: str) -> None`只消费已准备且摘要一致的输入；`verify_applications(root: Path, run: str) -> dict`只读检查原进程/配置/数据库前置，不执行补写或重启。入口分别为`prepare`、`start`、`verify`，参数仅run，凭据不进命令行。消费`r1_bootstrap.verify_original(root, run)`返回的`R1_E2E_VERIFIED_IDENTITY_BOOTSTRAP_INPUT_V1`，其`tenants[R1_E2E_MAIN|R1_E2E_ISOLATION]`包含`tenantId/rootOrganizationId/founderPrincipalId/appointmentId/authorityGrantIds/subjectHmacPath/originalVerificationEvidenceSha256`；该调用只核验原命令、返回路径而非秘密字节。不得用手写完成marker替代原核验，不复制其验证算法。
+
+- [ ] **先写失败测试。** 外部数据库/进程用替身，但真实执行保护、配置生成、命令构造及状态机。测试必须证明：bootstrap缺失/不匹配在任何SERVICE写入前拒绝；输入摘要漂移在启动前拒绝；prepare重复调用不重放；原SERVICE事务结果未知不重发；API失败不启动Worker/SPA；启动进程PID/创建时间不匹配不能READY；正常配置只绑定29444/29445、仅主Tenant HUMAN trust、Worker三项授权、来源三项政策、全部不同用途密钥。测试入口固定如下：
+
+```powershell
+D:/soft/python3/python.exe -m unittest tests.test_r1_applications
+```
+
+- [ ] **受控SERVICE前置和配置。** 参考`deploy/local-login/local_login.py`中SERVICE-only初始化及`local_worker.py`中的授权闭包，不导入其旧私密runtime、不运行旧命令。仅本主Tenant新建一个`SERVICE/LOCAL_SERVICE`主体及ROOT下SERVICE任职；三个DIRECT Grant仅`R1_PROJECTION_CONSUME`、`CONTACT_TASK_RECOVER`、`ROUTING_REVIEW_TASK_RECOVER`，grantor必须为原bootstrap创始任职。一次事务先核验原Tenant/ROOT/founder/manifest及部署摘要，写入原已保存UUID，准确核对新增行数；只读核验原UUID/字段集合，不按名称收养既存数据。此基础设施fixture不伪造HTTP命令回执。
+
+- [ ] **生成保护配置。** API使用`law_api_login`，Worker使用`law_worker_login`，均`sslmode=verify-full`，准确Jar/schema摘要和当前合同。API只配置主Tenant `R1_E2E_MAIN`、已冻结issuer/audience/directory/introspection；六项TenantKeys用途独立，credential-subject-hmac必须沿用主Tenantbootstrap密钥。为新SERVICE创建独立clientAuth证书/私钥/PKCS12及公钥，API绑定准确指纹，Worker使用同一原SERVICE任职及指纹，严格CA/mTLS，不复用服务器私钥为SERVICE。所有新增秘密在`applications/`保护边界内，原准备manifest和秘密保持原样。
+
+来源政策固定`R1_AUTO=AUTOMATIC`、`R1_MANUAL=MANUAL`、`R1_ZERO_CANDIDATE=AUTOMATIC`。前两项候选根`OWNED_ROOT`，零候选根`EMPTY_ROOT`；主管根、接入根均`ROOT`，时区`Asia/Shanghai`。两子组织由后继管理API在任何业务capture前建立；本单元只配置，不SQL创建HUMAN组织。SERVICE注册只允许这三来源，服务issuer=`urn:r1-e2e:service`、audience=`r1-e2e-api`。
+
+- [ ] **同制品启动。** 原Jar同时用于互斥api/worker启动，分别`-Xmx384m`；固定Java stdout/stderr UTF-8，API只监听127.0.0.1:29445，Worker无HTTP监听。Node只监听127.0.0.1:29444，使用原SPA dist字节；新`r1_server.mjs`保留旧`server.mjs`的准确路由白名单、CSP、缓存、路径拒绝与严格TLS代理语义，端口改为新环境固定值，不引入任意origin/路径配置或生产改动。进程隐藏启动、立即保存PID/命令/创建时间；部分启动或不确定结果保留现场，不自动杀旧进程或重启。应用状态只写入本单元`applications/`记录，不改环境`state.json`或bootstrap记录：它们继续保留已完成引导的原始阶段，保证`verify_original`消费者不会因后继装配被破坏。
+
+- [ ] **就绪和反例。** 新Node入口用原始字节摘要确认dist，要求准确Host，代理移除转发/代理头，10秒上游超时，CA严格校验；测试真实本机临时TLS服务器验证错误CA拒绝和正确CA代理，临时测试端口不得占用原/新固定服务端口。Node单元入口：
+
+```powershell
+node --test e2e/runtime/r1_server.test.mjs
+```
+
+实际Root启动后，只有准确当前PID/启动时刻的API/Worker隔离及READY日志、严格TLS的SPA200/未认证SELF401和SERVICE readiness204（空body、无ETag、Cache-Control包含no-store）同时满足才记录`APPLICATION_INFRASTRUCTURE_READY`，不能记真实用户登录、责任卡或黄金链PASS。不调用新的业务主命令；后继浏览器验收另建记录。实现者只运行本单元定点测试，Root独立评审后执行一次真实入口。
+
+- [ ] **提交和评审。** 提交只含本单元文件，报告列准确测试命令/退出码/覆盖边界；按Task10.3原始消费者接口交接，不复制其验证算法，不给原环境添加恢复或重放机制。
+
+## Task 10.5: 新隔离环境的受控管理配置与黄金链
+
+2026-09-13用户确认最小新入口方案；Task10.4已实际返回`APPLICATION_INFRASTRUCTURE_READY`。只新增独立验收消费者，不修改旧Task9配置、私密runtime、journal或报告，不改产品页面、OpenAPI、DDL、权限或依赖。消费当前run的原始bootstrap及应用核验结果，绑定同Jar/SPA、配置、schema和原进程身份；不自行启动、接管或重建环境。
+
+> 最新决定：用户要求R1验收到此为止，只提交推送现有修改。Task10.5停止，非PASS。实际18项CONFIRMED/0项PENDING，停于补齐草稿保存之后；整页刷新遗漏重新登录/任职确认的验收工具问题已定位但未修复。以下未勾选项仅保留计划，不继续执行；详情见2026-09-13-task10-environment-progress.md最终交接记录。
+
+- [ ] 新增独立`e2e/r1-isolated.config.ts`及受保护Python/TS桥接、固定操作清单与黄金链测试。默认不发现真实用例；真实入口必须显式选择`approved-r1-isolated`，设置`R1_ISOLATED_ACCEPTANCE=APPROVED_SYNTHETIC_ONLY`、准确环境run及全新操作UUID。workers=1、retries=0；未知响应保留原key并阻止后续写入，不自动重放。
+- [ ] 已有导入账号不重建：通过现有管理页面建立sales/supervisor/sourceOwner三HUMAN主体、OWNED_ROOT/EMPTY_ROOT两个ROOT子组织、三任职及八DIRECT授权，共16次管理命令。sales为OWNED_ROOT的CONTACT_OPERATOR，授予且仅授予OWNED_ROOT范围的SALES_CONTACT_OWNER；supervisor为ROOT的ROUTING_SUPERVISOR，授予LEAD_ASSIGN/LEAD_ROUTING_DECIDE/LEAD_VALIDITY_REVIEW；sourceOwner为ROOT的INTAKE_OPERATOR，授予LEAD_CAPTURE/LEAD_INGRESS_RESOLVE/LEAD_INGRESS_COMPLETE/SOURCE_INTAKE_REQUEST_ACK。后两者七项Grant范围ROOT，全部由原founder授予。EMPTY_ROOT保持空；revokedAppointment留待后继反例，不建立第二销售候选。
+- [ ] 2026-09-13用户批准的最小修订：此前“sales无Grant”与冻结显式授权合同冲突，改为追加上述唯一授权，不改产品权限模型。原15次管理命令已真实CONFIRMED；保留原命令和MANAGEMENT_COMPLETED历史阶段，单独追加SALES_AUTHORITY_COMPLETED阶段，再续验身份及黄金链。禁止重发前15项、换运行编号、覆盖失败证据或提升到ROOT范围。
+- [ ] 同日后续批准：原接入缺少联系方式，17项确认后实际产生来源负责人的COMPLETE_LEAD_INGRESS责任。保留原Lead及17项命令，通过既有页面保存并提交合成联系方式补齐草稿，再自动分配及首联。仅新增两项补齐写操作，累计21项（16管理+接入+补齐草稿/提交+首联草稿/提交）；明确标注补齐后分配链路，不当作直接接入自动分配的证据。无新Lead、重发capture、补权或外呼/短信。
+- [ ] 动态登录核对原任职与SELF，无重启。sourceOwner沿用既有受控HUMAN `POST /api/v1/leads`接入一条R1_AUTO合成Lead；当前SPA没有capture表单，不新增或宣称该表单通过。系统自动分配唯一sales候选后，真实页面完成CONTACT_LEAD草稿保存、整页刷新验证、CONNECTED_VALID主提交及原CommandId回执读取。
+- [ ] 使用既有law_app_query允许表/视图，独立只读核对唯一ContactResult/Opportunity、Task DONE、Draft CONFIRMED、合同规定的Event/Outbox/Audit/Receipt关系和数量。不得将读取审计增量混作命令业务增量，不暴露联系方式、密文、HMAC、JWT或原始响应。固定场景失败即保留失败记录，不生成总PASS。
+- [ ] 固定Playwright1.63.0与Chromium1243/153.0.8010.12、严格TLS；无录屏/trace/HAR/storageState/DOM错误快照。用户单独批准本轮准确CA暂时导入Windows CurrentUser Root，Root仅在评审后实际运行前导入，结束或失败时按准确指纹移除并核验；禁止LocalMachine、禁用TLS及源码安装信任。
+- [ ] 先RED/GREEN，定点Python`tests.test_r1_acceptance`、新offline-r1-isolated项目、触及TS类型检查及真实项目发现边界；不重复旧全套。独立评审后Root执行一次真实入口，仅按实际证据关闭本slice。历史Party/Delegation/IdP禁用/数据库故障另需授权；W09延期、UAT关闭、R2附件通知及语音后置保持不变。

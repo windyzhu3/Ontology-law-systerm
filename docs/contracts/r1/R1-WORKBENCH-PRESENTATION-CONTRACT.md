@@ -1,6 +1,21 @@
 # R1 Workbench 呈现合同
 
-Contract ID: R1-WORKBENCH-V1.1
+Contract ID: R1-WORKBENCH-V1.3
+
+Delegated-context authority: [ADR-0015](../../adr/ADR-0015-task9-delegated-context.md), superseding only the own-selection entry and initial recovery timing of ADR-0014. Task9.2a is static only.
+
+Select own Appointment first, then explicitly select a current delegated Appointment from the bounded SessionContextV1 candidates. Missing X-On-Behalf-Appointment-Id always means own identity; supplied selector requires explicit paired X-Appointment-Id. Candidate UUIDs remain wire values with safe appointment labels only; identical labels never replace selection IDs. No own selection means delegatedAppointmentChoices=[] and selectedOnBehalfAppointmentId=null. Explicit delegation requires READY, matching selected candidate, a full Actor scope key and canEnterIdentityAdmin=false; canEnterWorkbench is freshly evaluated for that Actor. Do not combine own/delegated cards or counts, infer Actor from a Task or treat a candidate as business authority. Management stays HUMAN/own Appointment/DIRECT and rejects the delegated selector.
+
+Initial context establishment after relogin is not a confirmed identity switch. While own/delegated selection is unfinished, retain the valid pending four-field recovery marker and block new writes. Never query or display a mismatched-key receipt or try multiple Actors. After explicit selection compare actorScopeKey before original-receipt lookup. Explicitly selecting another identity requires confirmation before discarding its pending clue: deleting the local clue does not cancel the original operation. Marker remains exactly {commandId,commandType,actorScopeKey,recordedAt}, one per tab for24 hours; no on-behalf ID, Token or body persistence. Expiry/revoked delegation never proves noncommit or permits automatic new key. Explicit own/delegated/on-behalf switching increments epoch, clears old cards/candidates/ETags and invalidates late responses. Same-Actor Token rotation keeps epoch, input and polling budgets. Task9.4/9.5 visual confirmation and T9-D08 runtime/browser checks remain required.
+
+Task9 identity authority: [ADR-0014](../../adr/ADR-0014-task9-real-user-access.md); profile: R1_IDENTITY_ACCESS_V1
+
+2026-09-08 named successor activates [Identity V1.1](R1-IDENTITY-ACCESS-CONTRACT.md), baseline MVP-2026-09-08.3, HTTP V1.5, Command V1.3, Workbench V1.3 and OpenAPI1.4.0: exactly37 operations (32 public Bearer +5 internal mTLS),14 static Identity commands and authenticated-self context with explicit delegated selection. Prior activation paragraphs/counts below are historical. ADM-01–04 HUMAN production work and real login are now in Task9 scope; Task9.2a is static FROZEN only. Existing nine business request DTOs, seven Task types and fourteen events are unchanged. Keycloak independently owns external identity storage outside the business13 schemas/52+2 tables at52-plus-2-v1.2; one SPA/OpenAPI/Jar and exclusive APP_ROLE=api|worker remain. No Task9 runtime, human UAT, Task10/capacity or R1 release status is advanced.
+
+
+Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_LEGACY_RECOVERY_V1
+
+At semantic baseline `MVP-2026-09-08.1`, receipt GET is always no-store with no ETag/304 and discloses only after current authorization and committed read Audit. The CurrentCard cache protocol below is unchanged. Preserve the complete original request and original Idempotency-Key for ambiguous writes. Old or unsupported recovery metadata safely fails; never parse/backfill legacy Audit text. Replay at the original endpoint under current authorization returns the original terminal result or conflict with no read Audit, metadata repair, business reexecution or other delta. A failed GET is not command failure and must never generate a new key automatically. Without the original request and valid metadata there is no automatic recovery or admin repair path. Browser Bearer GET cannot recover internal mTLS commands; those retain original mTLS request/key recovery.
 
 All seven nonempty CurrentCard variants are `R1_CURRENT_WORKCARD_DISCLOSURE_V1`. Both 200 BODY and 304 CACHE_REVALIDATED return only after disclosure Audit commit. Task, Lead, Owner Appointment/Principal/OrganizationUnit and every actually returned Draft/candidate/fact are separate typed disclosedSource anchors. Responses use `Cache-Control: private, no-cache` and `Vary: Authorization`; Actor-scoped ETags include authorization and every disclosed source revision/digest. The SPA uses generation/AbortController so a late older request cannot overwrite a newer envelope.
 
@@ -10,7 +25,7 @@ Status: FROZEN
 
 确认日期：2026-09-02
 
-R1 只交付一份响应式 Workbench。身份管理 route mode 与 Workbench 位于同一 SPA，但身份管理生产能力不属于 R1 纵切实现范围。
+R1 只交付一份响应式 Workbench。ADR-0014 纳入同一 SPA 的受保护 ADM-01～04 HUMAN 身份管理及真实登录；静态合同不代表生产能力完成。
 
 ## Envelope fields
 
@@ -124,7 +139,7 @@ Workbench 普通路径不显示全局菜单或左侧栏；操作流围绕当前�
 
 ## R1 boundary
 
-R1 只实现 `/workbench` 及其 P0-01 至 P0-04、联系和有效性复核卡。`/admin/identity/*` 的 route mode、导航隔离和权限边界在脚手架中保留，但身份管理生产页面、CRUD 和独立验收属于后续交付，不能计入 R1 完成证据。
+原 Task9.0 的 `/workbench` 及其 P0-01 至 P0-04、联系和有效性复核卡保留历史证据。ADR-0014 将真实登录、会话与受控 `/admin/identity/*` ADM-01～04 纳入扩大 Task9；新增生产实现、真实账号链路与人工 UAT 均须独立通过，不能由旧证据替代。Token 只在内存；唯一持久恢复例外为 Identity 合同的四字段、每标签页一条、24 小时 sessionStorage 标记。同 Actor Token rotation 保留 epoch、输入及轮询额度，换身份/任职清除旧视图。状态优先级：身份失效 > 未决恢复 > 已确认但刷新失败 > 读取错误 > 普通摘要；NO_APPOINTMENT、无入口权限、未知读取与业务零态必须分别呈现。
 
 ## R1 Evidence selector disclosure
 

@@ -1,5 +1,11 @@
 # R1 Business Closure Implementation Plan
 
+> 2026-09-08 Task9 范围修订：用户将真实登录/会话、受控用户/组织/任职/授权、完整工作台状态和真实用户验收纳入原 Task9，并确认 Keycloak/OIDC 及详细设计。原登录独立交付仅记作 Task9.0，扩大后的 Task9 重新打开。详见 [批准扩展设计](../specs/2026-09-08-task9-real-user-access-design.md)、[分段实施计划](2026-09-08-task9-real-user-access-plan.md)和[验收矩阵](../../acceptance/2026-09-08-task9-real-user-access-acceptance.md)。当前由 Task9.1 实施并独立验证具名合同后继。以下 Task1–8 历史证据和当时 inventory 不改写，现行冻结合同不因本计划或批准记录自动变更。
+
+Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_RECOVERY_ACTIVATION_V1
+
+> 2026-09-08原Task8具名前置：`MVP-2026-09-08.1` / `R1-HTTP-V1.3` / `R1-COMMAND-POLICY-EVENT-V1.2`只激活回执恢复静态合同。合同单元和独立审阅验收后，原Task8一次性实现V2原子写入、Audit Owner窄读口、完整当前授权、READ_COMMAND_RECEIPT审计、HTTP及联合PostgreSQL验证。必须覆盖拒绝capture无Lead/后来Lead DENY、SERVICE撤权/同组织错账户/来源组织改映射或revision变化、换Appointment/代办、终态Task/Draft、stale candidate/inactive assignee拒绝回执可读、Evidence撤回、权限变更、提交故障和全部delta。原Task8接受范围与四个认证WIP保持，历史checkbox/证据不重写；Task9/10、容量与R1状态不晋级。
+
 > 2026-09-07原Task7具名前置：[ADR-0012](../../adr/ADR-0012-r1-projection-readiness-protocol.md)、[批准readiness修订](../specs/2026-09-07-r1-projection-readiness-design.md)与[合同计划](2026-09-07-r1-projection-readiness-contract-plan.md)只替代15/11/4 inventory与readiness/失效时点措辞。后继`MVP-2026-09-07.1`/OpenAPI`1.2.0`为16/11/5，最终加锁评估后存在显式在途竞态；每次成功只允许一次紧随claim，每次consume仍完整重授权。历史步骤/checkbox和既有证据保留；合同验收后原Task7实现API evaluator、Owner读口、mTLS client和Worker gate，Task8实现生产安全/角色组装，后续门禁不因静态修订晋级。
 
 > 2026-09-06原Task 6具名前置：[ADR-0011](../../adr/ADR-0011-r1-contact-reopen-evidence-read.md)与[批准修订规格](../specs/2026-09-06-r1-contact-reopen-evidence-read-design.md)已将全局联系序号、`contactNo<3`自动额度、`contactNo>=3`复核及Evidence引用最小只读边界激活为静态合同。历史Task 6正文/checkbox不改写且仍未完成；后续实施以本合同提交为新BASE，一次性完成Java/jOOQ/实库/CurrentCard验收，不重复派发合同任务。
@@ -29,7 +35,7 @@
 - 七种非空 CurrentCard 一律属于 `R1_CURRENT_WORKCARD_DISCLOSURE_V1` 敏感披露；200/304 均审计提交后返回。
 - `R1_PROJECTION` DELIVERED 只表示有效 claim 下 API 重读当前事实并确认、Worker CAS 成功；不代表物化视图或客户端刷新。
 - 所有完成声明必须有当前构建的实测证据；合同、底座、业务、E2E、容量证据分别记录。
-- Provider 发送、AI、ADM-01～07、R2+ 不属于 R1。
+- Provider 发送、AI、R2+ 仍不属于本轮。ADM-01～07 排除是 Task1–8 的原边界；本次仅将受控 ADM-01～04 纳入 Task9 设计，须先通过 Task9.1 合同后继。ADM-05～07、SERVICE 管理、R2 附件/通知及后置语音仍排除。
 
 ## Delivery units and dependency map
 
@@ -43,7 +49,7 @@
 | 6 | Task 7 | ContactResultService、WaitLifecycleService | 7–10 |
 | 7 | Task 8 Worker | due discovery、projection consumer、Outbox port | 8、10 |
 | 8 | Task 8 API | 15 operation、安全/角色装配 | 9–10 |
-| 9 | Task 9 | 生产工作台 | 10 |
+| 9 | Task 9 | 真实登录/会话、受控身份管理、生产工作台状态及真实用户验收 | 10 |
 | 10 | Task 10 | 联合验收、CI、R1 容量门禁 | R1 完成判断 |
 
 工作根：`C:/Users/Jacob/.cache/codex-worktrees/ontology-law-r1-business`。Java 路径前缀 `backend/src/main/java/io/github/windyzhu3/ontologylaw/`，测试路径前缀 `backend/src/test/java/io/github/windyzhu3/ontologylaw/`。下文 Java 路径以此前缀展开；这样每个文件都有唯一位置。
@@ -171,25 +177,32 @@ assertEquals(CommandEnvelope.Envelope.SERVICE_ACTOR,
 - [ ] Implement DTO/header/precondition mapping, safe Problem Details, private revalidation cache and Receipt current-scope recovery; controllers contain no SQL. Ensure audit service returns only after commit before framework serialization.
 - [ ] Start both roles from the same Jar and prove forbidden Beans/DB roles absent, missing trust/registry readiness fails closed. Run named suites plus all backend ITs; commit `feat: expose authenticated R1 API and isolated worker`.
 
-## Task 9: Single SPA workbench
+## Task 9: Real user access, controlled identity administration and workbench
 
-**Files:** Create `apps/workbench/src/App.tsx`, `apps/workbench/src/features/workcard/CurrentCard.tsx`, `ActionDraftForm.tsx`, `WaitingSummary.tsx`, `useCurrentCard.ts` in that feature folder with corresponding test files; create `apps/workbench/src/styles/tokens.css`, `workbench.css`, `apps/workbench/src/test/setup.ts`; modify `apps/workbench/src/main.tsx`, `apps/workbench/src/lib/api.ts`, `apps/workbench/package.json`.
+**Status:** 重新打开。原七卡前端的本地验收是 Task9.0 历史证据；不能据此宣称扩大后的 Task9 已完成或真实用户已经能进入系统。
 
-**Interfaces:** Use generated OpenAPI types and existing API transport; unknown discriminator is unavailable state. Hook returns envelope/loading/error and explicit refresh/save/submit actions; request generation prevents stale overwrite and retains current envelope on 304.
+**Files and steps:** 以[扩展实施计划](2026-09-08-task9-real-user-access-plan.md)各单元的准确文件、接口和 RED/GREEN/独立评审步骤为准；[详细设计](../specs/2026-09-08-task9-real-user-access-design.md)与[新增验收矩阵](../../acceptance/2026-09-08-task9-real-user-access-acceptance.md)共同约束本节。
 
-- [ ] Remove zero-test exemption; write failing DOM/transport tests for seven forms, one main action, summary/next/waiting/Chat Composer, Draft refresh and original-command Receipt recovery.
-- [ ] Run Vitest RED; implement static forms and localized safe copy, warm-white/graphite/emerald/mint tokens and keyboard/ARIA behavior.
-- [ ] Test old GET arriving after new GET, lost submit response, double-click, focus refresh and bounded waiting poll. Draft conditional headers and Task ETag remain distinct.
-- [ ] Run `npm test`, `npm run typecheck`, `npm run build`; verify real browser at 360/768/1440 in Task 10. Commit `feat(web): implement R1 responsibility workbench`.
+**Interfaces:** 原七类卡、五字段 envelope、Task/Draft/Workbench 分离 ETag 和明确保存/提交保持；新增可信 HUMAN 动态映射、本人 context/任职选择、受控静态 Identity 管理及稳定 session epoch。先冻结具名后继，再修改生产接口，不以 IdP role 代替业务 Grant，不以管理员建档代替业务责任生成。
+
+- [x] Task9.0：保留 `5136e01` / `424f030` 的七卡、草稿、原请求恢复、刷新与等待摘要交付；75 项测试、七类 HTTP 适配器联通和首联浏览器证据见[历史进度](../../progress/2026-09-08-r1-task9-progress.md)。新增能力均不从这里继承完成状态。
+- [ ] Task9.1：详细设计确认后，完成登录/Identity/self-context/恢复的 ADR、基线、HTTP/Workbench/Command/OpenAPI/拓扑后继，合并最小 terminal NOT_FOUND 枚举对齐；独立审阅后才能实施。
+- [ ] Task9.2：真实 Keycloak 环境、可信 HUMAN 动态映射、本人任职 context、一次性离线引导首位管理员；禁止逐人硬编码 Actor 或首次登录自动提权。
+- [ ] Task9.3：受控 ADM-01～04 后端查询/命令、当前授权、CAS、事务、审计及回执恢复；不进入 ADM-05～07 或通用 RBAC。
+- [ ] Task9.4：SPA 真实登录、会话续期/退出、多任职选择、身份失效清屏及重登后的最小未决回执恢复；续期不得丢失同身份编辑。
+- [ ] Task9.5：冻结风格下的四类管理页面与今日摘要/当前卡/后续摘要/等待/提交/刷新/恢复完整状态；新增登录/任职页面先让用户确认视觉，再实施。
+- [ ] Task9.6：真实 IdP＋PG＋API＋SPA＋所需 Worker，逐类七卡页面联通、受控开户到责任卡、撤权/恢复/退出、360/768/1440 和人工真实使用者 UAT；全部验收 ID 通过并独立评审后才完成 Task9。
+
+Task9 不包含 R2 附件/通知、语音或参考容量压测；真实登录与七卡页面验收已纳入本任务，不再后置到 Task10。
 
 ## Task 10: Real E2E, strict CI and capacity acceptance
 
-**Files:** Create `e2e/compose.yaml`, `e2e/fixtures/r1-fixture.json`, `e2e/tests/r1-golden-path.spec.ts`, `r1-failure-paths.spec.ts`, `r1-worker-disclosure.spec.ts` in that test directory, `playwright.config.ts`, `.github/workflows/r1-vertical-slice.yml`, `scripts/ci/verify_r1_evidence.py`, `tests/test_r1_evidence.py`, `scripts/capacity/r1_profile.json`, `scripts/capacity/generate_r1_fixture.py`, `scripts/capacity/run_r1_capacity.py`; modify root package files and affected delivery ledger rows only after evidence qualifies.
+**Files:** Reuse/modify Task9 的 `e2e/compose.yaml`, `e2e/fixtures/identity-setup.ts`, `e2e/fixtures/r1-business-setup.ts`, `playwright.config.ts`；create `e2e/fixtures/r1-fixture.json`, `e2e/tests/r1-golden-path.spec.ts`, `r1-failure-paths.spec.ts`, `r1-worker-disclosure.spec.ts` in that test directory, `.github/workflows/r1-vertical-slice.yml`, `scripts/ci/verify_r1_evidence.py`, `tests/test_r1_evidence.py`, `scripts/capacity/r1_profile.json`, `scripts/capacity/generate_r1_fixture.py`, `scripts/capacity/run_r1_capacity.py`; modify root package files and affected delivery ledger rows only after evidence qualifies.
 
 **Interfaces:** Evidence JSON records build SHA, exact toolchain/digests, command exits and executed test identities. CI validator matches BranchID to successful actual report cases; capacity receipt binds Build/Profile/Generator/Fixture digest.
 
 - [ ] Write evidence validator mutation tests for zero/all-skipped tests, missing reports/artifacts, failed mapped BranchID, wrong build/digest and incomplete layer chain. Observe RED then implement strict parsing of actual machine reports.
-- [ ] Add pinned Playwright and browser, real PG/API/Worker/SPA fixture boot, golden path, failure/recovery/SERVICE/audit/worker tests. Fixtures contain test-only synthetic contacts, no real secrets in reports.
+- [ ] Reuse Task9 的锁定浏览器与真实 Keycloak/PG/API/SPA 身份及业务夹具，扩充实际 Worker、全部 BranchID、failure/recovery/SERVICE/audit/worker tests。不得将 Task9 的真实用户与七卡页面验收重新后置。Fixtures contain test-only synthetic contacts, no real secrets in reports.
 - [ ] Implement pathless PR/main workflow in the exact nine-layer order of spec §9, always-run aggregate including artifact outcome. Schema/Postgres/jOOQ/OpenAPI drift checks retain existing locked commands; no empty test counts accepted.
 - [ ] Implement deterministic R1 capacity generator from §2 BranchID vector and derived counts, not independent row targets. Small fixture first proves causal Task/Draft/wait/Event/Audit closure and distribution; full fixture has its own manifest/digests. Add same-Tenant contention smoke to ordinary PR gate.
 - [ ] Run real E2E, responsive/keyboard checks and per-branch database deltas. Preserve sanitized success/failure evidence. Execute full R1-CAPACITY-V1 only on the specified reference resources; record missing resources as unmet capacity acceptance, not a pass from a scaled local run.

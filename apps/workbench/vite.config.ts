@@ -1,6 +1,7 @@
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"] },
   build: {
     outDir: "dist",
   },

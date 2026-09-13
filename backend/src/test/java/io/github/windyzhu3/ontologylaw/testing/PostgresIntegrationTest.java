@@ -118,6 +118,9 @@ public abstract class PostgresIntegrationTest {
         }
 
         public Connection apiConnection() throws SQLException { return connect("law_api_login", apiPassword); }
+        public String jdbcUrl(){return postgres.getJdbcUrl();}
+        public String apiPassword(){return apiPassword;}
+        public String workerPassword(){return workerPassword;}
         public Connection workerConnection() throws SQLException { return connect("law_worker_login", workerPassword); }
         public Connection migratorConnection() throws SQLException { return connect("law_schema_migrator", migratorPassword); }
         public Connection adminConnection() throws SQLException { return connect(postgres.getUsername(), postgres.getPassword()); }

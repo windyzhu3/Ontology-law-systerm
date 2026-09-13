@@ -10,6 +10,10 @@ import string
 import subprocess
 import sys
 import unicodedata
+try:
+    from scripts.baseline.task9_identity_contract import OPERATIONS as TASK9_OPERATIONS, validate as validate_task9_identity_contract
+except ModuleNotFoundError:
+    from task9_identity_contract import OPERATIONS as TASK9_OPERATIONS, validate as validate_task9_identity_contract
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PureWindowsPath
@@ -20,11 +24,13 @@ try:
     from scripts.baseline.r1_business_closure_contract import validate as validate_r1_business_closure_contract
     from scripts.baseline.r1_contact_evidence_contract import validate as validate_r1_contact_evidence_contract
     from scripts.baseline.r1_projection_readiness_contract import validate as validate_r1_projection_readiness_contract
+    from scripts.baseline.r1_receipt_recovery_contract import validate as validate_r1_receipt_recovery_contract
 except ModuleNotFoundError:  # Direct script execution places this directory on sys.path.
     from r1_command_contract import validate_r1_command_contract
     from r1_business_closure_contract import validate as validate_r1_business_closure_contract
     from r1_contact_evidence_contract import validate as validate_r1_contact_evidence_contract
     from r1_projection_readiness_contract import validate as validate_r1_projection_readiness_contract
+    from r1_receipt_recovery_contract import validate as validate_r1_receipt_recovery_contract
 
 
 ALLOWED_STATES = {"DRAFT", "FROZEN", "MERGED", "IMPLEMENTED", "RUNTIME_VERIFIED"}
@@ -50,7 +56,7 @@ TARGET_GATE_STATES = {
 VISUAL_BUNDLE_VERSION = "visual-bundle-2026-08-27"
 VISUAL_OWNER = "Product Design"
 VISUAL_CONFIRMATION_DATE = "2026-08-27"
-CANONICAL_BASELINE_ID = "MVP-2026-09-07.1"
+CANONICAL_BASELINE_ID = "MVP-2026-09-08.3"
 HISTORICAL_BASELINE_ID = "MVP-2026-08-28.1"
 HISTORICAL_BANNER = "历史规格（HISTORICAL_SUPERSEDED）"
 HISTORICAL_WARNING = (
@@ -152,6 +158,12 @@ EXPECTED_VISUAL_ASSETS = {
     "docs/design/sales-mvp-workcards": 27,
     "docs/design/identity-admin-mvp": 7,
 }
+APPROVED_IDENTITY_VISUAL_SUPPLEMENTS = frozenset(
+    Path(
+        "docs/design/identity-admin-mvp/revisions/2026-09-09-contract-alignment"
+    ) / f"ADM-{index:02d}-review.png"
+    for index in range(1, 5)
+)
 
 CANONICAL_BASELINE = Path("docs/baseline/CURRENT-MVP-BASELINE.md")
 CLOSURE_SPEC = Path("docs/superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md")
@@ -691,7 +703,7 @@ R1_OPERATION_ERRORS = {
         "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
     },
     "getCurrentWorkCard": {
-        "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND", "RATE_LIMITED",
+        "VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND", "RATE_LIMITED",
         "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
     },
     "saveActionDraft": {
@@ -755,7 +767,7 @@ R1_OPERATION_ERRORS = {
         "TASK_PRECONDITION_REQUIRED", "RATE_LIMITED", "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
     },
     "getCommandReceipt": {
-        "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND", "RATE_LIMITED",
+        "VALIDATION_FAILED", "UNAUTHENTICATED", "NOT_AUTHORIZED", "NOT_FOUND", "RATE_LIMITED",
         "INTERNAL_ERROR", "SERVICE_UNAVAILABLE",
     },
     "reopenDueContactTasks": {
@@ -879,7 +891,12 @@ def expected_visual_rows() -> dict[str, str]:
 
 EXPECTED_VISUAL_ROWS = expected_visual_rows()
 REQUIRED_NONVISUAL_ROWS = {
-    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1": ("MVP", "FROZEN", "MVP-2026-09-08.1", "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2": ("MVP", "FROZEN", "MVP-2026-09-08.2", "../baseline/CURRENT-MVP-BASELINE.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2-2026-09-08.3": ("MVP", "FROZEN", CANONICAL_BASELINE_ID, "../baseline/CURRENT-MVP-BASELINE.md"),
+    "R1-IDENTITY-ACCESS-CONTRACT": ("R1", "FROZEN", "R1-IDENTITY-ACCESS-V1.0", "../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md"),
+    "R1-IDENTITY-ACCESS-CONTRACT-V1-1": ("R1", "FROZEN", "R1-IDENTITY-ACCESS-V1.1", "../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md"),
+    "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1": ("MVP", "FROZEN", "MVP-2026-09-07.1", "../baseline/CURRENT-MVP-BASELINE.md"),
     "DB-52P2-CONTRACT": ("MVP", "MERGED", "52-plus-2-v1", "../../database/schema-contract-52-plus-2/contract/schema_contract.py"),
     "DB-52P2-MIGRATIONS": ("MVP", "MERGED", "52-plus-2-v1", "../../database/schema-contract-52-plus-2/generated/db/migration/V840__schema_contract_validation.sql"),
     "BASE-CLOSURE-DESIGN": ("PR2", "FROZEN", HISTORICAL_BASELINE_ID, "../superpowers/specs/2026-08-28-baseline-closure-and-r1-gate-design.md"),
@@ -1654,8 +1671,8 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
         return
     metadata = (
         (task_text, "R1-TASK-COMPLETION-V1.2", "R1 task contract"),
-        (http_text, "R1-HTTP-V1.2", "R1 HTTP contract"),
-        (workbench_text, "R1-WORKBENCH-V1.1", "R1 workbench contract"),
+        (http_text, "R1-HTTP-V1.5", "R1 HTTP contract"),
+        (workbench_text, "R1-WORKBENCH-V1.3", "R1 workbench contract"),
     )
     for text, expected_id, label in metadata:
         if field_value(text, "Contract ID") != expected_id or field_value(text, "Status") != "FROZEN":
@@ -1992,10 +2009,12 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
     operations = unique_rows_by(operation_rows, "OperationId", "R1 HTTP operation", findings)
     if operations is None:
         return
-    if set(operations) != set(R1_OPERATION_CONTRACTS):
+    if set(operations) != set(R1_OPERATION_CONTRACTS) | set(TASK9_OPERATIONS.values()):
         findings.append("R1 HTTP operations must contain the exact frozen OperationId set")
         return
     for operation_id, row in operations.items():
+        if operation_id in TASK9_OPERATIONS.values():
+            continue  # Exact new DTO/security/error matrix is validated by Task9's closed transport guard.
         method, path, idempotency, preconditions, subject_binding, success_status = (
             R1_OPERATION_CONTRACTS[operation_id]
         )
@@ -2101,6 +2120,8 @@ def verify_r1_contracts(root: Path, findings: list[str]) -> None:
             findings.append(f"R1 HTTP error registry lacks safe text: {error_code}")
             return
     for operation_id, row in operations.items():
+        if operation_id in TASK9_OPERATIONS.values():
+            continue  # IdentityProblemV1 is distinct from the original business error registry.
         operation_errors = {code.strip() for code in row["ErrorCodes"].split(",")}
         for error_code in operation_errors:
             if error_code not in errors:
@@ -2624,6 +2645,18 @@ def verify_delivery_ledger(root: Path, findings: list[str]) -> list[str] | None:
     if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1":
         findings.append("Delivery ledger previous baseline must point to BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1")
         return
+    if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1":
+        findings.append("Delivery ledger previous baseline must point to the exact ADR-0013 successor")
+        return
+    if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2":
+        findings.append("Delivery ledger previous baseline must point to the exact ADR-0014 successor")
+        return
+    if superseded_by(rows_by_id["BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2"]) != "BASE-CURRENT-MVP-2026-09-05-2026-09-06.1-2026-09-06.2-2026-09-06.3-2026-09-07.1-2026-09-08.1-2026-09-08.2-2026-09-08.3":
+        findings.append("Delivery ledger previous baseline must point to the exact ADR-0015 successor")
+        return
+    if superseded_by(rows_by_id["R1-IDENTITY-ACCESS-CONTRACT"]) != "R1-IDENTITY-ACCESS-CONTRACT-V1-1":
+        findings.append("Delivery ledger Identity V1.0 must point to the exact ADR-0015 successor")
+        return
     unexpected_visual_ids = sorted(visual_row_ids - set(EXPECTED_VISUAL_ROWS))
     if unexpected_visual_ids:
         findings.append(f"Delivery ledger has unexpected visual row: {unexpected_visual_ids[0]}")
@@ -2750,12 +2783,33 @@ def verify_delivery_ledger(root: Path, findings: list[str]) -> list[str] | None:
 
 def verify_visual_asset_counts(root: Path, findings: list[str]) -> None:
     for relative_dir, expected_count in EXPECTED_VISUAL_ASSETS.items():
-        asset_count = sum(1 for _ in (root / relative_dir).rglob("*.png"))
+        if relative_dir == "docs/design/identity-admin-mvp":
+            frozen_dir = root / relative_dir / "frozen"
+            asset_count = sum(1 for _ in frozen_dir.rglob("*.png"))
+            finding_dir = f"{relative_dir}/frozen"
+        else:
+            asset_count = sum(1 for _ in (root / relative_dir).rglob("*.png"))
+            finding_dir = relative_dir
         if asset_count != expected_count:
             findings.append(
-                f"Visual asset count mismatch for {relative_dir}: "
+                f"Visual asset count mismatch for {finding_dir}: "
                 f"expected {expected_count} PNG files, found {asset_count}"
             )
+    identity_dir = Path("docs/design/identity-admin-mvp")
+    expected_originals = {
+        Path("docs") / target.removeprefix("../")
+        for row_id, target in EXPECTED_VISUAL_ROWS.items()
+        if row_id.startswith("VIS-IDENTITY-ADM-")
+    }
+    actual_identity_assets = {
+        path.relative_to(root)
+        for path in (root / identity_dir).rglob("*.png")
+    }
+    expected_identity_assets = expected_originals | APPROVED_IDENTITY_VISUAL_SUPPLEMENTS
+    for path in sorted(APPROVED_IDENTITY_VISUAL_SUPPLEMENTS - actual_identity_assets):
+        findings.append(f"Missing approved identity admin visual PNG: {path.as_posix()}")
+    for path in sorted(actual_identity_assets - expected_identity_assets):
+        findings.append(f"Unexpected identity admin visual PNG: {path.as_posix()}")
 
 
 def _verify_repository_result_unchecked(root: Path) -> VerificationResult:
@@ -2779,6 +2833,8 @@ def _verify_repository_result_unchecked(root: Path) -> VerificationResult:
         structural_findings.extend(validate_r1_business_closure_contract(root))
     structural_findings.extend(validate_r1_contact_evidence_contract(root))
     structural_findings.extend(validate_r1_projection_readiness_contract(root))
+    structural_findings.extend(validate_r1_receipt_recovery_contract(root))
+    structural_findings.extend(validate_task9_identity_contract(root))
     readiness_blockers = (
         verify_delivery_ledger(root, structural_findings) or []
     )

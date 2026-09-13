@@ -1,10 +1,23 @@
 # R1 Command Policy and Event Contract
 
-Contract ID: R1-COMMAND-POLICY-EVENT-V1.1
+Contract ID: R1-COMMAND-POLICY-EVENT-V1.3
+
+Delegated identity selection follows [ADR-0015](../../adr/ADR-0015-task9-delegated-context.md) and [Identity V1.1](R1-IDENTITY-ACCESS-CONTRACT.md). X-On-Behalf-Appointment-Id selects an existing Actor tuple with explicit own Appointment; it never selects Grant evidence or grants operation authority. The complete command policy/permission/event registry below remains V1.3 and byte-for-byte unchanged. Original Runtime locked authorization, one-hop source/scope/DENY checks, Owner comparison, complete business Audit Actor and original receipt NULL-safe equality remain mandatory. Identity management remains DIRECT-only; the named SELF null on-behalf Audit exception never applies to business commands/cards/receipts.
+
+Task9 identity authority: [ADR-0014](../../adr/ADR-0014-task9-real-user-access.md); profile: R1_IDENTITY_ACCESS_V1
+
+2026-09-08 named successor activates [Identity V1.1](R1-IDENTITY-ACCESS-CONTRACT.md), baseline MVP-2026-09-08.3, HTTP V1.5, Command V1.3, Workbench V1.3 and OpenAPI1.4.0: exactly37 operations (32 public Bearer +5 internal mTLS),14 static Identity commands and authenticated-self context with explicit delegated selection. Prior activation paragraphs/counts below are historical. ADM-01–04 HUMAN production work and real login are now in Task9 scope; Task9.2a is static FROZEN only. Existing nine business request DTOs, seven Task types and fourteen events are unchanged. Keycloak independently owns external identity storage outside the business13 schemas/52+2 tables at52-plus-2-v1.2; one SPA/OpenAPI/Jar and exclusive APP_ROLE=api|worker remain. No Task9 runtime, human UAT, Task10/capacity or R1 release status is advanced.
+
 
 Status: FROZEN
 
-Semantic baseline: MVP-2026-09-07.1
+Semantic baseline: MVP-2026-09-08.3
+
+Receipt recovery authority: [ADR-0013](../../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_COMMAND_RECEIPT_RECOVERY_V1
+
+ADR-0013 §§3–7 govern the exact closed recovery protocol. Nine public commands atomically write `R1_COMMAND_AUDIT_V2` / 2 with exactly result, authorizationEvidence and receiptRecovery for SUCCEEDED, NO_CHANGE and post-slot REJECTED. Metadata comes from immutable parsed server Context before the business savepoint; original Draft selector and resolved qualified Evidence pair are preserved, source natural-key HMAC is internal-only, and scopeDigest/Actor/on-behalf/fixed Audit columns bind the unique original command. Metadata failure rolls back the whole transaction. Internal recovery remains `R1_COMMAND_AUDIT_V1`; pre-slot rejection and original-request replay/conflict remain zero delta.
+
+Receipt lookup is not command execution: Owner ports revalidate current authorization and real binding without rerunning rejected attempted candidate/assignee eligibility. Capture must retain the original organization type/id/revision and scope ID, exact account/SERVICE binding and current natural-key Lead DENY. Task/Lead/Owner and any resolved Submission/Binding require all current DENY checks, independent complete authorization paths and the full deterministically ordered current authorization-set digest. Read disclosure audit is not a business Command, authority, permission slot, result Fact or Event; cardinalities of existing commands/events remain unchanged.
 
 Shared payload Schema: contracts/events/r1-domain-notification-v1.schema.json
 

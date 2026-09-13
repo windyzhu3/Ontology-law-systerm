@@ -50,7 +50,7 @@ class R1CommandContractTest(unittest.TestCase):
             self.assertEqual(self.validator()(root), [])
 
     def test_stale_semantic_baseline_cannot_relabel_current_command_contract(self) -> None:
-        self.assert_contract_mutation_fails("Semantic baseline: MVP-2026-09-07.1", "Semantic baseline: MVP-2026-09-06.2")
+        self.assert_contract_mutation_fails("Semantic baseline: MVP-2026-09-08.3", "Semantic baseline: MVP-2026-09-06.2")
 
     def test_capture_policy_cannot_be_removed(self) -> None:
         self.assert_contract_mutation_fails(

@@ -10,7 +10,7 @@ import static io.github.windyzhu3.ontologylaw.responsibility.internal.persistenc
 
 public final class JooqAuthorizationTaskReader implements AuthorizationTaskReader {
     public Task read(Connection c,UUID tenant,UUID taskId) {
-        var db=DSL.using(c,SQLDialect.POSTGRES);var t=TASK_OCCURRENCE;var d=ACTION_DRAFT;
+        var db=DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false));var t=TASK_OCCURRENCE;var d=ACTION_DRAFT;
         var task=db.select(t.REVISION,t.OWNER_APPOINTMENT_ID,t.BUSINESS_PURPOSE_CODE,t.PRIMARY_COMMAND_CODE,t.SUBJECT_TYPE,t.SUBJECT_ID,t.SUBJECT_REVISION,t.SUBJECT_HASH)
                 .from(t).where(t.TENANT_ID.eq(tenant)).and(t.TASK_OCCURRENCE_ID.eq(taskId)).fetchOne();
         if(task==null)return null;

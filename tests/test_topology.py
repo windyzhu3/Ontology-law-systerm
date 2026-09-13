@@ -219,7 +219,7 @@ class TopologyVerifierTest(unittest.TestCase):
             "version": "0.1.0",
             "scripts": {
                 "typecheck": "tsc --noEmit",
-                "test": "vitest run --passWithNoTests",
+                "test": "vitest run",
                 "build": "tsc --noEmit && vite build",
             },
             "dependencies": {"react": "19.2.8", "react-dom": "19.2.8"},
@@ -258,6 +258,33 @@ class TopologyVerifierTest(unittest.TestCase):
 
     def test_valid_single_artifact_layout_passes(self) -> None:
         self.assertEqual([], self._verify())
+
+    def test_real_workbench_tests_cannot_pass_with_no_tests(self) -> None:
+        self.assertEqual([], self._verify(), 'real test script is the accepted control')
+        path = self.root / 'apps/workbench/package.json'
+        package = json.loads(path.read_text(encoding='utf-8'))
+        package['scripts']['test'] = 'vitest run --passWithNoTests'
+        path.write_text(json.dumps(package), encoding='utf-8')
+        self.assertTrue(any('workbench script' in finding for finding in self._verify()))
+
+    def test_task9_external_identity_lock_rejects_floating_and_shared_storage(self) -> None:
+        verifier = self._load_verifier()
+        path = Path("deploy/identity/identity-toolchain.lock.json")
+        approved = json.loads((REPOSITORY_ROOT / path).read_text(encoding="utf-8"))
+        active_api = b"openapi: 3.1.0\ninfo: {version: 1.4.0}\n"
+        findings = []
+        verifier._verify_identity_toolchain({verifier.CANONICAL_OPENAPI: active_api, path: json.dumps(approved).encode()}, "fixture", findings)
+        self.assertEqual([], findings)
+        for section, key, value in (("keycloak", "version", "latest"), ("keycloak", "platformDigest", "latest"),
+                                    ("oidcAdapter", "integrity", ""), ("identityDatabase", "ownership", "BUSINESS_DATABASE")):
+            altered = json.loads(json.dumps(approved))
+            altered[section][key] = value
+            findings = []
+            verifier._verify_identity_toolchain({verifier.CANONICAL_OPENAPI: active_api, path: json.dumps(altered).encode()}, "fixture", findings)
+            self.assertTrue(findings)
+        findings = []
+        verifier._verify_identity_toolchain({verifier.CANONICAL_OPENAPI: active_api}, "fixture", findings)
+        self.assertTrue(findings)
 
     def test_adr_closes_party_ownership_and_query_jooq_boundaries(self) -> None:
         adr = ADR_PATH.read_text(encoding="utf-8")

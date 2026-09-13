@@ -1,0 +1,55 @@
+# R1 总验收证据与收口入口
+
+更新：2026-09-13。状态：Task10.1统一CI预检入口已实现；Task10.2隔离基础设施、Task10.3主/哨兵原始引导及Task10.4应用装配均已实际核验。Task10.4在限定修复后prepare/start/verify全部退出0，返回`APPLICATION_INFRASTRUCTURE_READY`；原失败目录及证据保留。下一单元为新环境受控管理配置和黄金/缺失失败链。**不是R1总验收通过报告**。
+
+## 当前决定
+
+- 用户将T9-W09既有等待记录的真实到期Worker恢复暂缓，记`DEFERRED_BY_USER`，不等待2026-09-14 10:00，不修改时钟、到期数据或旧证据；不阻塞Task10实施。
+- 人工U01～U03按用户签认关闭，不重复执行；Task9已通过六卡链与等待刷新子项不因进入Task10自动重跑。
+- Task9其余必需项没有被豁免。证据相同、环境/构建适用性可核对的项目复用；证据缺口必须补齐，不能把API测试代替浏览器全链或把离线脚本通过代替真实运行。
+- Task10是R1端到端、CI和交付门禁，不新增R2业务。附件/通知R2、语音后置；一个SPA、一份业务OpenAPI、一个api|worker Jar及当前52＋2物理合同不变。
+
+## 现有证据索引
+
+| 范围 | 已有记录 | 可使用的边界 |
+|---|---|---|
+| 业务后端、首联/主管复核/单任务等待恢复 | [Task6](../../progress/2026-09-07-r1-task6-progress.md) | 后端阶段证据；不冒充最终浏览器验收 |
+| Worker发现/调度/投影与就绪 | [Task7](../../progress/2026-09-07-r1-task7-progress.md) | 既有实库/协议证据；不将用户延期W09记PASS |
+| HTTP认证与生产装配 | [Task8](../../progress/2026-09-08-r1-task8-progress.md) | 历史阶段证据；当前身份方案以Task9后继为准 |
+| 动态身份、受控建档、六卡及等待刷新 | [Task9当前进度](../../progress/2026-09-09-task9-local-chain-acceptance.md) | 精确复用具名通过子集，保留构建/进程/原命令与失败记录 |
+| 登录/权限/工作台/恢复全部要求 | [Task9验收矩阵](../../acceptance/2026-09-08-task9-real-user-access-acceptance.md) | 是待验要求与证据入口，不是所有行已通过 |
+| 原始黄金/分支及CI要求 | [Task10计划](../../superpowers/plans/2026-08-28-r1-lead-contact-vertical-slice-plan.md#task-10-真实端到端验收和r2门禁) | 与后继合同冲突时遵从已批准当前合同，禁止回退旧OIDC/物理版本 |
+
+## Task10实际交付缺口（2026-09-13文件核对）
+
+| 原计划交付物 | 当前情况 | 下一步 |
+|---|---|---|
+| `e2e/compose.yaml`、`e2e/fixtures/r1-fixture.json` | Task10.2～10.4实际前置完成；同Jar API/Worker及同SPA就绪。HUMAN业务fixture仍只是输入 | 使用既有管理入口建立合成主体/组织/任职/授权，核对动态登录；见[实际运行记录](2026-09-13-task10-environment-progress.md) |
+| `r1-golden-path.spec.ts` | 不存在；已有六卡链只是指定子集 | 核对自动分配→有效接通→Opportunity→原回执恢复的缺口，只补尚无有效证据部分 |
+| `r1-failure-paths.spec.ts` | 不存在；后端测试及Task9场景分散 | 按当前BranchID与安全要求映射已覆盖项，集中实现剩余真实场景 |
+| `r1-waiting-path.spec.ts` | 不存在；已有等待准备/刷新证据 | 实际到期恢复按用户延期记录，不排入当前关键路径，不生成空测试声称覆盖 |
+| `.github/workflows/r1-vertical-slice.yml` | Task10.1已实现明确命名的preflight与统一Bash入口；托管CI尚未执行 | 后续接入隔离真实E2E；现有offline Playwright及预检绿色不代表总验收通过 |
+| 本README | 已建立 | 作为单一收口入口，更新当前状态，不再无限叠加“当前”历史段落 |
+| 最终runtime report与交付状态晋级 | 尚未具备条件 | 完成后据实生成，不倒填2026-08-28的成功报告、不自动晋级R2 |
+
+## 执行优先顺序
+
+具名分支与横切场景统一在[剩余执行矩阵](execution-matrix.md)跟踪。该清单区分历史通过子项、源码覆盖与尚缺真实证据，不以测试数量推算完成率。
+
+1. 在已实现的CI预检入口基础上，实施隔离的PG18/API/Worker/SPA/Keycloak环境与受控fixture；复用锁定制品，不连接原本地私密runtime，不修改原账号或数据。
+2. 归并Task9未闭合的安全/恢复/授权与七卡缺口到总验收执行清单。退出首轮无报告仍未通过，工具修复不等于真实通过；重复确认历史候选仍须受控准备。
+3. 同一最终适用构建上补齐黄金与关键失败路径，按改动范围回归一次，独立评审只复核实际修复，不为未改代码反复运行全套。
+4. 出具R1总结果：分别列通过、失败、未执行、用户延期和外部环境待提供。W09及参考容量环境独立列项；没有证据时不宣称全部R1发布门完成。
+
+每轮进度只报告：本轮交付物、实际关闭验收项、未决阻塞、下一批工作。工具测试计数单列，不作为功能完成率。
+
+## 本轮检查
+
+Task10.1实现提交`b0ffd32`，schema工作目录修复`5b7e663`。统一入口按baseline、schema/PG18、后端、OpenAPI、SPA、offline Playwright顺序执行，任一失败即停止；只读workflow不部署、不晋级交付状态。
+
+独立评审唯一Important项（schema包工作目录）已修复，同一评审者限定复核APPROVED，无新增缺陷。Task10.1范围内交付关闭，不代表整个Task10关闭。
+
+- 新增编排/接线测试：`python -m unittest tests.test_r1_preflight -v`，4项通过，退出0；覆盖固定顺序、schema目录、根目录证据输出、失败退出及后续停止。
+- schema真实包导入与Bash语法检查退出0。两个离线Playwright项目实际`--list`分别发现34/220项，topology检查退出0；发现数量不是浏览器执行通过数量。
+- 未运行完整预检、托管GitHub Actions或真实业务链；没有新增黄金/失败路径PASS，没有关闭新的Task9业务验收项。
+- 先前baseline检查退出0，仍有7项原有R2 readiness未满足条件。本轮不以工具测试数量计算业务完成率。

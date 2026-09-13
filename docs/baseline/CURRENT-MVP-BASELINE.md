@@ -1,6 +1,17 @@
 # 当前MVP基线
 
-Baseline ID: MVP-2026-09-07.1
+Baseline ID: MVP-2026-09-08.3
+
+Delegated-context authority: [ADR-0015](../adr/ADR-0015-task9-delegated-context.md). This named static successor preserves legal one-hop delegated entry under [Identity V1.1](../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md): optional paired X-On-Behalf-Appointment-Id, two required context fields, SELF max101 and pending recovery-marker retention until explicit identity choice. HTTP V1.5 / Workbench V1.3 / OpenAPI1.4.0 activate; Command V1.3 business policies, nine request bodies, fourteen events,37/32/5 and physical52-plus-2-v1.2 remain unchanged. Identity management stays HUMAN/own Appointment/DIRECT. Task9.2a static verification cannot establish T9-D02–08 runtime PASS.
+
+Task9 identity authority: [ADR-0014](../adr/ADR-0014-task9-real-user-access.md); profile: R1_IDENTITY_ACCESS_V1
+
+2026-09-08 named successor activates [Identity V1.1](../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md), baseline MVP-2026-09-08.3, HTTP V1.5, Command V1.3, Workbench V1.3 and OpenAPI1.4.0: exactly37 operations (32 public Bearer +5 internal mTLS),14 static Identity commands and authenticated-self context with explicit delegated selection. Prior activation paragraphs/counts below are historical. ADM-01–04 HUMAN production work and real login are now in Task9 scope; Task9.2a is static FROZEN only. Existing nine business request DTOs, seven Task types and fourteen events are unchanged. Keycloak independently owns external identity storage outside the business13 schemas/52+2 tables at52-plus-2-v1.2; one SPA/OpenAPI/Jar and exclusive APP_ROLE=api|worker remain. No Task9 runtime, human UAT, Task10/capacity or R1 release status is advanced.
+
+
+Receipt recovery authority: [ADR-0013](../adr/ADR-0013-r1-command-receipt-recovery.md); profile: R1_RECEIPT_RECOVERY_ACTIVATION_V1
+
+2026-09-08 named successor activates HTTP `R1-HTTP-V1.3` and command `R1-COMMAND-POLICY-EVENT-V1.2`: V2 metadata for nine public command terminal Audits, original-Actor-only bounded metadata lookup, complete current Owner authorization and committed receipt disclosure Audit. The precise runtime/V830 semantic exceptions and legacy original-request replay are governed by ADR-0013. OpenAPI `1.2.0`, 16/11/5, physical capability `52-plus-2-v1.2` and all prior activation IDs stay unchanged. Original Task8 owns joint new-write/GET runtime acceptance; this static FROZEN successor does not promote R1, Task9/10, SPA, E2E, capacity or release. The 2026-09-07 activation paragraph below is retained historical context.
 
 [ADR-0012](../adr/ADR-0012-r1-projection-readiness-protocol.md) activates the named `R1_PROJECTION_READINESS_V1` successor: OpenAPI `1.2.0`, HTTP `R1-HTTP-V1.2`, exactly 16 operations (11 public Bearer + 5 internal mTLS). It supersedes only ADR-0008's operation inventory and original closure §6.3 readiness/invalidation semantics. One successful final locked API evaluation enables one immediate bounded Worker claim; post-evaluation changes and natural expiry can race transport/claim, and every consume still reauthorizes. All responses are no-store; no proof, new authority, persistence or business delta exists. Physical capability stays `52-plus-2-v1.2`, Worker stays execution-only, and original Tasks7/8 retain production implementation/acceptance ownership. This static contract amendment does not promote backend, SPA, E2E, capacity or release readiness.
 
@@ -74,7 +85,7 @@ R1实施合同确认日期：2026-09-02
 - capture没有不存在资源的`If-Match`。Draft创建、Draft更新、Task命令与subject重验分别使用HTTP矩阵冻结的前置条件和ETag种类，不得混用。
 - R1责任完成、后继Owner、Receipt result与E2E delta以Task完成矩阵为准；零分配候选完成P0-04正常分支，不是HTTP错误。
 - CAPTURE_LEAD、SAVE_ACTION_DRAFT及两种具名recovery的专属权限、Owner组织scope、DENY和Actor路径，以及所有R1成功分支的精确事件集合，以[R1命令授权及事件合同](../contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)为准。CONNECTED_VALID必须原子写两个事件和两个R1_PROJECTION Outbox，Receipt仍唯一且引用ContactResult。
-- Workbench envelope固定为一句`todaySummary`、零或一张完整`currentCard`、最多两条`nextSummaries`、一个`waitingCount`和一个固定`chatComposer`。普通`/workbench`无全局导航/侧栏；身份管理使用同一SPA的独立受保护route mode，生产CRUD不计入R1。
+- Workbench envelope固定为一句`todaySummary`、零或一张完整`currentCard`、最多两条`nextSummaries`、一个`waitingCount`和一个固定`chatComposer`。普通`/workbench`无全局导航/侧栏；身份管理使用同一SPA的独立受保护route mode。ADR-0014 仅纳入受控 ADM-01～04 HUMAN 子集及真实登录；其生产验收仍未完成。
 
 ## task-waiting-contract
 
