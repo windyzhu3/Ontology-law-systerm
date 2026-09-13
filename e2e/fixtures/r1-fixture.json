@@ -1,0 +1,20 @@
+{
+  "profile": "R1_E2E_FIXTURE_INPUT_V1",
+  "claim": "PREPARATION_INPUT_NOT_BUSINESS_RESULT",
+  "tenants": [
+    {"key": "primary", "code": "R1_E2E_MAIN", "displayName": "R1 synthetic firm"},
+    {"key": "isolation", "code": "R1_E2E_ISOLATION", "displayName": "R1 isolation sentinel"}
+  ],
+  "accounts": [
+    {"key": "founder", "usernameStem": "founder", "displayName": "Synthetic Founder", "role": "FOUNDER", "appointmentState": "ACTIVE"},
+    {"key": "sales", "usernameStem": "sales", "displayName": "Synthetic Sales", "role": "SALES", "appointmentState": "ACTIVE"},
+    {"key": "supervisor", "usernameStem": "supervisor", "displayName": "Synthetic Supervisor", "role": "SUPERVISOR", "appointmentState": "ACTIVE"},
+    {"key": "sourceOwner", "usernameStem": "source-owner", "displayName": "Synthetic Source Owner", "role": "SOURCE_OWNER", "appointmentState": "ACTIVE"},
+    {"key": "revokedAppointment", "usernameStem": "revoked", "displayName": "Synthetic Revoked Appointment", "role": "SALES", "appointmentState": "REVOKED"}
+  ],
+  "leadSources": [
+    {"key": "automatic", "sourceCode": "R1_AUTO", "captureMode": "AUTOMATIC", "candidateMode": "OWNED"},
+    {"key": "manual", "sourceCode": "R1_MANUAL", "captureMode": "MANUAL", "candidateMode": "OWNED"},
+    {"key": "zeroCandidate", "sourceCode": "R1_ZERO_CANDIDATE", "captureMode": "AUTOMATIC", "candidateMode": "NONE"}
+  ]
+}

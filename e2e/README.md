@@ -1,3 +1,19 @@
+# Task 10.2 隔离 R1 环境装配
+
+`e2e/runtime/r1_environment.py` 只准备新的 R1 环境并为控制者提供独立的基础设施启动入口；它不读取或接管 Task 9 runtime，也不执行身份 bootstrap、业务 fixture 或黄金链。每个 run 必须使用规范的小写 ID，并且只会在 `.artifacts/r1-e2e/<run>` 首次独占创建一次。发现既存、残缺、链接或发生漂移的目录时保留现场并停止。
+
+固定拓扑为 `ontology-law-r1-e2e-<run>` Compose project：锁定 PostgreSQL 18 的独立身份库和业务库、Keycloak 26.7.3、Flyway 13.4.0，以及 project 自有网络和卷。Keycloak、SPA、API、业务 PostgreSQL 分别预留 `127.0.0.1:29443`–`29446`；身份库不发布主机端口。数据库迁移只运行当前生成迁移的 `migrate validate`，不会 clean、baseline、重写 DDL 或绕过能力角色。一次性数据库登录装配不创建 HUMAN 身份事实。
+
+准备器固定使用 Java 25.0.4.1+1、Node 24.20.0 与 Git 自带 OpenSSL，生成随机合成凭据、独立用途密钥、临时 CA、准确 SAN 证书及应用私有 PKCS12。秘密先进入只允许当前 Windows 用户与 SYSTEM（POSIX 为 0700/0600）的 run 目录，再通过 Compose file secrets 注入；不安装全局信任、不关闭 TLS、不在命令行或普通 manifest 中保存秘密。准备器复制并摘要现有唯一 Jar 与 SPA dist，但会明确把二者标为 `UNPROVEN_EXISTING_ARTIFACT`；仅有字节摘要不证明它们来自当前 HEAD。
+
+```powershell
+D:/soft/python3/python.exe e2e/runtime/r1_environment.py prepare <run>
+# 仅在独立评审后由控制者执行：
+D:/soft/python3/python.exe e2e/runtime/r1_environment.py start-infra <run>
+```
+
+`prepare` 会实际执行 OpenSSL、keytool 和 `docker compose config --quiet`，但不启动服务。`start-infra` 在重验所有摘要、固定端口及 project 无既存容器/网络/卷后，才运行本 run 的 Compose；失败不自动重试或删除资源。即使基础设施就绪，状态也只能是 `BLOCKED_IDENTITY_BOOTSTRAP_REQUIRED`。本单元的 `start-apps` 始终拒绝：后续 Task 10 单元必须消费真实 IdentityBootstrapCommand/身份管理 API 的当前-run绑定结果，不能靠可手写 marker、SQL HUMAN 记录或本工具伪造 `APP_READY`。
+
 # Task 9.6e 受控本地身份链
 
 CI uses `npm run test:e2e:offline` to select only `offline-harness` and
