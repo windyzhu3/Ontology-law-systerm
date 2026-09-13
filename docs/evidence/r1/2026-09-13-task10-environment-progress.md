@@ -112,6 +112,22 @@ Root最终检查170954：原bootstrap树摘要、原state及record摘要与本�
 
 后继Task10.4只装配同Jar API/Worker和同SPA。prepare显式选择original或continued引导核验源，记录后禁止fallback或改写。当前新三服务运行，旧三个local-login服务保持停止以留出资源，旧页面登录暂不可用但账号/realm/业务数据完整可恢复。当前可用虚拟内存约4.6GiB；后续仍只执行未完成路径。
 
+后续用户报告Docker Desktop再次退出。78d351确认引擎已重启、原三服务同时退出255且OOM=false，未认定退出原因。e7c89f进一步删除9个无容器使用且当前配置未引用的旧公共基础镜像，可按标签重新拉取；Docker镜像占用16.52GB降至10.31GB，未知归属匿名卷及自建镜像未删。原两库恢复后，Keycloak启动组合命令被执行策略拦截，未采用替代写入路径；用户通过Desktop手动启动原容器。4dc2b0确认三服务running及严格TLS200，d2094d只读verify-combined退出0，原引导结果有效，没有再次执行bootstrap。Task10.4实施继续；SERVICE readiness要求已按既有合同更正为204/空body/无ETag/no-store，不修改业务接口。
+
+## Task10.4应用准备：零写入失败后的限定修复
+
+应用装配代码及首轮独立复核已完成（`5d9b82c`、`d93572b`），首轮修复覆盖准确API监听地址/端口/PID及PID不匹配拒绝。一次真实prepare随后退出1，尚未start：既有`law_app_command`角色不能取得工具请求的`SHARE ROW EXCLUSIVE`表锁，日志为`permission denied for table tenant`。只读查询原保存SERVICE主体、任职和三条授权ID，计数均为0；没有成功写入SERVICE前置，也未重跑租户引导。
+
+用户已明确批准保留失败目录及日志，修复和独立评审后在同一验收环境进行一次新的应用准备。修复仅移除不必要的强表锁，保留SERIALIZABLE、既有角色、原前置及部署摘要检查、五行写入闭合；不增加数据库权限、不改业务接口。此刻失败证据仍原样保留，新的准备与应用启动尚未执行，不能记Task10.4实际就绪或R1总验收通过。
+
+## Task10.4实际应用基础设施就绪
+
+限定修复`8b78f50`只删除两行强表锁并增加定点回归测试；14项Python测试通过（3.952s），编译/差异检查通过，同一独立评审者确认规格及质量通过。Root再次只读确认失败准备的主体/任职/授权均为0（bb5c0a），按用户授权将原目录归档为同run内`applications-failed-lock-20260913`，全部文件内容及文件ACL前后完全一致（6632a2）。失败记录未覆盖或删除。
+
+在同一环境一次新prepare退出0（58660f），一次start退出0（511163），随后verify退出0并返回`APPLICATION_INFRASTRUCTURE_READY`（3fd71a）。本次实际执行证明既有运行时角色下SERVICE五行前置及只读闭包、同Jar API/Worker、同SPA、进程/监听边界及严格TLS就绪链通过；没有增加数据库权限或重发租户引导。
+
+Task10.4装配门现已关闭。该状态不是新环境真实用户登录、责任卡黄金/失败链或R1整体PASS；后续继续Task10剩余受控管理fixture与业务验收。Task9人工确认关闭、W09按用户要求暂缓的状态保持不变，不据此重跑已通过项目。
+
 ## 上游核对
 
 2026-09-13复核[官方26.7.3发布页](https://github.com/keycloak/keycloak/releases/tag/26.7.3)与[官方安全公告目录](https://github.com/keycloak/keycloak/security/advisories)。当前发布页列出26.7.3及其安全修复；检查的[DCR角色伪造公告](https://github.com/keycloak/keycloak/security/advisories/GHSA-95cx-vmr5-3cmr)列26.7.1为修复版本。另核对[reset-credentials问题记录](https://github.com/keycloak/keycloak/issues/51833)，已关闭并标注26.7.2等版本。此为部署前具名上游核对，不是全量漏洞扫描或“无CVE”保证；不升级锁定制品，不开启重置密码、动态客户端注册或扩大目录权限。

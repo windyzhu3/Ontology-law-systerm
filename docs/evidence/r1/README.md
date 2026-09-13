@@ -1,6 +1,6 @@
 # R1 总验收证据与收口入口
 
-更新：2026-09-13。状态：Task10.1统一CI预检入口已实现；Task10.2隔离基础设施已实际验证通过；Task10.3限定哨兵续建及主/哨兵组合真实核验均退出0，原成功/失败记录不变。按用户授权清理4套废弃Docker环境，并停止保留旧本地环境；Docker重启后资源已恢复，新环境正在运行。Task10.4应用装配为下一单元。**不是R1总验收通过报告**。
+更新：2026-09-13。状态：Task10.1统一CI预检入口已实现；Task10.2隔离基础设施、Task10.3主/哨兵原始引导及Task10.4应用装配均已实际核验。Task10.4在限定修复后prepare/start/verify全部退出0，返回`APPLICATION_INFRASTRUCTURE_READY`；原失败目录及证据保留。下一单元为新环境受控管理配置和黄金/缺失失败链。**不是R1总验收通过报告**。
 
 ## 当前决定
 
@@ -24,7 +24,7 @@
 
 | 原计划交付物 | 当前情况 | 下一步 |
 |---|---|---|
-| `e2e/compose.yaml`、`e2e/fixtures/r1-fixture.json` | 已实现；实际迁移/端口/TLS/目录读取成功，但进程清单保存缺陷使可复现环境验收尚未关闭；fixture仍只是输入 | 修复进程证据捕获后验证完整启动，再受控bootstrap/装配应用；见[实际运行记录](2026-09-13-task10-environment-progress.md) |
+| `e2e/compose.yaml`、`e2e/fixtures/r1-fixture.json` | Task10.2～10.4实际前置完成；同Jar API/Worker及同SPA就绪。HUMAN业务fixture仍只是输入 | 使用既有管理入口建立合成主体/组织/任职/授权，核对动态登录；见[实际运行记录](2026-09-13-task10-environment-progress.md) |
 | `r1-golden-path.spec.ts` | 不存在；已有六卡链只是指定子集 | 核对自动分配→有效接通→Opportunity→原回执恢复的缺口，只补尚无有效证据部分 |
 | `r1-failure-paths.spec.ts` | 不存在；后端测试及Task9场景分散 | 按当前BranchID与安全要求映射已覆盖项，集中实现剩余真实场景 |
 | `r1-waiting-path.spec.ts` | 不存在；已有等待准备/刷新证据 | 实际到期恢复按用户延期记录，不排入当前关键路径，不生成空测试声称覆盖 |

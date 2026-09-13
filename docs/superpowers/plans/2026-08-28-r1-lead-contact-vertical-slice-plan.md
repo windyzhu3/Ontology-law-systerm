@@ -603,6 +603,17 @@ D:/soft/python3/python.exe -m unittest tests.test_r1_applications
 node --test e2e/runtime/r1_server.test.mjs
 ```
 
-实际Root启动后，只有准确当前PID/启动时刻的API/Worker隔离及READY日志、严格TLS的SPA200/未认证SELF401和SERVICE readiness200同时满足才记录`APPLICATION_INFRASTRUCTURE_READY`，不能记真实用户登录、责任卡或黄金链PASS。不调用新的业务主命令；后继浏览器验收另建记录。实现者只运行本单元定点测试，Root独立评审后执行一次真实入口。
+实际Root启动后，只有准确当前PID/启动时刻的API/Worker隔离及READY日志、严格TLS的SPA200/未认证SELF401和SERVICE readiness204（空body、无ETag、Cache-Control包含no-store）同时满足才记录`APPLICATION_INFRASTRUCTURE_READY`，不能记真实用户登录、责任卡或黄金链PASS。不调用新的业务主命令；后继浏览器验收另建记录。实现者只运行本单元定点测试，Root独立评审后执行一次真实入口。
 
 - [ ] **提交和评审。** 提交只含本单元文件，报告列准确测试命令/退出码/覆盖边界；按Task10.3原始消费者接口交接，不复制其验证算法，不给原环境添加恢复或重放机制。
+
+## Task 10.5: 新隔离环境的受控管理配置与黄金链
+
+2026-09-13用户确认最小新入口方案；Task10.4已实际返回`APPLICATION_INFRASTRUCTURE_READY`。只新增独立验收消费者，不修改旧Task9配置、私密runtime、journal或报告，不改产品页面、OpenAPI、DDL、权限或依赖。消费当前run的原始bootstrap及应用核验结果，绑定同Jar/SPA、配置、schema和原进程身份；不自行启动、接管或重建环境。
+
+- [ ] 新增独立`e2e/r1-isolated.config.ts`及受保护Python/TS桥接、固定操作清单与黄金链测试。默认不发现真实用例；真实入口必须显式选择`approved-r1-isolated`，设置`R1_ISOLATED_ACCEPTANCE=APPROVED_SYNTHETIC_ONLY`、准确环境run及全新操作UUID。workers=1、retries=0；未知响应保留原key并阻止后续写入，不自动重放。
+- [ ] 已有导入账号不重建：通过现有管理页面建立sales/supervisor/sourceOwner三HUMAN主体、OWNED_ROOT/EMPTY_ROOT两个ROOT子组织、三任职及七DIRECT授权，共15次管理命令。sales为OWNED_ROOT的CONTACT_OPERATOR且无额外Grant；supervisor为ROOT的ROUTING_SUPERVISOR，授予LEAD_ASSIGN/LEAD_ROUTING_DECIDE/LEAD_VALIDITY_REVIEW；sourceOwner为ROOT的INTAKE_OPERATOR，授予LEAD_CAPTURE/LEAD_INGRESS_RESOLVE/LEAD_INGRESS_COMPLETE/SOURCE_INTAKE_REQUEST_ACK。全部Grant范围ROOT、原founder授予。EMPTY_ROOT保持空；revokedAppointment留待后继反例，不建立第二销售候选。
+- [ ] 动态登录核对原任职与SELF，无重启。sourceOwner沿用既有受控HUMAN `POST /api/v1/leads`接入一条R1_AUTO合成Lead；当前SPA没有capture表单，不新增或宣称该表单通过。系统自动分配唯一sales候选后，真实页面完成CONTACT_LEAD草稿保存、整页刷新验证、CONNECTED_VALID主提交及原CommandId回执读取。
+- [ ] 使用既有law_app_query允许表/视图，独立只读核对唯一ContactResult/Opportunity、Task DONE、Draft CONFIRMED、合同规定的Event/Outbox/Audit/Receipt关系和数量。不得将读取审计增量混作命令业务增量，不暴露联系方式、密文、HMAC、JWT或原始响应。固定场景失败即保留失败记录，不生成总PASS。
+- [ ] 固定Playwright1.63.0与Chromium1243/153.0.8010.12、严格TLS；无录屏/trace/HAR/storageState/DOM错误快照。用户单独批准本轮准确CA暂时导入Windows CurrentUser Root，Root仅在评审后实际运行前导入，结束或失败时按准确指纹移除并核验；禁止LocalMachine、禁用TLS及源码安装信任。
+- [ ] 先RED/GREEN，定点Python`tests.test_r1_acceptance`、新offline-r1-isolated项目、触及TS类型检查及真实项目发现边界；不重复旧全套。独立评审后Root执行一次真实入口，仅按实际证据关闭本slice。历史Party/Delegation/IdP禁用/数据库故障另需授权；W09延期、UAT关闭、R2附件通知及语音后置保持不变。
