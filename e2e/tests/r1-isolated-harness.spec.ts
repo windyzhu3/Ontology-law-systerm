@@ -21,6 +21,7 @@ const AcceptanceJournal = setupModule.AcceptanceJournal ?? { open: missing };
 const R1GoldenOrchestrator = setupModule.R1GoldenOrchestrator ?? class { constructor() { missing(); } };
 const WRITE_SEQUENCE: { step: string; method: 'POST'|'PUT'; path: string|RegExp }[] = setupModule.WRITE_SEQUENCE ?? [];
 const canonicalSha256 = setupModule.canonicalSha256 ?? missing;
+const { R1IsolatedBrowserAdapter } = require('../fixtures/r1-isolated-browser');
 
 
 const ROOT = resolve(__dirname, '../..');
@@ -85,7 +86,7 @@ test('environment projection rejects wrong run process inventory credentials and
   }
 });
 
-test('fixed write policy permits only the exact ordered 15 management writes then one capture draft submit', () => {
+test('fixed write policy preserves the historic 15 then adds one OWNED_ROOT sales authority before three business writes', () => {
   expect(WRITE_SEQUENCE.map(entry => entry.step)).toEqual([
     'principal-sales', 'principal-supervisor', 'principal-sourceOwner',
     'organization-OWNED_ROOT', 'organization-EMPTY_ROOT',
@@ -93,12 +94,42 @@ test('fixed write policy permits only the exact ordered 15 management writes the
     'grant-sourceOwner-LEAD_CAPTURE', 'grant-sourceOwner-LEAD_INGRESS_RESOLVE',
     'grant-sourceOwner-LEAD_INGRESS_COMPLETE', 'grant-sourceOwner-SOURCE_INTAKE_REQUEST_ACK',
     'grant-supervisor-LEAD_ASSIGN', 'grant-supervisor-LEAD_ROUTING_DECIDE',
-    'grant-supervisor-LEAD_VALIDITY_REVIEW', 'capture-R1_AUTO', 'contact-draft', 'contact-submit',
+    'grant-supervisor-LEAD_VALIDITY_REVIEW', 'grant-sales-SALES_CONTACT_OWNER',
+    'capture-R1_AUTO', 'contact-draft', 'contact-submit',
   ]);
   expect(WRITE_SEQUENCE.slice(0, 15).every(entry => entry.method === 'POST' && typeof entry.path === 'string' && entry.path.startsWith('/api/v1/admin/identity/'))).toBe(true);
-  expect(WRITE_SEQUENCE[15]).toEqual({ step: 'capture-R1_AUTO', method: 'POST', path: '/api/v1/leads' });
-  expect(WRITE_SEQUENCE[16].path).toEqual(/^\/api\/v1\/tasks\/[0-9a-f-]{36}\/draft$/);
-  expect(WRITE_SEQUENCE[17].path).toEqual(/^\/api\/v1\/tasks\/[0-9a-f-]{36}\/commands\/record-contact-result$/);
+  expect(WRITE_SEQUENCE[15]).toEqual({ step: 'grant-sales-SALES_CONTACT_OWNER', method: 'POST', path: '/api/v1/admin/identity/authority-grants' });
+  expect(WRITE_SEQUENCE[16]).toEqual({ step: 'capture-R1_AUTO', method: 'POST', path: '/api/v1/leads' });
+  expect(WRITE_SEQUENCE[17].path).toEqual(/^\/api\/v1\/tasks\/[0-9a-f-]{36}\/draft$/);
+  expect(WRITE_SEQUENCE[18].path).toEqual(/^\/api\/v1\/tasks\/[0-9a-f-]{36}\/commands\/record-contact-result$/);
+});
+
+test('browser preparation binds the added sales authority to OWNED_ROOT rather than ROOT', async () => {
+  const selected: Record<string,string> = {}, filled: Record<string,string> = {};
+  const session: any = {
+    self: { actorScopeKey: ACTOR }, appointmentId: APPOINTMENT,
+    context: { request: { async get() { return { status: () => 200, headers: () => ({ 'cache-control': 'no-store' }), json: async () => ({ items: [], nextCursor: null }) }; } } },
+    page: {
+      getByRole() { return { click: async () => {} }; },
+      getByLabel(label: string) { return { selectOption: async (value: string) => { selected[label] = value; }, fill: async (value: string) => { filled[label] = value; } }; },
+    },
+  };
+  const adapter: any = Object.create(R1IsolatedBrowserAdapter.prototype);
+  adapter.environment = { origin: 'https://localhost:29444', bootstrap: { rootId: '00000000-0000-4000-8000-000000000002' } };
+  adapter.adminPage = async () => session;
+  const resources = {
+    'appointment-sales': '00000000-0000-4000-8000-000000000021',
+    'organization-OWNED_ROOT': '00000000-0000-4000-8000-000000000022',
+  };
+  const intent = await adapter.prepareWrite(WRITE_SEQUENCE[15], resources);
+  expect(intent.body).toMatchObject({
+    appointmentId: resources['appointment-sales'], authorityCode: 'SALES_CONTACT_OWNER',
+    scopeOrganizationId: resources['organization-OWNED_ROOT'], validUntil: null,
+  });
+  expect(selected).toMatchObject({
+    '授权任职': resources['appointment-sales'], '组织范围': resources['organization-OWNED_ROOT'], '权限': 'SALES_CONTACT_OWNER',
+  });
+  expect(filled['生效时间']).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
 });
 
 test('journal saves original key digest and Actor before dispatch and confirms only its exact receipt', async () => {
@@ -169,52 +200,123 @@ test('durable management stage prevents confirmed management commands from being
   } finally { rmSync(folder, { recursive: true, force: true }); }
 });
 
+test('historic 15-command checkpoint appends only sales authority and the remaining three writes in the same operation', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'r1-acceptance-continuation-'));
+  try {
+    const path = join(folder, 'journal.json');
+    const journal = await AcceptanceJournal.open(path, identity());
+    await confirmPrefix(journal, 15);
+    await journal.completeStage('MANAGEMENT_COMPLETED');
+    const historicCommands = JSON.parse(readFileSync(path, 'utf8')).commands;
+    const seen: string[] = [], receipts = new Map<string, any>();
+    await new R1GoldenOrchestrator(await AcceptanceJournal.open(path, identity()), goldenAdapter(seen, receipts)).run();
+    expect(seen).toEqual(['grant-sales-SALES_CONTACT_OWNER', 'capture-R1_AUTO', 'contact-draft', 'contact-submit']);
+    const stored = JSON.parse(readFileSync(path, 'utf8'));
+    expect(stored.commands.slice(0, 15)).toEqual(historicCommands);
+    expect(stored.stages).toEqual(['MANAGEMENT_COMPLETED', 'SALES_AUTHORITY_COMPLETED', 'IDENTITIES_VERIFIED', 'CAPTURE_COMPLETED', 'DRAFT_RELOADED', 'GOLDEN_COMPLETED']);
+  } finally { rmSync(folder, { recursive: true, force: true }); }
+});
+
+test('added sales authority pending blocks continuation without replaying the historic 15', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'r1-acceptance-sales-pending-'));
+  try {
+    const path = join(folder, 'journal.json');
+    const journal = await AcceptanceJournal.open(path, identity());
+    await confirmPrefix(journal, 15);
+    await journal.completeStage('MANAGEMENT_COMPLETED');
+    const pending = armed('grant-sales-SALES_CONTACT_OWNER', '/api/v1/admin/identity/authority-grants', { marker: 'sales-authority' });
+    const gate = new AcceptanceDispatchGate(journal); gate.arm(pending); await gate.dispatch(actual(pending), async () => {});
+    const seen: string[] = [];
+    await expect(new R1GoldenOrchestrator(await AcceptanceJournal.open(path, identity()), goldenAdapter(seen, new Map())).run()).rejects.toThrow('R1_ISOLATED_BOUNDARY');
+    expect(seen).toEqual([]);
+    expect(JSON.parse(readFileSync(path, 'utf8')).commands).toHaveLength(16);
+  } finally { rmSync(folder, { recursive: true, force: true }); }
+});
+
+test('journal rejects a historic capture at index 15 and malformed stage ordering', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'r1-acceptance-malformed-'));
+  try {
+    const path = join(folder, 'journal.json');
+    const journal = await AcceptanceJournal.open(path, identity());
+    await confirmPrefix(journal, 15); await journal.completeStage('MANAGEMENT_COMPLETED');
+    const original = JSON.parse(readFileSync(path, 'utf8'));
+    const oldCapture = armed('capture-R1_AUTO', '/api/v1/leads', { marker: 'old-capture' });
+    const oldCaptureJournal = structuredClone(original); oldCaptureJournal.commands.push({ ...oldCapture, status: 'PENDING' }); writeFileSync(path, JSON.stringify(oldCaptureJournal));
+    await expect(AcceptanceJournal.open(path, identity())).rejects.toThrow('R1_ISOLATED_BOUNDARY');
+    const malformedStages = structuredClone(original); malformedStages.stages = ['MANAGEMENT_COMPLETED', 'IDENTITIES_VERIFIED']; writeFileSync(path, JSON.stringify(malformedStages));
+    await expect(AcceptanceJournal.open(path, identity())).rejects.toThrow('R1_ISOLATED_BOUNDARY');
+    writeFileSync(path, JSON.stringify(original));
+    await expect(AcceptanceJournal.open(path, { ...identity(), operationId: randomUUID() })).rejects.toThrow('R1_ISOLATED_BOUNDARY');
+    await expect(AcceptanceJournal.open(path, { ...identity(), environmentDigest: 'c'.repeat(64) })).rejects.toThrow('R1_ISOLATED_BOUNDARY');
+  } finally { rmSync(folder, { recursive: true, force: true }); }
+});
+
+test('browser identity verification requires exactly the OWNED_ROOT sales authority', async () => {
+  const root = '00000000-0000-4000-8000-000000000002';
+  const resources: Record<string,string> = {
+    'principal-sales': '00000000-0000-4000-8000-000000000031',
+    'principal-supervisor': '00000000-0000-4000-8000-000000000032',
+    'principal-sourceOwner': '00000000-0000-4000-8000-000000000033',
+    'organization-OWNED_ROOT': '00000000-0000-4000-8000-000000000034',
+    'organization-EMPTY_ROOT': '00000000-0000-4000-8000-000000000035',
+    'appointment-sales': '00000000-0000-4000-8000-000000000036',
+    'appointment-supervisor': '00000000-0000-4000-8000-000000000037',
+    'appointment-sourceOwner': '00000000-0000-4000-8000-000000000038',
+  };
+  const grants = [
+    ...['LEAD_CAPTURE','LEAD_INGRESS_RESOLVE','LEAD_INGRESS_COMPLETE','SOURCE_INTAKE_REQUEST_ACK'].map((authority, index) => ({ alias: 'sourceOwner', authority, id: `00000000-0000-4000-8010-${String(index + 1).padStart(12, '0')}`, scope: root })),
+    ...['LEAD_ASSIGN','LEAD_ROUTING_DECIDE','LEAD_VALIDITY_REVIEW'].map((authority, index) => ({ alias: 'supervisor', authority, id: `00000000-0000-4000-8020-${String(index + 1).padStart(12, '0')}`, scope: root })),
+    { alias: 'sales', authority: 'SALES_CONTACT_OWNER', id: '00000000-0000-4000-8030-000000000001', scope: resources['organization-OWNED_ROOT'] },
+  ];
+  for (const grant of grants) resources[`grant-${grant.alias}-${grant.authority}`] = grant.id;
+  const rows: Record<string,any[]> = {
+    principals: [
+      { id: resources['principal-sales'], displayName: 'R1 Synthetic Sales', state: 'ACTIVE' },
+      { id: resources['principal-supervisor'], displayName: 'R1 Synthetic Supervisor', state: 'ACTIVE' },
+      { id: resources['principal-sourceOwner'], displayName: 'R1 Synthetic Source Owner', state: 'ACTIVE' },
+    ],
+    organizations: [
+      { id: resources['organization-OWNED_ROOT'], code: 'OWNED_ROOT', parentOrganizationId: root, state: 'ACTIVE' },
+      { id: resources['organization-EMPTY_ROOT'], code: 'EMPTY_ROOT', parentOrganizationId: root, state: 'ACTIVE' },
+    ],
+    appointments: [
+      { id: resources['appointment-sales'], principal: { id: resources['principal-sales'] }, organization: { id: resources['organization-OWNED_ROOT'] }, roleCode: 'CONTACT_OPERATOR', state: 'ACTIVE' },
+      { id: resources['appointment-supervisor'], principal: { id: resources['principal-supervisor'] }, organization: { id: root }, roleCode: 'ROUTING_SUPERVISOR', state: 'ACTIVE' },
+      { id: resources['appointment-sourceOwner'], principal: { id: resources['principal-sourceOwner'] }, organization: { id: root }, roleCode: 'INTAKE_OPERATOR', state: 'ACTIVE' },
+    ],
+    'authority-grants': grants.map(grant => ({ id: grant.id, appointment: { id: resources[`appointment-${grant.alias}`] }, authorityCode: grant.authority, scopeOrganization: { id: grant.scope }, state: 'ACTIVE' })),
+  };
+  const adapter: any = Object.create(R1IsolatedBrowserAdapter.prototype);
+  adapter.environment = { bootstrap: { rootId: root } };
+  adapter.administrator = async () => ({});
+  adapter.rows = async (_session: any, path: string) => rows[path.split('/').at(-1)!];
+  adapter.workbench = async (alias: string) => ({ self: { selectedAppointmentId: resources[`appointment-${alias}`], selectedOnBehalfAppointmentId: null } });
+  await expect(adapter.verifyIdentities(resources)).resolves.toBeUndefined();
+  const salesGrant = rows['authority-grants'].at(-1); salesGrant.scopeOrganization.id = root;
+  await expect(adapter.verifyIdentities(resources)).rejects.toThrow('R1_ISOLATED_BOUNDARY');
+  salesGrant.scopeOrganization.id = resources['organization-OWNED_ROOT'];
+  rows['authority-grants'].push({ ...rows['authority-grants'].at(-1), id: randomUUID() });
+  await expect(adapter.verifyIdentities(resources)).rejects.toThrow('R1_ISOLATED_BOUNDARY');
+});
+
 test('golden orchestrator runs fixed management before identities capture reloaded draft and one completion', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'r1-acceptance-orchestrator-'));
   try {
     const journal = await AcceptanceJournal.open(join(folder, 'journal.json'), identity());
     const seen: string[] = [], checkpoints: Array<{ name: string; count: number }> = [];
     const receipts = new Map<string, any>();
-    const adapter = {
-      async prepareWrite(policy: any, resources: Record<string,string>) {
-        if (policy.step === 'contact-draft' || policy.step === 'contact-submit') expect(resources.contactTask).toMatch(/^[0-9a-f-]{36}$/);
-        const command = armed(policy.step, typeof policy.path === 'string' ? policy.path : policy.step === 'contact-draft'
-          ? `/api/v1/tasks/${resources.contactTask}/draft`
-          : `/api/v1/tasks/${resources.contactTask}/commands/record-contact-result`, { marker: policy.step });
-        command.method = policy.method; return command;
-      },
-      async executeWrite(command: ArmedWrite, gate: any) {
-        seen.push(command.step);
-        await gate.dispatch(actual(command), async () => {});
-        const resultFact = command.step === 'contact-submit'
-          ? { factType: 'LEAD_CONTACT_RESULT', factRef: randomUUID(), digest: 'A'.repeat(43) }
-          : { factType: 'R1_FIXTURE', factRef: randomUUID(), revision: 0 };
-        const response = { status: command.method === 'PUT' || command.step === 'contact-submit' ? 200 : 201,
-          headers: { location: `/api/v1/commands/${command.commandId}/receipt`, 'cache-control': 'no-store', etag: `"identity.${'A'.repeat(43)}"` },
-          body: { commandId: command.commandId, receiptId: randomUUID(), outcome: 'SUCCEEDED', resultFact } };
-        receipts.set(command.commandId, response.body);
-        return { response, resourceId: command.step === 'capture-R1_AUTO' ? randomUUID() : command.step === 'contact-draft' ? randomUUID() : command.step === 'contact-submit' ? resultFact.factRef : randomUUID() };
-      },
-      async verifyIdentities(resources: Record<string,string>) { checkpoints.push({ name: 'identities', count: Object.keys(resources).length }); },
-      async locateContactTask(resources: Record<string,string>) { checkpoints.push({ name: 'contact', count: Object.keys(resources).length }); return randomUUID(); },
-      async reloadDraft(resources: Record<string,string>) { checkpoints.push({ name: 'reload', count: Object.keys(resources).length }); },
-      async retrieveReceipt(commandId: string) { return receipts.get(commandId); },
-      async closeCompletion(commandId: string, resultFactDigest: string, resources: Record<string,string>) {
-        expect(resultFactDigest).toBe('A'.repeat(43));
-        checkpoints.push({ name: 'closure', count: Object.keys(resources).length });
-        return { commandId, counts: { contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 } };
-      },
-    };
+    const adapter = goldenAdapter(seen, receipts, checkpoints);
     const orchestrator = new R1GoldenOrchestrator(journal, adapter);
     const report = await orchestrator.run();
     expect(seen).toEqual(WRITE_SEQUENCE.map(entry => entry.step));
     expect(checkpoints.map(entry => entry.name)).toEqual(['identities','contact','reload','closure']);
     expect(journal.hasStage('MANAGEMENT_COMPLETED')).toBe(true);
+    expect(journal.hasStage('SALES_AUTHORITY_COMPLETED')).toBe(true);
     expect(journal.hasStage('IDENTITIES_VERIFIED')).toBe(true);
     expect(journal.hasStage('CAPTURE_COMPLETED')).toBe(true);
     expect(journal.hasStage('DRAFT_RELOADED')).toBe(true);
     expect(journal.hasStage('GOLDEN_COMPLETED')).toBe(true);
-    expect(report).toMatchObject({ managementCommandCount: 15, counts: { contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 } });
+    expect(report).toMatchObject({ managementCommandCount: 16, counts: { contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 } });
   } finally { rmSync(folder, { recursive: true, force: true }); }
 });
 
@@ -241,6 +343,49 @@ function actual(command: ArmedWrite) {
     commandId: command.commandId, method: command.method, path: command.path,
     bodyBytes: Buffer.from(JSON.stringify(command.body)), actorScopeKey: command.actorScopeKey,
     actorAppointmentId: command.actorAppointmentId, onBehalfAppointmentId: null,
+  };
+}
+
+async function confirmPrefix(journal: any, length: number) {
+  for (const policy of WRITE_SEQUENCE.slice(0, length)) {
+    const command = write(policy.step, String(policy.path), { marker: policy.step });
+    await journal.begin(command);
+    await journal.confirm(command.commandId, {
+      status: 201,
+      headers: { location: `/api/v1/commands/${command.commandId}/receipt`, 'cache-control': 'no-store' },
+      body: { commandId: command.commandId, receiptId: randomUUID(), outcome: 'SUCCEEDED', resultFact: { factType: 'IDENTITY', factRef: randomUUID(), revision: 0 } },
+    }, { resourceId: randomUUID() });
+  }
+}
+
+function goldenAdapter(seen: string[], receipts: Map<string, any>, checkpoints: Array<{ name: string; count: number }> = []) {
+  return {
+    async prepareWrite(policy: any, resources: Record<string,string>) {
+      if (policy.step === 'contact-draft' || policy.step === 'contact-submit') expect(resources.contactTask).toMatch(/^[0-9a-f-]{36}$/);
+      const command = armed(policy.step, typeof policy.path === 'string' ? policy.path : policy.step === 'contact-draft'
+        ? `/api/v1/tasks/${resources.contactTask}/draft`
+        : `/api/v1/tasks/${resources.contactTask}/commands/record-contact-result`, { marker: policy.step });
+      command.method = policy.method; return command;
+    },
+    async executeWrite(command: ArmedWrite, gate: any) {
+      seen.push(command.step); await gate.dispatch(actual(command), async () => {});
+      const resultFact = command.step === 'contact-submit'
+        ? { factType: 'LEAD_CONTACT_RESULT', factRef: randomUUID(), digest: 'A'.repeat(43) }
+        : { factType: 'R1_FIXTURE', factRef: randomUUID(), revision: 0 };
+      const response = { status: command.method === 'PUT' || command.step === 'contact-submit' ? 200 : 201,
+        headers: { location: `/api/v1/commands/${command.commandId}/receipt`, 'cache-control': 'no-store' },
+        body: { commandId: command.commandId, receiptId: randomUUID(), outcome: 'SUCCEEDED', resultFact } };
+      receipts.set(command.commandId, response.body);
+      return { response, resourceId: command.step === 'contact-submit' ? resultFact.factRef : randomUUID() };
+    },
+    async verifyIdentities(resources: Record<string,string>) { checkpoints.push({ name: 'identities', count: Object.keys(resources).length }); },
+    async locateContactTask(resources: Record<string,string>) { checkpoints.push({ name: 'contact', count: Object.keys(resources).length }); return randomUUID(); },
+    async reloadDraft(resources: Record<string,string>) { checkpoints.push({ name: 'reload', count: Object.keys(resources).length }); },
+    async retrieveReceipt(commandId: string) { return receipts.get(commandId); },
+    async closeCompletion(commandId: string, resultFactDigest: string, resources: Record<string,string>) {
+      expect(resultFactDigest).toBe('A'.repeat(43)); checkpoints.push({ name: 'closure', count: Object.keys(resources).length });
+      return { commandId, counts: { contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 } };
+    },
   };
 }
 

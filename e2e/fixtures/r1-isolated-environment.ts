@@ -153,17 +153,17 @@ export type LoadedR1Environment = Awaited<ReturnType<typeof loadR1IsolatedEnviro
 
 export function writeR1ClosedReport(
   environment: LoadedR1Environment,
-  result: { managementCommandCount: 15; goldenCommandId: string; resultFact: Record<string,unknown>; counts: Record<string,number> },
+  result: { managementCommandCount: 16; goldenCommandId: string; resultFact: Record<string,unknown>; counts: Record<string,number> },
 ): string {
   const counts = { contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 };
-  boundary(result.managementCommandCount === 15 && UUID.test(result.goldenCommandId));
+  boundary(result.managementCommandCount === 16 && UUID.test(result.goldenCommandId));
   boundary(exact(result.resultFact, ['factType','factRef','revision']) || exact(result.resultFact, ['factType','factRef','digest']));
   boundary(result.resultFact.factType === 'LEAD_CONTACT_RESULT' && typeof result.resultFact.factRef === 'string');
   boundary(JSON.stringify(result.counts) === JSON.stringify(counts));
   const report = {
     profile: 'R1_ISOLATED_ACCEPTANCE_REPORT_V1', run: environment.run,
     operationId: environment.operationId, status: 'GOLDEN_VERIFIED',
-    environmentDigest: environment.environmentDigest, managementCommandCount: 15,
+    environmentDigest: environment.environmentDigest, managementCommandCount: 16,
     goldenCommandId: result.goldenCommandId, resultFact: result.resultFact, counts,
   };
   const path = join(environment.runtime, `acceptance-${environment.operationId}-report.json`);

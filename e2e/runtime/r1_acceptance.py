@@ -230,6 +230,9 @@ def management_blueprint() -> list[dict]:
             ("supervisor", "LEAD_VALIDITY_REVIEW"),
         )
     ]
+    grants.append({"step": "grant-sales-SALES_CONTACT_OWNER", "kind": "grant", "method": "POST",
+                   "path": "/api/v1/admin/identity/authority-grants", "account": "sales",
+                   "authorityCode": "SALES_CONTACT_OWNER", "scope": "OWNED_ROOT"})
     return [*principals, *organizations, *appointments, *grants]
 
 
@@ -392,7 +395,7 @@ def closed_report(value: object) -> dict:
         if key not in value:
             raise RuntimeError("closed report input invalid")
         result[key] = value[key]
-    if result["status"] != "GOLDEN_VERIFIED" or result["managementCommandCount"] != 15 or \
+    if result["status"] != "GOLDEN_VERIFIED" or result["managementCommandCount"] != 16 or \
        not _uuid(result["operationId"]) or not _uuid(result["goldenCommandId"]) or \
        not isinstance(result["environmentDigest"], str) or not HASH_PATTERN.fullmatch(result["environmentDigest"]):
         raise RuntimeError("closed report input invalid")

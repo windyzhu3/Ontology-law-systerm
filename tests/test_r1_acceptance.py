@@ -292,7 +292,7 @@ class R1AcceptanceTest(unittest.TestCase):
             dependencies.calls,
         )
 
-    def test_fixed_management_blueprint_has_exact_fifteen_operations(self):
+    def test_fixed_management_blueprint_preserves_fifteen_then_adds_owned_root_sales_authority(self):
         plan = self.module.management_blueprint()
         self.assertEqual(
             [
@@ -303,16 +303,20 @@ class R1AcceptanceTest(unittest.TestCase):
                 "grant-sourceOwner-LEAD_INGRESS_COMPLETE", "grant-sourceOwner-SOURCE_INTAKE_REQUEST_ACK",
                 "grant-supervisor-LEAD_ASSIGN", "grant-supervisor-LEAD_ROUTING_DECIDE",
                 "grant-supervisor-LEAD_VALIDITY_REVIEW",
+                "grant-sales-SALES_CONTACT_OWNER",
             ],
             [entry["step"] for entry in plan],
         )
-        self.assertEqual(["POST"] * 15, [entry["method"] for entry in plan])
+        self.assertEqual(["POST"] * 16, [entry["method"] for entry in plan])
         self.assertEqual(
             ["CONTACT_OPERATOR", "ROUTING_SUPERVISOR", "INTAKE_OPERATOR"],
             [entry["roleCode"] for entry in plan if entry["kind"] == "appointment"],
         )
         self.assertNotIn("revokedAppointment", json.dumps(plan))
-        self.assertNotIn("SALES_CONTACT_OWNER", json.dumps(plan))
+        self.assertEqual(
+            {"account": "sales", "authorityCode": "SALES_CONTACT_OWNER", "scope": "OWNED_ROOT"},
+            {key: plan[-1][key] for key in ("account", "authorityCode", "scope")},
+        )
 
     def test_golden_completion_requires_unique_exact_facts_and_original_receipt(self):
         completion = self.completion()
@@ -392,7 +396,7 @@ class R1AcceptanceTest(unittest.TestCase):
             "operationId": OPERATION,
             "status": "GOLDEN_VERIFIED",
             "environmentDigest": "a" * 64,
-            "managementCommandCount": 15,
+            "managementCommandCount": 16,
             "goldenCommandId": self.completion()["commandId"],
             "resultFact": {"factType": "LEAD_CONTACT_RESULT", "factRef": "opaque-ref"},
             "counts": {"contactResult": 1, "opportunity": 1, "event": 2, "outbox": 2, "receipt": 1, "audit": 1},

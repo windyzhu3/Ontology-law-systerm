@@ -13,6 +13,7 @@ export const WRITE_SEQUENCE: readonly { step: string; method: 'POST'|'PUT'; path
     ['sourceOwner','LEAD_CAPTURE'], ['sourceOwner','LEAD_INGRESS_RESOLVE'], ['sourceOwner','LEAD_INGRESS_COMPLETE'], ['sourceOwner','SOURCE_INTAKE_REQUEST_ACK'],
     ['supervisor','LEAD_ASSIGN'], ['supervisor','LEAD_ROUTING_DECIDE'], ['supervisor','LEAD_VALIDITY_REVIEW'],
   ].map(([account, authority]) => ({ step: `grant-${account}-${authority}`, method: 'POST' as const, path: '/api/v1/admin/identity/authority-grants' })),
+  { step: 'grant-sales-SALES_CONTACT_OWNER', method: 'POST', path: '/api/v1/admin/identity/authority-grants' },
   { step: 'capture-R1_AUTO', method: 'POST', path: '/api/v1/leads' },
   { step: 'contact-draft', method: 'PUT', path: /^\/api\/v1\/tasks\/[0-9a-f-]{36}\/draft$/ },
   { step: 'contact-submit', method: 'POST', path: /^\/api\/v1\/tasks\/[0-9a-f-]{36}\/commands\/record-contact-result$/ },
@@ -34,6 +35,7 @@ export type WriteIntent = Omit<ArmedWrite, 'commandId'> & { commandId?: string }
 type Confirmed = JournalCommand & { status: 'CONFIRMED'; httpStatus: number; receiptId: string; resultFact: Record<string, unknown>; resourceId: string };
 type Pending = JournalCommand & { status: 'PENDING' };
 type JournalData = { profile: 'R1_ISOLATED_ACCEPTANCE_JOURNAL_V1'; identity: JournalIdentity; commands: (Pending|Confirmed)[]; stages: string[] };
+const STAGES = ['MANAGEMENT_COMPLETED','SALES_AUTHORITY_COMPLETED','IDENTITIES_VERIFIED','CAPTURE_COMPLETED','DRAFT_RELOADED','GOLDEN_COMPLETED'] as const;
 
 function exact(value: unknown, keys: string[]): value is Record<string, any> {
   return !!value && typeof value === 'object' && Object.keys(value).sort().join() === [...keys].sort().join();
@@ -51,6 +53,17 @@ function policy(index: number, command: JournalCommand): void {
   boundary(UUID.test(command.actorAppointmentId) && command.onBehalfAppointmentId === null);
 }
 
+function validProgress(data: JournalData): void {
+  boundary(data.stages.every((stage, index) => stage === STAGES[index]));
+  const confirmed = data.commands.filter(command => command.status === 'CONFIRMED').length;
+  const minimums = [15,16,16,17,18,19];
+  if (data.stages.length) boundary(confirmed >= minimums[data.stages.length - 1]);
+  const maximums = [15,16,16,17,18,19,19];
+  boundary(data.commands.length <= maximums[data.stages.length]);
+  if (data.stages.includes('MANAGEMENT_COMPLETED')) boundary(data.commands.slice(0, 15).every(command => command.status === 'CONFIRMED'));
+  if (data.stages.includes('SALES_AUTHORITY_COMPLETED')) boundary(data.commands[15]?.status === 'CONFIRMED');
+}
+
 export class AcceptanceJournal {
   private constructor(readonly path: string, private data: JournalData, private protect: () => Promise<void>) {}
   static async open(path: string, identity: JournalIdentity, protect: () => Promise<void> = async () => {}): Promise<AcceptanceJournal> {
@@ -65,6 +78,7 @@ export class AcceptanceJournal {
     boundary(Array.isArray(data.commands) && Array.isArray(data.stages));
     data.commands.forEach((command, index) => { policy(index, command); boundary(command.status === 'PENDING' || command.status === 'CONFIRMED'); });
     boundary(data.commands.filter(command => command.status === 'PENDING').length <= 1 && !data.commands.slice(0, -1).some(command => command.status === 'PENDING'));
+    validProgress(data);
     return new AcceptanceJournal(path, data, protect);
   }
   pending(): Pending | undefined { return this.data.commands.find(command => command.status === 'PENDING') as Pending|undefined; }
@@ -96,9 +110,9 @@ export class AcceptanceJournal {
     await this.save();
   }
   async completeStage(stage: string): Promise<void> {
-    const allowed = ['MANAGEMENT_COMPLETED','IDENTITIES_VERIFIED','CAPTURE_COMPLETED','DRAFT_RELOADED','GOLDEN_COMPLETED'];
-    const index = allowed.indexOf(stage); boundary(index === this.data.stages.length && !this.pending());
+    const index = STAGES.indexOf(stage as typeof STAGES[number]); boundary(index === this.data.stages.length && !this.pending());
     if (stage === 'MANAGEMENT_COMPLETED') boundary(this.data.commands.length === 15 && this.data.commands.every(command => command.status === 'CONFIRMED'));
+    if (stage === 'SALES_AUTHORITY_COMPLETED') boundary(this.data.commands.length === 16 && this.data.commands.every(command => command.status === 'CONFIRMED'));
     this.data.stages.push(stage); await this.save();
   }
 }
@@ -150,30 +164,33 @@ export class R1GoldenOrchestrator {
     resources[policyEntry.step] = confirmed.resourceId;
     return confirmed;
   }
-  async run(): Promise<{ managementCommandCount: 15; goldenCommandId: string; resultFact: Record<string,unknown>; counts: Record<string,number> }> {
+  async run(): Promise<{ managementCommandCount: 16; goldenCommandId: string; resultFact: Record<string,unknown>; counts: Record<string,number> }> {
     boundary(!this.journal.pending());
     const resources = this.journal.resources();
     if (!this.journal.hasStage('MANAGEMENT_COMPLETED')) {
       for (let index = 0; index < 15; index++) await this.write(index, resources);
       await this.journal.completeStage('MANAGEMENT_COMPLETED');
     }
+    if (!this.journal.hasStage('SALES_AUTHORITY_COMPLETED')) {
+      await this.write(15, resources); await this.journal.completeStage('SALES_AUTHORITY_COMPLETED');
+    }
     if (!this.journal.hasStage('IDENTITIES_VERIFIED')) {
       await this.adapter.verifyIdentities(resources); await this.journal.completeStage('IDENTITIES_VERIFIED');
     }
     if (!this.journal.hasStage('CAPTURE_COMPLETED')) {
-      await this.write(15, resources); await this.journal.completeStage('CAPTURE_COMPLETED');
+      await this.write(16, resources); await this.journal.completeStage('CAPTURE_COMPLETED');
     }
     resources.contactTask = await this.adapter.locateContactTask(resources); boundary(UUID.test(resources.contactTask));
     if (!this.journal.hasStage('DRAFT_RELOADED')) {
-      await this.write(16, resources); await this.adapter.reloadDraft(resources); await this.journal.completeStage('DRAFT_RELOADED');
+      await this.write(17, resources); await this.adapter.reloadDraft(resources); await this.journal.completeStage('DRAFT_RELOADED');
     }
-    const submit = await this.write(17, resources);
+    const submit = await this.write(18, resources);
     const recovered = await this.adapter.retrieveReceipt(submit.commandId);
     boundary(JSON.stringify(recovered) === JSON.stringify({ commandId: submit.commandId, receiptId: submit.receiptId, outcome: 'SUCCEEDED', resultFact: submit.resultFact }));
     boundary(submit.resultFact.factType === 'LEAD_CONTACT_RESULT' && FACT_DIGEST.test(String(submit.resultFact.digest)));
     const closure = await this.adapter.closeCompletion(submit.commandId, String(submit.resultFact.digest), resources);
     boundary(closure.commandId === submit.commandId && JSON.stringify(closure.counts) === JSON.stringify({ contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 }));
     if (!this.journal.hasStage('GOLDEN_COMPLETED')) await this.journal.completeStage('GOLDEN_COMPLETED');
-    return { managementCommandCount: 15, goldenCommandId: submit.commandId, resultFact: submit.resultFact, counts: closure.counts };
+    return { managementCommandCount: 16, goldenCommandId: submit.commandId, resultFact: submit.resultFact, counts: closure.counts };
   }
 }

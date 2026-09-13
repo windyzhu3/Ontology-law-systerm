@@ -186,3 +186,67 @@ Exit code `0`, silent.
 ### Review-fix live boundary
 
 No application verifier, real/private run, protected runtime, database, service, browser, IdP, trust store, fixed listener, or old suite was accessed in this fix. The strict-TLS golden run remains Root-owned after scoped re-review; this offline GREEN does not claim runtime PASS. The pre-existing untracked crash/replay logs, offline `test-results/`, and concurrent Root progress-document edit remain untouched and excluded.
+
+## Sales-authority amendment
+
+Base commit: `45891ea2910ff5053caf5ef5b3242bab9dc2a397`.
+
+The user-approved bounded amendment adds exactly one founder-issued DIRECT `SALES_CONTACT_OWNER` grant for the existing sales appointment, scoped to the existing OWNED_ROOT organization. The original first 15 commands and the historic meaning of `MANAGEMENT_COMPLETED` are unchanged. The added command is index 15 and receives its own `SALES_AUTHORITY_COMPLETED` stage; capture, Draft, and submit move to indexes 16, 17, and 18. Fresh execution is therefore 19 writes total, while the approved same-operation continuation performs only the new grant plus the remaining three writes. Closed reports now require management count 16.
+
+The journal validates an exact ordered stage prefix and command-count bounds on reopen. It rejects a pending added grant, an old capture at index 15, malformed stage ordering, and operation/environment identity mismatches. The continuation test compares all persisted fields of the original 15 confirmed command records before and after completion. Browser-bound tests exercise the real `prepareWrite` and `verifyIdentities` methods through transport doubles, proving the selected UI/body scope is OWNED_ROOT, the exact expected grant is ACTIVE, and no other sales grant exists.
+
+### Amendment RED
+
+TypeScript command:
+
+```powershell
+C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe node_modules/@playwright/test/cli.js test r1-isolated-harness.spec.ts --config e2e/r1-isolated.config.ts --project offline-r1-isolated
+```
+
+Exit code `1`: `7 failed, 6 passed`. Failures identified the absent index-15 sales grant, old capture/draft/submit indexes, missing sales-authority stage/continuation, acceptance of malformed stage ordering, old no-sales-grant identity assertion, and report count 15. One browser-verifier fixture path key was corrected before accepting its behavioral RED; the focused rerun then failed at the expected existing `R1_ISOLATED_BOUNDARY` no-sales-grant assertion.
+
+Python command:
+
+```powershell
+python -m unittest tests.test_r1_acceptance.R1AcceptanceTest.test_fixed_management_blueprint_preserves_fifteen_then_adds_owned_root_sales_authority tests.test_r1_acceptance.R1AcceptanceTest.test_closed_report_whitelists_public_evidence_and_redacts_nested_secrets
+```
+
+Exit code `1`: one failure and one error. The blueprint lacked `grant-sales-SALES_CONTACT_OWNER`, and `closed_report` rejected management count 16.
+
+### Amendment GREEN
+
+Final covering offline TypeScript command, with only `FORCE_COLOR=0` set in the test process:
+
+```powershell
+C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe node_modules/@playwright/test/cli.js test --config e2e/r1-isolated.config.ts --project offline-r1-isolated
+```
+
+Exit code `0`: `13 passed (2.4s)` using one worker, with no warning output.
+
+Python command:
+
+```powershell
+python -m unittest tests.test_r1_acceptance
+```
+
+Exit code `0`:
+
+```text
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 0.148s
+
+OK
+```
+
+Touched TypeScript graph command:
+
+```powershell
+C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe node_modules/typescript/bin/tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --esModuleInterop --skipLibCheck --strict --types node,@playwright/test e2e/fixtures/r1-isolated-environment.ts e2e/fixtures/r1-isolated-setup.ts e2e/fixtures/r1-isolated-browser.ts e2e/r1-isolated.config.ts e2e/tests/r1-golden-path.spec.ts e2e/tests/r1-isolated-harness.spec.ts apps/workbench/src/features/workcard/contract.ts apps/workbench/src/generated/api/schema.d.ts
+```
+
+Exit code `0`, silent. `git diff --check` also exited `0`.
+
+### Amendment live boundary
+
+No private runtime, service, database, browser session, IdP, CA/trust store, fixed listener, or live write was accessed. No product/API/UI, permission catalog, DDL, dependency, or old Task9 consumer changed. This offline amendment is not a golden runtime PASS; Root owns independent scoped review and the explicitly approved controlled continuation. Concurrent Root public-plan/progress/SOP changes and pre-existing crash/replay/test-result files remain untouched and excluded from this source commit.

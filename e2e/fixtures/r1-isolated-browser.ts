@@ -208,7 +208,9 @@ export class R1IsolatedBrowserAdapter implements GoldenAdapter {
     const session = await this.adminPage('/api/v1/admin/identity/authority-grants', resources), parts = policy.step.split('-'), account = parts[1], authorityCode = parts.slice(2).join('-');
     this.beforeIds = new Set((await this.rows(session, '/api/v1/admin/identity/authority-grants')).map(row => row.id));
     await session.page.getByRole('button', { name: '新增直接授权', exact: true }).click();
-    const appointmentId = resources[`appointment-${account}`], scopeOrganizationId = this.environment.bootstrap.rootId; boundary(UUID.test(appointmentId));
+    const appointmentId = resources[`appointment-${account}`];
+    const scopeOrganizationId = account === 'sales' ? resources['organization-OWNED_ROOT'] : this.environment.bootstrap.rootId;
+    boundary(UUID.test(appointmentId) && UUID.test(scopeOrganizationId));
     await session.page.getByLabel('授权任职', { exact: true }).selectOption(appointmentId); await session.page.getByLabel('组织范围', { exact: true }).selectOption(scopeOrganizationId); await session.page.getByLabel('权限', { exact: true }).selectOption(authorityCode);
     const validFrom = new Date(Math.floor(Date.now() / 60_000) * 60_000 - 60_000).toISOString();
     await session.page.getByLabel('生效时间', { exact: true }).fill(localDateTime(validFrom));
@@ -294,15 +296,17 @@ export class R1IsolatedBrowserAdapter implements GoldenAdapter {
     }
     boundary(!appointments.some(row => row.organization?.id === resources['organization-EMPTY_ROOT']));
     boundary(appointments.filter(row => row.roleCode === 'CONTACT_OPERATOR' && row.state === 'ACTIVE').length === 1);
-    boundary(!grants.some(row => row.appointment?.id === resources['appointment-sales']));
     for (const [alias, authority] of [
       ['sourceOwner','LEAD_CAPTURE'], ['sourceOwner','LEAD_INGRESS_RESOLVE'], ['sourceOwner','LEAD_INGRESS_COMPLETE'], ['sourceOwner','SOURCE_INTAKE_REQUEST_ACK'],
       ['supervisor','LEAD_ASSIGN'], ['supervisor','LEAD_ROUTING_DECIDE'], ['supervisor','LEAD_VALIDITY_REVIEW'],
+      ['sales','SALES_CONTACT_OWNER'],
     ] as const) {
       const grant = grants.find(row => row.id === resources[`grant-${alias}-${authority}`]);
+      const scope = alias === 'sales' ? resources['organization-OWNED_ROOT'] : this.environment.bootstrap.rootId;
       boundary(grant?.appointment?.id === resources[`appointment-${alias}`] && grant.authorityCode === authority
-        && grant.scopeOrganization?.id === this.environment.bootstrap.rootId && grant.state === 'ACTIVE');
+        && grant.scopeOrganization?.id === scope && grant.state === 'ACTIVE');
     }
+    boundary(grants.filter(row => row.appointment?.id === resources['appointment-sales']).length === 1);
     for (const alias of ['sourceOwner','supervisor','sales'] as const) {
       const session = await this.workbench(alias, resources);
       boundary(session.self.selectedAppointmentId === resources[`appointment-${alias}`] && session.self.selectedOnBehalfAppointmentId === null);
