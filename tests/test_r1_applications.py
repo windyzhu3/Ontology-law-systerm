@@ -286,6 +286,34 @@ class PrepareApplicationsTest(ApplicationFixture):
         self.assertTrue(commands["spa"][1].endswith("r1_server.mjs"))
         self.assertNotIn("1944", "\n".join(" ".join(value) for value in commands.values()))
 
+    def test_service_transaction_uses_runtime_role_without_privileged_table_locks(self) -> None:
+        folder, _, _, _ = self.prepared()
+        service = json.loads((folder / "service.json").read_text(encoding="utf-8"))
+        sql = applications._service_transaction_sql(
+            service, self.environment_manifest, service["externalSubjectHmac"]
+        ).decode("utf-8")
+
+        self.assertTrue(sql.startswith("BEGIN ISOLATION LEVEL SERIALIZABLE;"))
+        self.assertEqual(sql.count("SET LOCAL ROLE law_app_command;"), 1)
+        self.assertNotIn("SET LOCAL ROLE law_schema_migrator", sql)
+        self.assertNotIn("LOCK TABLE", sql)
+        for prerequisite in (
+            "FROM identity.tenant",
+            "FROM identity.organization_unit",
+            "FROM identity.principal",
+            "FROM identity.appointment",
+            "FROM identity.authority_grant",
+            "FROM platform_meta.deployment_state",
+        ):
+            self.assertIn(prerequisite, sql)
+        self.assertEqual(sql.count("INSERT INTO identity.principal"), 1)
+        self.assertEqual(sql.count("INSERT INTO identity.appointment"), 1)
+        self.assertEqual(sql.count("INSERT INTO identity.authority_grant"), 1)
+        self.assertEqual(sql.count("affected<>1"), 2)
+        self.assertEqual(sql.count("affected<>3"), 1)
+        self.assertIn("R1 application assembly prerequisite mismatch", sql)
+        self.assertIn("COMMIT;\nSELECT 'R1_APPLICATION_SERVICE_CREATED_5';", sql)
+
 
 class StartAndVerifyApplicationsTest(ApplicationFixture):
     def started(self) -> tuple[Path, dict, dict]:

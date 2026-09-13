@@ -342,8 +342,6 @@ def _service_transaction_sql(service: dict, manifest: dict, subject_hmac: str) -
     sql = f"""BEGIN ISOLATION LEVEL SERIALIZABLE;
 SET LOCAL ROLE law_app_command;
 SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='30s';
-LOCK TABLE identity.tenant, identity.organization_unit, identity.principal, identity.appointment,
- identity.authority_grant IN SHARE ROW EXCLUSIVE MODE;
 DO $r1$ DECLARE affected integer; BEGIN
  IF (SELECT count(*) FROM identity.tenant WHERE tenant_id={_sql_literal(tenant)}::uuid AND tenant_code='R1_E2E_MAIN' AND state='ACTIVE' AND revision=0)<>1
  OR (SELECT count(*) FROM identity.organization_unit WHERE tenant_id={_sql_literal(tenant)}::uuid AND organization_unit_id={_sql_literal(root)}::uuid AND unit_code='ROOT' AND parent_organization_unit_id IS NULL AND state='ACTIVE' AND revision=0)<>1
