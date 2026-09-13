@@ -288,6 +288,33 @@ class PrepareApplicationsTest(ApplicationFixture):
 
 
 class StartAndVerifyApplicationsTest(ApplicationFixture):
+    def started(self) -> tuple[Path, dict, dict]:
+        folder, projection, _, _ = self.prepared()
+        counter = iter((101, 102, 103))
+
+        def launch(name, command, root, folder):
+            return {
+                "pid": next(counter),
+                "created": "2026-09-13T00:00:01+00:00",
+                "startedAt": "2026-09-13T00:00:00+00:00",
+                "command": command,
+                "executable": command[0],
+                "commandLine": "saved-" + name,
+            }
+
+        with mock.patch.object(applications, "_verify_bootstrap_source", return_value=projection), \
+             mock.patch.object(applications, "_protect_application_boundary"), \
+             mock.patch.object(applications, "_verify_service_fixture"), \
+             mock.patch.object(applications, "_ports_available"), \
+             mock.patch.object(applications, "_launch_process", side_effect=launch), \
+             mock.patch.object(applications, "_wait_for_api"):
+            applications.start_applications(self.root, RUN)
+        processes = json.loads((folder / "state.json").read_text(encoding="utf-8"))["processes"]
+        (folder / "spa.stdout").write_text(
+            "R1_SPA_READY pid=103 host=127.0.0.1 port=29444\n", encoding="utf-8"
+        )
+        return folder, projection, processes
+
     def test_readiness_requires_existing_204_empty_no_etag_no_store_contract(self) -> None:
         good = [
             (200, {"Cache-Control": "no-store"}, b"spa"),
@@ -383,6 +410,77 @@ class StartAndVerifyApplicationsTest(ApplicationFixture):
                 applications.verify_applications(self.root, RUN)
         state = json.loads((folder / "state.json").read_text(encoding="utf-8"))
         self.assertNotEqual(state["phase"], "APPLICATION_INFRASTRUCTURE_READY")
+
+    def test_distinct_pid_mismatch_precedes_listener_and_readiness_probes(self) -> None:
+        folder, projection, saved = self.started()
+
+        def snapshot(pid):
+            name = next(name for name, item in saved.items() if item["pid"] == pid)
+            item = dict(saved[name])
+            if name == "api":
+                item["pid"] = 999
+            return item
+
+        listener_count = mock.Mock(return_value=0)
+        api_listeners = mock.Mock(return_value=[])
+        readiness = mock.Mock()
+        with mock.patch.object(applications, "_verify_bootstrap_source", return_value=projection), \
+             mock.patch.object(applications, "_protect_application_boundary"), \
+             mock.patch.object(applications, "_verify_service_fixture"), \
+             mock.patch.object(applications, "_process_snapshot", side_effect=snapshot), \
+             mock.patch.object(applications, "_listener_count", listener_count), \
+             mock.patch.object(applications, "_api_listener_inventory", api_listeners), \
+             mock.patch.object(applications, "_probe_readiness", readiness), \
+             self.assertRaisesRegex(RuntimeError, "api process identity mismatch"):
+            applications.verify_applications(self.root, RUN)
+        listener_count.assert_not_called()
+        api_listeners.assert_not_called()
+        readiness.assert_not_called()
+        state = json.loads((folder / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(state["phase"], "STARTED_UNVERIFIED")
+        self.assertFalse(state["applicationReady"])
+        self.assertNotIn("readiness", state)
+
+    def assert_api_listener_rejected(self, listeners: list[dict]) -> None:
+        folder, projection, saved = self.started()
+
+        def snapshot(pid):
+            name = next(name for name, item in saved.items() if item["pid"] == pid)
+            return dict(saved[name])
+
+        readiness = mock.Mock(return_value={"unexpected": "probe reached"})
+        with mock.patch.object(applications, "_verify_bootstrap_source", return_value=projection), \
+             mock.patch.object(applications, "_protect_application_boundary"), \
+             mock.patch.object(applications, "_verify_service_fixture"), \
+             mock.patch.object(applications, "_process_snapshot", side_effect=snapshot), \
+             mock.patch.object(applications, "_ready_log", return_value=True), \
+             mock.patch.object(applications, "_listener_count", return_value=0), \
+             mock.patch.object(
+                 applications, "_api_listener_inventory", return_value=listeners
+             ), \
+             mock.patch.object(applications, "_probe_readiness", readiness), \
+             self.assertRaisesRegex(RuntimeError, "API listener ownership mismatch"):
+            applications.verify_applications(self.root, RUN)
+        readiness.assert_not_called()
+        state = json.loads((folder / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(state["phase"], "STARTED_UNVERIFIED")
+        self.assertFalse(state["applicationReady"])
+        self.assertNotIn("readiness", state)
+
+    def test_wrong_api_listener_owner_cannot_publish_ready(self) -> None:
+        self.assert_api_listener_rejected([
+            {"protocol": "TCP", "address": "127.0.0.1", "port": 29445, "pid": 999}
+        ])
+
+    def test_wrong_api_listener_address_cannot_publish_ready(self) -> None:
+        self.assert_api_listener_rejected([
+            {"protocol": "TCP", "address": "0.0.0.0", "port": 29445, "pid": 101}
+        ])
+
+    def test_wrong_api_listener_port_cannot_publish_ready(self) -> None:
+        self.assert_api_listener_rejected([
+            {"protocol": "TCP", "address": "127.0.0.1", "port": 29446, "pid": 101}
+        ])
 
 
 class CliTest(unittest.TestCase):

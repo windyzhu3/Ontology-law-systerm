@@ -864,6 +864,44 @@ def _listener_count(pid: int) -> int:
     return int(result.stdout.strip())
 
 
+def _api_listener_inventory(api_pid: int) -> list[dict]:
+    if os.name != "nt":
+        raise RuntimeError("API listener verification requires the pinned Windows host")
+    script = (
+        "$ErrorActionPreference='Stop';$apiProcessId=" + str(api_pid) + ";$items=@();"
+        "$items+=@(Get-NetTCPConnection -State Listen | Where-Object {"
+        "$_.OwningProcess -eq $apiProcessId -or $_.LocalPort -eq 29445} | ForEach-Object {"
+        "[ordered]@{protocol='TCP';address=[string]$_.LocalAddress;"
+        "port=[int]$_.LocalPort;pid=[int]$_.OwningProcess}});"
+        "$items+=@(Get-NetUDPEndpoint | Where-Object {"
+        "$_.OwningProcess -eq $apiProcessId -or $_.LocalPort -eq 29445} | ForEach-Object {"
+        "[ordered]@{protocol='UDP';address=[string]$_.LocalAddress;"
+        "port=[int]$_.LocalPort;pid=[int]$_.OwningProcess}});"
+        "@{items=@($items)} | ConvertTo-Json -Compress -Depth 3"
+    )
+    result = subprocess.run(
+        ["pwsh.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+        capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    try:
+        payload = json.loads(result.stdout)
+        items = payload["items"]
+        if result.returncode or set(payload) != {"items"} or not isinstance(items, list):
+            raise ValueError
+        inventory = []
+        for item in items:
+            if not isinstance(item, dict) or set(item) != {"protocol", "address", "port", "pid"} or \
+               item["protocol"] not in {"TCP", "UDP"} or not isinstance(item["address"], str) or \
+               not isinstance(item["port"], int) or not isinstance(item["pid"], int):
+                raise ValueError
+            inventory.append(item)
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        raise RuntimeError("API listener evidence unavailable") from None
+    return sorted(inventory, key=lambda item: (
+        item["protocol"], item["address"], item["port"], item["pid"],
+    ))
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -928,6 +966,11 @@ def verify_applications(root: Path, run: str) -> dict:
         raise RuntimeError("current SPA readiness log unavailable")
     if _listener_count(processes["worker"]["pid"]) != 0:
         raise RuntimeError("Worker has an unexpected listener")
+    api_pid = processes["api"]["pid"]
+    if _api_listener_inventory(api_pid) != [
+        {"protocol": "TCP", "address": "127.0.0.1", "port": 29445, "pid": api_pid}
+    ]:
+        raise RuntimeError("API listener ownership mismatch")
     probes = _probe_readiness(runtime)
     for name, expected in processes.items():
         if not _same_process(expected, _process_snapshot(expected["pid"])):
