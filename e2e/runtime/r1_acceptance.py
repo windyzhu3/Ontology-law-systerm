@@ -27,6 +27,8 @@ import r1_applications as applications  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 INPUT_PROFILE = "R1_ISOLATED_ACCEPTANCE_INPUT_V1"
 COMPLETION_PROFILE = "R1_GOLDEN_COMPLETION_V1"
+INGRESS_PROFILE = "R1_INGRESS_BINDING_V1"
+FLOW_PROFILE = "CAPTURE_INGRESS_AUTOASSIGN_CONTACT_V1"
 READY_PHASE = "APPLICATION_INFRASTRUCTURE_READY"
 UUID_PATTERN = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
 HASH_PATTERN = re.compile(r"[0-9a-f]{64}")
@@ -243,9 +245,150 @@ def _single(value: dict, key: str) -> dict:
     return rows[0]
 
 
+def validate_ingress_binding(value: object, expected: dict) -> dict:
+    """Validate the exact capture -> ingress -> automatic-contact causal chain."""
+    if not isinstance(value, dict) or value.get("profile") != INGRESS_PROFILE or \
+       value.get("phase") not in {"CAPTURED", "COMPLETED"} or not _uuid(value.get("tenantId")) or \
+       not isinstance(expected, dict) or value.get("phase") != expected.get("phase"):
+        raise RuntimeError("ingress binding mismatch")
+    try:
+        capture = value["captureReceipt"]
+        task = value["ingressTask"]
+        if capture != {
+            "commandId": expected["captureCommandId"], "outcome": "SUCCEEDED",
+            "resultFactType": "lead.lead", "resultFactId": capture["resultFactId"], "resultFactRevision": 0,
+        } or not _uuid(capture["resultFactId"]):
+            raise ValueError
+        if task.get("id") != expected["ingressTaskId"] or task.get("ownerAppointmentId") != expected["sourceOwnerAppointmentId"] or \
+           task.get("primaryCommandCode") != "COMPLETE_LEAD_INGRESS" or task.get("subjectFactType") != "lead.lead" or \
+           task.get("subjectFactId") != capture["resultFactId"] or task.get("subjectFactRevision") != 0:
+            raise ValueError
+        if value["phase"] == "CAPTURED":
+            if task.get("state") != "OPEN" or task.get("revision") != 0 or any(task.get(key) is not None for key in (
+                "completionFactType", "completionFactId", "completionFactRevision",
+            )) or any(value.get(key) is not None for key in (
+                "ingressDraft", "ingressReceipt", "assignment", "contactTask",
+            )):
+                raise ValueError
+            return value
+        draft, receipt, assignment, contact = (value[key] for key in (
+            "ingressDraft", "ingressReceipt", "assignment", "contactTask",
+        ))
+        lead = capture["resultFactId"]
+        if task.get("state") != "DONE" or task.get("revision") != 1 or task.get("completionFactType") != "lead.lead" or \
+           task.get("completionFactId") != lead or task.get("completionFactRevision") != 1:
+            raise ValueError
+        if draft != {
+            "id": expected["ingressDraftId"], "taskId": expected["ingressTaskId"], "actionCode": "COMPLETE_LEAD_INGRESS",
+            "state": "CONFIRMED", "revision": 1, "createdByAppointmentId": expected["sourceOwnerAppointmentId"],
+            "confirmedByAppointmentId": expected["sourceOwnerAppointmentId"],
+        }:
+            raise ValueError
+        if receipt != {
+            "commandId": expected["ingressCommandId"], "outcome": "SUCCEEDED", "resultFactType": "lead.lead",
+            "resultFactId": lead, "resultFactRevision": 1,
+        }:
+            raise ValueError
+        if not _uuid(assignment.get("id")) or assignment.get("leadId") != lead or \
+           assignment.get("ownerAppointmentId") != expected["salesOwnerAppointmentId"] or assignment.get("assignmentNo") != 1 or \
+           assignment.get("reasonCode") != "SOURCE_POLICY_AUTOMATIC" or assignment.get("state") != "OPEN" or assignment.get("revision") != 0:
+            raise ValueError
+        if contact != {
+            "id": expected["contactTaskId"], "ownerAppointmentId": expected["salesOwnerAppointmentId"],
+            "primaryCommandCode": "RECORD_CONTACT_RESULT", "state": "OPEN", "revision": 0,
+            "subjectFactType": "lead.lead", "subjectFactId": lead, "subjectFactRevision": 1,
+        }:
+            raise ValueError
+    except (KeyError, TypeError, ValueError):
+        raise RuntimeError("ingress binding mismatch") from None
+    return value
+
+
+def ingress_binding_query(
+    tenant_id: str, capture_command_id: str, ingress_task_id: str, source_owner_id: str,
+    ingress_command_id: str | None = None, ingress_draft_id: str | None = None,
+    contact_task_id: str | None = None, sales_owner_id: str | None = None,
+) -> bytes:
+    completed = all(value is not None for value in (ingress_command_id, ingress_draft_id, contact_task_id, sales_owner_id))
+    if not all(_uuid(value) for value in (tenant_id, capture_command_id, ingress_task_id, source_owner_id)) or \
+       (completed and not all(_uuid(value) for value in (ingress_command_id, ingress_draft_id, contact_task_id, sales_owner_id))) or \
+       (not completed and any(value is not None for value in (ingress_command_id, ingress_draft_id, contact_task_id, sales_owner_id))):
+        raise RuntimeError("ingress binding selector invalid")
+    literal = applications._sql_literal
+    tenant, capture_command, ingress_task, source_owner = [literal(value) + "::uuid" for value in (
+        tenant_id, capture_command_id, ingress_task_id, source_owner_id,
+    )]
+    null = "NULL::jsonb"
+    if completed:
+        ingress_command, ingress_draft, contact_task, sales_owner = [literal(value) + "::uuid" for value in (
+            ingress_command_id, ingress_draft_id, contact_task_id, sales_owner_id,
+        )]
+        draft_json = f"(SELECT jsonb_build_object('id',action_draft_id,'taskId',task_occurrence_id,'actionCode',action_code,'state',state,'revision',revision,'createdByAppointmentId',created_by_appointment_id,'confirmedByAppointmentId',confirmed_by_appointment_id) FROM responsibility.action_draft WHERE tenant_id={tenant} AND action_draft_id={ingress_draft} AND task_occurrence_id={ingress_task} AND created_by_appointment_id={source_owner} AND confirmed_by_appointment_id={source_owner})"
+        receipt_json = f"(SELECT jsonb_build_object('commandId',s.command_id,'outcome',r.outcome,'resultFactType',r.result_fact_type,'resultFactId',r.result_fact_id,'resultFactRevision',r.result_fact_revision) FROM execution.command_execution_slot s JOIN execution.command_receipt r USING(tenant_id,command_execution_slot_id) WHERE s.tenant_id={tenant} AND s.command_id={ingress_command} AND s.command_type='COMPLETE_LEAD_INGRESS')"
+        assignment_json = f"(SELECT jsonb_build_object('id',lead_assignment_id,'leadId',lead_id,'ownerAppointmentId',owner_appointment_id,'assignmentNo',assignment_no,'reasonCode',assignment_reason_code,'state',assignment_status_code,'revision',revision) FROM lead.lead_assignment WHERE tenant_id={tenant} AND lead_id=(SELECT result_fact_id FROM capture_receipt) AND owner_appointment_id={sales_owner} AND assignment_no=1 AND assignment_reason_code='SOURCE_POLICY_AUTOMATIC')"
+        contact_json = f"(SELECT jsonb_build_object('id',task_occurrence_id,'ownerAppointmentId',owner_appointment_id,'primaryCommandCode',primary_command_code,'state',state,'revision',revision,'subjectFactType',subject_type,'subjectFactId',subject_id,'subjectFactRevision',subject_revision) FROM responsibility.task_occurrence WHERE tenant_id={tenant} AND task_occurrence_id={contact_task} AND owner_appointment_id={sales_owner} AND primary_command_code='RECORD_CONTACT_RESULT')"
+        phase = "COMPLETED"
+    else:
+        draft_json = receipt_json = assignment_json = contact_json = null
+        phase = "CAPTURED"
+    sql = f"""BEGIN READ ONLY;
+SET LOCAL ROLE law_app_query;
+WITH capture_receipt AS (
+ SELECT s.command_id,r.outcome,r.result_fact_type,r.result_fact_id,r.result_fact_revision
+ FROM execution.command_execution_slot s JOIN execution.command_receipt r USING(tenant_id,command_execution_slot_id)
+ WHERE s.tenant_id={tenant} AND s.command_id={capture_command} AND s.command_type='CAPTURE_LEAD'
+)
+SELECT jsonb_build_object(
+ 'profile','{INGRESS_PROFILE}','phase','{phase}','tenantId',{tenant}::text,
+ 'captureReceipt',(SELECT jsonb_build_object('commandId',command_id,'outcome',outcome,'resultFactType',result_fact_type,'resultFactId',result_fact_id,'resultFactRevision',result_fact_revision) FROM capture_receipt),
+ 'ingressTask',(SELECT jsonb_build_object('id',task_occurrence_id,'ownerAppointmentId',owner_appointment_id,'primaryCommandCode',primary_command_code,'state',state,'revision',revision,'subjectFactType',subject_type,'subjectFactId',subject_id,'subjectFactRevision',subject_revision,'completionFactType',completion_fact_type,'completionFactId',completion_fact_id,'completionFactRevision',completion_fact_revision) FROM responsibility.task_occurrence WHERE tenant_id={tenant} AND task_occurrence_id={ingress_task} AND owner_appointment_id={source_owner} AND primary_command_code='COMPLETE_LEAD_INGRESS'),
+ 'ingressDraft',{draft_json},'ingressReceipt',{receipt_json},'assignment',{assignment_json},'contactTask',{contact_json}
+)::text;
+COMMIT;
+"""
+    return sql.encode("utf-8")
+
+
+def read_ingress_binding(
+    root: Path, run: str, operation_id: str, phase: str, tenant_id: str,
+    capture_command_id: str, ingress_task_id: str, source_owner_id: str,
+    ingress_command_id: str | None = None, ingress_draft_id: str | None = None,
+    contact_task_id: str | None = None, sales_owner_id: str | None = None,
+) -> dict:
+    environment = load_acceptance_environment(root, run, operation_id)
+    if tenant_id != environment["bootstrap"]["tenantId"] or phase not in {"CAPTURED", "COMPLETED"}:
+        raise RuntimeError("ingress binding mismatch")
+    runtime, folder, _, _, manifest, _ = applications._load_application(Path(root).resolve(strict=True), run, (READY_PHASE,))
+    result = applications._invoke(
+        applications._database_command(Path(root).resolve(strict=True), runtime, manifest),
+        Path(root).resolve(strict=True), folder, f"acceptance-ingress-{phase.lower()}-{operation_id}",
+        input_bytes=ingress_binding_query(
+            tenant_id, capture_command_id, ingress_task_id, source_owner_id,
+            ingress_command_id, ingress_draft_id, contact_task_id, sales_owner_id,
+        ),
+    )
+    if result.returncode:
+        raise RuntimeError("ingress binding unavailable")
+    try:
+        value = json.loads(result.stdout.strip())
+    except json.JSONDecodeError as error:
+        raise RuntimeError("ingress binding unavailable") from error
+    expected = {
+        "phase": phase, "captureCommandId": capture_command_id, "ingressTaskId": ingress_task_id,
+        "sourceOwnerAppointmentId": source_owner_id,
+    }
+    if phase == "COMPLETED":
+        expected.update({
+            "ingressCommandId": ingress_command_id, "ingressDraftId": ingress_draft_id,
+            "contactTaskId": contact_task_id, "salesOwnerAppointmentId": sales_owner_id,
+        })
+    validate_ingress_binding(value, expected)
+    return value
+
+
 def validate_golden_completion(value: object, expected_digest: str) -> dict:
     """Validate the closed CONTACT_CONNECTED_VALID database projection."""
-    if not isinstance(value, dict) or value.get("profile") != COMPLETION_PROFILE or \
+    if not isinstance(value, dict) or value.get("profile") != COMPLETION_PROFILE or value.get("flowProfile") != FLOW_PROFILE or \
        not _uuid(value.get("tenantId")) or not _uuid(value.get("commandId")) or \
        not isinstance(expected_digest, str) or not FACT_DIGEST_PATTERN.fullmatch(expected_digest):
         raise RuntimeError("golden completion mismatch")
@@ -256,6 +399,7 @@ def validate_golden_completion(value: object, expected_digest: str) -> dict:
         draft = _single(value, "drafts")
         receipt = _single(value, "receipts")
         audit = _single(value, "audits")
+        ingress = value.get("ingress")
         events = value.get("events")
         outboxes = value.get("outboxes")
         if not isinstance(events, list) or len(events) != 2 or not all(isinstance(row, dict) for row in events) or \
@@ -279,21 +423,21 @@ def validate_golden_completion(value: object, expected_digest: str) -> dict:
            opportunity.get("sourceContactResultId") != contact_id or opportunity.get("revision") != 0:
             raise ValueError
         if task.get("ownerAppointmentId") != owner or task.get("state") != "DONE" or \
-           task.get("revision") != 1 or task.get("completionFactType") != "LEAD_CONTACT_RESULT" or \
+           task.get("revision") != 1 or task.get("completionFactType") != "lead.lead_contact_result" or \
            task.get("completionFactId") != contact_id or task.get("completionFactHash") != expected_digest:
             raise ValueError
         if draft.get("taskId") != task_id or draft.get("state") != "CONFIRMED" or \
            draft.get("revision") != 1 or draft.get("confirmedByAppointmentId") != owner:
             raise ValueError
-        if receipt != {"commandId": command, "outcome": "SUCCEEDED", "resultFactType": "LEAD_CONTACT_RESULT", "resultFactId": contact_id, "resultFactHash": expected_digest}:
+        if receipt != {"commandId": command, "outcome": "SUCCEEDED", "resultFactType": "lead.lead_contact_result", "resultFactId": contact_id, "resultFactHash": expected_digest}:
             raise ValueError
         if audit.get("commandId") != command or audit.get("commandType") != "RECORD_CONTACT_RESULT" or \
            audit.get("resultCode") != "SUCCEEDED" or audit.get("actorAppointmentId") != owner or \
            audit.get("onBehalfOfAppointmentId") is not None:
             raise ValueError
         expected_events = {
-            ("LeadContactResultRecordedV1", "LEAD_CONTACT_RESULT", contact_id),
-            ("OpportunityOpened", "OPPORTUNITY", opportunity_id),
+            ("LeadContactResultRecordedV1", "lead.lead_contact_result", contact_id),
+            ("OpportunityOpened", "opportunity.opportunity", opportunity_id),
         }
         actual_events = {(row.get("type"), row.get("sourceFactType"), row.get("sourceFactId")) for row in events}
         event_ids = {row.get("id") for row in events}
@@ -303,22 +447,42 @@ def validate_golden_completion(value: object, expected_digest: str) -> dict:
         expected_outboxes = {(row["id"], row["type"]) for row in events}
         if actual_outboxes != expected_outboxes:
             raise ValueError
-    except (KeyError, TypeError, ValueError):
+        if not isinstance(ingress, dict):
+            raise ValueError
+        binding = dict(ingress)
+        binding["contactTask"] = {**ingress["contactTask"], "state": "OPEN", "revision": 0}
+        validate_ingress_binding(binding, {
+            "phase": "COMPLETED", "captureCommandId": ingress["captureReceipt"]["commandId"],
+            "ingressCommandId": ingress["ingressReceipt"]["commandId"], "ingressTaskId": ingress["ingressTask"]["id"],
+            "ingressDraftId": ingress["ingressDraft"]["id"], "sourceOwnerAppointmentId": ingress["ingressTask"]["ownerAppointmentId"],
+            "salesOwnerAppointmentId": owner, "contactTaskId": task_id,
+        })
+        if ingress["assignment"]["id"] != contact.get("assignmentId") or ingress["contactTask"] != {
+            "id": task_id, "ownerAppointmentId": owner, "primaryCommandCode": "RECORD_CONTACT_RESULT",
+            "state": "DONE", "revision": 1, "subjectFactType": "lead.lead",
+            "subjectFactId": contact.get("leadId"), "subjectFactRevision": 1,
+        }:
+            raise ValueError
+    except (KeyError, TypeError, ValueError, RuntimeError):
         raise RuntimeError("golden completion mismatch") from None
     return value
 
 
 def completion_query(
     tenant_id: str, command_id: str, task_id: str, draft_id: str,
-    owner_id: str, expected_digest: str,
+    owner_id: str, expected_digest: str, capture_command_id: str,
+    ingress_command_id: str, ingress_task_id: str, ingress_draft_id: str,
+    source_owner_id: str,
 ) -> bytes:
     """Build the fixed, read-only closure query without protected content columns."""
-    if not all(_uuid(value) for value in (tenant_id, command_id, task_id, draft_id, owner_id)) or \
+    if not all(_uuid(value) for value in (tenant_id, command_id, task_id, draft_id, owner_id, capture_command_id,
+                                           ingress_command_id, ingress_task_id, ingress_draft_id, source_owner_id)) or \
        not isinstance(expected_digest, str) or not FACT_DIGEST_PATTERN.fullmatch(expected_digest):
         raise RuntimeError("golden completion selector invalid")
     literal = applications._sql_literal
-    tenant, command, task, draft, owner = [literal(value) + "::uuid" for value in (
-        tenant_id, command_id, task_id, draft_id, owner_id,
+    tenant, command, task, draft, owner, capture_command, ingress_command, ingress_task, ingress_draft, source_owner = [literal(value) + "::uuid" for value in (
+        tenant_id, command_id, task_id, draft_id, owner_id, capture_command_id,
+        ingress_command_id, ingress_task_id, ingress_draft_id, source_owner_id,
     )]
     expected_hash = f"decode(translate({literal(expected_digest)},'-_','+/')||'=','base64')"
     sql = f"""BEGIN READ ONLY;
@@ -336,9 +500,30 @@ WITH selected_contact AS (
 ), selected_events AS (
  SELECT domain_event_id,event_type,source_fact_type,source_fact_id FROM execution.domain_event
  WHERE tenant_id={tenant} AND command_id={command}
+), capture_receipt AS (
+ SELECT s.command_id,r.outcome,r.result_fact_type,r.result_fact_id,r.result_fact_revision
+ FROM execution.command_execution_slot s JOIN execution.command_receipt r USING(tenant_id,command_execution_slot_id)
+ WHERE s.tenant_id={tenant} AND s.command_id={capture_command} AND s.command_type='CAPTURE_LEAD'
+), ingress_receipt AS (
+ SELECT s.command_id,r.outcome,r.result_fact_type,r.result_fact_id,r.result_fact_revision
+ FROM execution.command_execution_slot s JOIN execution.command_receipt r USING(tenant_id,command_execution_slot_id)
+ WHERE s.tenant_id={tenant} AND s.command_id={ingress_command} AND s.command_type='COMPLETE_LEAD_INGRESS'
+), selected_assignment AS (
+ SELECT lead_assignment_id,lead_id,owner_appointment_id,assignment_no,assignment_reason_code,assignment_status_code,revision
+ FROM lead.lead_assignment WHERE tenant_id={tenant} AND lead_id=(SELECT result_fact_id FROM capture_receipt)
+ AND owner_appointment_id={owner} AND assignment_no=1 AND assignment_reason_code='SOURCE_POLICY_AUTOMATIC'
 )
 SELECT jsonb_build_object(
- 'profile','R1_GOLDEN_COMPLETION_V1','tenantId',{tenant}::text,'commandId',{command}::text,
+ 'profile','R1_GOLDEN_COMPLETION_V1','flowProfile','{FLOW_PROFILE}','tenantId',{tenant}::text,'commandId',{command}::text,
+ 'ingress',jsonb_build_object(
+  'profile','{INGRESS_PROFILE}','phase','COMPLETED','tenantId',{tenant}::text,
+  'captureReceipt',(SELECT jsonb_build_object('commandId',command_id,'outcome',outcome,'resultFactType',result_fact_type,'resultFactId',result_fact_id,'resultFactRevision',result_fact_revision) FROM capture_receipt),
+  'ingressTask',(SELECT jsonb_build_object('id',task_occurrence_id,'ownerAppointmentId',owner_appointment_id,'primaryCommandCode',primary_command_code,'state',state,'revision',revision,'subjectFactType',subject_type,'subjectFactId',subject_id,'subjectFactRevision',subject_revision,'completionFactType',completion_fact_type,'completionFactId',completion_fact_id,'completionFactRevision',completion_fact_revision) FROM responsibility.task_occurrence WHERE tenant_id={tenant} AND task_occurrence_id={ingress_task} AND owner_appointment_id={source_owner} AND primary_command_code='COMPLETE_LEAD_INGRESS'),
+  'ingressDraft',(SELECT jsonb_build_object('id',action_draft_id,'taskId',task_occurrence_id,'actionCode',action_code,'state',state,'revision',revision,'createdByAppointmentId',created_by_appointment_id,'confirmedByAppointmentId',confirmed_by_appointment_id) FROM responsibility.action_draft WHERE tenant_id={tenant} AND action_draft_id={ingress_draft} AND task_occurrence_id={ingress_task} AND created_by_appointment_id={source_owner} AND confirmed_by_appointment_id={source_owner}),
+  'ingressReceipt',(SELECT jsonb_build_object('commandId',command_id,'outcome',outcome,'resultFactType',result_fact_type,'resultFactId',result_fact_id,'resultFactRevision',result_fact_revision) FROM ingress_receipt),
+  'assignment',(SELECT jsonb_build_object('id',lead_assignment_id,'leadId',lead_id,'ownerAppointmentId',owner_appointment_id,'assignmentNo',assignment_no,'reasonCode',assignment_reason_code,'state',assignment_status_code,'revision',revision) FROM selected_assignment),
+  'contactTask',(SELECT jsonb_build_object('id',task_occurrence_id,'ownerAppointmentId',owner_appointment_id,'primaryCommandCode',primary_command_code,'state',state,'revision',revision,'subjectFactType',subject_type,'subjectFactId',subject_id,'subjectFactRevision',subject_revision) FROM responsibility.task_occurrence WHERE tenant_id={tenant} AND task_occurrence_id={task} AND owner_appointment_id={owner} AND primary_command_code='RECORD_CONTACT_RESULT')
+ ),
  'contactResults',coalesce((SELECT jsonb_agg(jsonb_build_object('id',lead_contact_result_id,'leadId',lead_id,'assignmentId',lead_assignment_id,'taskId',contact_task_id,'contactNo',contact_no,'resultCode',result_code)) FROM selected_contact),'[]'::jsonb),
  'opportunities',coalesce((SELECT jsonb_agg(jsonb_build_object('id',opportunity_id,'leadId',source_lead_id,'assignmentId',source_assignment_id,'ownerAppointmentId',owner_appointment_id,'sourceContactResultId',source_contact_result_id,'revision',revision)) FROM selected_opportunity),'[]'::jsonb),
  'tasks',coalesce((SELECT jsonb_agg(jsonb_build_object('id',task_occurrence_id,'ownerAppointmentId',owner_appointment_id,'state',state,'revision',revision,'completionFactType',completion_fact_type,'completionFactId',completion_fact_id,'completionFactHash',translate(rtrim(encode(completion_fact_hash,'base64'),'='),'+/','-_'))) FROM responsibility.task_occurrence WHERE tenant_id={tenant} AND task_occurrence_id={task} AND owner_appointment_id={owner} AND completion_fact_hash={expected_hash}),'[]'::jsonb),
@@ -356,6 +541,8 @@ COMMIT;
 def read_golden_completion(
     root: Path, run: str, operation_id: str, command_id: str,
     task_id: str, draft_id: str, owner_id: str, expected_digest: str,
+    capture_command_id: str, ingress_command_id: str, ingress_task_id: str,
+    ingress_draft_id: str, source_owner_id: str,
 ) -> dict:
     """Re-verify the current run, then return its closed read-only golden projection."""
     environment = load_acceptance_environment(root, run, operation_id)
@@ -367,7 +554,8 @@ def read_golden_completion(
         Path(root).resolve(strict=True), folder, f"acceptance-completion-{operation_id}",
         input_bytes=completion_query(
             environment["bootstrap"]["tenantId"], command_id, task_id, draft_id, owner_id,
-            expected_digest,
+            expected_digest, capture_command_id, ingress_command_id, ingress_task_id,
+            ingress_draft_id, source_owner_id,
         ),
     )
     if result.returncode:
@@ -388,14 +576,14 @@ def closed_report(value: object) -> dict:
         raise RuntimeError("closed report input invalid")
     keys = (
         "run", "operationId", "status", "environmentDigest", "managementCommandCount",
-        "goldenCommandId", "resultFact", "counts",
+        "flowProfile", "goldenCommandId", "resultFact", "counts",
     )
     result = {"profile": "R1_ISOLATED_ACCEPTANCE_REPORT_V1"}
     for key in keys:
         if key not in value:
             raise RuntimeError("closed report input invalid")
         result[key] = value[key]
-    if result["status"] != "GOLDEN_VERIFIED" or result["managementCommandCount"] != 16 or \
+    if result["status"] != "GOLDEN_VERIFIED" or result["managementCommandCount"] != 16 or result["flowProfile"] != FLOW_PROFILE or \
        not _uuid(result["operationId"]) or not _uuid(result["goldenCommandId"]) or \
        not isinstance(result["environmentDigest"], str) or not HASH_PATTERN.fullmatch(result["environmentDigest"]):
         raise RuntimeError("closed report input invalid")
@@ -417,14 +605,40 @@ def main(argv: list[str] | None = None) -> int:
     completion.add_argument("--draft-id", required=True)
     completion.add_argument("--owner-appointment-id", required=True)
     completion.add_argument("--result-fact-digest", required=True)
+    completion.add_argument("--capture-command-id", required=True)
+    completion.add_argument("--ingress-command-id", required=True)
+    completion.add_argument("--ingress-task-id", required=True)
+    completion.add_argument("--ingress-draft-id", required=True)
+    completion.add_argument("--source-owner-appointment-id", required=True)
+    ingress = commands.add_parser("ingress-binding")
+    ingress.add_argument("run")
+    ingress.add_argument("--operation-id", required=True)
+    ingress.add_argument("--phase", choices=("CAPTURED", "COMPLETED"), required=True)
+    ingress.add_argument("--tenant-id", required=True)
+    ingress.add_argument("--capture-command-id", required=True)
+    ingress.add_argument("--ingress-task-id", required=True)
+    ingress.add_argument("--source-owner-appointment-id", required=True)
+    ingress.add_argument("--ingress-command-id")
+    ingress.add_argument("--ingress-draft-id")
+    ingress.add_argument("--contact-task-id")
+    ingress.add_argument("--sales-owner-appointment-id")
     args = parser.parse_args(argv)
     try:
         if args.command == "environment":
             value = load_acceptance_environment(args.root, args.run, args.operation_id)
-        else:
+        elif args.command == "completion":
             value = read_golden_completion(
                 args.root, args.run, args.operation_id, args.command_id,
                 args.task_id, args.draft_id, args.owner_appointment_id, args.result_fact_digest,
+                args.capture_command_id, args.ingress_command_id, args.ingress_task_id,
+                args.ingress_draft_id, args.source_owner_appointment_id,
+            )
+        else:
+            value = read_ingress_binding(
+                args.root, args.run, args.operation_id, args.phase, args.tenant_id,
+                args.capture_command_id, args.ingress_task_id, args.source_owner_appointment_id,
+                args.ingress_command_id, args.ingress_draft_id, args.contact_task_id,
+                args.sales_owner_appointment_id,
             )
         print(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
         return 0

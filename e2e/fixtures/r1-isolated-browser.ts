@@ -2,8 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { expect, type Browser, type BrowserContext, type Page, type Request } from '@playwright/test';
 
 import { candidate, parseEnvelope, sameValues } from '../../apps/workbench/src/features/workcard/contract';
-import { closeR1GoldenCompletion, type LoadedR1Environment, UUID, boundary } from './r1-isolated-environment';
-import { AcceptanceDispatchGate, WRITE_SEQUENCE, canonicalSha256, type GoldenAdapter, type WriteIntent } from './r1-isolated-setup';
+import { closeR1GoldenCompletion, verifyR1IngressBinding, type LoadedR1Environment, UUID, boundary } from './r1-isolated-environment';
+import { AcceptanceDispatchGate, WRITE_SEQUENCE, canonicalSha256, type ConfirmedWrite, type GoldenAdapter, type WriteIntent } from './r1-isolated-setup';
 
 
 const SELF = '/api/v1/session/context';
@@ -37,6 +37,8 @@ export class R1IsolatedBrowserAdapter implements GoldenAdapter {
   private trigger?: () => Promise<void>;
   private beforeIds = new Set<string>();
   private preparedSession?: Session;
+  private ingressCard: any;
+  private savedIngressDraft: any;
   private contactCard: any;
   private savedDraft: any;
   private constructor(private browser: Browser, readonly environment: LoadedR1Environment) {}
@@ -158,6 +160,8 @@ export class R1IsolatedBrowserAdapter implements GoldenAdapter {
     if (policy.step.startsWith('appointment-')) return this.prepareAppointment(policy, resources);
     if (policy.step.startsWith('grant-')) return this.prepareGrant(policy, resources);
     if (policy.step === 'capture-R1_AUTO') return this.prepareCapture(policy, resources);
+    if (policy.step === 'ingress-draft') return this.prepareIngressDraft(policy, resources);
+    if (policy.step === 'ingress-submit') return this.prepareIngressSubmit(policy, resources);
     if (policy.step === 'contact-draft') return this.prepareDraft(policy, resources);
     boundary(policy.step === 'contact-submit'); return this.prepareSubmit(policy, resources);
   }
@@ -244,6 +248,29 @@ export class R1IsolatedBrowserAdapter implements GoldenAdapter {
     return this.intent(policy, session, path, body);
   }
 
+  private async prepareIngressDraft(policy: Policy, resources: Record<string,string>): Promise<WriteIntent> {
+    const session = await this.workbench('sourceOwner', resources); boundary(this.ingressCard?.taskId === resources.ingressTask && this.ingressCard.taskType === 'COMPLETE_LEAD_INGRESS');
+    const values = { ...this.ingressCard.commandForm.values, phone: '+12025550100', sourceCode: 'OWNER_CONFIRMED', sourceSummary: 'R1 isolated synthetic ingress completion.' };
+    for (const [name, value] of Object.entries(values)) {
+      const locator = session.page.locator(name === 'sourceSummary' ? '#chat-candidate' : `#candidate-${name}`);
+      if (!await locator.count()) continue;
+      if (name.endsWith('Code')) await locator.selectOption(String(value)); else await locator.fill(String(value));
+    }
+    const body = candidate(this.ingressCard, values), path = `/api/v1/tasks/${resources.ingressTask}/draft`;
+    this.preparedSession = session; this.trigger = async () => { await session.page.getByRole('button', { name: '保存候选', exact: true }).click(); };
+    return this.intent(policy, session, path, body);
+  }
+
+  private async prepareIngressSubmit(policy: Policy, resources: Record<string,string>): Promise<WriteIntent> {
+    const session = await this.workbench('sourceOwner', resources), card = this.ingressCard;
+    boundary(card?.taskId === resources.ingressTask && card.actionDraft && sameValues(card.actionDraft.values, this.savedIngressDraft.values));
+    const body = { ...card.actionDraft.values, draftId: card.actionDraft.draftId, expectedDraftRevision: card.actionDraft.draftRevision, draftDigest: card.actionDraft.digest };
+    const path = `/api/v1/tasks/${resources.ingressTask}/commands/complete-lead-ingress`;
+    await expect(session.page.locator('#primary-confirm')).toBeEnabled({ timeout: SCREEN_TIMEOUT });
+    this.preparedSession = session; this.trigger = async () => { await session.page.locator('#primary-confirm').click(); };
+    return this.intent(policy, session, path, body);
+  }
+
   private async prepareSubmit(policy: Policy, resources: Record<string,string>): Promise<WriteIntent> {
     const session = await this.workbench('sales', resources), card = this.contactCard; boundary(card?.taskId === resources.contactTask && card.actionDraft && sameValues(card.actionDraft.values, this.savedDraft.values));
     const body = { ...card.actionDraft.values, draftId: card.actionDraft.draftId, expectedDraftRevision: card.actionDraft.draftRevision, draftDigest: card.actionDraft.digest };
@@ -260,19 +287,52 @@ export class R1IsolatedBrowserAdapter implements GoldenAdapter {
       const waiting = session.page.waitForResponse(response => new URL(response.url()).origin === this.environment.origin && new URL(response.url()).pathname === command.path && response.request().method() === command.method, { timeout: SCREEN_TIMEOUT });
       await trigger(); const response = await waiting; boundary(this.active.routed);
       const headers = await response.allHeaders(), raw = await response.json();
-      const wire: Wire = { status: response.status(), headers, body: command.step === 'contact-draft' ? raw.receipt : raw };
+      const wire: Wire = { status: response.status(), headers, body: command.step.endsWith('-draft') ? raw.receipt : raw };
       let resourceId: string;
       if (command.step.startsWith('principal-') || command.step.startsWith('organization-') || command.step.startsWith('appointment-') || command.step.startsWith('grant-')) {
         const rows = await this.rows(session, command.path), fact = wire.body?.resultFact;
         const matches = rows.filter(row => UUID.test(row.id) && !this.beforeIds.has(row.id) && publicFactRef(this.environment, fact?.factType, row.id) === fact?.factRef);
         boundary(matches.length === 1); resourceId = matches[0].id;
-      } else if (command.step === 'contact-draft') {
-        boundary(raw.draft && UUID.test(raw.draft.draftId)); this.savedDraft = raw.draft; resourceId = raw.draft.draftId;
+      } else if (command.step.endsWith('-draft')) {
+        boundary(raw.draft && UUID.test(raw.draft.draftId));
+        if (command.step === 'ingress-draft') this.savedIngressDraft = raw.draft; else this.savedDraft = raw.draft;
+        resourceId = raw.draft.draftId;
       } else {
         const factRef = wire.body?.resultFact?.factRef; boundary(typeof factRef === 'string' && factRef.length >= 16 && factRef.length <= 512); resourceId = factRef;
       }
       return { response: wire, resourceId };
     } finally { this.active = undefined; this.trigger = undefined; this.preparedSession = undefined; }
+  }
+
+  async locateIngressTask(resources: Record<string,string>, capture: ConfirmedWrite): Promise<string> {
+    if (resources['ingress-submit']) { boundary(UUID.test(resources.ingressTask)); return resources.ingressTask; }
+    const session = await this.workbench('sourceOwner', resources);
+    const waiting = session.page.waitForResponse(response => new URL(response.url()).pathname === CURRENT && response.request().method() === 'GET');
+    await session.page.getByRole('button', { name: '刷新当前责任', exact: true }).click();
+    const response = await waiting; boundary(response.status() === 200); const envelope = parseEnvelope(await response.json()), card = envelope.currentCard;
+    boundary(card?.taskType === 'COMPLETE_LEAD_INGRESS' && UUID.test(card.taskId) && card.primaryCommand.enabled
+      && (!resources.ingressTask || card.taskId === resources.ingressTask));
+    if (resources['ingress-draft']) {
+      boundary(card.actionDraft?.draftId === resources['ingress-draft']); this.savedIngressDraft = card.actionDraft;
+    } else boundary(card.actionDraft === null);
+    await verifyR1IngressBinding(this.environment, {
+      phase: 'CAPTURED', captureCommandId: capture.commandId, ingressTaskId: card.taskId,
+      sourceOwnerAppointmentId: resources['appointment-sourceOwner'],
+    });
+    this.ingressCard = card; return card.taskId;
+  }
+
+  async reloadIngressDraft(resources: Record<string,string>): Promise<void> {
+    const session = await this.workbench('sourceOwner', resources); boundary(this.savedIngressDraft && UUID.test(this.savedIngressDraft.draftId));
+    const waiting = session.page.waitForResponse(response => new URL(response.url()).pathname === CURRENT && response.request().method() === 'GET');
+    await session.page.reload({ waitUntil: 'domcontentloaded', timeout: SCREEN_TIMEOUT });
+    const response = await waiting; boundary(response.status() === 200); const envelope = parseEnvelope(await response.json()), card = envelope.currentCard;
+    boundary(card?.taskId === resources.ingressTask && card.taskType === 'COMPLETE_LEAD_INGRESS' && card.actionDraft?.draftId === this.savedIngressDraft.draftId);
+    const reloadedDraft = card.actionDraft; boundary(reloadedDraft && sameValues(reloadedDraft.values, this.savedIngressDraft.values)); this.ingressCard = card;
+    for (const [name, value] of Object.entries(this.savedIngressDraft.values)) {
+      const locator = session.page.locator(name === 'sourceSummary' ? '#chat-candidate' : `#candidate-${name}`); if (await locator.count()) await expect(locator).toHaveValue(String(value));
+    }
+    await expect(session.page.locator('#primary-confirm')).toBeEnabled({ timeout: SCREEN_TIMEOUT });
   }
 
   async verifyIdentities(resources: Record<string,string>): Promise<void> {
@@ -313,13 +373,27 @@ export class R1IsolatedBrowserAdapter implements GoldenAdapter {
     }
   }
 
-  async locateContactTask(resources: Record<string,string>): Promise<string> {
-    const session = await this.workbench('sales', resources);
-    const waiting = session.page.waitForResponse(response => new URL(response.url()).pathname === CURRENT && response.request().method() === 'GET');
-    await session.page.getByRole('button', { name: '刷新当前责任', exact: true }).click();
-    const response = await waiting; boundary(response.status() === 200); const envelope = parseEnvelope(await response.json());
-    boundary(envelope.currentCard?.taskType === 'CONTACT_LEAD' && UUID.test(envelope.currentCard.taskId) && envelope.currentCard.actionDraft === null && envelope.currentCard.primaryCommand.enabled);
-    this.contactCard = envelope.currentCard; return envelope.currentCard.taskId;
+  async locateContactTask(resources: Record<string,string>, capture: ConfirmedWrite, ingress: ConfirmedWrite): Promise<string> {
+    let taskId = resources.contactTask;
+    if (!resources['contact-submit']) {
+      const session = await this.workbench('sales', resources);
+      const waiting = session.page.waitForResponse(response => new URL(response.url()).pathname === CURRENT && response.request().method() === 'GET');
+      await session.page.getByRole('button', { name: '刷新当前责任', exact: true }).click();
+      const response = await waiting; boundary(response.status() === 200); const envelope = parseEnvelope(await response.json());
+      boundary(envelope.currentCard?.taskType === 'CONTACT_LEAD' && UUID.test(envelope.currentCard.taskId) && envelope.currentCard.primaryCommand.enabled
+        && (!taskId || envelope.currentCard.taskId === taskId));
+      if (resources['contact-draft']) {
+        boundary(envelope.currentCard.actionDraft?.draftId === resources['contact-draft']); this.savedDraft = envelope.currentCard.actionDraft;
+      } else boundary(envelope.currentCard.actionDraft === null);
+      this.contactCard = envelope.currentCard; taskId = envelope.currentCard.taskId;
+    } else boundary(UUID.test(taskId));
+    await verifyR1IngressBinding(this.environment, {
+      phase: 'COMPLETED', captureCommandId: capture.commandId, ingressCommandId: ingress.commandId,
+      ingressTaskId: resources.ingressTask, ingressDraftId: resources['ingress-draft'],
+      sourceOwnerAppointmentId: resources['appointment-sourceOwner'], contactTaskId: taskId,
+      salesOwnerAppointmentId: resources['appointment-sales'],
+    });
+    return taskId;
   }
 
   async reloadDraft(resources: Record<string,string>): Promise<void> {
@@ -337,13 +411,16 @@ export class R1IsolatedBrowserAdapter implements GoldenAdapter {
     await expect(session.page.locator('#primary-confirm')).toBeEnabled({ timeout: SCREEN_TIMEOUT });
   }
 
-  async retrieveReceipt(commandId: string): Promise<any> {
-    boundary(UUID.test(commandId)); const session = this.sessions.get('sales'); boundary(session);
+  async retrieveReceipt(alias: 'sourceOwner'|'sales', commandId: string, resources: Record<string,string>): Promise<any> {
+    boundary(UUID.test(commandId)); const session = this.sessions.get(alias) ?? await this.workbench(alias, resources);
     return this.read(session, `/api/v1/commands/${commandId}/receipt`);
   }
 
-  async closeCompletion(commandId: string, resultFactDigest: string, resources: Record<string,string>): Promise<{ commandId: string; counts: Record<string,number> }> {
+  async closeCompletion(commandId: string, resultFactDigest: string, resources: Record<string,string>, capture: ConfirmedWrite, ingress: ConfirmedWrite): Promise<{ commandId: string; counts: Record<string,number> }> {
     const owner = resources['appointment-sales'], task = resources.contactTask, draft = resources['contact-draft']; boundary(UUID.test(owner) && UUID.test(task) && UUID.test(draft));
-    return closeR1GoldenCompletion(this.environment, commandId, task, draft, owner, resultFactDigest);
+    return closeR1GoldenCompletion(this.environment, commandId, task, draft, owner, resultFactDigest, {
+      captureCommandId: capture.commandId, ingressCommandId: ingress.commandId, ingressTaskId: resources.ingressTask,
+      ingressDraftId: resources['ingress-draft'], sourceOwnerAppointmentId: resources['appointment-sourceOwner'],
+    });
   }
 }

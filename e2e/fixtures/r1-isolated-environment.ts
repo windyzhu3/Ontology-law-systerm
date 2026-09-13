@@ -110,23 +110,57 @@ async function bridge(run: string, operationId: string): Promise<unknown> {
   }));
 }
 
-async function completionBridge(environment: AcceptanceEnvironment, commandId: string, taskId: string, draftId: string, ownerId: string, resultFactDigest: string): Promise<unknown> {
+type IngressSelectors = {
+  captureCommandId: string; ingressCommandId?: string; ingressTaskId: string; ingressDraftId?: string;
+  sourceOwnerAppointmentId: string; contactTaskId?: string; salesOwnerAppointmentId?: string;
+};
+
+async function ingressBridge(environment: AcceptanceEnvironment, selectors: IngressSelectors & { phase: 'CAPTURED'|'COMPLETED' }): Promise<unknown> {
+  const optional = selectors.phase === 'COMPLETED' ? [
+    '--ingress-command-id', selectors.ingressCommandId!, '--ingress-draft-id', selectors.ingressDraftId!,
+    '--contact-task-id', selectors.contactTaskId!, '--sales-owner-appointment-id', selectors.salesOwnerAppointmentId!,
+  ] : [];
   return new Promise((resolveValue, reject) => execFile(PYTHON, [
     '-B', join(ROOT, 'e2e/runtime/r1_acceptance.py'), '--root', ROOT,
-    'completion', environment.run, '--operation-id', environment.operationId,
-    '--command-id', commandId, '--task-id', taskId, '--draft-id', draftId,
-    '--owner-appointment-id', ownerId, '--result-fact-digest', resultFactDigest,
+    'ingress-binding', environment.run, '--operation-id', environment.operationId, '--phase', selectors.phase,
+    '--tenant-id', environment.bootstrap.tenantId, '--capture-command-id', selectors.captureCommandId,
+    '--ingress-task-id', selectors.ingressTaskId, '--source-owner-appointment-id', selectors.sourceOwnerAppointmentId,
+    ...optional,
   ], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120_000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
     if (error) { reject(new Error('R1_ISOLATED_BOUNDARY')); return; }
     try { resolveValue(JSON.parse(stdout)); } catch { reject(new Error('R1_ISOLATED_BOUNDARY')); }
   }));
 }
 
-export async function closeR1GoldenCompletion(environment: AcceptanceEnvironment, commandId: string, taskId: string, draftId: string, ownerId: string, resultFactDigest: string) {
+export async function verifyR1IngressBinding(environment: AcceptanceEnvironment, selectors: IngressSelectors & { phase: 'CAPTURED'|'COMPLETED' }): Promise<void> {
+  const required = [selectors.captureCommandId, selectors.ingressTaskId, selectors.sourceOwnerAppointmentId];
+  if (selectors.phase === 'COMPLETED') required.push(selectors.ingressCommandId!, selectors.ingressDraftId!, selectors.contactTaskId!, selectors.salesOwnerAppointmentId!);
+  boundary(required.every(value => UUID.test(value)));
+  const value: any = await ingressBridge(environment, selectors);
+  boundary(value?.profile === 'R1_INGRESS_BINDING_V1' && value.phase === selectors.phase && value.tenantId === environment.bootstrap.tenantId);
+}
+
+async function supplementedCompletionBridge(environment: AcceptanceEnvironment, commandId: string, taskId: string, draftId: string, ownerId: string, resultFactDigest: string, ingress: IngressSelectors): Promise<unknown> {
+  return new Promise((resolveValue, reject) => execFile(PYTHON, [
+    '-B', join(ROOT, 'e2e/runtime/r1_acceptance.py'), '--root', ROOT,
+    'completion', environment.run, '--operation-id', environment.operationId,
+    '--command-id', commandId, '--task-id', taskId, '--draft-id', draftId,
+    '--owner-appointment-id', ownerId, '--result-fact-digest', resultFactDigest,
+    '--capture-command-id', ingress.captureCommandId, '--ingress-command-id', ingress.ingressCommandId!,
+    '--ingress-task-id', ingress.ingressTaskId, '--ingress-draft-id', ingress.ingressDraftId!,
+    '--source-owner-appointment-id', ingress.sourceOwnerAppointmentId,
+  ], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120_000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
+    if (error) { reject(new Error('R1_ISOLATED_BOUNDARY')); return; }
+    try { resolveValue(JSON.parse(stdout)); } catch { reject(new Error('R1_ISOLATED_BOUNDARY')); }
+  }));
+}
+
+export async function closeR1GoldenCompletion(environment: AcceptanceEnvironment, commandId: string, taskId: string, draftId: string, ownerId: string, resultFactDigest: string, ingress: IngressSelectors) {
   boundary([commandId, taskId, draftId, ownerId].every(value => UUID.test(value)));
+  boundary([ingress.captureCommandId, ingress.ingressCommandId, ingress.ingressTaskId, ingress.ingressDraftId, ingress.sourceOwnerAppointmentId].every(value => typeof value === 'string' && UUID.test(value)));
   boundary(FACT_DIGEST.test(resultFactDigest));
-  const value: any = await completionBridge(environment, commandId, taskId, draftId, ownerId, resultFactDigest);
-  boundary(value?.profile === 'R1_GOLDEN_COMPLETION_V1' && value.tenantId === environment.bootstrap.tenantId && value.commandId === commandId);
+  const value: any = await supplementedCompletionBridge(environment, commandId, taskId, draftId, ownerId, resultFactDigest, ingress);
+  boundary(value?.profile === 'R1_GOLDEN_COMPLETION_V1' && value.flowProfile === 'CAPTURE_INGRESS_AUTOASSIGN_CONTACT_V1' && value.tenantId === environment.bootstrap.tenantId && value.commandId === commandId);
   const singles = ['contactResults','opportunities','tasks','drafts','receipts','audits'];
   boundary(singles.every(key => Array.isArray(value[key]) && value[key].length === 1));
   boundary(Array.isArray(value.events) && value.events.length === 2 && Array.isArray(value.outboxes) && value.outboxes.length === 2);
@@ -153,10 +187,10 @@ export type LoadedR1Environment = Awaited<ReturnType<typeof loadR1IsolatedEnviro
 
 export function writeR1ClosedReport(
   environment: LoadedR1Environment,
-  result: { managementCommandCount: 16; goldenCommandId: string; resultFact: Record<string,unknown>; counts: Record<string,number> },
+  result: { flowProfile: 'CAPTURE_INGRESS_AUTOASSIGN_CONTACT_V1'; managementCommandCount: 16; goldenCommandId: string; resultFact: Record<string,unknown>; counts: Record<string,number> },
 ): string {
   const counts = { contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 };
-  boundary(result.managementCommandCount === 16 && UUID.test(result.goldenCommandId));
+  boundary(result.flowProfile === 'CAPTURE_INGRESS_AUTOASSIGN_CONTACT_V1' && result.managementCommandCount === 16 && UUID.test(result.goldenCommandId));
   boundary(exact(result.resultFact, ['factType','factRef','revision']) || exact(result.resultFact, ['factType','factRef','digest']));
   boundary(result.resultFact.factType === 'LEAD_CONTACT_RESULT' && typeof result.resultFact.factRef === 'string');
   boundary(JSON.stringify(result.counts) === JSON.stringify(counts));
@@ -164,6 +198,7 @@ export function writeR1ClosedReport(
     profile: 'R1_ISOLATED_ACCEPTANCE_REPORT_V1', run: environment.run,
     operationId: environment.operationId, status: 'GOLDEN_VERIFIED',
     environmentDigest: environment.environmentDigest, managementCommandCount: 16,
+    flowProfile: 'CAPTURE_INGRESS_AUTOASSIGN_CONTACT_V1',
     goldenCommandId: result.goldenCommandId, resultFact: result.resultFact, counts,
   };
   const path = join(environment.runtime, `acceptance-${environment.operationId}-report.json`);

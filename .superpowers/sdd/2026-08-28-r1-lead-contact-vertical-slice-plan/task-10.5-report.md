@@ -250,3 +250,77 @@ Exit code `0`, silent. `git diff --check` also exited `0`.
 ### Amendment live boundary
 
 No private runtime, service, database, browser session, IdP, CA/trust store, fixed listener, or live write was accessed. No product/API/UI, permission catalog, DDL, dependency, or old Task9 consumer changed. This offline amendment is not a golden runtime PASS; Root owns independent scoped review and the explicitly approved controlled continuation. Concurrent Root public-plan/progress/SOP changes and pre-existing crash/replay/test-result files remain untouched and excluded from this source commit.
+
+## Existing-Lead ingress continuation amendment
+
+Base commit: `ff34b1534d1b29cbec7c02a623ff9ced8dc8ecff`.
+
+This user-approved bounded amendment preserves the actual same-operation 17-CONFIRMED checkpoint and its four existing stages byte-for-byte. It appends only `ingress-draft`, `ingress-submit`, `contact-draft`, and `contact-submit` at indexes 17–20. The sourceOwner uses the real workbench form to save the fixed phone-only candidate (`OWNER_CONFIRMED` plus the approved synthetic summary), reloads the whole page and checks the saved values, then submits the existing `COMPLETE_LEAD_INGRESS` task. The original capture remains contact-free and immutable; no new Lead or recapture path exists.
+
+Before adopting the ingress card, a narrow `BEGIN READ ONLY` / `SET LOCAL ROLE law_app_query` bridge binds its exact Task owner and frozen Lead subject to the original capture command receipt. After ingress completion, the bridge requires the original Lead revision chain, exact sourceOwner Task/Draft/receipt, `SOURCE_POLICY_AUTOMATIC` assignment, and same-Lead sales `CONTACT_LEAD` successor. The final contact closure repeats the immutable ingress chain alongside the existing contact/result/opportunity/event/outbox/audit closure. SQL selects no candidate payload, contact value, ciphertext, HMAC, token, or credential field. Public output identifies `CAPTURE_INGRESS_AUTOASSIGN_CONTACT_V1`, so this supplemented flow is not reported as direct-capture automatic assignment.
+
+Both initial Draft writes now require the frozen create response HTTP `201`, derived from `R1CommandService`'s `ifNoneMatch != null` branch. HTTP `200` remains an update status and is rejected for these fixed first writes. The bounded source pass also corrected the database closure's fact types to the persisted internal Subject values (`lead.lead`, `lead.lead_contact_result`, and `opportunity.opportunity`); browser receipt DTOs continue to require the public `LEAD` and `LEAD_CONTACT_RESULT` enums.
+
+### Ingress continuation RED
+
+TypeScript covering command:
+
+```powershell
+C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe node_modules/@playwright/test/cli.js test e2e/tests/r1-isolated-harness.spec.ts --config e2e/r1-isolated.config.ts --project offline-r1-isolated --reporter=line
+```
+
+Exit code `1`: `5 failed, 10 passed`. The failures proved the production sequence still lacked both ingress writes, first Draft incorrectly accepted HTTP 200, browser ingress preparation used the sales/contact path, and both the 17-checkpoint continuation and full orchestrator still followed the old 19-write route.
+
+Python covering command:
+
+```powershell
+D:/soft/python3/python.exe -B -m unittest tests.test_r1_acceptance
+```
+
+Exit code `1`: seven failures and two errors. The missing behaviors were the ingress binding validator/query, supplemented final closure enforcement, and closed-report flow profile.
+
+The internal Subject-type regression was separately observed before its implementation:
+
+```powershell
+D:/soft/python3/python.exe -B -m unittest tests.test_r1_acceptance.R1AcceptanceTest.test_golden_completion_requires_unique_exact_facts_and_original_receipt tests.test_r1_acceptance.R1AcceptanceTest.test_ingress_binding_rejects_wrong_actor_task_and_causal_lead
+```
+
+Exit code `1`: two errors with `golden completion mismatch` and `ingress binding mismatch`, proving the old public-enum expectations rejected the persisted database types. The captured-predecessor terminal-field test also exited `1` before the validator rejected a prefilled completion Fact on the required OPEN revision-zero ingress Task.
+
+### Ingress continuation final GREEN
+
+Final TypeScript covering command, with inherited `NO_COLOR` removed and `FORCE_COLOR=0` only for the test process:
+
+```powershell
+$env:NO_COLOR=$null; $env:FORCE_COLOR='0'; C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe node_modules/@playwright/test/cli.js test e2e/tests/r1-isolated-harness.spec.ts --config e2e/r1-isolated.config.ts --project offline-r1-isolated --reporter=line
+```
+
+Exit code `0`: `15 passed (2.9s)` using one worker, with no warning output.
+
+Python command:
+
+```powershell
+D:/soft/python3/python.exe -B -m unittest tests.test_r1_acceptance
+```
+
+Exit code `0`:
+
+```text
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 0.209s
+
+OK
+```
+
+Touched TypeScript graph command:
+
+```powershell
+C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe node_modules/typescript/bin/tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --esModuleInterop --skipLibCheck --strict --types node,@playwright/test e2e/fixtures/r1-isolated-environment.ts e2e/fixtures/r1-isolated-setup.ts e2e/fixtures/r1-isolated-browser.ts e2e/r1-isolated.config.ts e2e/tests/r1-golden-path.spec.ts e2e/tests/r1-isolated-harness.spec.ts apps/workbench/src/features/workcard/contract.ts apps/workbench/src/generated/api/schema.d.ts
+```
+
+Exit code `0`, silent. `git diff --check` also exited `0`.
+
+### Ingress continuation live boundary
+
+No protected/private runtime, live service, database, browser, IdP, CA/trust store, fixed listener, or real write was accessed. No product/API/UI, permission, DDL, dependency, Task9 consumer, or old suite changed or ran. These fresh offline results do not constitute a golden runtime PASS. Root owns scoped independent review and any later controlled continuation. Concurrent Root public documentation and evidence changes plus pre-existing crash/replay/test-result artifacts remain untouched and excluded.

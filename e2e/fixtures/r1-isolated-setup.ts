@@ -15,6 +15,8 @@ export const WRITE_SEQUENCE: readonly { step: string; method: 'POST'|'PUT'; path
   ].map(([account, authority]) => ({ step: `grant-${account}-${authority}`, method: 'POST' as const, path: '/api/v1/admin/identity/authority-grants' })),
   { step: 'grant-sales-SALES_CONTACT_OWNER', method: 'POST', path: '/api/v1/admin/identity/authority-grants' },
   { step: 'capture-R1_AUTO', method: 'POST', path: '/api/v1/leads' },
+  { step: 'ingress-draft', method: 'PUT', path: /^\/api\/v1\/tasks\/[0-9a-f-]{36}\/draft$/ },
+  { step: 'ingress-submit', method: 'POST', path: /^\/api\/v1\/tasks\/[0-9a-f-]{36}\/commands\/complete-lead-ingress$/ },
   { step: 'contact-draft', method: 'PUT', path: /^\/api\/v1\/tasks\/[0-9a-f-]{36}\/draft$/ },
   { step: 'contact-submit', method: 'POST', path: /^\/api\/v1\/tasks\/[0-9a-f-]{36}\/commands\/record-contact-result$/ },
 ];
@@ -32,10 +34,10 @@ export interface JournalCommand {
 }
 export interface ArmedWrite extends JournalCommand { body: Record<string, unknown> }
 export type WriteIntent = Omit<ArmedWrite, 'commandId'> & { commandId?: string };
-type Confirmed = JournalCommand & { status: 'CONFIRMED'; httpStatus: number; receiptId: string; resultFact: Record<string, unknown>; resourceId: string };
+export type ConfirmedWrite = JournalCommand & { status: 'CONFIRMED'; httpStatus: number; receiptId: string; resultFact: Record<string, unknown>; resourceId: string };
 type Pending = JournalCommand & { status: 'PENDING' };
-type JournalData = { profile: 'R1_ISOLATED_ACCEPTANCE_JOURNAL_V1'; identity: JournalIdentity; commands: (Pending|Confirmed)[]; stages: string[] };
-const STAGES = ['MANAGEMENT_COMPLETED','SALES_AUTHORITY_COMPLETED','IDENTITIES_VERIFIED','CAPTURE_COMPLETED','DRAFT_RELOADED','GOLDEN_COMPLETED'] as const;
+type JournalData = { profile: 'R1_ISOLATED_ACCEPTANCE_JOURNAL_V1'; identity: JournalIdentity; commands: (Pending|ConfirmedWrite)[]; stages: string[] };
+const STAGES = ['MANAGEMENT_COMPLETED','SALES_AUTHORITY_COMPLETED','IDENTITIES_VERIFIED','CAPTURE_COMPLETED','INGRESS_DRAFT_RELOADED','INGRESS_COMPLETED','DRAFT_RELOADED','GOLDEN_COMPLETED'] as const;
 
 function exact(value: unknown, keys: string[]): value is Record<string, any> {
   return !!value && typeof value === 'object' && Object.keys(value).sort().join() === [...keys].sort().join();
@@ -56,9 +58,9 @@ function policy(index: number, command: JournalCommand): void {
 function validProgress(data: JournalData): void {
   boundary(data.stages.every((stage, index) => stage === STAGES[index]));
   const confirmed = data.commands.filter(command => command.status === 'CONFIRMED').length;
-  const minimums = [15,16,16,17,18,19];
+  const minimums = [15,16,16,17,18,19,20,21];
   if (data.stages.length) boundary(confirmed >= minimums[data.stages.length - 1]);
-  const maximums = [15,16,16,17,18,19,19];
+  const maximums = [15,16,16,17,18,19,19,21,21];
   boundary(data.commands.length <= maximums[data.stages.length]);
   if (data.stages.includes('MANAGEMENT_COMPLETED')) boundary(data.commands.slice(0, 15).every(command => command.status === 'CONFIRMED'));
   if (data.stages.includes('SALES_AUTHORITY_COMPLETED')) boundary(data.commands[15]?.status === 'CONFIRMED');
@@ -82,8 +84,8 @@ export class AcceptanceJournal {
     return new AcceptanceJournal(path, data, protect);
   }
   pending(): Pending | undefined { return this.data.commands.find(command => command.status === 'PENDING') as Pending|undefined; }
-  confirmed(step: string): Confirmed | undefined { return this.data.commands.find(command => command.step === step && command.status === 'CONFIRMED') as Confirmed|undefined; }
-  resources(): Record<string,string> { return Object.fromEntries(this.data.commands.filter(command => command.status === 'CONFIRMED').map(command => [command.step, (command as Confirmed).resourceId])); }
+  confirmed(step: string): ConfirmedWrite | undefined { return this.data.commands.find(command => command.step === step && command.status === 'CONFIRMED') as ConfirmedWrite|undefined; }
+  resources(): Record<string,string> { return Object.fromEntries(this.data.commands.filter(command => command.status === 'CONFIRMED').map(command => [command.step, (command as ConfirmedWrite).resourceId])); }
   hasStage(stage: string): boolean { return this.data.stages.includes(stage); }
   private async save(): Promise<void> {
     const temporary = this.path + '.' + randomUUID() + '.tmp';
@@ -96,10 +98,10 @@ export class AcceptanceJournal {
   }
   async confirm(commandId: string, response: { status: number; headers: Record<string,string>; body: any }, selected: { resourceId: string }): Promise<void> {
     const pending = this.pending(); boundary(pending?.commandId === commandId);
-    boundary(pending.step === 'capture-R1_AUTO' || pending.step === 'contact-submit'
+    boundary(['capture-R1_AUTO','ingress-submit','contact-submit'].includes(pending.step)
       ? typeof selected.resourceId === 'string' && selected.resourceId.length >= 16 && selected.resourceId.length <= 512
       : UUID.test(selected.resourceId));
-    const expectedStatus = pending.method === 'PUT' || pending.step === 'contact-submit' ? 200 : 201;
+    const expectedStatus = pending.method === 'PUT' ? 201 : ['ingress-submit','contact-submit'].includes(pending.step) ? 200 : 201;
     boundary(response.status === expectedStatus && response.headers.location === `/api/v1/commands/${commandId}/receipt`);
     boundary(response.headers['cache-control']?.toLowerCase().split(',').map(value => value.trim()).includes('no-store'));
     const receipt = response.body;
@@ -140,16 +142,18 @@ export interface GoldenAdapter {
   prepareWrite(policy: typeof WRITE_SEQUENCE[number], resources: Record<string,string>): Promise<WriteIntent>;
   executeWrite(command: WriteIntent, gate: AcceptanceDispatchGate): Promise<{ response: { status: number; headers: Record<string,string>; body: any }; resourceId: string }>;
   verifyIdentities(resources: Record<string,string>): Promise<void>;
-  locateContactTask(resources: Record<string,string>): Promise<string>;
+  locateIngressTask(resources: Record<string,string>, capture: ConfirmedWrite): Promise<string>;
+  reloadIngressDraft(resources: Record<string,string>): Promise<void>;
+  locateContactTask(resources: Record<string,string>, capture: ConfirmedWrite, ingress: ConfirmedWrite): Promise<string>;
   reloadDraft(resources: Record<string,string>): Promise<void>;
-  retrieveReceipt(commandId: string): Promise<any>;
-  closeCompletion(commandId: string, resultFactDigest: string, resources: Record<string,string>): Promise<{ commandId: string; counts: Record<string,number> }>;
+  retrieveReceipt(alias: 'sourceOwner'|'sales', commandId: string, resources: Record<string,string>): Promise<any>;
+  closeCompletion(commandId: string, resultFactDigest: string, resources: Record<string,string>, capture: ConfirmedWrite, ingress: ConfirmedWrite): Promise<{ commandId: string; counts: Record<string,number> }>;
 }
 
 export class R1GoldenOrchestrator {
   private gate: AcceptanceDispatchGate;
   constructor(private journal: AcceptanceJournal, private adapter: GoldenAdapter) { this.gate = new AcceptanceDispatchGate(journal); }
-  private async write(index: number, resources: Record<string,string>): Promise<Confirmed> {
+  private async write(index: number, resources: Record<string,string>): Promise<ConfirmedWrite> {
     const policyEntry = WRITE_SEQUENCE[index];
     const previous = this.journal.confirmed(policyEntry.step);
     if (previous) return previous;
@@ -164,7 +168,11 @@ export class R1GoldenOrchestrator {
     resources[policyEntry.step] = confirmed.resourceId;
     return confirmed;
   }
-  async run(): Promise<{ managementCommandCount: 16; goldenCommandId: string; resultFact: Record<string,unknown>; counts: Record<string,number> }> {
+  private taskFromDraft(step: 'ingress-draft'|'contact-draft'): string | undefined {
+    const path = this.journal.confirmed(step)?.path, match = path?.match(/^\/api\/v1\/tasks\/([0-9a-f-]{36})\/draft$/);
+    return match?.[1];
+  }
+  async run(): Promise<{ flowProfile: 'CAPTURE_INGRESS_AUTOASSIGN_CONTACT_V1'; managementCommandCount: 16; goldenCommandId: string; resultFact: Record<string,unknown>; counts: Record<string,number> }> {
     boundary(!this.journal.pending());
     const resources = this.journal.resources();
     if (!this.journal.hasStage('MANAGEMENT_COMPLETED')) {
@@ -177,20 +185,32 @@ export class R1GoldenOrchestrator {
     if (!this.journal.hasStage('IDENTITIES_VERIFIED')) {
       await this.adapter.verifyIdentities(resources); await this.journal.completeStage('IDENTITIES_VERIFIED');
     }
-    if (!this.journal.hasStage('CAPTURE_COMPLETED')) {
-      await this.write(16, resources); await this.journal.completeStage('CAPTURE_COMPLETED');
+    const capture = await this.write(16, resources);
+    boundary(capture.resultFact.factType === 'LEAD' && typeof capture.resultFact.factRef === 'string' && Number.isSafeInteger(capture.resultFact.revision));
+    if (!this.journal.hasStage('CAPTURE_COMPLETED')) await this.journal.completeStage('CAPTURE_COMPLETED');
+    resources.ingressTask = this.taskFromDraft('ingress-draft') ?? '';
+    resources.ingressTask = await this.adapter.locateIngressTask(resources, capture); boundary(UUID.test(resources.ingressTask));
+    if (!this.journal.hasStage('INGRESS_DRAFT_RELOADED')) {
+      await this.write(17, resources); await this.adapter.reloadIngressDraft(resources); await this.journal.completeStage('INGRESS_DRAFT_RELOADED');
     }
-    resources.contactTask = await this.adapter.locateContactTask(resources); boundary(UUID.test(resources.contactTask));
+    const ingress = await this.write(18, resources);
+    const ingressReceipt = await this.adapter.retrieveReceipt('sourceOwner', ingress.commandId, resources);
+    boundary(JSON.stringify(ingressReceipt) === JSON.stringify({ commandId: ingress.commandId, receiptId: ingress.receiptId, outcome: 'SUCCEEDED', resultFact: ingress.resultFact }));
+    boundary(ingress.resultFact.factType === 'LEAD' && ingress.resultFact.factRef === capture.resultFact.factRef
+      && Number.isSafeInteger(ingress.resultFact.revision) && ingress.resultFact.revision === Number(capture.resultFact.revision) + 1);
+    if (!this.journal.hasStage('INGRESS_COMPLETED')) await this.journal.completeStage('INGRESS_COMPLETED');
+    resources.contactTask = this.taskFromDraft('contact-draft') ?? '';
+    resources.contactTask = await this.adapter.locateContactTask(resources, capture, ingress); boundary(UUID.test(resources.contactTask));
     if (!this.journal.hasStage('DRAFT_RELOADED')) {
-      await this.write(17, resources); await this.adapter.reloadDraft(resources); await this.journal.completeStage('DRAFT_RELOADED');
+      await this.write(19, resources); await this.adapter.reloadDraft(resources); await this.journal.completeStage('DRAFT_RELOADED');
     }
-    const submit = await this.write(18, resources);
-    const recovered = await this.adapter.retrieveReceipt(submit.commandId);
+    const submit = await this.write(20, resources);
+    const recovered = await this.adapter.retrieveReceipt('sales', submit.commandId, resources);
     boundary(JSON.stringify(recovered) === JSON.stringify({ commandId: submit.commandId, receiptId: submit.receiptId, outcome: 'SUCCEEDED', resultFact: submit.resultFact }));
     boundary(submit.resultFact.factType === 'LEAD_CONTACT_RESULT' && FACT_DIGEST.test(String(submit.resultFact.digest)));
-    const closure = await this.adapter.closeCompletion(submit.commandId, String(submit.resultFact.digest), resources);
+    const closure = await this.adapter.closeCompletion(submit.commandId, String(submit.resultFact.digest), resources, capture, ingress);
     boundary(closure.commandId === submit.commandId && JSON.stringify(closure.counts) === JSON.stringify({ contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 }));
     if (!this.journal.hasStage('GOLDEN_COMPLETED')) await this.journal.completeStage('GOLDEN_COMPLETED');
-    return { managementCommandCount: 16, goldenCommandId: submit.commandId, resultFact: submit.resultFact, counts: closure.counts };
+    return { flowProfile: 'CAPTURE_INGRESS_AUTOASSIGN_CONTACT_V1', managementCommandCount: 16, goldenCommandId: submit.commandId, resultFact: submit.resultFact, counts: closure.counts };
   }
 }

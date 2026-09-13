@@ -86,7 +86,7 @@ test('environment projection rejects wrong run process inventory credentials and
   }
 });
 
-test('fixed write policy preserves the historic 15 then adds one OWNED_ROOT sales authority before three business writes', () => {
+test('fixed write policy preserves the historic 17 then appends ingress and contact writes', () => {
   expect(WRITE_SEQUENCE.map(entry => entry.step)).toEqual([
     'principal-sales', 'principal-supervisor', 'principal-sourceOwner',
     'organization-OWNED_ROOT', 'organization-EMPTY_ROOT',
@@ -95,13 +95,62 @@ test('fixed write policy preserves the historic 15 then adds one OWNED_ROOT sale
     'grant-sourceOwner-LEAD_INGRESS_COMPLETE', 'grant-sourceOwner-SOURCE_INTAKE_REQUEST_ACK',
     'grant-supervisor-LEAD_ASSIGN', 'grant-supervisor-LEAD_ROUTING_DECIDE',
     'grant-supervisor-LEAD_VALIDITY_REVIEW', 'grant-sales-SALES_CONTACT_OWNER',
-    'capture-R1_AUTO', 'contact-draft', 'contact-submit',
+    'capture-R1_AUTO', 'ingress-draft', 'ingress-submit', 'contact-draft', 'contact-submit',
   ]);
   expect(WRITE_SEQUENCE.slice(0, 15).every(entry => entry.method === 'POST' && typeof entry.path === 'string' && entry.path.startsWith('/api/v1/admin/identity/'))).toBe(true);
   expect(WRITE_SEQUENCE[15]).toEqual({ step: 'grant-sales-SALES_CONTACT_OWNER', method: 'POST', path: '/api/v1/admin/identity/authority-grants' });
   expect(WRITE_SEQUENCE[16]).toEqual({ step: 'capture-R1_AUTO', method: 'POST', path: '/api/v1/leads' });
   expect(WRITE_SEQUENCE[17].path).toEqual(/^\/api\/v1\/tasks\/[0-9a-f-]{36}\/draft$/);
-  expect(WRITE_SEQUENCE[18].path).toEqual(/^\/api\/v1\/tasks\/[0-9a-f-]{36}\/commands\/record-contact-result$/);
+  expect(WRITE_SEQUENCE[18].path).toEqual(/^\/api\/v1\/tasks\/[0-9a-f-]{36}\/commands\/complete-lead-ingress$/);
+  expect(WRITE_SEQUENCE[19].path).toEqual(/^\/api\/v1\/tasks\/[0-9a-f-]{36}\/draft$/);
+  expect(WRITE_SEQUENCE[20].path).toEqual(/^\/api\/v1\/tasks\/[0-9a-f-]{36}\/commands\/record-contact-result$/);
+});
+
+test('both first draft creates require HTTP 201 and reject update status 200', async () => {
+  for (const index of [17, 19]) {
+    const folder = mkdtempSync(join(tmpdir(), 'r1-first-draft-status-'));
+    try {
+      const journal = await AcceptanceJournal.open(join(folder, 'journal.json'), identity());
+      await confirmPrefix(journal, index);
+      const task = randomUUID();
+      const command = armed(WRITE_SEQUENCE[index].step, `/api/v1/tasks/${task}/draft`, { marker: WRITE_SEQUENCE[index].step });
+      command.method = 'PUT';
+      const gate = new AcceptanceDispatchGate(journal); gate.arm(command); await gate.dispatch(actual(command), async () => {});
+      const response = (status: number) => ({
+        status, headers: { location: `/api/v1/commands/${command.commandId}/receipt`, 'cache-control': 'no-store' },
+        body: { commandId: command.commandId, receiptId: randomUUID(), outcome: 'SUCCEEDED', resultFact: { factType: 'ACTION_DRAFT', factRef: randomUUID(), revision: 0 } },
+      });
+      await expect(journal.confirm(command.commandId, response(200), { resourceId: randomUUID() })).rejects.toThrow('R1_ISOLATED_BOUNDARY');
+      await expect(journal.confirm(command.commandId, response(201), { resourceId: randomUUID() })).resolves.toBeUndefined();
+    } finally { rmSync(folder, { recursive: true, force: true }); }
+  }
+});
+
+test('browser prepares the approved ingress candidate on the sourceOwner card', async () => {
+  const filled: Record<string,string> = {}, selected: Record<string,string> = {};
+  const ingressTask = '00000000-0000-4000-8000-000000000041';
+  const session: any = { self: { actorScopeKey: ACTOR }, appointmentId: APPOINTMENT, page: {
+    locator(selector: string) { return { count: async () => 1, fill: async (value: string) => { filled[selector] = value; }, selectOption: async (value: string) => { selected[selector] = value; } }; },
+    getByRole() { return { click: async () => {} }; },
+  } };
+  const adapter: any = Object.create(R1IsolatedBrowserAdapter.prototype);
+  adapter.workbench = async (alias: string) => { expect(alias).toBe('sourceOwner'); return session; };
+  adapter.ingressCard = {
+    taskId: ingressTask, taskType: 'COMPLETE_LEAD_INGRESS', actionDraft: null,
+    commandForm: { actionCode: 'COMPLETE_LEAD_INGRESS', schemaVersion: 1, values: {}, fields: [
+      { name: 'phone', label: '电话', control: 'TEL', required: false, readOnly: false, options: [] },
+      { name: 'email', label: '邮箱', control: 'EMAIL', required: false, readOnly: false, options: [] },
+      { name: 'sourceCode', label: '来源确认', control: 'SELECT', required: true, readOnly: false, options: [{ value: 'OWNER_CONFIRMED', label: '负责人确认', disabled: false }] },
+      { name: 'sourceSummary', label: '来源摘要', control: 'TEXTAREA', required: true, readOnly: false, options: [] },
+    ] },
+  };
+  const intent = await adapter.prepareWrite(WRITE_SEQUENCE[17], { ingressTask });
+  expect(intent).toMatchObject({ method: 'PUT', path: `/api/v1/tasks/${ingressTask}/draft`, actorAppointmentId: APPOINTMENT, body: {
+    actionCode: 'COMPLETE_LEAD_INGRESS', schemaVersion: 1,
+    values: { phone: '+12025550100', sourceCode: 'OWNER_CONFIRMED', sourceSummary: 'R1 isolated synthetic ingress completion.' },
+  } });
+  expect(filled).toMatchObject({ '#candidate-phone': '+12025550100', '#chat-candidate': 'R1 isolated synthetic ingress completion.' });
+  expect(selected['#candidate-sourceCode']).toBe('OWNER_CONFIRMED');
 });
 
 test('browser preparation binds the added sales authority to OWNED_ROOT rather than ROOT', async () => {
@@ -200,20 +249,22 @@ test('durable management stage prevents confirmed management commands from being
   } finally { rmSync(folder, { recursive: true, force: true }); }
 });
 
-test('historic 15-command checkpoint appends only sales authority and the remaining three writes in the same operation', async () => {
+test('historic 17-command capture checkpoint appends only four ingress and contact writes in the same operation', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'r1-acceptance-continuation-'));
   try {
     const path = join(folder, 'journal.json');
     const journal = await AcceptanceJournal.open(path, identity());
-    await confirmPrefix(journal, 15);
-    await journal.completeStage('MANAGEMENT_COMPLETED');
+    await confirmPrefix(journal, 15); await journal.completeStage('MANAGEMENT_COMPLETED');
+    await confirmPrefix(journal, 16); await journal.completeStage('SALES_AUTHORITY_COMPLETED');
+    await journal.completeStage('IDENTITIES_VERIFIED');
+    await confirmPrefix(journal, 17); await journal.completeStage('CAPTURE_COMPLETED');
     const historicCommands = JSON.parse(readFileSync(path, 'utf8')).commands;
     const seen: string[] = [], receipts = new Map<string, any>();
     await new R1GoldenOrchestrator(await AcceptanceJournal.open(path, identity()), goldenAdapter(seen, receipts)).run();
-    expect(seen).toEqual(['grant-sales-SALES_CONTACT_OWNER', 'capture-R1_AUTO', 'contact-draft', 'contact-submit']);
+    expect(seen).toEqual(['ingress-draft', 'ingress-submit', 'contact-draft', 'contact-submit']);
     const stored = JSON.parse(readFileSync(path, 'utf8'));
-    expect(stored.commands.slice(0, 15)).toEqual(historicCommands);
-    expect(stored.stages).toEqual(['MANAGEMENT_COMPLETED', 'SALES_AUTHORITY_COMPLETED', 'IDENTITIES_VERIFIED', 'CAPTURE_COMPLETED', 'DRAFT_RELOADED', 'GOLDEN_COMPLETED']);
+    expect(stored.commands.slice(0, 17)).toEqual(historicCommands);
+    expect(stored.stages).toEqual(['MANAGEMENT_COMPLETED', 'SALES_AUTHORITY_COMPLETED', 'IDENTITIES_VERIFIED', 'CAPTURE_COMPLETED', 'INGRESS_DRAFT_RELOADED', 'INGRESS_COMPLETED', 'DRAFT_RELOADED', 'GOLDEN_COMPLETED']);
   } finally { rmSync(folder, { recursive: true, force: true }); }
 });
 
@@ -309,14 +360,16 @@ test('golden orchestrator runs fixed management before identities capture reload
     const orchestrator = new R1GoldenOrchestrator(journal, adapter);
     const report = await orchestrator.run();
     expect(seen).toEqual(WRITE_SEQUENCE.map(entry => entry.step));
-    expect(checkpoints.map(entry => entry.name)).toEqual(['identities','contact','reload','closure']);
+    expect(checkpoints.map(entry => entry.name)).toEqual(['identities','ingress','ingress-reload','contact','reload','closure']);
     expect(journal.hasStage('MANAGEMENT_COMPLETED')).toBe(true);
     expect(journal.hasStage('SALES_AUTHORITY_COMPLETED')).toBe(true);
     expect(journal.hasStage('IDENTITIES_VERIFIED')).toBe(true);
     expect(journal.hasStage('CAPTURE_COMPLETED')).toBe(true);
+    expect(journal.hasStage('INGRESS_DRAFT_RELOADED')).toBe(true);
+    expect(journal.hasStage('INGRESS_COMPLETED')).toBe(true);
     expect(journal.hasStage('DRAFT_RELOADED')).toBe(true);
     expect(journal.hasStage('GOLDEN_COMPLETED')).toBe(true);
-    expect(report).toMatchObject({ managementCommandCount: 16, counts: { contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 } });
+    expect(report).toMatchObject({ flowProfile: 'CAPTURE_INGRESS_AUTOASSIGN_CONTACT_V1', managementCommandCount: 16, counts: { contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 } });
   } finally { rmSync(folder, { recursive: true, force: true }); }
 });
 
@@ -347,41 +400,59 @@ function actual(command: ArmedWrite) {
 }
 
 async function confirmPrefix(journal: any, length: number) {
-  for (const policy of WRITE_SEQUENCE.slice(0, length)) {
-    const command = write(policy.step, String(policy.path), { marker: policy.step });
+  const start = journal.resources ? Object.keys(journal.resources()).length : 0;
+  for (const policy of WRITE_SEQUENCE.slice(start, length)) {
+    const task = randomUUID();
+    const path = typeof policy.path === 'string' ? policy.path : policy.step.endsWith('-draft') ? `/api/v1/tasks/${task}/draft`
+      : policy.step === 'ingress-submit' ? `/api/v1/tasks/${task}/commands/complete-lead-ingress`
+      : `/api/v1/tasks/${task}/commands/record-contact-result`;
+    const command = write(policy.step, path, { marker: policy.step }); command.method = policy.method;
+    const leadFactRef = 'lead-' + 'L'.repeat(43);
+    const resultFact = policy.step === 'capture-R1_AUTO' ? { factType: 'LEAD', factRef: leadFactRef, revision: 0 }
+      : policy.step === 'ingress-submit' ? { factType: 'LEAD', factRef: leadFactRef, revision: 1 }
+      : policy.step === 'contact-submit' ? { factType: 'LEAD_CONTACT_RESULT', factRef: randomUUID(), digest: 'A'.repeat(43) }
+      : { factType: 'IDENTITY', factRef: randomUUID(), revision: 0 };
     await journal.begin(command);
     await journal.confirm(command.commandId, {
-      status: 201,
+      status: policy.method === 'PUT' ? 201 : ['ingress-submit','contact-submit'].includes(policy.step) ? 200 : 201,
       headers: { location: `/api/v1/commands/${command.commandId}/receipt`, 'cache-control': 'no-store' },
-      body: { commandId: command.commandId, receiptId: randomUUID(), outcome: 'SUCCEEDED', resultFact: { factType: 'IDENTITY', factRef: randomUUID(), revision: 0 } },
+      body: { commandId: command.commandId, receiptId: randomUUID(), outcome: 'SUCCEEDED', resultFact },
     }, { resourceId: randomUUID() });
   }
 }
 
 function goldenAdapter(seen: string[], receipts: Map<string, any>, checkpoints: Array<{ name: string; count: number }> = []) {
+  const leadFactRef = 'lead-' + 'L'.repeat(43);
   return {
     async prepareWrite(policy: any, resources: Record<string,string>) {
-      if (policy.step === 'contact-draft' || policy.step === 'contact-submit') expect(resources.contactTask).toMatch(/^[0-9a-f-]{36}$/);
-      const command = armed(policy.step, typeof policy.path === 'string' ? policy.path : policy.step === 'contact-draft'
-        ? `/api/v1/tasks/${resources.contactTask}/draft`
-        : `/api/v1/tasks/${resources.contactTask}/commands/record-contact-result`, { marker: policy.step });
+      if (policy.step.startsWith('ingress-')) expect(resources.ingressTask).toMatch(/^[0-9a-f-]{36}$/);
+      if (policy.step.startsWith('contact-')) expect(resources.contactTask).toMatch(/^[0-9a-f-]{36}$/);
+      const task = policy.step.startsWith('ingress-') ? resources.ingressTask : resources.contactTask;
+      const path = policy.step.endsWith('-draft') ? `/api/v1/tasks/${task}/draft`
+        : policy.step === 'ingress-submit' ? `/api/v1/tasks/${task}/commands/complete-lead-ingress`
+        : policy.step === 'contact-submit' ? `/api/v1/tasks/${task}/commands/record-contact-result` : String(policy.path);
+      const command = armed(policy.step, path, { marker: policy.step });
       command.method = policy.method; return command;
     },
     async executeWrite(command: ArmedWrite, gate: any) {
       seen.push(command.step); await gate.dispatch(actual(command), async () => {});
-      const resultFact = command.step === 'contact-submit'
+      const resultFact = command.step === 'capture-R1_AUTO' ? { factType: 'LEAD', factRef: leadFactRef, revision: 0 }
+        : command.step === 'ingress-submit' ? { factType: 'LEAD', factRef: leadFactRef, revision: 1 }
+        : command.step === 'contact-submit'
         ? { factType: 'LEAD_CONTACT_RESULT', factRef: randomUUID(), digest: 'A'.repeat(43) }
         : { factType: 'R1_FIXTURE', factRef: randomUUID(), revision: 0 };
-      const response = { status: command.method === 'PUT' || command.step === 'contact-submit' ? 200 : 201,
+      const response = { status: command.method === 'PUT' ? 201 : ['ingress-submit','contact-submit'].includes(command.step) ? 200 : 201,
         headers: { location: `/api/v1/commands/${command.commandId}/receipt`, 'cache-control': 'no-store' },
         body: { commandId: command.commandId, receiptId: randomUUID(), outcome: 'SUCCEEDED', resultFact } };
       receipts.set(command.commandId, response.body);
       return { response, resourceId: command.step === 'contact-submit' ? resultFact.factRef : randomUUID() };
     },
     async verifyIdentities(resources: Record<string,string>) { checkpoints.push({ name: 'identities', count: Object.keys(resources).length }); },
+    async locateIngressTask(resources: Record<string,string>) { checkpoints.push({ name: 'ingress', count: Object.keys(resources).length }); return randomUUID(); },
+    async reloadIngressDraft(resources: Record<string,string>) { checkpoints.push({ name: 'ingress-reload', count: Object.keys(resources).length }); },
     async locateContactTask(resources: Record<string,string>) { checkpoints.push({ name: 'contact', count: Object.keys(resources).length }); return randomUUID(); },
     async reloadDraft(resources: Record<string,string>) { checkpoints.push({ name: 'reload', count: Object.keys(resources).length }); },
-    async retrieveReceipt(commandId: string) { return receipts.get(commandId); },
+    async retrieveReceipt(_alias: string, commandId: string) { return receipts.get(commandId); },
     async closeCompletion(commandId: string, resultFactDigest: string, resources: Record<string,string>) {
       expect(resultFactDigest).toBe('A'.repeat(43)); checkpoints.push({ name: 'closure', count: Object.keys(resources).length });
       return { commandId, counts: { contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 } };

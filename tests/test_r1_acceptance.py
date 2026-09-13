@@ -337,6 +337,56 @@ class R1AcceptanceTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "golden completion"):
             self.module.validate_golden_completion(broken, RESULT_DIGEST)
 
+    def test_ingress_binding_rejects_wrong_actor_task_and_causal_lead(self):
+        value = self.ingress_binding()
+        expected = {
+            "phase": "COMPLETED", "captureCommandId": value["captureReceipt"]["commandId"],
+            "ingressCommandId": value["ingressReceipt"]["commandId"],
+            "ingressTaskId": value["ingressTask"]["id"], "ingressDraftId": value["ingressDraft"]["id"],
+            "sourceOwnerAppointmentId": value["ingressTask"]["ownerAppointmentId"],
+            "salesOwnerAppointmentId": value["contactTask"]["ownerAppointmentId"],
+            "contactTaskId": value["contactTask"]["id"],
+        }
+        self.module.validate_ingress_binding(value, expected)
+        for mutate in (
+            lambda item: item["ingressTask"].__setitem__("ownerAppointmentId", "00000000-0000-4000-8000-000000000799"),
+            lambda item: item["ingressDraft"].__setitem__("taskId", "00000000-0000-4000-8000-000000000799"),
+            lambda item: item["ingressReceipt"].__setitem__("resultFactId", "00000000-0000-4000-8000-000000000799"),
+            lambda item: item["contactTask"].__setitem__("subjectFactId", "00000000-0000-4000-8000-000000000799"),
+        ):
+            broken = self.ingress_binding(); mutate(broken)
+            with self.assertRaisesRegex(RuntimeError, "ingress binding"):
+                self.module.validate_ingress_binding(broken, expected)
+
+    def test_ingress_binding_query_is_read_only_and_excludes_contact_values(self):
+        value = self.ingress_binding()
+        sql = self.module.ingress_binding_query(
+            TENANT, value["captureReceipt"]["commandId"], value["ingressTask"]["id"],
+            value["ingressTask"]["ownerAppointmentId"], value["ingressReceipt"]["commandId"],
+            value["ingressDraft"]["id"], value["contactTask"]["id"],
+            value["contactTask"]["ownerAppointmentId"],
+        ).decode("utf-8")
+        self.assertIn("BEGIN READ ONLY", sql)
+        self.assertIn("SET LOCAL ROLE law_app_query", sql)
+        for table in ("execution.command_receipt", "responsibility.task_occurrence", "responsibility.action_draft", "lead.lead_assignment"):
+            self.assertIn(table, sql)
+        for forbidden in ("candidate_payload", "phone", "email", "ciphertext", "hmac", "password", "jwt"):
+            self.assertNotIn(forbidden, sql.lower())
+
+    def test_captured_binding_requires_an_uncompleted_open_ingress_task(self):
+        value = self.ingress_binding()
+        value.update({"phase": "CAPTURED", "ingressDraft": None, "ingressReceipt": None, "assignment": None, "contactTask": None})
+        value["ingressTask"].update({"state": "OPEN", "revision": 0, "completionFactType": None, "completionFactId": None, "completionFactRevision": None})
+        expected = {
+            "phase": "CAPTURED", "captureCommandId": value["captureReceipt"]["commandId"],
+            "ingressTaskId": value["ingressTask"]["id"],
+            "sourceOwnerAppointmentId": value["ingressTask"]["ownerAppointmentId"],
+        }
+        self.module.validate_ingress_binding(value, expected)
+        value["ingressTask"]["completionFactId"] = value["captureReceipt"]["resultFactId"]
+        with self.assertRaisesRegex(RuntimeError, "ingress binding"):
+            self.module.validate_ingress_binding(value, expected)
+
     def test_golden_completion_rejects_http_task_or_receipt_digest_mismatch(self):
         if len(inspect.signature(self.module.validate_golden_completion).parameters) != 2:
             self.fail("expected digest closure implementation is missing")
@@ -372,6 +422,9 @@ class R1AcceptanceTest(unittest.TestCase):
         sql = self.module.completion_query(
             TENANT, completion["commandId"], completion["tasks"][0]["id"],
             completion["drafts"][0]["id"], completion["tasks"][0]["ownerAppointmentId"], RESULT_DIGEST,
+            completion["ingress"]["captureReceipt"]["commandId"], completion["ingress"]["ingressReceipt"]["commandId"],
+            completion["ingress"]["ingressTask"]["id"], completion["ingress"]["ingressDraft"]["id"],
+            completion["ingress"]["ingressTask"]["ownerAppointmentId"],
         ).decode("utf-8")
         self.assertIn("BEGIN READ ONLY", sql)
         self.assertIn("SET LOCAL ROLE law_app_query", sql)
@@ -390,6 +443,14 @@ class R1AcceptanceTest(unittest.TestCase):
         ):
             self.assertIn(identifier, sql)
 
+    def test_golden_completion_rejects_broken_supplemented_ingress_chain(self):
+        for target in ("captureReceipt", "ingressTask", "ingressDraft", "ingressReceipt", "assignment", "contactTask"):
+            broken = self.completion()
+            broken["ingress"][target]["resultFactId" if target in ("captureReceipt", "ingressReceipt") else "leadId" if target == "assignment" else "subjectFactId" if target in ("ingressTask", "contactTask") else "taskId"] = "00000000-0000-4000-8000-000000000799"
+            with self.subTest(target=target):
+                with self.assertRaisesRegex(RuntimeError, "golden completion"):
+                    self.module.validate_golden_completion(broken, RESULT_DIGEST)
+
     def test_closed_report_whitelists_public_evidence_and_redacts_nested_secrets(self):
         report = self.module.closed_report({
             "run": RUN,
@@ -397,6 +458,7 @@ class R1AcceptanceTest(unittest.TestCase):
             "status": "GOLDEN_VERIFIED",
             "environmentDigest": "a" * 64,
             "managementCommandCount": 16,
+            "flowProfile": "CAPTURE_INGRESS_AUTOASSIGN_CONTACT_V1",
             "goldenCommandId": self.completion()["commandId"],
             "resultFact": {"factType": "LEAD_CONTACT_RESULT", "factRef": "opaque-ref"},
             "counts": {"contactResult": 1, "opportunity": 1, "event": 2, "outbox": 2, "receipt": 1, "audit": 1},
@@ -405,7 +467,7 @@ class R1AcceptanceTest(unittest.TestCase):
             "rawError": "secret stack",
         })
         self.assertEqual(
-            {"profile", "run", "operationId", "status", "environmentDigest", "managementCommandCount", "goldenCommandId", "resultFact", "counts"},
+            {"profile", "run", "operationId", "status", "environmentDigest", "managementCommandCount", "flowProfile", "goldenCommandId", "resultFact", "counts"},
             set(report),
         )
         serialized = json.dumps(report)
@@ -423,24 +485,50 @@ class R1AcceptanceTest(unittest.TestCase):
         owner = "00000000-0000-4000-8000-000000000708"
         event_contact = "00000000-0000-4000-8000-000000000709"
         event_opportunity = "00000000-0000-4000-8000-000000000710"
+        ingress = self.ingress_binding()
         return {
             "profile": "R1_GOLDEN_COMPLETION_V1",
             "tenantId": TENANT,
             "commandId": command,
+            "flowProfile": "CAPTURE_INGRESS_AUTOASSIGN_CONTACT_V1",
+            "ingress": {
+                **ingress,
+                "contactTask": {**ingress["contactTask"], "state": "DONE", "revision": 1},
+            },
             "contactResults": [{"id": contact, "leadId": lead, "assignmentId": assignment, "taskId": task, "contactNo": 1, "resultCode": "CONNECTED_VALID"}],
             "opportunities": [{"id": opportunity, "leadId": lead, "assignmentId": assignment, "ownerAppointmentId": owner, "sourceContactResultId": contact, "revision": 0}],
-            "tasks": [{"id": task, "ownerAppointmentId": owner, "state": "DONE", "revision": 1, "completionFactType": "LEAD_CONTACT_RESULT", "completionFactId": contact, "completionFactHash": RESULT_DIGEST}],
+            "tasks": [{"id": task, "ownerAppointmentId": owner, "state": "DONE", "revision": 1, "completionFactType": "lead.lead_contact_result", "completionFactId": contact, "completionFactHash": RESULT_DIGEST}],
             "drafts": [{"id": draft, "taskId": task, "state": "CONFIRMED", "revision": 1, "confirmedByAppointmentId": owner}],
-            "receipts": [{"commandId": command, "outcome": "SUCCEEDED", "resultFactType": "LEAD_CONTACT_RESULT", "resultFactId": contact, "resultFactHash": RESULT_DIGEST}],
+            "receipts": [{"commandId": command, "outcome": "SUCCEEDED", "resultFactType": "lead.lead_contact_result", "resultFactId": contact, "resultFactHash": RESULT_DIGEST}],
             "audits": [{"commandId": command, "commandType": "RECORD_CONTACT_RESULT", "resultCode": "SUCCEEDED", "actorAppointmentId": owner, "onBehalfOfAppointmentId": None}],
             "events": [
-                {"id": event_contact, "type": "LeadContactResultRecordedV1", "sourceFactType": "LEAD_CONTACT_RESULT", "sourceFactId": contact},
-                {"id": event_opportunity, "type": "OpportunityOpened", "sourceFactType": "OPPORTUNITY", "sourceFactId": opportunity},
+                {"id": event_contact, "type": "LeadContactResultRecordedV1", "sourceFactType": "lead.lead_contact_result", "sourceFactId": contact},
+                {"id": event_opportunity, "type": "OpportunityOpened", "sourceFactType": "opportunity.opportunity", "sourceFactId": opportunity},
             ],
             "outboxes": [
                 {"eventId": event_contact, "eventType": "LeadContactResultRecordedV1"},
                 {"eventId": event_opportunity, "eventType": "OpportunityOpened"},
             ],
+        }
+
+    def ingress_binding(self):
+        lead = "00000000-0000-4000-8000-000000000706"
+        ingress_task = "00000000-0000-4000-8000-000000000711"
+        ingress_draft = "00000000-0000-4000-8000-000000000712"
+        source_owner = "00000000-0000-4000-8000-000000000713"
+        sales_owner = "00000000-0000-4000-8000-000000000708"
+        contact_task = "00000000-0000-4000-8000-000000000704"
+        capture_command = "00000000-0000-4000-8000-000000000714"
+        ingress_command = "00000000-0000-4000-8000-000000000715"
+        assignment = "00000000-0000-4000-8000-000000000707"
+        return {
+            "profile": "R1_INGRESS_BINDING_V1", "phase": "COMPLETED", "tenantId": TENANT,
+            "captureReceipt": {"commandId": capture_command, "outcome": "SUCCEEDED", "resultFactType": "lead.lead", "resultFactId": lead, "resultFactRevision": 0},
+            "ingressTask": {"id": ingress_task, "ownerAppointmentId": source_owner, "primaryCommandCode": "COMPLETE_LEAD_INGRESS", "state": "DONE", "revision": 1, "subjectFactType": "lead.lead", "subjectFactId": lead, "subjectFactRevision": 0, "completionFactType": "lead.lead", "completionFactId": lead, "completionFactRevision": 1},
+            "ingressDraft": {"id": ingress_draft, "taskId": ingress_task, "actionCode": "COMPLETE_LEAD_INGRESS", "state": "CONFIRMED", "revision": 1, "createdByAppointmentId": source_owner, "confirmedByAppointmentId": source_owner},
+            "ingressReceipt": {"commandId": ingress_command, "outcome": "SUCCEEDED", "resultFactType": "lead.lead", "resultFactId": lead, "resultFactRevision": 1},
+            "assignment": {"id": assignment, "leadId": lead, "ownerAppointmentId": sales_owner, "assignmentNo": 1, "reasonCode": "SOURCE_POLICY_AUTOMATIC", "state": "OPEN", "revision": 0},
+            "contactTask": {"id": contact_task, "ownerAppointmentId": sales_owner, "primaryCommandCode": "RECORD_CONTACT_RESULT", "state": "OPEN", "revision": 0, "subjectFactType": "lead.lead", "subjectFactId": lead, "subjectFactRevision": 1},
         }
 
 
