@@ -538,3 +538,33 @@ TDD验证真正Bash驱动行为：使用临时目录/PATH的外部命令替身�
 最终只跑本单元新测试、shell语法、两个实际Playwright离线项目`--list`及必要既有topology核对；不重跑backend/SPA/215业务/identity全套或任何真实本地链。完整CI执行留到托管runner，不能声称本地已跑通GitHub。先RED再GREEN，报告命令/退出/限制，提交仅ownedfiles，独立评审后由Root更新完成状态。
 
 状态（2026-09-13）：Task10.1范围内完成，实现`b0ffd32`、工作目录修复`5b7e663`；4项新增测试通过，独立评审唯一Important修复后限定复核APPROVED。托管CI/完整驱动未执行；Task10整体仍开放。下一批是隔离环境和受控fixture，再补黄金/关键失败真实链，W09不在当前关键路径。详见[统一证据索引](../../evidence/r1/README.md)。
+
+## Task 10.2: 隔离端到端环境装配
+
+实施原Task10的一次性环境要求，复用现有local-login的真实服务装配方式，不复用其runtime或旧验收记录。用户已要求继续完整实施验收；本单元不改产品、UI、OpenAPI、权限或迁移。现有本机Docker约8GiB且旧环境运行中，禁止停止旧服务释放容量；新环境为功能验收，不代表参考容量验收。
+
+Files: 新建`e2e/compose.yaml`、`e2e/fixtures/r1-fixture.json`、`e2e/runtime/`下职责明确的准备/启动工具及必要HTTPS静态代理、`tests/test_r1_environment.py`；可更新`e2e/README.md`。Root负责计划/总证据索引，不修改已有Task9消费者或私密目录。不增加npm/Maven依赖或第二SPA/Jar，不建通用部署框架。
+
+Topology: 使用现有锁定PG18、Flyway、Keycloak镜像，以新的`ontology-law-r1-e2e-<run>` compose project隔离两个数据库、网络和卷，无container_name或external volume；所有对主机发布端口绑定127.0.0.1，与旧19443–19446分离。API和Worker复用同一个从本工作树构建的Jar、同版本宿主Java25.0.4.1+1，SPA由既有固定Node24.20.0运行的HTTPS静态代理托管同一构建产物；此本地/CI宿主模式无需新增Java/Node镜像。compose负责PG/Keycloak/Flyway，启动工具负责三宿主进程，未来Linux runner同构装配，不声称所有进程均容器化。
+
+Preparation: 仅接受本worktree内gitignored的专用`.artifacts/r1-e2e/<run>`目录，规范run ID、路径/链接检查；首次独占创建且拒绝覆盖/接管既存或不完整run。秘密文件先保护再写（Windows仅当前用户与SYSTEM，POSIX0700/0600），不得接收旧Task9runtime或打印秘密。准备工具产生随机合成账号密码、独立tenant密钥、PG角色密码、临时CA及准确SAN服务器证书/Java truststore；不安装全局信任、不关闭TLS。Secret通过文件注入，不入命令行或提交。模板仅非秘密角色/来源场景：主Tenant、隔离哨兵Tenant、founder、销售、主管、来源负责人、撤销任职、自动/人工/零候选来源；fixture是准备输入，不是业务结果或PASS声明。Keycloak复用realm-template安全参数和只读目录角色，准确issuer/redirect/origin，账号只在新realm合成导入，不修改旧Keycloak、不引入默认管理员。
+
+Startup: 完整校验锁定版本、所需文件/摘要、空闲端口与精确project隔离后才启动。只启动本run新基础设施；schema用当前生成迁移migrate→validate，不重写DDL、关闭guard或绕过能力角色；应用数据库与IdP数据库独立TLS及凭据。原子保存run manifest、命令阶段和实际进程/制品信息；失败不自动重试未知写入、不删除卷或原证据。API/Worker配置和身份前置若尚未具备，明确状态止于基础设施就绪，不生成“全环境READY”；真实HUMAN仍走现有IdentityBootstrapCommand/Identity管理API，不用SQL伪造HUMAN事实。后续fixture装载和黄金链执行属于原Task10后续步骤，须消费这些准确准备产物，不能把环境工具测试冒充真实验收。
+
+Verification: 先RED→GREEN覆盖实际准备器输出/文件副作用、重复run拒绝、路径/秘密边界、真实compose config解析、失败阶段停止；外部openssl/keytool/docker进程可在失败用例替换，不能只grep源代码或证明mock存在。尽量使用当前工具实际生成一次临时合成准备产物，并`docker compose config --quiet`，不输出完整配置/凭据。实现者不启动服务、不执行bootstrap/业务写入；Root在独立评审后执行新隔离环境，记录真实退出与就绪阶段，再进入业务fixture及黄金/失败路径。W09延期、UAT关闭、R2/附件通知/语音范围均不变。提交owned source files，完整报告命令/退出/差距，不伪称托管CI通过。
+
+2026-09-13实际运行网络澄清（用户已明确批准，仅新隔离环境）：Docker29.4.3下仅internal网络的服务出现声明端口但实际映射为空。保留identity/business两个internal网络，只给Keycloak和business-db分别增加独立的identity-host/business-host普通bridge；两个host桥不得共享，不使用host网络模式，身份数据库仍只有internal网络。发布仍严格127.0.0.1:29443/29446；普通bridge具备出站能力，但不增加外网业务请求、不更改旧环境或宿主防火墙。启动工具必须核对实际NetworkSettings.Ports而不只看声明配置，映射缺失或错误立即失败并保留现场，不继续等TLS。失败run只停止保留，源变更后新建run，不在线修改旧网络或manifest。
+
+## Task 10.3: 消费隔离环境的受控身份引导
+
+这是原Task10 fixture前置，不新增身份产品能力。只消费Task10.2新环境，使用已有同一Jar的`IdentityBootstrapCommand`完成主Tenant和隔离哨兵Tenant的受控初始化。API/Worker/SPA进程装配及人类业务授权由后续消费者完成，本单元不得把bootstrap成功写成应用READY或黄金链PASS。
+
+Files: 新增`e2e/runtime/r1_bootstrap.py`和`tests/test_r1_bootstrap.py`；仅必要时向`e2e/runtime/r1_environment.py`增加可复用的已准备输入验证入口，不修改既有manifest或接管旧run；可更新`e2e/README.md`。不改业务Java、DDL、OpenAPI、前端、依赖、Task9消费者或旧私密目录。Root负责计划/证据索引。
+
+输入只接受本工作树`.artifacts/r1-e2e/<run>`且真实状态为`INFRASTRUCTURE_READY`。首先验证其精确Compose项目、输入摘要、受保护目录和当前制品，验证数据库部署状态与Jar/schema摘要一致。环境manifest保持原样，新引导记录独占建立在该run内的受保护子目录。所有秘密只引用本run已有文件；为两个Tenant分别生成UUID及独立subject HMAC，不能与bootstrap签名密钥或其他用途密钥混用。主Tenant代码`R1_E2E_MAIN`，哨兵`R1_E2E_ISOLATION`；ROOT组织，创始管理员仅`IDENTITY_ADMIN`及现有四项管理授权，语义基线`MVP-2026-09-08.3`、物理合同`52-plus-2-v1.2`。创始账号使用本run已导入的founder合成账号；哨兵与主Tenant可以映射同一个IdP账号，但分别绑定Tenant及独立HMAC，本步骤不配置浏览器的跨租户选择或新增信任规则。
+
+命令固定复用`IdentityBootstrapCommand`的candidate→dry-run→execute --confirm-bootstrap→verify；本地离线Java明确使用`-Xmx256m`避免按整机内存推导堆，不作为参考容量配置。所有selector、settings、original manifest和原commandId只保存在受保护文件。candidate标准输出必须捕获至秘密文件，不写普通日志；不打印selector、subject HMAC、密码或令牌。保留原操作manifest与每阶段退出码，失败/不确定停止，不创建替代command或重发execute；重复入口拒绝覆盖，另有只读verify-original入口只能复用原文件和原command，不修复/篡改证据。不得SQL创建HUMAN/组织/任职/授权，不使用管理员密码grant或绕过目录服务。两个Tenant都通过实际original verify后只标记`IDENTITY_BOOTSTRAP_VERIFIED`（applicationReady仍false）；保留每Tenant精确Fact ID的脱敏引用，来源须是原bootstrap验证或受约束只读DB查询，不凭测试构造猜测ID。
+
+Java标准输出/错误在调用源头固定`-Dstdout.encoding=UTF-8`与`-Dstderr.encoding=UTF-8`，以bytes捕获再严格UTF-8解码；秘密输出原始字节仅留受保护文件，解码/JSON异常必须失败关闭，不使用替换或猜测编码。Task10.2已由真实固定keytool使用相应`-J-D…`参数验证Windows输出边界；本命令调用Java本体不加`-J`。
+
+TDD覆盖真实准备/阶段调度的副作用和停止行为：错误环境/摘要/权限在任何candidate前拒绝；重复初始化不重放；candidate失败、execute非零不进入后续写入；验证入口只执行verify；两个Tenant参数和独立密钥确切；普通输出无秘密。外部Java/数据库可用进程替身验证调度，不复制实现逻辑，不把替身结果当真实bootstrap。只运行本单元定点测试和必要受影响环境测试；实现者不执行真实bootstrap，由Root在独立评审通过后运行并记录实际命令/退出/阶段。W09延期、UAT关闭以及待授权的历史Party/Delegation/账号禁用/故障注入均保持原状态。
