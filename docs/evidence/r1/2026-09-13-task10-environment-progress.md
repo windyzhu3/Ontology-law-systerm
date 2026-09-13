@@ -54,6 +54,14 @@ Task10.2初版`718c99b`及准备run `task102-20260913`完成，10项工具测试
 
 Root随后使用全新`task102-utf8-20260913`：prepare退出0（b5b5aa），复核后start-infra退出0（d3b494）。实际回环映射、三个一次性任务退出0、严格CA discovery及六服务完整快照全部通过，状态`INFRASTRUCTURE_READY`，`applicationReady=false`。旧三个本地服务仍Up3days（623dd8）。先前失败run及不完整snapshot不覆盖、不删除；本次不重跑旧六卡或等待刷新。Task10.2基础设施前置关闭，继续Task10.3，不等于新环境业务黄金链或R1总验收通过。
 
+## Task10.3资源约束
+
+后继实现者的Task10.3合成10测已通过；额外运行未改的环境测试模块时，宿主JVM出现native memory/G1 mmap分配失败。Root仅提取固定故障原因行，没有输出原始崩溃日志；实现者确认两次环境模块尝试产生7个日志，已逐一移除继承并限制当前用户/SYSTEM，未提交或删除。该失败不代表Task10.3真实bootstrap或业务验收失败，二者尚未执行；不再重跑该未改模块。
+
+宿主采样freeVirtualMemory=185420KiB、freePhysicalMemory=796828KiB。Root逐个核验精确新Compose标签后停止新run三个原容器（Keycloak b0b955、两库d28358，均退出0），保留所有卷/数据/原state及snapshot，不改旧环境或宿主页文件。此时新环境实时状态为暂时停止；Task10.2此前实际通过证据仍保留，但不能将当前停止状态称为就绪。实际bootstrap之前须恢复同一原容器并重新只读验证端口、健康和严格TLS，不重跑初始化oneshot或伪造READY记录。
+
+停止新三个服务后再次采样freeVirtualMemory=873172KiB（约853MiB）。为避免盲目恢复后再次触发资源失败，已请求用户仅临时停止旧`ontology-law-local-login-keycloak`并在验收后恢复同一原容器的具名授权；未获批准前不操作。期间旧登录/续期将不可用，旧DB、账号、realm、卷、配置保持不变。该授权与此前新网络批准不同，不能混用；在此文更新时仍待回复。
+
 ## 上游核对
 
 2026-09-13复核[官方26.7.3发布页](https://github.com/keycloak/keycloak/releases/tag/26.7.3)与[官方安全公告目录](https://github.com/keycloak/keycloak/security/advisories)。当前发布页列出26.7.3及其安全修复；检查的[DCR角色伪造公告](https://github.com/keycloak/keycloak/security/advisories/GHSA-95cx-vmr5-3cmr)列26.7.1为修复版本。另核对[reset-credentials问题记录](https://github.com/keycloak/keycloak/issues/51833)，已关闭并标注26.7.2等版本。此为部署前具名上游核对，不是全量漏洞扫描或“无CVE”保证；不升级锁定制品，不开启重置密码、动态客户端注册或扩大目录权限。

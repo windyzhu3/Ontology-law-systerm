@@ -565,6 +565,40 @@ Files: 新增`e2e/runtime/r1_bootstrap.py`和`tests/test_r1_bootstrap.py`；仅�
 
 命令固定复用`IdentityBootstrapCommand`的candidate→dry-run→execute --confirm-bootstrap→verify；本地离线Java明确使用`-Xmx256m`避免按整机内存推导堆，不作为参考容量配置。所有selector、settings、original manifest和原commandId只保存在受保护文件。candidate标准输出必须捕获至秘密文件，不写普通日志；不打印selector、subject HMAC、密码或令牌。保留原操作manifest与每阶段退出码，失败/不确定停止，不创建替代command或重发execute；重复入口拒绝覆盖，另有只读verify-original入口只能复用原文件和原command，不修复/篡改证据。不得SQL创建HUMAN/组织/任职/授权，不使用管理员密码grant或绕过目录服务。两个Tenant都通过实际original verify后只标记`IDENTITY_BOOTSTRAP_VERIFIED`（applicationReady仍false）；保留每Tenant精确Fact ID的脱敏引用，来源须是原bootstrap验证或受约束只读DB查询，不凭测试构造猜测ID。
 
+固定引导字段：两个Tenant的`identityProviderCode`分别等于其`tenantCode`；共同`operatorAssertion=Controlled R1 isolated synthetic identity bootstrap`、`node=R1_E2E_BOOTSTRAP`、`activeBootstrapKeyId=r1-e2e-bootstrap-v1`。Tenant展示名取公开fixture，两个ROOT展示名分别为`R1 synthetic firm root`与`R1 isolation sentinel root`，管理员展示名为`Synthetic Founder`。后继API仅对主Tenant使用`R1_E2E_MAIN` HUMAN trust，不因哨兵bootstrap重复注册相同issuer/audience。
+
 Java标准输出/错误在调用源头固定`-Dstdout.encoding=UTF-8`与`-Dstderr.encoding=UTF-8`，以bytes捕获再严格UTF-8解码；秘密输出原始字节仅留受保护文件，解码/JSON异常必须失败关闭，不使用替换或猜测编码。Task10.2已由真实固定keytool使用相应`-J-D…`参数验证Windows输出边界；本命令调用Java本体不加`-J`。
 
 TDD覆盖真实准备/阶段调度的副作用和停止行为：错误环境/摘要/权限在任何candidate前拒绝；重复初始化不重放；candidate失败、execute非零不进入后续写入；验证入口只执行verify；两个Tenant参数和独立密钥确切；普通输出无秘密。外部Java/数据库可用进程替身验证调度，不复制实现逻辑，不把替身结果当真实bootstrap。只运行本单元定点测试和必要受影响环境测试；实现者不执行真实bootstrap，由Root在独立评审通过后运行并记录实际命令/退出/阶段。W09延期、UAT关闭以及待授权的历史Party/Delegation/账号禁用/故障注入均保持原状态。
+
+## Task 10.4: 新隔离环境的既有应用装配
+
+承接Task10.3实际原始引导核验，只装配当前唯一Jar的API/Worker和当前唯一SPA，不新增业务端点、前端页面、身份能力或通用部署平台。HUMAN主体、组织、任职、业务DIRECT授权仍由后继真实管理API建立，本单元不得用SQL提前填入。尚未获准的历史Party/Delegation/账号禁用及故障注入仍不执行。
+
+**Files:** 新增`e2e/runtime/r1_applications.py`、`e2e/runtime/r1_server.mjs`、`tests/test_r1_applications.py`、`e2e/runtime/r1_server.test.mjs`；允许更新`e2e/README.md`。不改Task10.2已摘要的源文件、旧部署脚本、业务Java、DDL、OpenAPI、SPA源代码或依赖。
+
+**接口和输入：** `prepare_applications(root: Path, run: str) -> Path`独占建立本run下受保护`applications/`；`start_applications(root: Path, run: str) -> None`只消费已准备且摘要一致的输入；`verify_applications(root: Path, run: str) -> dict`只读检查原进程/配置/数据库前置，不执行补写或重启。入口分别为`prepare`、`start`、`verify`，参数仅run，凭据不进命令行。消费`r1_bootstrap.verify_original(root, run)`返回的`R1_E2E_VERIFIED_IDENTITY_BOOTSTRAP_INPUT_V1`，其`tenants[R1_E2E_MAIN|R1_E2E_ISOLATION]`包含`tenantId/rootOrganizationId/founderPrincipalId/appointmentId/authorityGrantIds/subjectHmacPath/originalVerificationEvidenceSha256`；该调用只核验原命令、返回路径而非秘密字节。不得用手写完成marker替代原核验，不复制其验证算法。
+
+- [ ] **先写失败测试。** 外部数据库/进程用替身，但真实执行保护、配置生成、命令构造及状态机。测试必须证明：bootstrap缺失/不匹配在任何SERVICE写入前拒绝；输入摘要漂移在启动前拒绝；prepare重复调用不重放；原SERVICE事务结果未知不重发；API失败不启动Worker/SPA；启动进程PID/创建时间不匹配不能READY；正常配置只绑定29444/29445、仅主Tenant HUMAN trust、Worker三项授权、来源三项政策、全部不同用途密钥。测试入口固定如下：
+
+```powershell
+D:/soft/python3/python.exe -m unittest tests.test_r1_applications
+```
+
+- [ ] **受控SERVICE前置和配置。** 参考`deploy/local-login/local_login.py`中SERVICE-only初始化及`local_worker.py`中的授权闭包，不导入其旧私密runtime、不运行旧命令。仅本主Tenant新建一个`SERVICE/LOCAL_SERVICE`主体及ROOT下SERVICE任职；三个DIRECT Grant仅`R1_PROJECTION_CONSUME`、`CONTACT_TASK_RECOVER`、`ROUTING_REVIEW_TASK_RECOVER`，grantor必须为原bootstrap创始任职。一次事务先核验原Tenant/ROOT/founder/manifest及部署摘要，写入原已保存UUID，准确核对新增行数；只读核验原UUID/字段集合，不按名称收养既存数据。此基础设施fixture不伪造HTTP命令回执。
+
+- [ ] **生成保护配置。** API使用`law_api_login`，Worker使用`law_worker_login`，均`sslmode=verify-full`，准确Jar/schema摘要和当前合同。API只配置主Tenant `R1_E2E_MAIN`、已冻结issuer/audience/directory/introspection；六项TenantKeys用途独立，credential-subject-hmac必须沿用主Tenantbootstrap密钥。为新SERVICE创建独立clientAuth证书/私钥/PKCS12及公钥，API绑定准确指纹，Worker使用同一原SERVICE任职及指纹，严格CA/mTLS，不复用服务器私钥为SERVICE。所有新增秘密在`applications/`保护边界内，原准备manifest和秘密保持原样。
+
+来源政策固定`R1_AUTO=AUTOMATIC`、`R1_MANUAL=MANUAL`、`R1_ZERO_CANDIDATE=AUTOMATIC`。前两项候选根`OWNED_ROOT`，零候选根`EMPTY_ROOT`；主管根、接入根均`ROOT`，时区`Asia/Shanghai`。两子组织由后继管理API在任何业务capture前建立；本单元只配置，不SQL创建HUMAN组织。SERVICE注册只允许这三来源，服务issuer=`urn:r1-e2e:service`、audience=`r1-e2e-api`。
+
+- [ ] **同制品启动。** 原Jar同时用于互斥api/worker启动，分别`-Xmx384m`；固定Java stdout/stderr UTF-8，API只监听127.0.0.1:29445，Worker无HTTP监听。Node只监听127.0.0.1:29444，使用原SPA dist字节；新`r1_server.mjs`保留旧`server.mjs`的准确路由白名单、CSP、缓存、路径拒绝与严格TLS代理语义，端口改为新环境固定值，不引入任意origin/路径配置或生产改动。进程隐藏启动、立即保存PID/命令/创建时间；部分启动或不确定结果保留现场，不自动杀旧进程或重启。
+
+- [ ] **就绪和反例。** 新Node入口用原始字节摘要确认dist，要求准确Host，代理移除转发/代理头，10秒上游超时，CA严格校验；测试真实本机临时TLS服务器验证错误CA拒绝和正确CA代理，临时测试端口不得占用原/新固定服务端口。Node单元入口：
+
+```powershell
+node --test e2e/runtime/r1_server.test.mjs
+```
+
+实际Root启动后，只有准确当前PID/启动时刻的API/Worker隔离及READY日志、严格TLS的SPA200/未认证SELF401和SERVICE readiness200同时满足才记录`APPLICATION_INFRASTRUCTURE_READY`，不能记真实用户登录、责任卡或黄金链PASS。不调用新的业务主命令；后继浏览器验收另建记录。实现者只运行本单元定点测试，Root独立评审后执行一次真实入口。
+
+- [ ] **提交和评审。** 提交只含本单元文件，报告列准确测试命令/退出码/覆盖边界；按Task10.3原始消费者接口交接，不复制其验证算法，不给原环境添加恢复或重放机制。
