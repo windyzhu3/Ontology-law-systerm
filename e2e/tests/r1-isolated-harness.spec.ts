@@ -268,6 +268,35 @@ test('historic 17-command capture checkpoint appends only four ingress and conta
   } finally { rmSync(folder, { recursive: true, force: true }); }
 });
 
+test('confirmed contact draft checkpoint reopens before reload and never reissues that draft', async () => {
+  const folder = mkdtempSync(join(tmpdir(), 'r1-contact-draft-checkpoint-'));
+  try {
+    const path = join(folder, 'journal.json');
+    const journal = await AcceptanceJournal.open(path, identity());
+    await confirmPrefix(journal, 15); await journal.completeStage('MANAGEMENT_COMPLETED');
+    await confirmPrefix(journal, 16); await journal.completeStage('SALES_AUTHORITY_COMPLETED');
+    await journal.completeStage('IDENTITIES_VERIFIED');
+    await confirmPrefix(journal, 17); await journal.completeStage('CAPTURE_COMPLETED');
+    await confirmPrefix(journal, 18); await journal.completeStage('INGRESS_DRAFT_RELOADED');
+    await confirmPrefix(journal, 19); await journal.completeStage('INGRESS_COMPLETED');
+    await confirmPrefix(journal, 20);
+    const checkpoint = JSON.parse(readFileSync(path, 'utf8'));
+    expect(checkpoint.commands).toHaveLength(20);
+    expect(checkpoint.commands[19]).toMatchObject({ step: 'contact-draft', status: 'CONFIRMED', httpStatus: 201 });
+    expect(checkpoint.stages.at(-1)).toBe('INGRESS_COMPLETED');
+
+    const seen: string[] = [], receipts = new Map<string, any>(), checkpoints: Array<{ name: string; count: number }> = [];
+    const ingress = checkpoint.commands[18];
+    receipts.set(ingress.commandId, { commandId: ingress.commandId, receiptId: ingress.receiptId, outcome: 'SUCCEEDED', resultFact: ingress.resultFact });
+    await new R1GoldenOrchestrator(await AcceptanceJournal.open(path, identity()), goldenAdapter(seen, receipts, checkpoints)).run();
+    expect(seen).toEqual(['contact-submit']);
+    expect(checkpoints.map(entry => entry.name)).toEqual(['ingress', 'contact', 'reload', 'closure']);
+    const completed = JSON.parse(readFileSync(path, 'utf8'));
+    expect(completed.commands.slice(0, 20)).toEqual(checkpoint.commands);
+    expect(completed.commands).toHaveLength(21);
+  } finally { rmSync(folder, { recursive: true, force: true }); }
+});
+
 test('added sales authority pending blocks continuation without replaying the historic 15', async () => {
   const folder = mkdtempSync(join(tmpdir(), 'r1-acceptance-sales-pending-'));
   try {

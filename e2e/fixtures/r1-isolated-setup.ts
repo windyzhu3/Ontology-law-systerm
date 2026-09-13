@@ -60,7 +60,7 @@ function validProgress(data: JournalData): void {
   const confirmed = data.commands.filter(command => command.status === 'CONFIRMED').length;
   const minimums = [15,16,16,17,18,19,20,21];
   if (data.stages.length) boundary(confirmed >= minimums[data.stages.length - 1]);
-  const maximums = [15,16,16,17,18,19,19,21,21];
+  const maximums = [15,16,16,17,18,19,20,21,21];
   boundary(data.commands.length <= maximums[data.stages.length]);
   if (data.stages.includes('MANAGEMENT_COMPLETED')) boundary(data.commands.slice(0, 15).every(command => command.status === 'CONFIRMED'));
   if (data.stages.includes('SALES_AUTHORITY_COMPLETED')) boundary(data.commands[15]?.status === 'CONFIRMED');

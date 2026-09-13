@@ -324,3 +324,39 @@ Exit code `0`, silent. `git diff --check` also exited `0`.
 ### Ingress continuation live boundary
 
 No protected/private runtime, live service, database, browser, IdP, CA/trust store, fixed listener, or real write was accessed. No product/API/UI, permission, DDL, dependency, Task9 consumer, or old suite changed or ran. These fresh offline results do not constitute a golden runtime PASS. Root owns scoped independent review and any later controlled continuation. Concurrent Root public documentation and evidence changes plus pre-existing crash/replay/test-result artifacts remain untouched and excluded.
+
+## Review 04 durability fix
+
+Base commit: `ee915e4e568b744b3b9f50bd9e2d17fd0de392e3`.
+
+The review identified the exact post-write/pre-reload window after contact Draft index 19 has been confirmed: the journal contains 20 commands while its last durable stage is still `INGRESS_COMPLETED`. The previous `maximums[6]` value of 19 rejected that legitimate checkpoint on reopen. The fixed stage maxima are `[15,16,16,17,18,19,20,21,21]`; no other sequence, stage, adapter, or closure behavior changed.
+
+### Review 04 RED
+
+```powershell
+$env:NO_COLOR=$null; $env:FORCE_COLOR='0'; C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe node_modules/@playwright/test/cli.js test e2e/tests/r1-isolated-harness.spec.ts --config e2e/r1-isolated.config.ts --project offline-r1-isolated --reporter=line --grep "confirmed contact draft checkpoint"
+```
+
+Exit code `1`: the exact one-test checkpoint failed in `AcceptanceJournal.open` → `validProgress` with `R1_ISOLATED_BOUNDARY`, before any continuation dispatch.
+
+### Review 04 focused GREEN
+
+The same command exited `0`: `1 passed (957ms)`. The reopened journal retained all 20 original records, dispatched only `contact-submit`, and performed contact-card adoption, reload, and closure without reissuing `contact-draft`.
+
+### Review 04 covering GREEN
+
+```powershell
+$env:NO_COLOR=$null; $env:FORCE_COLOR='0'; C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe node_modules/@playwright/test/cli.js test e2e/tests/r1-isolated-harness.spec.ts --config e2e/r1-isolated.config.ts --project offline-r1-isolated --reporter=line
+```
+
+Exit code `0`: `16 passed (2.8s)` using one worker, with no warning output.
+
+Touched strict TypeScript command:
+
+```powershell
+C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe node_modules/typescript/bin/tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --esModuleInterop --skipLibCheck --strict --types node,@playwright/test e2e/fixtures/r1-isolated-setup.ts e2e/tests/r1-isolated-harness.spec.ts
+```
+
+Exit code `0`, silent. `git diff --check` also exited `0`. Python was unchanged and was intentionally not repeated.
+
+No protected/private runtime, live service, database, browser, IdP, CA/trust store, fixed listener, or write was accessed. The result remains offline source evidence, not a golden runtime PASS.
