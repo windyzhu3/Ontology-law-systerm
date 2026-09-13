@@ -68,6 +68,30 @@ Root随后使用全新`task102-utf8-20260913`：prepare退出0（b5b5aa），复
 
 代码/评审门已通过，真实bootstrap仍未运行，Task10.3不能整体记为运行验收通过。下一步为资源授权后恢复同一新容器并完成实际bootstrap，再实施Task10.4同Jar API/Worker及同SPA装配，之后补黄金/失败路径。旧环境、W09延期、UAT关闭、R2排除及其他待授权测试范围不变；本轮未推送仓库。
 
+## 2026-09-13授权后的首次真实bootstrap
+
+用户确认仅临时停止旧Keycloak以释放资源。Root停用唯一原容器`e2486c1bca2b`，未操作历史failed-feature容器；恢复新run原两库和Keycloak，不重跑初始化oneshot。实际两库健康、准确回环发布和新CA严格discovery通过（5958f8）。
+
+随后唯一一次`bootstrap task102-utf8-20260913`非零退出（40eb2a），原state/record保留失败。candidate、dry-run均退出0；dry-run stdout为2362字节，含jOOQ INFO logo/tips/version日志及末尾一个准确`DRY_RUN` JSON，整个stdout不是单JSON；execute未被调用且无execute输出。原候选有效期300秒，不能事后续用或静默更新原manifest。
+
+Root另发现同一工具后继Fact查询直接读取`audit.audit_entry`，在既定`law_app_query`角色下被拒绝；既有授权仅允许`audit.audit_entry_classified_v`，生产bootstrap原始核验同样使用该视图。没有增加GRANT或改权限。改用既有分类视图进行独立只读核对（95626c）：本原Tenant在tenant、principal、organization、appointment、grant、slot、receipt、audit八项计数均0，证实未产生初始化事实。
+
+实现者限定修复标准输出日志分流和分类视图目标，不改业务Jar/DDL/权限，不增加恢复框架。原失败run及命令全部保留；确认零副作用后，后续仅建立新的独立合成run承接验证，不修改或重试原命令。成本是一次额外的隔离准备/迁移，不重放旧业务验收。
+
+修复期间Root停止新三个原容器，恢复同一旧Keycloak。原容器完整ID、配置摘要及挂载摘要与停用后基准一致；旧容器挂载列表为空，因此必须保留其原可写层，不得删除/重建。初次停用前的挂载摘要命令因空数组序列化报错，没有获得停用前摘要，不将后取摘要冒充此前证据。恢复后旧`local-r1`通过系统信任的严格TLS发现200（847dac），旧数据库未停用、未修改账号/realm/配置；未读取旧私密runtime文件。
+
+## 第二轮真实引导：主Tenant成功，哨兵受资源阻断
+
+限定修复`bc66d1f31a107fdd842d062fdf53cbe65c4d881b`完成：受保护并绑定摘要的Logback配置将日志定向stderr，保持完整stdout单JSON；Fact查询只用既有分类视图。17项定点测试通过（5.830秒），包含真实固定JDK及原Jar日志依赖的无数据库探测；独立复核两项均ADDRESSED，无新Critical/Important。原保留dry-run预览另只读通过现有语义校验（014024），不据此更改生产解析器。
+
+全新`task103-stdout-20260913` prepare退出0（31681a），经复核后start-infra退出0（ca6089）；仅初始化本新隔离环境。随后一次bootstrap（03e692/d7f51b）整体非零：主Tenant的candidate/dry-run/execute/verify/fact-query全部退出0，模式依次为DRY_RUN、CREATED、VERIFIED_ORIGINAL，原Fact查询成功。主Tenant是真实已创建及原始核验通过，不能重发或换原命令。
+
+哨兵Tenantcandidate退出0，dry-run退出1、stdout572字节为JVM原生内存不足诊断，未调用execute（dd2c4e/ae5e95）。此时freeVirtualMemory仅21520KiB、freePhysicalMemory985140KiB。不是新的JSON/业务规则故障，也不能将整组记PASS。原run state和record保持失败，成功主Tenant原settings、命令、HMAC、全部stage输出及Fact记录保留；哨兵失败记录同样保留，不补造成功。
+
+Root核验精确新项目标签后停止新KC `6c84bc51d725`和两库`215ad4b9530c`、`5f7092e200dd`，保留容器、卷和数据；恢复旧原Keycloak `e2486c1bca2b`（df9df4）。18718e确认旧配置/挂载摘要不变、旧两库仍Up3days，85b0d3确认旧local-r1严格TLS发现200。新增`hs_err_pid42168.log`与`replay_pid42168.log`已按精确文件保护，仅当前用户/SYSTEM可访问，未提交、未删除，未输出原始日志；前7份崩溃诊断也保留。
+
+恢复旧服务后本机freeVirtualMemory仅525960KiB。已请求用户释放资源（建议开始前至少3GiB可用虚拟内存）或提供独立环境，并另行批准仅续建未写入哨兵的最小入口：先验证原主Tenant完整闭包及哨兵零写入，保留全部失败证据，只对未写入哨兵重新取得候选，不重发主Tenant。此方案在批准前不实施；不通过继续新建整套run丢弃已成功主Tenant。Task10.4保持未实施，R1/R2门禁不推进。
+
 ## 上游核对
 
 2026-09-13复核[官方26.7.3发布页](https://github.com/keycloak/keycloak/releases/tag/26.7.3)与[官方安全公告目录](https://github.com/keycloak/keycloak/security/advisories)。当前发布页列出26.7.3及其安全修复；检查的[DCR角色伪造公告](https://github.com/keycloak/keycloak/security/advisories/GHSA-95cx-vmr5-3cmr)列26.7.1为修复版本。另核对[reset-credentials问题记录](https://github.com/keycloak/keycloak/issues/51833)，已关闭并标注26.7.2等版本。此为部署前具名上游核对，不是全量漏洞扫描或“无CVE”保证；不升级锁定制品，不开启重置密码、动态客户端注册或扩大目录权限。

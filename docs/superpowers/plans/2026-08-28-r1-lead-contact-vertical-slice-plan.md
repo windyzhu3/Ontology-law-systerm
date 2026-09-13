@@ -567,7 +567,7 @@ Files: 新增`e2e/runtime/r1_bootstrap.py`和`tests/test_r1_bootstrap.py`；仅�
 
 固定引导字段：两个Tenant的`identityProviderCode`分别等于其`tenantCode`；共同`operatorAssertion=Controlled R1 isolated synthetic identity bootstrap`、`node=R1_E2E_BOOTSTRAP`、`activeBootstrapKeyId=r1-e2e-bootstrap-v1`。Tenant展示名取公开fixture，两个ROOT展示名分别为`R1 synthetic firm root`与`R1 isolation sentinel root`，管理员展示名为`Synthetic Founder`。后继API仅对主Tenant使用`R1_E2E_MAIN` HUMAN trust，不因哨兵bootstrap重复注册相同issuer/audience。
 
-Java标准输出/错误在调用源头固定`-Dstdout.encoding=UTF-8`与`-Dstderr.encoding=UTF-8`，以bytes捕获再严格UTF-8解码；秘密输出原始字节仅留受保护文件，解码/JSON异常必须失败关闭，不使用替换或猜测编码。Task10.2已由真实固定keytool使用相应`-J-D…`参数验证Windows输出边界；本命令调用Java本体不加`-J`。
+Java标准输出/错误在调用源头固定`-Dstdout.encoding=UTF-8`与`-Dstderr.encoding=UTF-8`，以bytes捕获再严格UTF-8解码；秘密输出原始字节仅留受保护文件，解码/JSON异常必须失败关闭，不使用替换或猜测编码。Task10.2已由真实固定keytool使用相应`-J-D…`参数验证Windows输出边界；本命令调用Java本体不加`-J`。离线日志通过新增`e2e/runtime/r1-bootstrap-logback.xml`及其受保护副本定向stderr，两份精确路径/摘要绑定原记录，stdout仍要求完整单JSON，不从混合输出里挑最后一行。新增`tests/fixtures/R1BootstrapLoggingProbe.java`仅为无数据库的真实JVM日志分流测试，不进入业务Jar。Fact核验使用现有`audit.audit_entry_classified_v`和`law_app_query`，不直读审计原表、不增加权限。
 
 TDD覆盖真实准备/阶段调度的副作用和停止行为：错误环境/摘要/权限在任何candidate前拒绝；重复初始化不重放；candidate失败、execute非零不进入后续写入；验证入口只执行verify；两个Tenant参数和独立密钥确切；普通输出无秘密。外部Java/数据库可用进程替身验证调度，不复制实现逻辑，不把替身结果当真实bootstrap。只运行本单元定点测试和必要受影响环境测试；实现者不执行真实bootstrap，由Root在独立评审通过后运行并记录实际命令/退出/阶段。W09延期、UAT关闭以及待授权的历史Party/Delegation/账号禁用/故障注入均保持原状态。
 
@@ -591,7 +591,7 @@ D:/soft/python3/python.exe -m unittest tests.test_r1_applications
 
 来源政策固定`R1_AUTO=AUTOMATIC`、`R1_MANUAL=MANUAL`、`R1_ZERO_CANDIDATE=AUTOMATIC`。前两项候选根`OWNED_ROOT`，零候选根`EMPTY_ROOT`；主管根、接入根均`ROOT`，时区`Asia/Shanghai`。两子组织由后继管理API在任何业务capture前建立；本单元只配置，不SQL创建HUMAN组织。SERVICE注册只允许这三来源，服务issuer=`urn:r1-e2e:service`、audience=`r1-e2e-api`。
 
-- [ ] **同制品启动。** 原Jar同时用于互斥api/worker启动，分别`-Xmx384m`；固定Java stdout/stderr UTF-8，API只监听127.0.0.1:29445，Worker无HTTP监听。Node只监听127.0.0.1:29444，使用原SPA dist字节；新`r1_server.mjs`保留旧`server.mjs`的准确路由白名单、CSP、缓存、路径拒绝与严格TLS代理语义，端口改为新环境固定值，不引入任意origin/路径配置或生产改动。进程隐藏启动、立即保存PID/命令/创建时间；部分启动或不确定结果保留现场，不自动杀旧进程或重启。
+- [ ] **同制品启动。** 原Jar同时用于互斥api/worker启动，分别`-Xmx384m`；固定Java stdout/stderr UTF-8，API只监听127.0.0.1:29445，Worker无HTTP监听。Node只监听127.0.0.1:29444，使用原SPA dist字节；新`r1_server.mjs`保留旧`server.mjs`的准确路由白名单、CSP、缓存、路径拒绝与严格TLS代理语义，端口改为新环境固定值，不引入任意origin/路径配置或生产改动。进程隐藏启动、立即保存PID/命令/创建时间；部分启动或不确定结果保留现场，不自动杀旧进程或重启。应用状态只写入本单元`applications/`记录，不改环境`state.json`或bootstrap记录：它们继续保留已完成引导的原始阶段，保证`verify_original`消费者不会因后继装配被破坏。
 
 - [ ] **就绪和反例。** 新Node入口用原始字节摘要确认dist，要求准确Host，代理移除转发/代理头，10秒上游超时，CA严格校验；测试真实本机临时TLS服务器验证错误CA拒绝和正确CA代理，临时测试端口不得占用原/新固定服务端口。Node单元入口：
 
