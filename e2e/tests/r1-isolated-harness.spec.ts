@@ -186,7 +186,9 @@ test('golden orchestrator runs fixed management before identities capture reload
       async executeWrite(command: ArmedWrite, gate: any) {
         seen.push(command.step);
         await gate.dispatch(actual(command), async () => {});
-        const resultFact = { factType: command.step === 'contact-submit' ? 'LEAD_CONTACT_RESULT' : 'R1_FIXTURE', factRef: randomUUID(), revision: 0 };
+        const resultFact = command.step === 'contact-submit'
+          ? { factType: 'LEAD_CONTACT_RESULT', factRef: randomUUID(), digest: 'A'.repeat(43) }
+          : { factType: 'R1_FIXTURE', factRef: randomUUID(), revision: 0 };
         const response = { status: command.method === 'PUT' || command.step === 'contact-submit' ? 200 : 201,
           headers: { location: `/api/v1/commands/${command.commandId}/receipt`, 'cache-control': 'no-store', etag: `"identity.${'A'.repeat(43)}"` },
           body: { commandId: command.commandId, receiptId: randomUUID(), outcome: 'SUCCEEDED', resultFact } };
@@ -197,7 +199,11 @@ test('golden orchestrator runs fixed management before identities capture reload
       async locateContactTask(resources: Record<string,string>) { checkpoints.push({ name: 'contact', count: Object.keys(resources).length }); return randomUUID(); },
       async reloadDraft(resources: Record<string,string>) { checkpoints.push({ name: 'reload', count: Object.keys(resources).length }); },
       async retrieveReceipt(commandId: string) { return receipts.get(commandId); },
-      async closeCompletion(commandId: string, resources: Record<string,string>) { checkpoints.push({ name: 'closure', count: Object.keys(resources).length }); return { commandId, counts: { contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 } }; },
+      async closeCompletion(commandId: string, resultFactDigest: string, resources: Record<string,string>) {
+        expect(resultFactDigest).toBe('A'.repeat(43));
+        checkpoints.push({ name: 'closure', count: Object.keys(resources).length });
+        return { commandId, counts: { contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 } };
+      },
     };
     const orchestrator = new R1GoldenOrchestrator(journal, adapter);
     const report = await orchestrator.run();

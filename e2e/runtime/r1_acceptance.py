@@ -30,6 +30,7 @@ COMPLETION_PROFILE = "R1_GOLDEN_COMPLETION_V1"
 READY_PHASE = "APPLICATION_INFRASTRUCTURE_READY"
 UUID_PATTERN = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")
 HASH_PATTERN = re.compile(r"[0-9a-f]{64}")
+FACT_DIGEST_PATTERN = re.compile(r"[A-Za-z0-9_-]{43}")
 COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 
 
@@ -81,6 +82,14 @@ def load_acceptance_environment(
         raise RuntimeError("acceptance operation identity invalid")
     root = Path(root).resolve(strict=True)
     dependency = dependencies or _Dependencies()
+    runtime, _, state, app_manifest, environment_manifest, service = dependency.load_application(
+        root, run, (READY_PHASE,),
+    )
+    runtime = Path(runtime).resolve(strict=True)
+    if state.get("phase") != READY_PHASE or state.get("applicationReady") is not True or \
+       state.get("run") != run or app_manifest.get("run") != run or environment_manifest.get("run") != run:
+        raise RuntimeError("application readiness state mismatch")
+
     readiness = dependency.verify_applications(root, run)
     if not _exact(readiness, {
         "profile", "run", "phase", "bootstrapSource", "applicationReady",
@@ -90,13 +99,6 @@ def load_acceptance_environment(
        readiness.get("applicationReady") is not True or readiness.get("claims") != [READY_PHASE]:
         raise RuntimeError("application readiness unavailable")
 
-    runtime, _, state, app_manifest, environment_manifest, service = dependency.load_application(
-        root, run, (READY_PHASE,),
-    )
-    runtime = Path(runtime).resolve(strict=True)
-    if state.get("phase") != READY_PHASE or state.get("applicationReady") is not True or \
-       state.get("run") != run or app_manifest.get("run") != run or environment_manifest.get("run") != run:
-        raise RuntimeError("application readiness state mismatch")
     expected_processes = state.get("processes")
     if not isinstance(expected_processes, dict) or set(expected_processes) != {"api", "worker", "spa"}:
         raise RuntimeError("application process identity mismatch")
@@ -238,10 +240,11 @@ def _single(value: dict, key: str) -> dict:
     return rows[0]
 
 
-def validate_golden_completion(value: object) -> dict:
+def validate_golden_completion(value: object, expected_digest: str) -> dict:
     """Validate the closed CONTACT_CONNECTED_VALID database projection."""
     if not isinstance(value, dict) or value.get("profile") != COMPLETION_PROFILE or \
-       not _uuid(value.get("tenantId")) or not _uuid(value.get("commandId")):
+       not _uuid(value.get("tenantId")) or not _uuid(value.get("commandId")) or \
+       not isinstance(expected_digest, str) or not FACT_DIGEST_PATTERN.fullmatch(expected_digest):
         raise RuntimeError("golden completion mismatch")
     try:
         contact = _single(value, "contactResults")
@@ -274,12 +277,12 @@ def validate_golden_completion(value: object) -> dict:
             raise ValueError
         if task.get("ownerAppointmentId") != owner or task.get("state") != "DONE" or \
            task.get("revision") != 1 or task.get("completionFactType") != "LEAD_CONTACT_RESULT" or \
-           task.get("completionFactId") != contact_id:
+           task.get("completionFactId") != contact_id or task.get("completionFactHash") != expected_digest:
             raise ValueError
         if draft.get("taskId") != task_id or draft.get("state") != "CONFIRMED" or \
            draft.get("revision") != 1 or draft.get("confirmedByAppointmentId") != owner:
             raise ValueError
-        if receipt != {"commandId": command, "outcome": "SUCCEEDED", "resultFactType": "LEAD_CONTACT_RESULT", "resultFactId": contact_id}:
+        if receipt != {"commandId": command, "outcome": "SUCCEEDED", "resultFactType": "LEAD_CONTACT_RESULT", "resultFactId": contact_id, "resultFactHash": expected_digest}:
             raise ValueError
         if audit.get("commandId") != command or audit.get("commandType") != "RECORD_CONTACT_RESULT" or \
            audit.get("resultCode") != "SUCCEEDED" or audit.get("actorAppointmentId") != owner or \
@@ -302,14 +305,19 @@ def validate_golden_completion(value: object) -> dict:
     return value
 
 
-def completion_query(tenant_id: str, command_id: str, task_id: str, draft_id: str, owner_id: str) -> bytes:
+def completion_query(
+    tenant_id: str, command_id: str, task_id: str, draft_id: str,
+    owner_id: str, expected_digest: str,
+) -> bytes:
     """Build the fixed, read-only closure query without protected content columns."""
-    if not all(_uuid(value) for value in (tenant_id, command_id, task_id, draft_id, owner_id)):
+    if not all(_uuid(value) for value in (tenant_id, command_id, task_id, draft_id, owner_id)) or \
+       not isinstance(expected_digest, str) or not FACT_DIGEST_PATTERN.fullmatch(expected_digest):
         raise RuntimeError("golden completion selector invalid")
     literal = applications._sql_literal
     tenant, command, task, draft, owner = [literal(value) + "::uuid" for value in (
         tenant_id, command_id, task_id, draft_id, owner_id,
     )]
+    expected_hash = f"decode(translate({literal(expected_digest)},'-_','+/')||'=','base64')"
     sql = f"""BEGIN READ ONLY;
 SET LOCAL ROLE law_app_query;
 WITH selected_contact AS (
@@ -330,9 +338,9 @@ SELECT jsonb_build_object(
  'profile','R1_GOLDEN_COMPLETION_V1','tenantId',{tenant}::text,'commandId',{command}::text,
  'contactResults',coalesce((SELECT jsonb_agg(jsonb_build_object('id',lead_contact_result_id,'leadId',lead_id,'assignmentId',lead_assignment_id,'taskId',contact_task_id,'contactNo',contact_no,'resultCode',result_code)) FROM selected_contact),'[]'::jsonb),
  'opportunities',coalesce((SELECT jsonb_agg(jsonb_build_object('id',opportunity_id,'leadId',source_lead_id,'assignmentId',source_assignment_id,'ownerAppointmentId',owner_appointment_id,'sourceContactResultId',source_contact_result_id,'revision',revision)) FROM selected_opportunity),'[]'::jsonb),
- 'tasks',coalesce((SELECT jsonb_agg(jsonb_build_object('id',task_occurrence_id,'ownerAppointmentId',owner_appointment_id,'state',state,'revision',revision,'completionFactType',completion_fact_type,'completionFactId',completion_fact_id)) FROM responsibility.task_occurrence WHERE tenant_id={tenant} AND task_occurrence_id={task} AND owner_appointment_id={owner}),'[]'::jsonb),
+ 'tasks',coalesce((SELECT jsonb_agg(jsonb_build_object('id',task_occurrence_id,'ownerAppointmentId',owner_appointment_id,'state',state,'revision',revision,'completionFactType',completion_fact_type,'completionFactId',completion_fact_id,'completionFactHash',translate(rtrim(encode(completion_fact_hash,'base64'),'='),'+/','-_'))) FROM responsibility.task_occurrence WHERE tenant_id={tenant} AND task_occurrence_id={task} AND owner_appointment_id={owner} AND completion_fact_hash={expected_hash}),'[]'::jsonb),
  'drafts',coalesce((SELECT jsonb_agg(jsonb_build_object('id',action_draft_id,'taskId',task_occurrence_id,'state',state,'revision',revision,'confirmedByAppointmentId',confirmed_by_appointment_id)) FROM responsibility.action_draft WHERE tenant_id={tenant} AND action_draft_id={draft} AND task_occurrence_id={task} AND confirmed_by_appointment_id={owner}),'[]'::jsonb),
- 'receipts',coalesce((SELECT jsonb_agg(jsonb_build_object('commandId',s.command_id,'outcome',r.outcome,'resultFactType',r.result_fact_type,'resultFactId',r.result_fact_id)) FROM selected_slot s JOIN execution.command_receipt r USING(tenant_id,command_execution_slot_id)),'[]'::jsonb),
+ 'receipts',coalesce((SELECT jsonb_agg(jsonb_build_object('commandId',s.command_id,'outcome',r.outcome,'resultFactType',r.result_fact_type,'resultFactId',r.result_fact_id,'resultFactHash',translate(rtrim(encode(r.result_fact_hash,'base64'),'='),'+/','-_'))) FROM selected_slot s JOIN execution.command_receipt r USING(tenant_id,command_execution_slot_id) WHERE r.result_fact_hash={expected_hash}),'[]'::jsonb),
  'audits',coalesce((SELECT jsonb_agg(jsonb_build_object('commandId',command_id,'commandType',command_type,'resultCode',result_code,'actorAppointmentId',actor_appointment_id,'onBehalfOfAppointmentId',on_behalf_of_appointment_id)) FROM audit.audit_entry_classified_v WHERE tenant_id={tenant} AND command_id={command} AND command_type='RECORD_CONTACT_RESULT'),'[]'::jsonb),
  'events',coalesce((SELECT jsonb_agg(jsonb_build_object('id',domain_event_id,'type',event_type,'sourceFactType',source_fact_type,'sourceFactId',source_fact_id) ORDER BY event_type) FROM selected_events),'[]'::jsonb),
  'outboxes',coalesce((SELECT jsonb_agg(jsonb_build_object('eventId',e.domain_event_id,'eventType',e.event_type) ORDER BY e.event_type) FROM selected_events e JOIN execution.domain_event_outbox o ON o.tenant_id={tenant} AND o.domain_event_id=e.domain_event_id),'[]'::jsonb)
@@ -344,7 +352,7 @@ COMMIT;
 
 def read_golden_completion(
     root: Path, run: str, operation_id: str, command_id: str,
-    task_id: str, draft_id: str, owner_id: str,
+    task_id: str, draft_id: str, owner_id: str, expected_digest: str,
 ) -> dict:
     """Re-verify the current run, then return its closed read-only golden projection."""
     environment = load_acceptance_environment(root, run, operation_id)
@@ -356,6 +364,7 @@ def read_golden_completion(
         Path(root).resolve(strict=True), folder, f"acceptance-completion-{operation_id}",
         input_bytes=completion_query(
             environment["bootstrap"]["tenantId"], command_id, task_id, draft_id, owner_id,
+            expected_digest,
         ),
     )
     if result.returncode:
@@ -364,7 +373,7 @@ def read_golden_completion(
         value = json.loads(result.stdout.strip())
     except json.JSONDecodeError as error:
         raise RuntimeError("golden completion unavailable") from error
-    validate_golden_completion(value)
+    validate_golden_completion(value, expected_digest)
     if value["commandId"] != command_id or value["tenantId"] != environment["bootstrap"]["tenantId"]:
         raise RuntimeError("golden completion mismatch")
     return value
@@ -404,6 +413,7 @@ def main(argv: list[str] | None = None) -> int:
     completion.add_argument("--task-id", required=True)
     completion.add_argument("--draft-id", required=True)
     completion.add_argument("--owner-appointment-id", required=True)
+    completion.add_argument("--result-fact-digest", required=True)
     args = parser.parse_args(argv)
     try:
         if args.command == "environment":
@@ -411,7 +421,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             value = read_golden_completion(
                 args.root, args.run, args.operation_id, args.command_id,
-                args.task_id, args.draft_id, args.owner_appointment_id,
+                args.task_id, args.draft_id, args.owner_appointment_id, args.result_fact_digest,
             )
         print(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
         return 0

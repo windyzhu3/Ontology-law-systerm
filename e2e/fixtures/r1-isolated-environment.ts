@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 export const HASH = /^[0-9a-f]{64}$/;
+export const FACT_DIGEST = /^[A-Za-z0-9_-]{43}$/;
 const COMMIT = /^[0-9a-f]{40}$/;
 const PROCESS_NAMES = ['api', 'worker', 'spa'] as const;
 const ACCOUNT_NAMES = ['founder', 'sales', 'supervisor', 'sourceOwner'] as const;
@@ -109,25 +110,27 @@ async function bridge(run: string, operationId: string): Promise<unknown> {
   }));
 }
 
-async function completionBridge(environment: AcceptanceEnvironment, commandId: string, taskId: string, draftId: string, ownerId: string): Promise<unknown> {
+async function completionBridge(environment: AcceptanceEnvironment, commandId: string, taskId: string, draftId: string, ownerId: string, resultFactDigest: string): Promise<unknown> {
   return new Promise((resolveValue, reject) => execFile(PYTHON, [
     '-B', join(ROOT, 'e2e/runtime/r1_acceptance.py'), '--root', ROOT,
     'completion', environment.run, '--operation-id', environment.operationId,
     '--command-id', commandId, '--task-id', taskId, '--draft-id', draftId,
-    '--owner-appointment-id', ownerId,
+    '--owner-appointment-id', ownerId, '--result-fact-digest', resultFactDigest,
   ], { cwd: ROOT, encoding: 'utf8', windowsHide: true, timeout: 120_000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
     if (error) { reject(new Error('R1_ISOLATED_BOUNDARY')); return; }
     try { resolveValue(JSON.parse(stdout)); } catch { reject(new Error('R1_ISOLATED_BOUNDARY')); }
   }));
 }
 
-export async function closeR1GoldenCompletion(environment: AcceptanceEnvironment, commandId: string, taskId: string, draftId: string, ownerId: string) {
+export async function closeR1GoldenCompletion(environment: AcceptanceEnvironment, commandId: string, taskId: string, draftId: string, ownerId: string, resultFactDigest: string) {
   boundary([commandId, taskId, draftId, ownerId].every(value => UUID.test(value)));
-  const value: any = await completionBridge(environment, commandId, taskId, draftId, ownerId);
+  boundary(FACT_DIGEST.test(resultFactDigest));
+  const value: any = await completionBridge(environment, commandId, taskId, draftId, ownerId, resultFactDigest);
   boundary(value?.profile === 'R1_GOLDEN_COMPLETION_V1' && value.tenantId === environment.bootstrap.tenantId && value.commandId === commandId);
   const singles = ['contactResults','opportunities','tasks','drafts','receipts','audits'];
   boundary(singles.every(key => Array.isArray(value[key]) && value[key].length === 1));
   boundary(Array.isArray(value.events) && value.events.length === 2 && Array.isArray(value.outboxes) && value.outboxes.length === 2);
+  boundary(value.tasks[0].completionFactHash === resultFactDigest && value.receipts[0].resultFactHash === resultFactDigest);
   return { commandId, counts: { contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 } };
 }
 

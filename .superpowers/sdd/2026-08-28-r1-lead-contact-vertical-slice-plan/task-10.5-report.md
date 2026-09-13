@@ -105,3 +105,84 @@ Default `--list` exited `0` and listed only 8 `offline-r1-isolated` harness test
 - Therefore this report is not a golden PASS. The live result remains unavailable in this source unit until Root completes independent review, the approved exact temporary CurrentUser CA trust, the single controlled run, database/audit closure, and exact trust cleanup verification.
 - The 600-second live test contains no retry. Per-screen waits and the verified-environment/closure bridges are fixed and bounded; an uncertain successful write remains PENDING rather than being resent.
 - Early RED runs created untracked `test-results/` error-context files containing only offline synthetic failure diagnostics. They are excluded from the owned commit. Pre-existing JVM crash/replay logs and concurrent Root documentation edits are untouched and excluded.
+
+## Review fix round 1
+
+Base commit: `c67a67009675565d44f53c2db29c46c98718004d`.
+
+The two Important findings in `task-10.5-review-01.md` were fixed without changing the 18-write surface, browser flow, product, application assembler, permissions, DDL, service state, or live environment:
+
+- `load_acceptance_environment` now enters the existing validated `_load_application(..., (APPLICATION_INFRASTRUCTURE_READY,))` boundary before invoking `verify_applications`. A persisted `STARTED_UNVERIFIED` state therefore fails before the verifier's state-promotion branch can run. The focused test uses the real `_load_application` implementation and proves both zero verifier calls and byte-identical original `state.json`.
+- The exact original submit receipt `resultFact.digest` now crosses the orchestrator, browser adapter, TypeScript/Python bridge, CLI, query, and completion validator. The `law_app_query` transaction exposes URL-safe base64 `task_occurrence.completion_fact_hash` and `command_receipt.result_fact_hash`, filters both by the expected digest, and requires both returned values to equal the original HTTP digest. Mismatch coverage independently changes the expected HTTP digest, Task hash, and Receipt hash.
+
+### Review-fix RED
+
+Python command:
+
+```powershell
+D:/soft/python3/python.exe -X utf8 -m unittest tests.test_r1_acceptance.R1AcceptanceTest.test_non_ready_saved_state_uses_real_loader_before_verifier_without_mutation tests.test_r1_acceptance.R1AcceptanceTest.test_golden_completion_rejects_http_task_or_receipt_digest_mismatch
+```
+
+Exit code `1`:
+
+```text
+FF
+FAIL: test_non_ready_saved_state_uses_real_loader_before_verifier_without_mutation
+AssertionError: "applications not consumable" does not match "forbidden non-ready verifier call"
+
+FAIL: test_golden_completion_rejects_http_task_or_receipt_digest_mismatch
+AssertionError: expected digest closure implementation is missing
+
+Ran 2 tests in 0.074s
+FAILED (failures=2)
+```
+
+TypeScript command:
+
+```powershell
+C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe node_modules/@playwright/test/cli.js test --config e2e/r1-isolated.config.ts --project offline-r1-isolated -g "golden orchestrator"
+```
+
+Exit code `1`: the single orchestrator test expected the exact 43-character receipt digest but received the resources object at the old second argument, proving that the original digest was not forwarded to closure.
+
+### Review-fix focused GREEN
+
+The same two Python tests exited `0` with `Ran 2 tests ... OK`. The same targeted Playwright command exited `0` with `1 passed (894ms)`. The three readiness tests, including the existing READY projection/order coverage, separately exited `0` with `Ran 3 tests ... OK`.
+
+### Review-fix final GREEN
+
+Python command, with `FORCE_COLOR` removed and `NO_COLOR=1` only for the test process:
+
+```powershell
+D:/soft/python3/python.exe -X utf8 -m unittest tests.test_r1_acceptance
+```
+
+Exit code `0`:
+
+```text
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 0.114s
+
+OK
+```
+
+Playwright command, with `NO_COLOR` removed and `FORCE_COLOR=0` only for the test process:
+
+```powershell
+C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe node_modules/@playwright/test/cli.js test --config e2e/r1-isolated.config.ts --project offline-r1-isolated
+```
+
+Exit code `0`: `8 passed (2.2s)` using one worker, with no warning output.
+
+Touched TypeScript graph command:
+
+```powershell
+C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe node_modules/typescript/bin/tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --esModuleInterop --skipLibCheck --strict --types node,@playwright/test e2e/fixtures/r1-isolated-environment.ts e2e/fixtures/r1-isolated-setup.ts e2e/fixtures/r1-isolated-browser.ts e2e/r1-isolated.config.ts e2e/tests/r1-golden-path.spec.ts e2e/tests/r1-isolated-harness.spec.ts apps/workbench/src/features/workcard/contract.ts apps/workbench/src/generated/api/schema.d.ts
+```
+
+Exit code `0`, silent.
+
+### Review-fix live boundary
+
+No application verifier, real/private run, protected runtime, database, service, browser, IdP, trust store, fixed listener, or old suite was accessed in this fix. The strict-TLS golden run remains Root-owned after scoped re-review; this offline GREEN does not claim runtime PASS. The pre-existing untracked crash/replay logs, offline `test-results/`, and concurrent Root progress-document edit remain untouched and excluded.

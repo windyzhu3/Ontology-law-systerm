@@ -338,8 +338,8 @@ export class R1IsolatedBrowserAdapter implements GoldenAdapter {
     return this.read(session, `/api/v1/commands/${commandId}/receipt`);
   }
 
-  async closeCompletion(commandId: string, resources: Record<string,string>): Promise<{ commandId: string; counts: Record<string,number> }> {
+  async closeCompletion(commandId: string, resultFactDigest: string, resources: Record<string,string>): Promise<{ commandId: string; counts: Record<string,number> }> {
     const owner = resources['appointment-sales'], task = resources.contactTask, draft = resources['contact-draft']; boundary(UUID.test(owner) && UUID.test(task) && UUID.test(draft));
-    return closeR1GoldenCompletion(this.environment, commandId, task, draft, owner);
+    return closeR1GoldenCompletion(this.environment, commandId, task, draft, owner, resultFactDigest);
   }
 }

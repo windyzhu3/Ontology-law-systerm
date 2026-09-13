@@ -1,5 +1,6 @@
 import hashlib
 import importlib.util
+import inspect
 import json
 import tempfile
 import unittest
@@ -14,6 +15,7 @@ TENANT = "00000000-0000-4000-8000-000000000001"
 ROOT_ORGANIZATION = "00000000-0000-4000-8000-000000000002"
 FOUNDER = "00000000-0000-4000-8000-000000000003"
 FOUNDER_APPOINTMENT = "00000000-0000-4000-8000-000000000004"
+RESULT_DIGEST = "A" * 43
 
 
 def load_module(test_case: unittest.TestCase):
@@ -198,7 +200,10 @@ class R1AcceptanceTest(unittest.TestCase):
             self.module.load_acceptance_environment(
                 self.root, RUN, OPERATION, dependencies=dependencies
             )
-        self.assertEqual(["verify-applications"], dependencies.calls)
+        self.assertEqual([
+            ("load-application", ("APPLICATION_INFRASTRUCTURE_READY",)),
+            "verify-applications",
+        ], dependencies.calls)
 
         dependencies = ControlledDependencies(self.fixture)
         dependencies.changed_pid = True
@@ -207,6 +212,35 @@ class R1AcceptanceTest(unittest.TestCase):
                 self.root, RUN, OPERATION, dependencies=dependencies
             )
         self.assertNotIn(("verify-bootstrap", "original"), dependencies.calls)
+
+    def test_non_ready_saved_state_uses_real_loader_before_verifier_without_mutation(self):
+        self.folder.mkdir()
+        state_path = self.folder / "state.json"
+        state_path.write_text(json.dumps({
+            "profile": "R1_E2E_APPLICATION_STATE_V1", "run": RUN,
+            "phase": "STARTED_UNVERIFIED", "applicationReady": False,
+        }), encoding="utf-8")
+        (self.folder / "manifest.json").write_text("{}", encoding="utf-8")
+        original = state_path.read_bytes()
+
+        class RealLoaderDependencies:
+            def __init__(nested):
+                nested.verifier_calls = []
+
+            def load_application(nested, root, run, phases):
+                return self.module.applications._load_application(root, run, phases)
+
+            def verify_applications(nested, root, run):
+                nested.verifier_calls.append((root, run))
+                raise RuntimeError("forbidden non-ready verifier call")
+
+        dependencies = RealLoaderDependencies()
+        with self.assertRaisesRegex(RuntimeError, "applications not consumable"):
+            self.module.load_acceptance_environment(
+                self.root, RUN, OPERATION, dependencies=dependencies,
+            )
+        self.assertEqual([], dependencies.verifier_calls)
+        self.assertEqual(original, state_path.read_bytes())
 
     def test_public_environment_contains_only_current_run_references_and_stable_binding(self):
         dependencies = ControlledDependencies(self.fixture)
@@ -247,8 +281,8 @@ class R1AcceptanceTest(unittest.TestCase):
         )
         self.assertEqual(
             [
-                "verify-applications",
                 ("load-application", ("APPLICATION_INFRASTRUCTURE_READY",)),
+                "verify-applications",
                 ("process", 101),
                 ("process", 102),
                 ("process", 103),
@@ -282,22 +316,38 @@ class R1AcceptanceTest(unittest.TestCase):
 
     def test_golden_completion_requires_unique_exact_facts_and_original_receipt(self):
         completion = self.completion()
-        self.module.validate_golden_completion(completion)
+        self.module.validate_golden_completion(completion, RESULT_DIGEST)
         for collection in ("contactResults", "opportunities", "tasks", "drafts", "receipts", "audits"):
             broken = self.completion()
             broken[collection] = []
             with self.subTest(collection=collection, problem="missing"):
                 with self.assertRaisesRegex(RuntimeError, "golden completion"):
-                    self.module.validate_golden_completion(broken)
+                    self.module.validate_golden_completion(broken, RESULT_DIGEST)
             broken = self.completion()
             broken[collection].append(dict(broken[collection][0]))
             with self.subTest(collection=collection, problem="duplicate"):
                 with self.assertRaisesRegex(RuntimeError, "golden completion"):
-                    self.module.validate_golden_completion(broken)
+                    self.module.validate_golden_completion(broken, RESULT_DIGEST)
         broken = self.completion()
         broken["receipts"][0]["commandId"] = "00000000-0000-4000-8000-000000000999"
         with self.assertRaisesRegex(RuntimeError, "golden completion"):
-            self.module.validate_golden_completion(broken)
+            self.module.validate_golden_completion(broken, RESULT_DIGEST)
+
+    def test_golden_completion_rejects_http_task_or_receipt_digest_mismatch(self):
+        if len(inspect.signature(self.module.validate_golden_completion).parameters) != 2:
+            self.fail("expected digest closure implementation is missing")
+        for target in ("expected", "task", "receipt"):
+            completion = self.completion()
+            expected = RESULT_DIGEST
+            if target == "expected":
+                expected = "B" * 43
+            elif target == "task":
+                completion["tasks"][0]["completionFactHash"] = "B" * 43
+            else:
+                completion["receipts"][0]["resultFactHash"] = "B" * 43
+            with self.subTest(target=target):
+                with self.assertRaisesRegex(RuntimeError, "golden completion"):
+                    self.module.validate_golden_completion(completion, expected)
 
     def test_golden_completion_requires_two_exact_events_and_outboxes(self):
         for collection in ("events", "outboxes"):
@@ -309,7 +359,7 @@ class R1AcceptanceTest(unittest.TestCase):
                     broken[collection].append(dict(broken[collection][0]))
                 with self.subTest(collection=collection, mutation=mutation):
                     with self.assertRaisesRegex(RuntimeError, "golden completion"):
-                        self.module.validate_golden_completion(broken)
+                        self.module.validate_golden_completion(broken, RESULT_DIGEST)
 
     def test_completion_query_is_read_only_uses_allowed_audit_view_and_excludes_sensitive_columns(self):
         completion = self.completion()
@@ -317,11 +367,13 @@ class R1AcceptanceTest(unittest.TestCase):
             self.fail("completion_query implementation is missing")
         sql = self.module.completion_query(
             TENANT, completion["commandId"], completion["tasks"][0]["id"],
-            completion["drafts"][0]["id"], completion["tasks"][0]["ownerAppointmentId"],
+            completion["drafts"][0]["id"], completion["tasks"][0]["ownerAppointmentId"], RESULT_DIGEST,
         ).decode("utf-8")
         self.assertIn("BEGIN READ ONLY", sql)
         self.assertIn("SET LOCAL ROLE law_app_query", sql)
         self.assertIn("audit.audit_entry_classified_v", sql)
+        self.assertIn("completion_fact_hash", sql)
+        self.assertIn("result_fact_hash", sql)
         self.assertNotIn("FROM audit.audit_entry ", sql)
         for forbidden in (
             "candidate_payload", "legal_need_ciphertext", "legal_need_digest",
@@ -373,9 +425,9 @@ class R1AcceptanceTest(unittest.TestCase):
             "commandId": command,
             "contactResults": [{"id": contact, "leadId": lead, "assignmentId": assignment, "taskId": task, "contactNo": 1, "resultCode": "CONNECTED_VALID"}],
             "opportunities": [{"id": opportunity, "leadId": lead, "assignmentId": assignment, "ownerAppointmentId": owner, "sourceContactResultId": contact, "revision": 0}],
-            "tasks": [{"id": task, "ownerAppointmentId": owner, "state": "DONE", "revision": 1, "completionFactType": "LEAD_CONTACT_RESULT", "completionFactId": contact}],
+            "tasks": [{"id": task, "ownerAppointmentId": owner, "state": "DONE", "revision": 1, "completionFactType": "LEAD_CONTACT_RESULT", "completionFactId": contact, "completionFactHash": RESULT_DIGEST}],
             "drafts": [{"id": draft, "taskId": task, "state": "CONFIRMED", "revision": 1, "confirmedByAppointmentId": owner}],
-            "receipts": [{"commandId": command, "outcome": "SUCCEEDED", "resultFactType": "LEAD_CONTACT_RESULT", "resultFactId": contact}],
+            "receipts": [{"commandId": command, "outcome": "SUCCEEDED", "resultFactType": "LEAD_CONTACT_RESULT", "resultFactId": contact, "resultFactHash": RESULT_DIGEST}],
             "audits": [{"commandId": command, "commandType": "RECORD_CONTACT_RESULT", "resultCode": "SUCCEEDED", "actorAppointmentId": owner, "onBehalfOfAppointmentId": None}],
             "events": [
                 {"id": event_contact, "type": "LeadContactResultRecordedV1", "sourceFactType": "LEAD_CONTACT_RESULT", "sourceFactId": contact},

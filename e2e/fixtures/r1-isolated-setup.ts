@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { closeSync, existsSync, fsyncSync, openSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 
-import { HASH, UUID, boundary } from './r1-isolated-environment';
+import { FACT_DIGEST, HASH, UUID, boundary } from './r1-isolated-environment';
 
 
 export const ACTOR_SCOPE = /^ask1\.[A-Za-z0-9_-]{43}$/;
@@ -129,7 +129,7 @@ export interface GoldenAdapter {
   locateContactTask(resources: Record<string,string>): Promise<string>;
   reloadDraft(resources: Record<string,string>): Promise<void>;
   retrieveReceipt(commandId: string): Promise<any>;
-  closeCompletion(commandId: string, resources: Record<string,string>): Promise<{ commandId: string; counts: Record<string,number> }>;
+  closeCompletion(commandId: string, resultFactDigest: string, resources: Record<string,string>): Promise<{ commandId: string; counts: Record<string,number> }>;
 }
 
 export class R1GoldenOrchestrator {
@@ -170,7 +170,8 @@ export class R1GoldenOrchestrator {
     const submit = await this.write(17, resources);
     const recovered = await this.adapter.retrieveReceipt(submit.commandId);
     boundary(JSON.stringify(recovered) === JSON.stringify({ commandId: submit.commandId, receiptId: submit.receiptId, outcome: 'SUCCEEDED', resultFact: submit.resultFact }));
-    const closure = await this.adapter.closeCompletion(submit.commandId, resources);
+    boundary(submit.resultFact.factType === 'LEAD_CONTACT_RESULT' && FACT_DIGEST.test(String(submit.resultFact.digest)));
+    const closure = await this.adapter.closeCompletion(submit.commandId, String(submit.resultFact.digest), resources);
     boundary(closure.commandId === submit.commandId && JSON.stringify(closure.counts) === JSON.stringify({ contactResult: 1, opportunity: 1, event: 2, outbox: 2, receipt: 1, audit: 1 }));
     if (!this.journal.hasStage('GOLDEN_COMPLETED')) await this.journal.completeStage('GOLDEN_COMPLETED');
     return { managementCommandCount: 15, goldenCommandId: submit.commandId, resultFact: submit.resultFact, counts: closure.counts };
