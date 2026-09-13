@@ -1,6 +1,7 @@
 services:
   identity-db:
     image: postgres@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+    mem_limit: 768m
     entrypoint: ["/bin/sh", "/r1/postgres-entrypoint.sh", "identity"]
     command: ["postgres", "-c", "ssl=on", "-c", "ssl_cert_file=/run/r1-secrets/identity-db-cert", "-c", "ssl_key_file=/run/r1-secrets/identity-db-key", "-c", "log_statement=none", "-c", "log_min_error_statement=panic"]
     environment:
@@ -21,6 +22,7 @@ services:
 
   keycloak-files:
     image: postgres@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+    mem_limit: 128m
     user: "0:0"
     entrypoint: ["/bin/sh", "/r1/prepare-keycloak-files.sh"]
     secrets: [identity-db-password, ca, keycloak-cert, keycloak-key, realm]
@@ -33,6 +35,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak@sha256:88943b6ad06d6293a239f0dfca5acec64218c9b3ab327bf9c936acf408a6ae3b
+    mem_limit: 1536m
     depends_on:
       identity-db: {condition: service_healthy}
       keycloak-files: {condition: service_completed_successfully}
@@ -52,6 +55,7 @@ services:
       KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/conf/r1/server.key
       KC_FEATURES_DISABLED: impersonation,parameterized-scopes
       KC_HTTP_ACCESS_LOG_ENABLED: "false"
+      JAVA_OPTS_KC_HEAP: -Xms128m -Xmx768m -XX:MaxMetaspaceSize=256m
     ports: ["127.0.0.1:29443:8443"]
     volumes:
       - keycloak-config:/opt/keycloak/conf/r1:ro
@@ -61,6 +65,7 @@ services:
 
   business-db:
     image: postgres@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+    mem_limit: 768m
     entrypoint: ["/bin/sh", "/r1/postgres-entrypoint.sh", "business"]
     command: ["postgres", "-c", "ssl=on", "-c", "ssl_cert_file=/run/r1-secrets/business-db-cert", "-c", "ssl_key_file=/run/r1-secrets/business-db-key", "-c", "log_statement=none", "-c", "log_min_error_statement=panic"]
     environment:
@@ -83,6 +88,7 @@ services:
 
   flyway:
     image: redgate/flyway@sha256:c093a247b19ff09a6a72774569171ee355fff2ae44ceba4a4aa4b23235d99c93
+    mem_limit: 512m
     depends_on:
       business-db: {condition: service_healthy}
     entrypoint: ["/bin/sh", "/r1/flyway-entrypoint.sh"]
@@ -109,6 +115,7 @@ services:
 
   runtime-logins:
     image: postgres@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+    mem_limit: 256m
     depends_on:
       flyway: {condition: service_completed_successfully}
     entrypoint: ["/bin/sh", "/r1/provision-runtime-logins.sh"]

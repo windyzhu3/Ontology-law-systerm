@@ -38,6 +38,7 @@ REALM = "r1-e2e"
 ISSUER = "https://localhost:29443/realms/r1-e2e"
 SPA_ORIGIN = "https://localhost:29444"
 API_ORIGIN = "https://localhost:29445"
+BOUNDED_CONCURRENT_LIMIT_BYTES = 3 * 1024 * 1024 * 1024
 SECRET_NAMES = (
     "identity-db-password", "business-superuser-password", "migrator-password",
     "api-db-password", "worker-db-password", "introspection-secret", "directory-secret",
@@ -515,6 +516,18 @@ def _validate_compose(root: Path, runtime: Path, project: str,
         raise RuntimeError("compose config failed; inspect protected diagnostics")
 
 
+def _memory_feasibility() -> dict[str, object]:
+    return {
+        "profile": "R1_E2E_FUNCTIONAL_MEMORY_V1",
+        "boundedConcurrentLimitBytes": BOUNDED_CONCURRENT_LIMIT_BYTES,
+        "capacityAcceptance": False,
+        "note": (
+            "Configured Compose limits for a functional local run only; this is not reference capacity acceptance "
+            "and does not prove a host pagefile root cause."
+        ),
+    }
+
+
 def _git_snapshot(root: Path) -> dict[str, object]:
     head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True)
     status = subprocess.run(
@@ -562,6 +575,7 @@ def prepare_environment(
         stage = "compose-config"
         project = "ontology-law-r1-e2e-" + run
         _validate_compose(root, runtime, project, command_runner)
+        memory_feasibility = _memory_feasibility()
         _verify_private_boundary(runtime)
         required = {relative: sha256_file(runtime / relative) for relative in REQUIRED_RUNTIME_FILES}
         manifest = {
@@ -571,6 +585,7 @@ def prepare_environment(
             "sourceDigests": _source_digests(root), "requiredFiles": required,
             "artifacts": {"jar": jar, "spa": spa}, "schemaManifestSha256": schema_manifest_digest,
             "hostTools": versions,
+            "memoryFeasibility": memory_feasibility,
             "sourceGitSnapshot": _git_snapshot(root),
             "secretBoundaryValidated": True,
             "artifactProvenanceNote": "Existing bytes were copied and hashed; this preparation did not prove how they were built.",
@@ -649,7 +664,28 @@ def preflight_start(root: Path, run: str,
     return runtime, state, manifest
 
 
-def start_infrastructure(root: Path, run: str, command_runner: CommandRunner = subprocess.run) -> None:
+def _probe_keycloak(runtime: Path) -> None:
+    context = ssl.create_default_context(cafile=str(runtime / "certs/ca.pem"))
+    last_error: Exception | None = None
+    for _ in range(60):
+        try:
+            with urllib.request.urlopen(
+                ISSUER + "/.well-known/openid-configuration", context=context, timeout=5,
+            ) as response:
+                discovery = json.load(response)
+            if discovery.get("issuer") != ISSUER:
+                raise RuntimeError("Keycloak discovery issuer mismatch")
+            return
+        except Exception as error:
+            last_error = error
+            time.sleep(2)
+    raise RuntimeError("Keycloak discovery did not become ready") from last_error
+
+
+def start_infrastructure(
+    root: Path, run: str, command_runner: CommandRunner = subprocess.run,
+    *, discovery_probe: Callable[[Path], None] | None = None,
+) -> None:
     root = Path(root).resolve(strict=True)
     runtime, state, manifest = preflight_start(root, run, command_runner)
     state_path = runtime / "state.json"
@@ -658,30 +694,34 @@ def start_infrastructure(root: Path, run: str, command_runner: CommandRunner = s
         "docker", "compose", "--env-file", str(runtime / "compose.env"),
         "-f", str(root / "e2e/compose.yaml"), "-p", manifest["composeProject"],
     ]
-    completed = _run(prefix + ["up", "--wait", "--wait-timeout", "180", "--no-build"],
-                     root, runtime, "compose-up", command_runner)
-    if completed.returncode:
-        _record(state_path, state, "START_FAILED", failedStage="compose-up", errorType="ExternalCommandError")
-        raise RuntimeError("compose up failed; protected resources retained without retry")
+    def run_stage(arguments: list[str], label: str, failed_stage: str, message: str) -> None:
+        completed = _run(prefix + arguments, root, runtime, label, command_runner)
+        if completed.returncode:
+            _record(
+                state_path, state, "START_FAILED", failedStage=failed_stage,
+                errorType="ExternalCommandError",
+            )
+            raise RuntimeError(message + "; protected resources retained without retry")
+
+    run_stage(
+        ["up", "-d", "--wait", "--wait-timeout", "180", "--no-build", "identity-db", "business-db"],
+        "compose-databases-ready", "databases-ready", "database services failed readiness",
+    )
+    for service in ("keycloak-files", "flyway", "runtime-logins"):
+        run_stage(
+            ["run", "--no-deps", "-T", service],
+            f"compose-{service}", service, f"{service} one-shot failed",
+        )
+    run_stage(
+        ["up", "-d", "--no-deps", "--wait", "--wait-timeout", "180", "--no-build", "keycloak"],
+        "compose-keycloak-ready", "keycloak-ready", "Keycloak service failed readiness",
+    )
     try:
-        context = ssl.create_default_context(cafile=str(runtime / "certs/ca.pem"))
-        last_error: Exception | None = None
-        for _ in range(60):
-            try:
-                with urllib.request.urlopen(ISSUER + "/.well-known/openid-configuration", context=context, timeout=5) as response:
-                    discovery = json.load(response)
-                if discovery.get("issuer") != ISSUER:
-                    raise RuntimeError("Keycloak discovery issuer mismatch")
-                break
-            except Exception as error:
-                last_error = error
-                time.sleep(2)
-        else:
-            raise RuntimeError("Keycloak discovery did not become ready") from last_error
+        (discovery_probe or _probe_keycloak)(runtime)
     except Exception as error:
         _record(state_path, state, "START_FAILED", failedStage="keycloak-discovery", errorType=type(error).__name__)
         raise RuntimeError("infrastructure discovery failed; protected resources retained") from error
-    ps = _run(prefix + ["ps", "--format", "json"], root, runtime, "compose-ps", command_runner)
+    ps = _run(prefix + ["ps", "-a", "--format", "json"], root, runtime, "compose-ps", command_runner)
     if ps.returncode:
         _record(state_path, state, "START_FAILED", failedStage="compose-ps", errorType="ExternalCommandError")
         raise RuntimeError("cannot record infrastructure process state")

@@ -193,6 +193,36 @@ class R1EnvironmentPreparationTest(unittest.TestCase):
         self.assertEqual("/r1/ca.pem", service["environment"]["PGSSLROOTCERT"])
         self.assertTrue(any(volume["target"] == "/r1/ca.pem" and volume["read_only"] for volume in service["volumes"]))
 
+    def test_compose_has_bounded_local_limits_and_keycloak_heap(self) -> None:
+        completed = subprocess.run(
+            [
+                "docker", "compose", "--env-file", str(self.runtime / "compose.env"),
+                "-f", str(ROOT / "e2e/compose.yaml"), "-p", "ontology-law-r1-e2e-test",
+                "config", "--format", "json",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, completed.returncode, completed.stderr)
+        services = json.loads(completed.stdout)["services"]
+        expected = {
+            "identity-db": 805306368,
+            "business-db": 805306368,
+            "keycloak-files": 134217728,
+            "flyway": 536870912,
+            "runtime-logins": 268435456,
+            "keycloak": 1610612736,
+        }
+        self.assertEqual(expected, {name: int(service["mem_limit"]) for name, service in services.items()})
+        self.assertEqual(
+            "-Xms128m -Xmx768m -XX:MaxMetaspaceSize=256m",
+            services["keycloak"]["environment"]["JAVA_OPTS_KC_HEAP"],
+        )
+        manifest = json.loads((self.runtime / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(3221225472, manifest["memoryFeasibility"]["boundedConcurrentLimitBytes"])
+        self.assertFalse(manifest["memoryFeasibility"]["capacityAcceptance"])
+
 
 class R1EnvironmentFailureTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -249,21 +279,89 @@ class R1EnvironmentFailureTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "prepared file drift"):
             self.module.preflight_start(ROOT, self.run_id)
 
-    def test_compose_failure_is_recorded_once_without_deleting_the_run(self) -> None:
+    def test_long_running_readiness_failure_is_recorded_without_follow_on_or_retry(self) -> None:
         self.module.prepare_environment(ROOT, self.run_id)
+        seen = []
 
         def failed_compose(*args, **kwargs):
             command = args[0]
-            if "up" in command:
+            seen.append(command)
+            if "up" in command and "identity-db" in command:
                 return subprocess.CompletedProcess(command, 17, stdout="", stderr="synthetic compose failure")
+            if command[:2] == ["docker", "info"]:
+                return subprocess.CompletedProcess(command, 0, stdout="8183173120\n", stderr="")
             return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
-        with self.assertRaisesRegex(RuntimeError, "compose up failed"):
-            self.module.start_infrastructure(ROOT, self.run_id, command_runner=failed_compose)
+        with self.assertRaisesRegex(RuntimeError, "database services failed readiness"):
+            self.module.start_infrastructure(
+                ROOT, self.run_id, command_runner=failed_compose, discovery_probe=lambda runtime: None
+            )
         state = json.loads((self.runtime / "state.json").read_text(encoding="utf-8"))
         self.assertEqual("START_FAILED", state["phase"])
-        self.assertEqual("compose-up", state["failedStage"])
+        self.assertEqual("databases-ready", state["failedStage"])
         self.assertTrue(self.runtime.exists())
+        self.assertFalse(any(command[-1] in {"flyway", "runtime-logins"} for command in seen))
+        with self.assertRaisesRegex(RuntimeError, "not startable"):
+            self.module.start_infrastructure(ROOT, self.run_id, command_runner=lambda *args, **kwargs: self.fail("must not retry"))
+
+    def test_oneshot_nonzero_stops_before_later_writes_and_cannot_retry(self) -> None:
+        self.module.prepare_environment(ROOT, self.run_id)
+        seen = []
+
+        def fail_flyway(*args, **kwargs):
+            command = args[0]
+            seen.append(command)
+            if command[:2] == ["docker", "info"]:
+                return subprocess.CompletedProcess(command, 0, stdout="8183173120\n", stderr="")
+            if "run" in command and command[-1] == "flyway":
+                return subprocess.CompletedProcess(command, 19, stdout="", stderr="synthetic flyway failure")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        with self.assertRaisesRegex(RuntimeError, "flyway one-shot failed"):
+            self.module.start_infrastructure(
+                ROOT, self.run_id, command_runner=fail_flyway, discovery_probe=lambda runtime: None
+            )
+        state = json.loads((self.runtime / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual("START_FAILED", state["phase"])
+        self.assertEqual("flyway", state["failedStage"])
+        self.assertFalse(any(command[-1] in {"runtime-logins", "keycloak"} for command in seen))
+        with self.assertRaisesRegex(RuntimeError, "not startable"):
+            self.module.start_infrastructure(ROOT, self.run_id, command_runner=lambda *args, **kwargs: self.fail("must not retry"))
+
+    def test_infrastructure_sequences_long_running_and_oneshot_services(self) -> None:
+        self.module.prepare_environment(ROOT, self.run_id)
+        seen = []
+
+        def successful_compose(*args, **kwargs):
+            command = args[0]
+            seen.append(command)
+            if command[:2] == ["docker", "info"]:
+                return subprocess.CompletedProcess(command, 0, stdout="8183173120\n", stderr="")
+            if "ps" in command and "compose" in command:
+                return subprocess.CompletedProcess(command, 0, stdout="[]", stderr="")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        self.module.start_infrastructure(
+            ROOT, self.run_id, command_runner=successful_compose, discovery_probe=lambda runtime: None
+        )
+
+        compose_commands = [
+            command[next(index for index, value in enumerate(command) if value in {"up", "run"}):]
+            for command in seen if "up" in command or "run" in command
+        ]
+        self.assertEqual(
+            [
+                ["up", "-d", "--wait", "--wait-timeout", "180", "--no-build", "identity-db", "business-db"],
+                ["run", "--no-deps", "-T", "keycloak-files"],
+                ["run", "--no-deps", "-T", "flyway"],
+                ["run", "--no-deps", "-T", "runtime-logins"],
+                ["up", "-d", "--no-deps", "--wait", "--wait-timeout", "180", "--no-build", "keycloak"],
+            ],
+            compose_commands,
+        )
+        state = json.loads((self.runtime / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual("INFRASTRUCTURE_READY", state["phase"])
+        self.assertFalse(state["applicationReady"])
 
 
 class R1EnvironmentToolchainTest(unittest.TestCase):

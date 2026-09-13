@@ -14,7 +14,9 @@ D:/soft/python3/python.exe e2e/runtime/r1_environment.py prepare <run>
 D:/soft/python3/python.exe e2e/runtime/r1_environment.py start-infra <run>
 ```
 
-`prepare` 会实际执行 OpenSSL、keytool 和 `docker compose config --quiet`，但不启动服务。`start-infra` 在重验所有摘要、固定端口及 project 无既存容器/网络/卷后，才运行本 run 的 Compose；失败不自动重试或删除资源。即使基础设施就绪，状态也只能是 `BLOCKED_IDENTITY_BOOTSTRAP_REQUIRED`。本单元的 `start-apps` 始终拒绝：后续 Task 10 单元必须消费真实 IdentityBootstrapCommand/身份管理 API 的当前-run绑定结果，不能靠可手写 marker、SQL HUMAN 记录或本工具伪造 `APP_READY`。
+`prepare` 会实际执行 OpenSSL、keytool 和 `docker compose config --quiet`，但不启动服务。Compose 给两库分别设置 768MiB、本地 Keycloak 设置 1536MiB（其中 Java heap 最大 768MiB），并给三个一次性服务设置更小的硬上限；稳定常驻组合上限为 3GiB。manifest 只报告该本地功能边界，不探测宿主容量、不构成容量验收，也不证明宿主页文件故障的根因。
+
+`start-infra` 在重验所有摘要、固定端口及 project 无既存容器/网络/卷后，先等待两库健康，再逐个用前台 `docker compose run --no-deps` 要求 keycloak-files、Flyway 和 runtime-logins 正常退出（不使用会把成功 leaf 退出误判为整体失败的聚合 `up --wait`），最后启动 Keycloak 并以严格 CA discovery 确认 readiness。任一常驻 readiness 或一次性退出失败都会保留现场、记录准确阶段并拒绝同 run 重试，不会忽略 Compose 非零退出或重放未知写入。即使基础设施就绪，状态也只能是 `BLOCKED_IDENTITY_BOOTSTRAP_REQUIRED`。本单元的 `start-apps` 始终拒绝：后续 Task 10 单元必须消费真实 IdentityBootstrapCommand/身份管理 API 的当前-run绑定结果，不能靠可手写 marker、SQL HUMAN 记录或本工具伪造 `APP_READY`。
 
 # Task 9.6e 受控本地身份链
 
