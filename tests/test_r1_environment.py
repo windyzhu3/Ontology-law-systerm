@@ -10,6 +10,7 @@ import unittest
 import uuid
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +20,18 @@ BUSINESS_CONTAINER_ID = "a" * 64
 KEYCLOAK_CONTAINER_ID = "b" * 64
 
 
+def process_records(project):
+    return [
+        {"Project": project, "Service": service, "State": state, "ExitCode": 0,
+         "Health": health, "Command": "synthetic \u2026"}
+        for service, state, health in (
+            ("identity-db", "running", "healthy"), ("business-db", "running", "healthy"),
+            ("keycloak", "running", ""), ("keycloak-files", "exited", ""),
+            ("flyway", "exited", ""), ("runtime-logins", "exited", ""),
+        )
+    ]
+
+
 def successful_start_command(command):
     if command[:2] == ["docker", "compose"] and "ps" in command:
         if "-q" in command:
@@ -26,8 +39,11 @@ def successful_start_command(command):
                 "business-db": BUSINESS_CONTAINER_ID,
                 "keycloak": KEYCLOAK_CONTAINER_ID,
             }[command[-1]]
-            return subprocess.CompletedProcess(command, 0, stdout=container_id + "\n", stderr="")
-        return subprocess.CompletedProcess(command, 0, stdout="[]", stderr="")
+            return subprocess.CompletedProcess(command, 0, stdout=(container_id + "\n").encode(), stderr=b"")
+        records = process_records(command[command.index("-p") + 1])
+        return subprocess.CompletedProcess(command, 0, stdout="\n".join(
+            json.dumps(record, ensure_ascii=False) for record in records
+        ).encode("utf-8"), stderr=b"")
     if command[:2] == ["docker", "inspect"]:
         ports = {
             BUSINESS_CONTAINER_ID: {
@@ -39,8 +55,8 @@ def successful_start_command(command):
                 "8080/tcp": [],
             },
         }[command[-1]]
-        return subprocess.CompletedProcess(command, 0, stdout=json.dumps(ports) + "\n", stderr="")
-    return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        return subprocess.CompletedProcess(command, 0, stdout=(json.dumps(ports) + "\n").encode(), stderr=b"")
+    return subprocess.CompletedProcess(command, 0, stdout=b"", stderr=b"")
 
 
 def load_module():
@@ -346,10 +362,10 @@ class R1EnvironmentFailureTest(unittest.TestCase):
             command = args[0]
             seen.append(command)
             if "up" in command and "identity-db" in command:
-                return subprocess.CompletedProcess(command, 17, stdout="", stderr="synthetic compose failure")
+                return subprocess.CompletedProcess(command, 17, stdout=b"", stderr=b"synthetic compose failure")
             if command[:2] == ["docker", "info"]:
-                return subprocess.CompletedProcess(command, 0, stdout="8183173120\n", stderr="")
-            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+                return subprocess.CompletedProcess(command, 0, stdout=b"8183173120\n", stderr=b"")
+            return subprocess.CompletedProcess(command, 0, stdout=b"", stderr=b"")
 
         with self.assertRaisesRegex(RuntimeError, "database services failed readiness"):
             self.module.start_infrastructure(
@@ -371,7 +387,7 @@ class R1EnvironmentFailureTest(unittest.TestCase):
             command = args[0]
             seen.append(command)
             if "run" in command and command[-1] == "flyway":
-                return subprocess.CompletedProcess(command, 19, stdout="", stderr="synthetic flyway failure")
+                return subprocess.CompletedProcess(command, 19, stdout=b"", stderr=b"synthetic flyway failure")
             return successful_start_command(command)
 
         with self.assertRaisesRegex(RuntimeError, "flyway one-shot failed"):
@@ -439,7 +455,7 @@ class R1EnvironmentFailureTest(unittest.TestCase):
             command = args[0]
             seen.append(command)
             if command[:2] == ["docker", "inspect"] and command[-1] == BUSINESS_CONTAINER_ID:
-                return subprocess.CompletedProcess(command, 0, stdout='{"5432/tcp": []}\n', stderr="")
+                return subprocess.CompletedProcess(command, 0, stdout=b'{"5432/tcp": []}\n', stderr=b"")
             return successful_start_command(command)
 
         discovery_called = False
@@ -467,7 +483,7 @@ class R1EnvironmentFailureTest(unittest.TestCase):
             seen.append(command)
             if command[:2] == ["docker", "inspect"] and command[-1] == KEYCLOAK_CONTAINER_ID:
                 wrong = {"8443/tcp": [{"HostIp": "0.0.0.0", "HostPort": "29443"}]}
-                return subprocess.CompletedProcess(command, 0, stdout=json.dumps(wrong) + "\n", stderr="")
+                return subprocess.CompletedProcess(command, 0, stdout=(json.dumps(wrong) + "\n").encode(), stderr=b"")
             return successful_start_command(command)
 
         discovery_called = False
@@ -488,6 +504,120 @@ class R1EnvironmentFailureTest(unittest.TestCase):
             command[:2] == ["docker", "compose"] and "-a" in command and "ps" in command
             for command in seen
         ))
+
+
+class R1EnvironmentProcessEvidenceTest(unittest.TestCase):
+    def setUp(self):
+        self.module = load_module()
+        self.runtime = self.module._runtime(ROOT, "unit-evidence-" + uuid.uuid4().hex[:12], may_not_exist=True)
+        self.runtime.mkdir()
+        self.module._protect_directory(self.runtime)
+        self.addCleanup(shutil.rmtree, self.runtime)
+        self.project = "ontology-law-r1-e2e-synthetic"
+
+    def start_with_snapshot(self, output, *, stage="ps", stderr=b"", returncode=0):
+        def command_runner(command, **kwargs):
+            if ((stage == "ps" and command[-4:] == ["ps", "-a", "--format", "json"])
+                    or (stage == "flyway" and command[-1] == "flyway")):
+                if output is None:
+                    return subprocess.CompletedProcess(command, 0, stdout=None, stderr=b"")
+                # A real process writes bytes; locale and reader-thread behavior stay real.
+                return subprocess.run([
+                    str(PYTHON), "-c", "import sys; "
+                    f"sys.stdout.buffer.write({output!r}); "
+                    f"sys.stderr.buffer.write({stderr!r}); sys.exit({returncode})",
+                ], **kwargs)
+            return successful_start_command(command)
+
+        with patch.object(self.module, "preflight_start", return_value=(
+            self.runtime, {"applicationReady": False}, {"composeProject": self.project},
+        )):
+            self.module.start_infrastructure(
+                ROOT, "synthetic", command_runner=command_runner, discovery_probe=lambda runtime: None,
+            )
+
+    def assert_failed_snapshot(self, output, **kwargs):
+        with self.assertRaisesRegex(RuntimeError, "infrastructure process state"):
+            self.start_with_snapshot(output, **kwargs)
+        state = json.loads((self.runtime / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual("START_FAILED", state["phase"])
+        self.assertEqual("compose-ps", state["failedStage"])
+        self.assertFalse(state["applicationReady"])
+        self.assertNotIn("INFRASTRUCTURE_READY", [event["phase"] for event in state["events"]])
+        self.assertFalse((self.runtime / "infrastructure-processes.json").exists())
+
+    def test_real_utf8_subprocess_snapshot_survives_gbk_host_locale(self):
+        records = process_records(self.project)
+        raw = "\n".join(json.dumps(record, ensure_ascii=False) for record in records).encode("utf-8")
+        with patch.object(subprocess, "_text_encoding", return_value="gbk"):
+            self.start_with_snapshot(raw)
+        snapshot = (self.runtime / "infrastructure-processes.json").read_text(encoding="utf-8")
+        self.assertEqual(records, [json.loads(line) for line in snapshot.splitlines()])
+        self.assertEqual(raw, (self.runtime / "logs/compose-ps.stdout").read_bytes())
+        self.assertEqual("INFRASTRUCTURE_READY", json.loads(
+            (self.runtime / "state.json").read_text(encoding="utf-8")
+        )["phase"])
+
+    def test_real_subprocess_crlf_preserves_raw_log_and_normalizes_version_parser_input(self):
+        raw = (b'openjdk version "25.0.4.1" 2026-08-18 LTS\r\n'
+               b'OpenJDK Runtime Environment Temurin-25.0.4.1+1 (build 25.0.4.1+1-LTS)\r\n')
+        completed = self.module._run([
+            str(PYTHON), "-c", f"import sys; sys.stderr.buffer.write({raw!r})",
+        ], ROOT, self.runtime, "synthetic-version")
+        self.assertEqual("25.0.4.1+1-LTS", self.module.validate_java_version(completed.stderr))
+        self.assertEqual(raw, (self.runtime / "logs/synthetic-version.stderr").read_bytes())
+
+    def test_invalid_utf8_stdout_or_stderr_fails_and_preserves_exact_raw_bytes(self):
+        valid = "\n".join(json.dumps(row) for row in process_records(self.project)).encode()
+        for stdout, stderr in ((b"synthetic-private-\xff", b""), (valid, b"synthetic-private-\xff")):
+            with self.subTest(stream="stdout" if stderr == b"" else "stderr"):
+                self.assert_failed_snapshot(stdout, stderr=stderr)
+                self.assertEqual(stdout, (self.runtime / "logs/compose-ps.stdout").read_bytes())
+                self.assertEqual(stderr, (self.runtime / "logs/compose-ps.stderr").read_bytes())
+                self.module._verify_private_boundary(self.runtime)
+
+    def test_empty_missing_or_malformed_snapshot_cannot_claim_ready(self):
+        for output in (None, b"", b" \n", b"[]", b"{}", b"not-json", b"[1]", b"null"):
+            with self.subTest(output=output):
+                self.assert_failed_snapshot(output)
+
+    def test_snapshot_requires_exact_project_inventory_states_exits_and_health(self):
+        mutations = [
+            ("Project", "wrong-project", 0), ("Service", "unknown", 0),
+            ("State", "exited", 0), ("State", "restarting", 2),
+            ("State", "running", 3), ("ExitCode", 19, 4),
+            ("ExitCode", False, 4), ("ExitCode", "0", 5),
+            ("Health", "unhealthy", 1), ("Health", "starting", 2),
+        ]
+        for key, value, index in mutations:
+            records = process_records(self.project)
+            records[index][key] = value
+            with self.subTest(key=key, value=value, index=index):
+                self.assert_failed_snapshot(json.dumps(records).encode())
+        for variation in ("missing", "duplicate", "absent-exit", "absent-health"):
+            records = process_records(self.project)
+            if variation == "missing":
+                records.pop()
+            elif variation == "duplicate":
+                records.append(records[0])
+            else:
+                del records[0]["ExitCode" if variation == "absent-exit" else "Health"]
+            with self.subTest(variation=variation):
+                self.assert_failed_snapshot(json.dumps(records).encode())
+
+    def test_nonzero_snapshot_command_cannot_claim_ready(self):
+        self.assert_failed_snapshot(json.dumps(process_records(self.project)).encode(), returncode=7)
+
+    def test_decoding_failure_during_oneshot_records_its_failed_stage(self):
+        with self.assertRaisesRegex(RuntimeError, "flyway one-shot failed"):
+            self.start_with_snapshot(b"synthetic-private-\xff", stage="flyway")
+        state = json.loads((self.runtime / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual("START_FAILED", state["phase"])
+        self.assertEqual("flyway", state["failedStage"])
+        journal = [json.loads(line) for line in (self.runtime / "command-stages.jsonl").read_text().splitlines()]
+        self.assertEqual("compose-flyway", journal[-1]["label"])
+        self.assertEqual(0, journal[-1]["exit"])
+        self.assertFalse((self.runtime / "infrastructure-processes.json").exists())
 
 
 class R1EnvironmentToolchainTest(unittest.TestCase):

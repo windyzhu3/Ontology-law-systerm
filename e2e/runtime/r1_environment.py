@@ -253,12 +253,12 @@ def _protect_file(path: Path) -> None:
         path.chmod(0o600)
 
 
-def _write(path: Path, value: str) -> None:
+def _write(path: Path, value: str | bytes) -> None:
     temporary = path.with_name(path.name + ".new-" + secrets.token_hex(6))
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as output:
-            output.write(value)
+        with os.fdopen(descriptor, "wb") as output:
+            output.write(value.encode("utf-8") if isinstance(value, str) else value)
             output.flush()
             os.fsync(output.fileno())
         os.replace(temporary, path)
@@ -281,14 +281,18 @@ def _record(state_path: Path, state: dict, phase: str, **extra: object) -> None:
 def _run(command: list[str], root: Path, runtime: Path, label: str,
          command_runner: CommandRunner = subprocess.run) -> subprocess.CompletedProcess:
     try:
-        completed = command_runner(command, cwd=root, capture_output=True, text=True)
+        # Decode on this thread: Windows text-mode pipe readers can lose output
+        # on a locale decoding error without failing subprocess.run itself.
+        completed = command_runner(command, cwd=root, capture_output=True, text=False)
     except OSError as error:
         raise RuntimeError(f"{label} could not execute") from error
     logs = runtime / "logs"
     if not logs.exists():
         _mkdir_secure(logs)
-    _write(logs / f"{label}.stdout", completed.stdout or "")
-    _write(logs / f"{label}.stderr", completed.stderr or "")
+    for stream in ("stdout", "stderr"):
+        raw = getattr(completed, stream)
+        if isinstance(raw, bytes):
+            _write(logs / f"{label}.{stream}", raw)
     journal = runtime / "command-stages.jsonl"
     descriptor = os.open(journal, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
     with os.fdopen(descriptor, "a", encoding="utf-8", newline="\n") as output:
@@ -296,7 +300,17 @@ def _run(command: list[str], root: Path, runtime: Path, label: str,
         output.flush()
         os.fsync(output.fileno())
     _protect_file(journal)
-    return completed
+    if not isinstance(completed.stdout, bytes) or not isinstance(completed.stderr, bytes):
+        raise RuntimeError(f"{label} capture missing or not bytes; protected output retained")
+    try:
+        stdout = completed.stdout.decode("utf-8", errors="strict")
+        stderr = completed.stderr.decode("utf-8", errors="strict")
+    except UnicodeDecodeError as error:
+        raise RuntimeError(f"{label} output is not valid UTF-8; protected output retained") from error
+    # Preserve the prior universal-newline contract for parsers, but not raw logs.
+    stdout = stdout.replace("\r\n", "\n").replace("\r", "\n")
+    stderr = stderr.replace("\r\n", "\n").replace("\r", "\n")
+    return subprocess.CompletedProcess(completed.args, completed.returncode, stdout, stderr)
 
 
 def _require_sources(root: Path) -> None:
@@ -399,7 +413,8 @@ def _create_crypto(root: Path, runtime: Path, toolchain: HostToolchain) -> None:
     password_file = runtime / "secrets/trust-password.txt"
     truststore = certs / "application-trust.p12"
     keytool = _run([
-        str(toolchain.keytool), "-importcert", "-noprompt", "-alias", "r1-e2e-ca", "-file", str(ca_cert),
+        str(toolchain.keytool), "-J-Dstdout.encoding=UTF-8", "-J-Dstderr.encoding=UTF-8",
+        "-importcert", "-noprompt", "-alias", "r1-e2e-ca", "-file", str(ca_cert),
         "-keystore", str(truststore), "-storetype", "PKCS12", "-storepass:file", str(password_file),
     ], root, runtime, "keytool-truststore")
     if keytool.returncode:
@@ -720,6 +735,44 @@ def _verify_published_port(
         raise RuntimeError(f"{service} NetworkSettings port mapping mismatch")
 
 
+def _validate_process_snapshot(output: str, project: str) -> None:
+    expected = {
+        "identity-db": ("running", "healthy"),
+        "business-db": ("running", "healthy"),
+        "keycloak": ("running", ""),
+        "keycloak-files": ("exited", ""),
+        "flyway": ("exited", ""),
+        "runtime-logins": ("exited", ""),
+    }
+    try:
+        # Compose versions emit either a JSON array or one JSON object per line.
+        if output.lstrip().startswith("["):
+            records = json.loads(output)
+        else:
+            records = [json.loads(line) for line in output.splitlines() if line.strip()]
+    except json.JSONDecodeError as error:
+        raise RuntimeError("malformed infrastructure process snapshot") from error
+    if not isinstance(records, list) or len(records) != len(expected):
+        raise RuntimeError("infrastructure process inventory mismatch")
+    seen = set()
+    for record in records:
+        if not isinstance(record, dict):
+            raise RuntimeError("malformed infrastructure process record")
+        service = record.get("Service")
+        if not isinstance(service, str) or service not in expected or service in seen:
+            raise RuntimeError("infrastructure process service mismatch")
+        seen.add(service)
+        state, health = expected[service]
+        if (
+            record.get("Project") != project
+            or record.get("State") != state
+            or record.get("Health") != health
+            or type(record.get("ExitCode")) is not int
+            or record["ExitCode"] != 0
+        ):
+            raise RuntimeError("infrastructure process project or readiness mismatch")
+
+
 def start_infrastructure(
     root: Path, run: str, command_runner: CommandRunner = subprocess.run,
     *, discovery_probe: Callable[[Path], None] | None = None,
@@ -733,7 +786,12 @@ def start_infrastructure(
         "-f", str(root / "e2e/compose.yaml"), "-p", manifest["composeProject"],
     ]
     def run_stage(arguments: list[str], label: str, failed_stage: str, message: str) -> None:
-        completed = _run(prefix + arguments, root, runtime, label, command_runner)
+        try:
+            completed = _run(prefix + arguments, root, runtime, label, command_runner)
+        except RuntimeError as error:
+            _record(state_path, state, "START_FAILED", failedStage=failed_stage,
+                    errorType=type(error).__name__)
+            raise RuntimeError(message + "; protected resources retained without retry") from error
         if completed.returncode:
             _record(
                 state_path, state, "START_FAILED", failedStage=failed_stage,
@@ -776,11 +834,15 @@ def start_infrastructure(
     except Exception as error:
         _record(state_path, state, "START_FAILED", failedStage="keycloak-discovery", errorType=type(error).__name__)
         raise RuntimeError("infrastructure discovery failed; protected resources retained") from error
-    ps = _run(prefix + ["ps", "-a", "--format", "json"], root, runtime, "compose-ps", command_runner)
-    if ps.returncode:
-        _record(state_path, state, "START_FAILED", failedStage="compose-ps", errorType="ExternalCommandError")
-        raise RuntimeError("cannot record infrastructure process state")
-    _write(runtime / "infrastructure-processes.json", ps.stdout or "[]")
+    try:
+        ps = _run(prefix + ["ps", "-a", "--format", "json"], root, runtime, "compose-ps", command_runner)
+        if ps.returncode:
+            raise RuntimeError("compose process query failed")
+        _validate_process_snapshot(ps.stdout, manifest["composeProject"])
+        _write(runtime / "infrastructure-processes.json", ps.stdout)
+    except (RuntimeError, OSError) as error:
+        _record(state_path, state, "START_FAILED", failedStage="compose-ps", errorType=type(error).__name__)
+        raise RuntimeError("cannot record infrastructure process state; protected output retained") from error
     _record(state_path, state, "INFRASTRUCTURE_READY", failedStage=None, applicationReady=False,
             applicationStatus="BLOCKED_IDENTITY_BOOTSTRAP_REQUIRED")
 
