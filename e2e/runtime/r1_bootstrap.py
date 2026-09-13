@@ -28,6 +28,7 @@ import r1_environment as environment
 
 ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_DIRECTORY = "identity-bootstrap"
+LOGGING_CONFIG_SOURCE = "e2e/runtime/r1-bootstrap-logback.xml"
 JAVA_MAIN = "io.github.windyzhu3.ontologylaw.api.IdentityBootstrapCommand"
 JAVA_LAUNCHER = "org.springframework.boot.loader.launch.PropertiesLauncher"
 SEMANTIC_BASELINE = "MVP-2026-09-08.3"
@@ -234,11 +235,30 @@ def _fixture_values(root: Path, run: str) -> tuple[str, dict[str, str]]:
     return f"r1-{run}-founder", displays
 
 
-def _java_command(java_path: Path, jar: Path) -> list[str]:
+def _java_command(java_path: Path, jar: Path, logging_config: Path) -> list[str]:
     return [
         str(java_path), "-Xmx256m", "-Dstdout.encoding=UTF-8", "-Dstderr.encoding=UTF-8",
+        f"-Dlogback.configurationFile={logging_config.resolve()}",
         f"-Dloader.main={JAVA_MAIN}", "-cp", str(jar), JAVA_LAUNCHER,
     ]
+
+
+def _prepare_logging_config(root: Path, runtime: Path, bootstrap_root: Path) -> tuple[Path, dict]:
+    source = environment._plain_file(root / LOGGING_CONFIG_SOURCE, "bootstrap logging configuration")
+    encoded = source.read_bytes()
+    if not encoded or len(encoded) > 8192:
+        raise RuntimeError("bootstrap logging configuration is invalid")
+    target = bootstrap_root / "logback.xml"
+    environment._write(target, encoded)
+    source_digest, target_digest = _sha256(source), _sha256(target)
+    if source_digest != target_digest:
+        raise RuntimeError("bootstrap logging configuration copy mismatch")
+    return target, {
+        "loggingConfigSourcePath": LOGGING_CONFIG_SOURCE,
+        "loggingConfigSourceSha256": source_digest,
+        "loggingConfigPath": target.relative_to(runtime).as_posix(),
+        "loggingConfigSha256": target_digest,
+    }
 
 
 def _append_stage(operation_path: Path, mode: str, exit_code: int | None) -> None:
@@ -393,7 +413,7 @@ def _fact_query(tenant_id: str, tenant_code: str, command_id: str) -> bytes:
         "'appointmentId',change_summary->>'appointmentId',"
         "'grantIds',change_summary->'grantIds',"
         "'originalEvidenceSha256',encode(authorization_snapshot_digest,'hex'))::text "
-        "FROM audit.audit_entry AS bootstrap_audit WHERE tenant_id='" + tenant_id + "'::uuid "
+        "FROM audit.audit_entry_classified_v AS bootstrap_audit WHERE tenant_id='" + tenant_id + "'::uuid "
         "AND command_id='" + command_id + "'::uuid "
         "AND action_code='BOOTSTRAP_IDENTITY_ADMIN' AND result_code='SUCCEEDED' "
         "AND change_summary->>'profile'='R1_IDENTITY_BOOTSTRAP_V1' "
@@ -494,6 +514,7 @@ def bootstrap_identities(
     founder_identifier, fixture_displays = _fixture_values(root, run)
     jar = runtime / manifest["artifacts"]["jar"]["path"]
     environment._mkdir_secure(bootstrap_root)
+    logging_config, logging_record = _prepare_logging_config(root, runtime, bootstrap_root)
     record_path = bootstrap_root / "record.json"
     record = {
         "profile": "R1_E2E_IDENTITY_BOOTSTRAP_RECORD_V1",
@@ -504,6 +525,7 @@ def bootstrap_identities(
         "createdAt": environment.utc_now(),
         "updatedAt": environment.utc_now(),
         "tenants": [],
+        **logging_record,
     }
     environment._atomic_json(record_path, record)
     try:
@@ -526,7 +548,7 @@ def bootstrap_identities(
                 "tenantCode": code,
                 "stages": [],
             })
-            base = _java_command(java_path, jar)
+            base = _java_command(java_path, jar, logging_config)
             candidate = _run_stage(
                 [*base, "candidate", str(settings_path), str(identifier_path)],
                 root, folder, operation_path, "candidate", command_runner,
@@ -625,8 +647,31 @@ def verify_original(
     entries = record.get("tenants")
     if not isinstance(entries, list) or [entry.get("tenantCode") for entry in entries] != [item[1] for item in TENANTS]:
         raise RuntimeError("original bootstrap tenant inventory mismatch")
+    expected_logging_paths = {
+        "loggingConfigSourcePath": LOGGING_CONFIG_SOURCE,
+        "loggingConfigPath": (Path(BOOTSTRAP_DIRECTORY) / "logback.xml").as_posix(),
+    }
+    if any(record.get(key) != value for key, value in expected_logging_paths.items()):
+        raise RuntimeError("original bootstrap logging configuration mismatch")
+    logging_source = root / LOGGING_CONFIG_SOURCE
+    logging_config = runtime / record["loggingConfigPath"]
+    for path, digest_key in (
+        (logging_source, "loggingConfigSourceSha256"),
+        (logging_config, "loggingConfigSha256"),
+    ):
+        digest = record.get(digest_key)
+        if (
+            not isinstance(digest, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", digest)
+            or not path.is_file()
+            or environment._is_link(path)
+            or _sha256(path) != digest
+        ):
+            raise RuntimeError("original bootstrap logging configuration mismatch")
+    if record["loggingConfigSourceSha256"] != record["loggingConfigSha256"]:
+        raise RuntimeError("original bootstrap logging configuration mismatch")
     jar = runtime / manifest["artifacts"]["jar"]["path"]
-    base = _java_command(java_path, jar)
+    base = _java_command(java_path, jar, logging_config)
     validated_entries = []
     for entry in entries:
         paths = {

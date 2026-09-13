@@ -152,6 +152,13 @@ class R1BootstrapTest(unittest.TestCase):
         (self.runtime / "certs").mkdir()
         (self.root / "database/schema-contract-52-plus-2/generated").mkdir(parents=True)
         (self.root / "e2e/fixtures").mkdir(parents=True)
+        (self.root / "e2e/runtime").mkdir(parents=True)
+        (self.root / "e2e/runtime/r1-bootstrap-logback.xml").write_text(
+            "<configuration><appender name=\"STDERR\" class=\"ch.qos.logback.core.ConsoleAppender\">"
+            "<target>System.err</target><encoder><pattern>%msg%n</pattern></encoder></appender>"
+            "<root level=\"INFO\"><appender-ref ref=\"STDERR\"/></root></configuration>\n",
+            encoding="utf-8",
+        )
         (self.root / "e2e/fixtures/r1-fixture.json").write_text(json.dumps({
             "profile": "R1_E2E_FIXTURE_INPUT_V1",
             "tenants": [
@@ -249,6 +256,12 @@ class R1BootstrapTest(unittest.TestCase):
                 self.assertIn("-Dstdout.encoding=UTF-8", command)
                 self.assertIn("-Dstderr.encoding=UTF-8", command)
                 self.assertFalse(any(value.startswith("-J-D") for value in command))
+                logging_options = [value for value in command if value.startswith("-Dlogback.configurationFile=")]
+                self.assertEqual(1, len(logging_options))
+                self.assertEqual(
+                    str((bootstrap / "logback.xml").resolve()),
+                    logging_options[0].split("=", 1)[1],
+                )
                 if "execute" in command:
                     self.assertEqual("--confirm-bootstrap", command[-1])
         state = json.loads((self.runtime / "state.json").read_text())
@@ -256,6 +269,13 @@ class R1BootstrapTest(unittest.TestCase):
         self.assertFalse(state["applicationReady"])
         self.assertNotIn("READY", state.get("applicationStatus", ""))
         self.assertEqual(2, process.fact_calls)
+        record = json.loads((bootstrap / "record.json").read_text())
+        self.assertEqual("e2e/runtime/r1-bootstrap-logback.xml", record["loggingConfigSourcePath"])
+        self.assertEqual("identity-bootstrap/logback.xml", record["loggingConfigPath"])
+        self.assertEqual(
+            hashlib.sha256((bootstrap / "logback.xml").read_bytes()).hexdigest(),
+            record["loggingConfigSha256"],
+        )
         self.assertEqual(environment_manifest_before, (self.runtime / "manifest.json").read_bytes())
         sql_inputs = [input_bytes for command, input_bytes in process.calls if command[:2] == ["docker", "compose"] and "exec" in command]
         self.assertTrue(sql_inputs)
@@ -314,6 +334,14 @@ class R1BootstrapTest(unittest.TestCase):
             self.run_bootstrap(process)
         self.assertEqual([], process.java_modes())
         self.assertFalse((self.runtime / "identity-bootstrap").exists())
+
+    def test_fact_query_uses_only_the_existing_query_role_classified_audit_view(self):
+        sql = self.module._fact_query(str(uuid.uuid4()), "R1_E2E_MAIN", str(uuid.uuid4())).decode("utf-8")
+        self.assertIn("BEGIN READ ONLY", sql)
+        self.assertIn("SET LOCAL ROLE law_app_query", sql)
+        self.assertIn("FROM audit.audit_entry_classified_v AS bootstrap_audit", sql)
+        self.assertNotRegex(sql, r"FROM\s+audit\.audit_entry(?:\s|$)")
+        self.assertNotRegex(sql, r"\b(?:INSERT|UPDATE|DELETE|GRANT)\b")
 
     def test_repeat_entry_refuses_without_replaying_any_command(self):
         self.run_bootstrap()
@@ -402,6 +430,28 @@ class R1BootstrapTest(unittest.TestCase):
             self.module.verify_original(self.root, self.run, command_runner=process)
         self.assertEqual([], process.java_modes())
 
+    def test_verify_original_rejects_logging_configuration_drift_before_java(self):
+        self.run_bootstrap()
+        targets = (
+            self.runtime / "identity-bootstrap/logback.xml",
+            self.root / "e2e/runtime/r1-bootstrap-logback.xml",
+        )
+        for target in targets:
+            for mutation in ("delete", "modify"):
+                with self.subTest(target=target.name, mutation=mutation):
+                    original = target.read_bytes()
+                    if mutation == "delete":
+                        target.unlink()
+                    else:
+                        target.write_bytes(original + b"tampered")
+                    try:
+                        process = ControlledProcess(self.module, self.manifest)
+                        with self.assertRaisesRegex(RuntimeError, "logging configuration"):
+                            self.module.verify_original(self.root, self.run, command_runner=process)
+                        self.assertEqual([], process.java_modes())
+                    finally:
+                        target.write_bytes(original)
+
     def test_verify_original_rejects_deleted_or_modified_original_stage_output_before_java(self):
         self.run_bootstrap()
         for tenant in ("main", "isolation"):
@@ -437,6 +487,35 @@ class R1BootstrapTest(unittest.TestCase):
             (self.runtime / "secrets/bootstrap-key.txt").read_text().strip(), "password", "token",
         ):
             self.assertNotIn(forbidden, public.lower() if forbidden in {"password", "token"} else public)
+
+
+class R1BootstrapRealLoggingTest(unittest.TestCase):
+    def test_fixed_java_routes_project_logging_to_stderr_and_keeps_stdout_single_json(self):
+        module = load_module()
+        toolchain = module.environment.resolve_host_toolchain()
+        javac = toolchain.java.with_name("javac.exe" if sys.platform == "win32" else "javac")
+        jar = ROOT / "backend/target/ontology-law-system-0.1.0-SNAPSHOT.jar"
+        config = ROOT / "e2e/runtime/r1-bootstrap-logback.xml"
+        source = ROOT / "tests/fixtures/R1BootstrapLoggingProbe.java"
+        with tempfile.TemporaryDirectory() as folder:
+            classes = Path(folder).resolve()
+            compiled = subprocess.run(
+                [str(javac), "-J-Xmx64m", "-d", str(classes), str(source)],
+                cwd=ROOT, capture_output=True, text=False,
+            )
+            self.assertEqual(0, compiled.returncode, compiled.stderr.decode("utf-8", errors="replace"))
+            command = module._java_command(toolchain.java, jar, config)
+            main_index = command.index(f"-Dloader.main={module.JAVA_MAIN}")
+            command[main_index] = "-Dloader.main=R1BootstrapLoggingProbe"
+            command.insert(main_index, f"-Dloader.path={classes}")
+            completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=False)
+        stdout = completed.stdout.decode("utf-8", errors="strict")
+        stderr = completed.stderr.decode("utf-8", errors="strict")
+        self.assertEqual(0, completed.returncode, stderr)
+        self.assertEqual({"mode": "PROBE"}, json.loads(stdout))
+        self.assertEqual(1, len(stdout.splitlines()))
+        self.assertIn("r1-bootstrap-probe-log", stderr)
+        self.assertNotIn("r1-bootstrap-probe-log", stdout)
 
 
 if __name__ == "__main__":
