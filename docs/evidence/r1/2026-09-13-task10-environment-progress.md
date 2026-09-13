@@ -102,6 +102,16 @@ Root核验精确新项目标签后停止新KC `6c84bc51d725`和两库`215ad4b953
 
 Root最终检查170954：原bootstrap树摘要、原state及record摘要与本轮开始完全一致；旧Keycloak严格系统CA HTTPS discovery返回200；backend/apps/contracts/已摘要环境源文件相对本轮BASE无差异。可用虚拟内存788772KiB（约770MiB），仍不启动新服务。当前仅代码/评审门关闭，哨兵实际续建、Task10.4应用装配及后续R1黄金/失败路径仍未完成。下一步先由用户释放资源，再恢复同一保留环境、执行一次受控哨兵续建；不另建整套run、不重发主Tenant、不把离线测试写成真实验收PASS。本轮未推送仓库。
 
+## Docker清理后，Task10.3真实核验完成
+
+用户明确授权清理本次验证不需要的Docker资源。经标签、停止状态与卷引用核对，ee9b2b删除四套废弃Task10.2环境（reviewed/bounded/loopback/utf8）的24个容器、24个独占卷、12个无连接网络；这些Docker数据库快照不可直接恢复，宿主验收记录未删。当前Task10.3六容器/所有卷、旧local-login账号及数据保留；旧三个容器仅停止。未全局prune，未删无法确认归属的匿名卷或自建镜像。
+
+全部容器停止后vmmemWSL仍占约7067MiB，遂重启Docker Desktop（8f25f7退出0，aae442确认running）。可用虚拟内存一度恢复至约7.7GiB。恢复同一新环境两库、健康后恢复同一Keycloak；4494ed严格CA discovery200，没有重建或重跑一次性初始化。
+
+已评审的continue-isolation实际退出0（981549），main-verify、absence-query、candidate、dry-run、execute、verify、fact-query七阶段全部0（8addab）；随后verify-combined退出0（5ebde4）。原state与bootstrap record摘要仍与初始锚点一致。主Tenant只读核验，未重发主Tenant写入；哨兵新原始命令及证据保存于单独保护目录。Task10.3实际引导前置完成，尚不代表登录/黄金链/R1总验收通过。
+
+后继Task10.4只装配同Jar API/Worker和同SPA。prepare显式选择original或continued引导核验源，记录后禁止fallback或改写。当前新三服务运行，旧三个local-login服务保持停止以留出资源，旧页面登录暂不可用但账号/realm/业务数据完整可恢复。当前可用虚拟内存约4.6GiB；后续仍只执行未完成路径。
+
 ## 上游核对
 
 2026-09-13复核[官方26.7.3发布页](https://github.com/keycloak/keycloak/releases/tag/26.7.3)与[官方安全公告目录](https://github.com/keycloak/keycloak/security/advisories)。当前发布页列出26.7.3及其安全修复；检查的[DCR角色伪造公告](https://github.com/keycloak/keycloak/security/advisories/GHSA-95cx-vmr5-3cmr)列26.7.1为修复版本。另核对[reset-credentials问题记录](https://github.com/keycloak/keycloak/issues/51833)，已关闭并标注26.7.2等版本。此为部署前具名上游核对，不是全量漏洞扫描或“无CVE”保证；不升级锁定制品，不开启重置密码、动态客户端注册或扩大目录权限。
