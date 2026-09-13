@@ -205,7 +205,54 @@ class R1BootstrapContinuationTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "execute failed"):
             self.continue_isolation(process)
         self.assertEqual(["verify", "candidate", "dry-run", "execute"], process.java_modes())
+        record = json.loads((
+            self.runtime / "identity-bootstrap-isolation-continuation/record.json"
+        ).read_text())
+        self.assertEqual(
+            ["main-verify", "absence-query", "candidate", "dry-run", "execute"],
+            [stage["mode"] for stage in record["stages"]],
+        )
+        for stage in record["stages"]:
+            for stream in ("stdout", "stderr"):
+                evidence = stage["outputs"][stream]
+                self.assertEqual("AVAILABLE", evidence["status"])
+                path = self.runtime / evidence["path"]
+                self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), evidence["sha256"])
+        execute = next(stage for stage in record["stages"] if stage["mode"] == "execute")
+        self.assertEqual(19, execute["exitCode"])
         self.assertEqual(before, self.original_snapshot())
+        with self.assertRaisesRegex(RuntimeError, "existing isolation continuation"):
+            self.continue_isolation(ContinuationProcess(self.bootstrap, self.manifest))
+
+    def test_execute_output_persistence_uncertainty_records_available_and_missing_evidence(self):
+        process = ContinuationProcess(self.bootstrap, self.manifest)
+        original_write = self.bootstrap.environment._write
+
+        def fail_execute_stderr(path, value):
+            if Path(path).name == "execute.stderr":
+                raise OSError("synthetic protected output failure")
+            return original_write(path, value)
+
+        with patch.object(self.bootstrap.environment, "_write", side_effect=fail_execute_stderr):
+            with self.assertRaisesRegex(RuntimeError, "persistence failed"):
+                self.continue_isolation(process)
+        self.assertEqual(["verify", "candidate", "dry-run", "execute"], process.java_modes())
+        record = json.loads((
+            self.runtime / "identity-bootstrap-isolation-continuation/record.json"
+        ).read_text())
+        execute = next(stage for stage in record["stages"] if stage["mode"] == "execute")
+        self.assertEqual(0, execute["exitCode"])
+        stdout = execute["outputs"]["stdout"]
+        self.assertEqual("AVAILABLE", stdout["status"])
+        self.assertEqual(
+            hashlib.sha256((self.runtime / stdout["path"]).read_bytes()).hexdigest(),
+            stdout["sha256"],
+        )
+        self.assertEqual(
+            {"path": "identity-bootstrap-isolation-continuation/execute.stderr",
+             "status": "MISSING", "sha256": None},
+            execute["outputs"]["stderr"],
+        )
         with self.assertRaisesRegex(RuntimeError, "existing isolation continuation"):
             self.continue_isolation(ContinuationProcess(self.bootstrap, self.manifest))
 

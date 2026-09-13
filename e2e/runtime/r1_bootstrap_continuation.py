@@ -37,69 +37,6 @@ def _require_digest(value: str, label: str) -> str:
     return value
 
 
-def _exact_file(runtime: Path, relative: str, expected: str, label: str) -> Path:
-    if relative != expected:
-        raise RuntimeError(f"{label} path mismatch")
-    path = runtime / relative
-    if not path.is_file() or bootstrap.environment._is_link(path):
-        raise RuntimeError(f"{label} is missing or linked")
-    if path.resolve().parent != (runtime / expected).resolve().parent:
-        raise RuntimeError(f"{label} path mismatch")
-    return path
-
-
-def _hashed_file(runtime: Path, relative: str, expected: str, digest: object, label: str) -> Path:
-    path = _exact_file(runtime, relative, expected, label)
-    if _require_digest(digest, f"{label} digest") != bootstrap._sha256(path):
-        raise RuntimeError(f"{label} evidence mismatch")
-    return path
-
-
-def _validate_stage_outputs(
-    runtime: Path, value: object, parent: str, modes: tuple[str, ...], label: str,
-) -> dict:
-    if not isinstance(value, dict) or set(value) != set(modes):
-        raise RuntimeError(f"{label} evidence mismatch")
-    for mode in modes:
-        streams = value.get(mode)
-        if not isinstance(streams, dict) or set(streams) != {
-            "stdoutPath", "stdoutSha256", "stderrPath", "stderrSha256",
-        }:
-            raise RuntimeError(f"{label} evidence mismatch")
-        for stream in ("stdout", "stderr"):
-            relative = f"{parent}/{mode}.{stream}"
-            try:
-                _hashed_file(
-                    runtime, streams[f"{stream}Path"], relative,
-                    streams[f"{stream}Sha256"], label,
-                )
-            except (KeyError, TypeError, RuntimeError) as error:
-                raise RuntimeError(f"{label} evidence mismatch") from error
-    return value
-
-
-def _logging_config(root: Path, runtime: Path, record: dict) -> Path:
-    expected = {
-        "loggingConfigSourcePath": bootstrap.LOGGING_CONFIG_SOURCE,
-        "loggingConfigPath": "identity-bootstrap/logback.xml",
-    }
-    if any(record.get(key) != value for key, value in expected.items()):
-        raise RuntimeError("original bootstrap logging configuration mismatch")
-    source = root / bootstrap.LOGGING_CONFIG_SOURCE
-    target = runtime / "identity-bootstrap/logback.xml"
-    for path, key in ((source, "loggingConfigSourceSha256"), (target, "loggingConfigSha256")):
-        digest = record.get(key)
-        if (
-            not path.is_file() or bootstrap.environment._is_link(path)
-            or not isinstance(digest, str) or not HEX_DIGEST.fullmatch(digest)
-            or bootstrap._sha256(path) != digest
-        ):
-            raise RuntimeError("original bootstrap logging configuration mismatch")
-    if record["loggingConfigSourceSha256"] != record["loggingConfigSha256"]:
-        raise RuntimeError("original bootstrap logging configuration mismatch")
-    return target
-
-
 def _validate_manifest(original: dict, settings: dict, code: str, display: str, root_display: str) -> None:
     expected = {
         "profile": "R1_IDENTITY_BOOTSTRAP_V1",
@@ -156,20 +93,9 @@ def _validate_main(root: Path, runtime: Path, manifest: dict, record: dict) -> d
         or {path.name for path in main_folder.iterdir()} != expected_names
     ):
         raise RuntimeError("original MAIN evidence inventory mismatch")
-    fields = {
-        "settings": ("settingsPath", "settingsSha256", f"{base}/settings.json"),
-        "subject": ("subjectHmacPath", "subjectHmacSha256", f"{base}/subject-hmac.txt"),
-        "original": ("originalManifestPath", "originalManifestSha256", f"{base}/original-manifest.json"),
-        "operation": ("operationPath", "operationSha256", f"{base}/operation.json"),
-        "facts": ("factReferencesPath", "factReferencesSha256", f"{base}/fact-references.json"),
-    }
-    paths = {}
-    try:
-        for name, (path_key, digest_key, expected) in fields.items():
-            paths[name] = _hashed_file(runtime, entry[path_key], expected, entry[digest_key], "original bootstrap")
-    except (KeyError, TypeError) as error:
-        raise RuntimeError("original bootstrap evidence mismatch") from error
-    _validate_stage_outputs(runtime, entry.get("stageOutputs"), base, ORIGINAL_STAGES, "original bootstrap")
+    paths = bootstrap._validate_completed_bootstrap_entry(
+        runtime, entry, "main", "R1_E2E_MAIN",
+    )
     operation = bootstrap._read_json(paths["operation"], "original bootstrap operation")
     if (
         operation.get("profile") != "R1_E2E_IDENTITY_BOOTSTRAP_OPERATION_V1"
@@ -182,7 +108,10 @@ def _validate_main(root: Path, runtime: Path, manifest: dict, record: dict) -> d
     settings = _validate_settings(runtime, manifest, paths["settings"], "R1_E2E_MAIN")
     original = bootstrap._read_json(paths["original"], "original MAIN manifest")
     _validate_manifest(original, settings, "R1_E2E_MAIN", "R1 synthetic firm", "R1 synthetic firm root")
-    founder = _exact_file(runtime, f"{base}/founder-identifier.txt", f"{base}/founder-identifier.txt", "founder identifier")
+    founder = bootstrap._evidence_path(
+        runtime, f"{base}/founder-identifier.txt", f"{base}/founder-identifier.txt",
+        "founder identifier",
+    )
     if founder.read_text(encoding="utf-8", errors="strict").strip() != f"r1-{manifest['run']}-founder":
         raise RuntimeError("original founder identifier mismatch")
     outputs = entry["stageOutputs"]
@@ -270,7 +199,7 @@ def _validate_origin(
         or {path.name for path in bootstrap_root.iterdir()} != {"record.json", "logback.xml", "main", "isolation"}
     ):
         raise RuntimeError("original bootstrap evidence inventory mismatch")
-    logging_config = _logging_config(root, runtime, record)
+    logging_config = bootstrap._validate_logging_config(root, runtime, record)
     main = _validate_main(root, runtime, manifest, record)
     isolation = _validate_partial_isolation(runtime, manifest)
     tree_digest, tree_files = bootstrap.environment.tree_digest(runtime / "identity-bootstrap")
@@ -326,9 +255,28 @@ def _require_absence(row: dict) -> None:
         raise RuntimeError("isolation absence proof is malformed or nonzero")
 
 
-def _append_stage(record_path: Path, mode: str, exit_code: int | None) -> None:
+def _captured_stage_outputs(runtime: Path, folder: Path, mode: str) -> dict:
+    outputs = {}
+    for stream in ("stdout", "stderr"):
+        path = folder / f"{mode}.{stream}"
+        relative = path.relative_to(runtime).as_posix()
+        if path.is_file() and not bootstrap.environment._is_link(path):
+            outputs[stream] = {
+                "path": relative, "status": "AVAILABLE", "sha256": bootstrap._sha256(path),
+            }
+        else:
+            outputs[stream] = {"path": relative, "status": "MISSING", "sha256": None}
+    return outputs
+
+
+def _append_stage(
+    runtime: Path, folder: Path, record_path: Path, mode: str, exit_code: int | None,
+) -> None:
     record = bootstrap._read_json(record_path, "isolation continuation record")
-    record["stages"].append({"mode": mode, "exitCode": exit_code, "at": bootstrap.environment.utc_now()})
+    record["stages"].append({
+        "mode": mode, "exitCode": exit_code, "at": bootstrap.environment.utc_now(),
+        "outputs": _captured_stage_outputs(runtime, folder, mode),
+    })
     record["updatedAt"] = bootstrap.environment.utc_now()
     bootstrap.environment._atomic_json(record_path, record)
 
@@ -342,25 +290,12 @@ def _run(
             command, root, label, command_runner, output_directory=folder, input_bytes=input_bytes,
         )
     except bootstrap.ProcessFailure as error:
-        _append_stage(record_path, label, error.exit_code)
+        _append_stage(folder.parent, folder, record_path, label, error.exit_code)
         raise RuntimeError(str(error)) from error
-    _append_stage(record_path, label, exit_code)
+    _append_stage(folder.parent, folder, record_path, label, exit_code)
     if exit_code:
         raise RuntimeError(f"{label} failed or is uncertain; continuation cannot be retried")
     return bootstrap._parse_object(stdout, label)
-
-
-def _stage_manifest(runtime: Path, folder: Path) -> dict:
-    result = {}
-    for mode in CONTINUATION_STAGES:
-        result[mode] = {}
-        for stream in ("stdout", "stderr"):
-            path = folder / f"{mode}.{stream}"
-            if not path.is_file() or bootstrap.environment._is_link(path):
-                raise RuntimeError("continuation stage output is missing or linked")
-            result[mode][f"{stream}Path"] = path.relative_to(runtime).as_posix()
-            result[mode][f"{stream}Sha256"] = bootstrap._sha256(path)
-    return result
 
 
 def continue_isolation(
@@ -465,7 +400,7 @@ def continue_isolation(
         record.update(
             phase="IDENTITY_BOOTSTRAP_CONTINUED_VERIFIED",
             updatedAt=bootstrap.environment.utc_now(),
-            stageOutputs=_stage_manifest(runtime, folder),
+            stageOutputs=bootstrap._stage_output_manifest(runtime, folder, CONTINUATION_STAGES),
             main={
                 "tenantCode": "R1_E2E_MAIN",
                 "settingsPath": main["entry"]["settingsPath"],
@@ -513,12 +448,12 @@ def _validate_continuation(runtime: Path, run: str, origin: dict) -> dict:
         or any(not path.is_file() or bootstrap.environment._is_link(path) for path in folder.iterdir())
     ):
         raise RuntimeError("continuation evidence mismatch")
-    completion_path = _exact_file(
+    completion_path = bootstrap._evidence_path(
         runtime, f"{CONTINUATION_DIRECTORY}/completion.json",
         f"{CONTINUATION_DIRECTORY}/completion.json", "continuation completion",
     )
     completion = bootstrap._read_json(completion_path, "continuation completion")
-    record_path = _exact_file(
+    record_path = bootstrap._evidence_path(
         runtime, completion.get("recordPath", ""), f"{CONTINUATION_DIRECTORY}/record.json",
         "continuation",
     )
@@ -537,7 +472,7 @@ def _validate_continuation(runtime: Path, run: str, origin: dict) -> dict:
         != [(mode, 0) for mode in CONTINUATION_STAGES]
     ):
         raise RuntimeError("continuation record mismatch")
-    _validate_stage_outputs(
+    bootstrap._validate_stage_outputs(
         runtime, record.get("stageOutputs"), CONTINUATION_DIRECTORY,
         CONTINUATION_STAGES, "continuation",
     )
@@ -561,20 +496,20 @@ def _validate_continuation(runtime: Path, run: str, origin: dict) -> dict:
     if not isinstance(isolation, dict):
         raise RuntimeError("continuation path mismatch")
     try:
-        settings_path = _hashed_file(
+        settings_path = bootstrap._evidence_file(
             runtime, isolation["settingsPath"], "identity-bootstrap/isolation/settings.json",
             isolation["settingsSha256"], "continuation",
         )
-        subject_path = _hashed_file(
+        subject_path = bootstrap._evidence_file(
             runtime, isolation["subjectHmacPath"], "identity-bootstrap/isolation/subject-hmac.txt",
             isolation["subjectHmacSha256"], "continuation",
         )
-        original_path = _hashed_file(
+        original_path = bootstrap._evidence_file(
             runtime, isolation["originalManifestPath"],
             f"{CONTINUATION_DIRECTORY}/isolation-original-manifest.json",
             isolation["originalManifestSha256"], "continuation",
         )
-        facts_path = _hashed_file(
+        facts_path = bootstrap._evidence_file(
             runtime, isolation["factReferencesPath"], f"{CONTINUATION_DIRECTORY}/fact-references.json",
             isolation["factReferencesSha256"], "continuation",
         )
@@ -619,11 +554,11 @@ def verify_combined(
     folder = runtime / CONTINUATION_DIRECTORY
     if not folder.is_dir() or bootstrap.environment._is_link(folder):
         raise RuntimeError("continuation evidence mismatch")
-    completion_path = _exact_file(
+    completion_path = bootstrap._evidence_path(
         runtime, f"{CONTINUATION_DIRECTORY}/completion.json",
         f"{CONTINUATION_DIRECTORY}/completion.json", "continuation completion",
     )
-    record_path = _exact_file(
+    record_path = bootstrap._evidence_path(
         runtime, f"{CONTINUATION_DIRECTORY}/record.json",
         f"{CONTINUATION_DIRECTORY}/record.json", "continuation record",
     )

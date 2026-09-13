@@ -281,9 +281,12 @@ def _append_stage(operation_path: Path, mode: str, exit_code: int | None) -> Non
     environment._atomic_json(operation_path, operation)
 
 
-def _stage_output_manifest(runtime: Path, folder: Path) -> dict:
+def _stage_output_manifest(
+    runtime: Path, folder: Path,
+    modes: tuple[str, ...] = ("candidate", "dry-run", "execute", "verify", "fact-query"),
+) -> dict:
     outputs = {}
-    for mode in ("candidate", "dry-run", "execute", "verify", "fact-query"):
+    for mode in modes:
         streams = {}
         for stream in ("stdout", "stderr"):
             path = folder / f"{mode}.{stream}"
@@ -293,6 +296,102 @@ def _stage_output_manifest(runtime: Path, folder: Path) -> dict:
             streams[f"{stream}Sha256"] = _sha256(path)
         outputs[mode] = streams
     return outputs
+
+
+def _evidence_path(runtime: Path, relative: str, expected: str, label: str) -> Path:
+    if not isinstance(relative, str) or relative != expected:
+        raise RuntimeError(f"{label} path mismatch")
+    path = runtime / relative
+    if not path.is_file() or environment._is_link(path):
+        raise RuntimeError(f"{label} is missing or linked")
+    if path.resolve().parent != (runtime / expected).resolve().parent:
+        raise RuntimeError(f"{label} path mismatch")
+    return path
+
+
+def _evidence_file(
+    runtime: Path, relative: str, expected: str, digest: object, label: str,
+) -> Path:
+    path = _evidence_path(runtime, relative, expected, label)
+    if (
+        not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)
+        or _sha256(path) != digest
+    ):
+        raise RuntimeError(f"{label} evidence mismatch")
+    return path
+
+
+def _validate_stage_outputs(
+    runtime: Path, value: object, parent: str, modes: tuple[str, ...], label: str,
+) -> dict:
+    if not isinstance(value, dict) or set(value) != set(modes):
+        raise RuntimeError(f"{label} evidence mismatch")
+    for mode in modes:
+        streams = value.get(mode)
+        if not isinstance(streams, dict) or set(streams) != {
+            "stdoutPath", "stdoutSha256", "stderrPath", "stderrSha256",
+        }:
+            raise RuntimeError(f"{label} evidence mismatch")
+        for stream in ("stdout", "stderr"):
+            expected = f"{parent}/{mode}.{stream}"
+            try:
+                _evidence_file(
+                    runtime, streams[f"{stream}Path"], expected,
+                    streams[f"{stream}Sha256"], label,
+                )
+            except (KeyError, TypeError, RuntimeError) as error:
+                raise RuntimeError(f"{label} evidence mismatch") from error
+    return value
+
+
+def _validate_logging_config(root: Path, runtime: Path, record: dict) -> Path:
+    expected = {
+        "loggingConfigSourcePath": LOGGING_CONFIG_SOURCE,
+        "loggingConfigPath": (Path(BOOTSTRAP_DIRECTORY) / "logback.xml").as_posix(),
+    }
+    if any(record.get(key) != value for key, value in expected.items()):
+        raise RuntimeError("original bootstrap logging configuration mismatch")
+    source = root / LOGGING_CONFIG_SOURCE
+    target = runtime / expected["loggingConfigPath"]
+    for path, key in ((source, "loggingConfigSourceSha256"), (target, "loggingConfigSha256")):
+        digest = record.get(key)
+        if (
+            not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)
+            or not path.is_file() or environment._is_link(path) or _sha256(path) != digest
+        ):
+            raise RuntimeError("original bootstrap logging configuration mismatch")
+    if record["loggingConfigSourceSha256"] != record["loggingConfigSha256"]:
+        raise RuntimeError("original bootstrap logging configuration mismatch")
+    return target
+
+
+def _validate_completed_bootstrap_entry(
+    runtime: Path, entry: dict, tenant_key: str, tenant_code: str,
+) -> dict[str, Path]:
+    base = f"{BOOTSTRAP_DIRECTORY}/{tenant_key}"
+    if entry.get("tenantCode") != tenant_code:
+        raise RuntimeError("original bootstrap tenant inventory mismatch")
+    fields = {
+        "settings": ("settingsPath", "settingsSha256", f"{base}/settings.json"),
+        "subject": ("subjectHmacPath", "subjectHmacSha256", f"{base}/subject-hmac.txt"),
+        "original": ("originalManifestPath", "originalManifestSha256", f"{base}/original-manifest.json"),
+        "operation": ("operationPath", "operationSha256", f"{base}/operation.json"),
+        "facts": ("factReferencesPath", "factReferencesSha256", f"{base}/fact-references.json"),
+    }
+    paths = {}
+    try:
+        for name, (path_key, digest_key, expected) in fields.items():
+            paths[name] = _evidence_file(
+                runtime, entry[path_key], expected, entry[digest_key], "original bootstrap",
+            )
+    except (KeyError, TypeError, RuntimeError) as error:
+        raise RuntimeError("original bootstrap evidence mismatch") from error
+    _validate_stage_outputs(
+        runtime, entry.get("stageOutputs"), base,
+        ("candidate", "dry-run", "execute", "verify", "fact-query"),
+        "original bootstrap",
+    )
+    return paths
 
 
 def _run_stage(
@@ -661,75 +760,12 @@ def verify_original(
     entries = record.get("tenants")
     if not isinstance(entries, list) or [entry.get("tenantCode") for entry in entries] != [item[1] for item in TENANTS]:
         raise RuntimeError("original bootstrap tenant inventory mismatch")
-    expected_logging_paths = {
-        "loggingConfigSourcePath": LOGGING_CONFIG_SOURCE,
-        "loggingConfigPath": (Path(BOOTSTRAP_DIRECTORY) / "logback.xml").as_posix(),
-    }
-    if any(record.get(key) != value for key, value in expected_logging_paths.items()):
-        raise RuntimeError("original bootstrap logging configuration mismatch")
-    logging_source = root / LOGGING_CONFIG_SOURCE
-    logging_config = runtime / record["loggingConfigPath"]
-    for path, digest_key in (
-        (logging_source, "loggingConfigSourceSha256"),
-        (logging_config, "loggingConfigSha256"),
-    ):
-        digest = record.get(digest_key)
-        if (
-            not isinstance(digest, str)
-            or not re.fullmatch(r"[0-9a-f]{64}", digest)
-            or not path.is_file()
-            or environment._is_link(path)
-            or _sha256(path) != digest
-        ):
-            raise RuntimeError("original bootstrap logging configuration mismatch")
-    if record["loggingConfigSourceSha256"] != record["loggingConfigSha256"]:
-        raise RuntimeError("original bootstrap logging configuration mismatch")
+    logging_config = _validate_logging_config(root, runtime, record)
     jar = runtime / manifest["artifacts"]["jar"]["path"]
     base = _java_command(java_path, jar, logging_config)
     validated_entries = []
-    for entry in entries:
-        paths = {
-            "settings": runtime / entry["settingsPath"],
-            "subject": runtime / entry["subjectHmacPath"],
-            "original": runtime / entry["originalManifestPath"],
-            "operation": runtime / entry["operationPath"],
-            "facts": runtime / entry["factReferencesPath"],
-        }
-        expected_hashes = {
-            "settings": entry["settingsSha256"],
-            "subject": entry["subjectHmacSha256"],
-            "original": entry["originalManifestSha256"],
-            "operation": entry["operationSha256"],
-            "facts": entry["factReferencesSha256"],
-        }
-        for key, path in paths.items():
-            if not path.is_file() or environment._is_link(path) or _sha256(path) != expected_hashes[key]:
-                raise RuntimeError("original bootstrap evidence mismatch")
-        stage_outputs = entry.get("stageOutputs")
-        expected_modes = {"candidate", "dry-run", "execute", "verify", "fact-query"}
-        if not isinstance(stage_outputs, dict) or set(stage_outputs) != expected_modes:
-            raise RuntimeError("original bootstrap evidence mismatch")
-        evidence_parent = Path(entry["settingsPath"]).parent
-        for mode in expected_modes:
-            streams = stage_outputs[mode]
-            if not isinstance(streams, dict) or set(streams) != {
-                "stdoutPath", "stdoutSha256", "stderrPath", "stderrSha256",
-            }:
-                raise RuntimeError("original bootstrap evidence mismatch")
-            for stream in ("stdout", "stderr"):
-                expected_relative = (evidence_parent / f"{mode}.{stream}").as_posix()
-                if streams[f"{stream}Path"] != expected_relative:
-                    raise RuntimeError("original bootstrap evidence mismatch")
-                path = runtime / expected_relative
-                digest = streams[f"{stream}Sha256"]
-                if (
-                    not isinstance(digest, str)
-                    or not re.fullmatch(r"[0-9a-f]{64}", digest)
-                    or not path.is_file()
-                    or environment._is_link(path)
-                    or _sha256(path) != digest
-                ):
-                    raise RuntimeError("original bootstrap evidence mismatch")
+    for (tenant_key, tenant_code, _, _), entry in zip(TENANTS, entries, strict=True):
+        paths = _validate_completed_bootstrap_entry(runtime, entry, tenant_key, tenant_code)
         validated_entries.append((entry, paths))
     verified_tenants = {}
     for entry, paths in validated_entries:
