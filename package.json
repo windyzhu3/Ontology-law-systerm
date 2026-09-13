@@ -15,7 +15,8 @@
     "typecheck": "npm run typecheck --workspace apps/workbench",
     "test": "npm run test --workspace apps/workbench",
     "build": "npm run build --workspace apps/workbench",
-    "test:e2e:task9": "playwright test --config playwright.config.ts"
+    "test:e2e:task9": "playwright test --config playwright.config.ts",
+    "test:e2e:offline": "playwright test --config playwright.config.ts --project offline-harness && playwright test --config e2e/business.config.ts --project offline-business"
   },
   "devDependencies": {
     "openapi-typescript": "7.13.0",

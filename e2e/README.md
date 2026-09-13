@@ -1,5 +1,9 @@
 # Task 9.6e 受控本地身份链
 
+CI uses `npm run test:e2e:offline` to select only `offline-harness` and
+`offline-business`. This preflight entry does not run or authorize any
+`approved-local*` project and is not R1 runtime acceptance.
+
 ## Task 9.6o 具名草稿成功回执恢复
 
 草稿响应值与发送候选值使用生产 `sameValues` 比较：对象属性顺序不影响相等性，字段值、缺失或多余字段仍拒绝。其他 journal、身份、回执和字节完整性比较不变。
