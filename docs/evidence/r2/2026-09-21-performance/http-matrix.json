@@ -1,0 +1,35 @@
+[
+  {
+    "endpoint": "current",
+    "concurrency": 5,
+    "samples": 100,
+    "visibleTasks": 19,
+    "p50Ms": 1206.14,
+    "p95Ms": 1566.45,
+    "maxMs": 1587.32,
+    "failures": 0,
+    "ipv4Diagnostic": true
+  },
+  {
+    "endpoint": "quoteTask",
+    "concurrency": 5,
+    "samples": 100,
+    "visibleTasks": 19,
+    "p50Ms": 933.13,
+    "p95Ms": 1242.75,
+    "maxMs": 1389.71,
+    "failures": 0,
+    "ipv4Diagnostic": true
+  },
+  {
+    "endpoint": "quoteDetail",
+    "concurrency": 5,
+    "samples": 100,
+    "visibleTasks": 19,
+    "p50Ms": 867.82,
+    "p95Ms": 970.31,
+    "maxMs": 984.98,
+    "failures": 0,
+    "ipv4Diagnostic": true
+  }
+]

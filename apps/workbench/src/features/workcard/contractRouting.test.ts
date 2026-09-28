@@ -1,0 +1,5 @@
+import {it,expect} from 'vitest';
+import {parseEnvelope,isContractCard,contractTaskActions} from './contract';
+import {publicCommandFacts} from '../session/recoveryMarker';
+import {opportunityEnvelope} from '../../test/opportunityFixtures';
+it.each(Object.entries(contractTaskActions))('routes %s only through its exact contract command', (taskType,action)=>{const base=opportunityEnvelope(),card={...base.currentCard,taskType,businessPurpose:{code:taskType,label:'合同办理'},primaryCommand:{code:action,label:'确认本次办理',enabled:true},expectedCompletionFact:publicCommandFacts[action],commandForm:{actionCode:action,schemaVersion:1,values:{},fields:[]}};const parsed=parseEnvelope({...base,currentCard:card});expect(isContractCard(parsed.currentCard!)).toBe(true);expect(()=>parseEnvelope({...base,currentCard:{...card,commandForm:{...card.commandForm,values:{decision:'APPROVED'}}}})).toThrow();expect(()=>parseEnvelope({...base,currentCard:{...card,primaryCommand:{...card.primaryCommand,code:'FORM_QUOTE'}}})).toThrow();});

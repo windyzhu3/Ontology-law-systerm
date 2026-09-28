@@ -1,0 +1,23 @@
+{
+  "status": "REVIEW_ONLY_PASS",
+  "scenes": 11,
+  "widths": [
+    1440,
+    390,
+    360
+  ],
+  "screenshots": 33,
+  "sharedCss": "4 byte-identical to approved R",
+  "checks": [
+    "search clears detail",
+    "state filter",
+    "view switching",
+    "retry",
+    "readonly",
+    "revoked",
+    "task changed",
+    "no overflow"
+  ],
+  "errors": [],
+  "apiRequests": []
+}

@@ -13,7 +13,10 @@ class R1EventPolicyTest {
         var root=PostgresIntegrationTest.repositoryRoot();
         String contract=Files.readString(root.resolve("docs/contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md"));
         var descriptors=rows(contract,"Event descriptor registry");
-        assertEquals(descriptors.size(),CommandHandler.Event.values().length);
+        // Approved sales-chain repair additions retain the original lead projection owner.
+        var repairEvents=Set.of(CommandHandler.Event.SalesFollowupAttemptRecordedV1,CommandHandler.Event.SourceRequestContinuationRecordedV1,CommandHandler.Event.SourceRequestTaskRestoredV1,CommandHandler.Event.SourceRequestReviewReopenedV1);
+        assertEquals(descriptors.size()+repairEvents.size(),Arrays.stream(CommandHandler.Event.values()).filter(e->e.queueOwners().contains(CommandHandler.QueueOwner.R1_PROJECTION)).count());
+        for(var event:repairEvents){assertEquals(1,event.schemaVersion());assertEquals(Set.of(CommandHandler.QueueOwner.R1_PROJECTION),event.queueOwners());assertFalse(descriptors.stream().anyMatch(row->row.get(0).equals(event.name())));}
         for(var row:descriptors) {
             var event=CommandHandler.Event.valueOf(row.get(0));
             assertEquals(Integer.parseInt(row.get(1)),event.schemaVersion());assertEquals(row.get(2),event.sourceFactType());assertEquals(row.get(3),event.sourceSelector());

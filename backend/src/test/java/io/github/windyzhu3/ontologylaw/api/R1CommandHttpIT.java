@@ -25,6 +25,7 @@ class R1CommandHttpIT extends R1HttpFixture {
             mutate("insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values (?,?,?,?,?,?,clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",seed.tenant(),UUID.randomUUID(),seed.appointment(),seed.appointment(),seed.org(),code);
     }
     Map<String,Object> candidate(TaskFactory.Type type){return switch(type){
+        case CLASSIFY_MATTER,ACCEPT_TRANSFER,SUPPLEMENT_TRANSFER,PREPARE_TRANSFER,REVIEW_TRANSFER,CHECK_CONTRACT_RECEIPT,SUPPLEMENT_CONTRACT_RECEIPT,CHECK_CONTRACT_EXECUTION,RESOLVE_SOURCE_REQUEST,REVIEW_CONTRACT_TERMINATION,ARRANGE_CONTRACT_SIGNATURE,COLLECT_CONTRACT_SIGNATURE,VERIFY_CONTRACT_SIGNATURE,ARCHIVE_CONTRACT_SIGNATURE,REQUEST_CONTRACT_PREPARATION,DECIDE_CONTRACT_PREPARATION,PREPARE_CONTRACT,SUBMIT_CONTRACT_REVIEW,REVIEW_CONTRACT,SUBMIT_CONTRACT_APPROVAL,APPROVE_CONTRACT,SUPPLEMENT_CONTRACT_REVIEW,PREPARE_QUOTE,SUBMIT_QUOTE_APPROVAL,APPROVE_QUOTE,DELIVER_QUOTE,RECORD_QUOTE_REPLY,RESOLVE_QUOTE_AUTHORITY,PROGRESS_OPPORTUNITY->throw new IllegalArgumentException("R1 fixture requires an activated Lead command");
         case COMPLETE_LEAD_INGRESS->Map.of("phone","+12025550999","sourceCode","OWNER_CONFIRMED","sourceSummary","HTTP verified input");
         case RESOLVE_LEAD_DUPLICATE->Map.of("decisionCode","KEEP_SEPARATE","candidateLeadId",secondaryLead.toString(),"candidateLeadRevision",1L,"partyId",secondaryParty.toString(),"partyRevision",0L,"rationaleSummary","Verified separate matter");
         case ASSIGN_LEAD->Map.of("ownerAppointmentId",secondaryAppointment.toString());
@@ -47,10 +48,16 @@ class R1CommandHttpIT extends R1HttpFixture {
         }
     }
     @Test void capture_generated_operation_uses_inputless_authority_context_and_same_key_original_receipt()throws Exception {
-        setupFlow(TaskFactory.Type.COMPLETE_LEAD_INGRESS);provisionSuccessors();var payload=new TreeMap<String,Object>(input(false));payload.put("sourceRecordKey","HTTP-capture-exact-Case");UUID command=UUID.randomUUID();
+        setupFlow(TaskFactory.Type.COMPLETE_LEAD_INGRESS);provisionSuccessors();var payload=new TreeMap<String,Object>(input(false));payload.put("sourceRecordKey","HTTP-capture-exact-Case");payload.put("customerName","华启制造");payload.put("contactName","王女士");UUID command=UUID.randomUUID();
         try(var http=new HttpHarness()) {
             var response=http.request("POST","/api/v1/leads",payload,Map.of("Idempotency-Key",command.toString()));assertEquals(201,response.statusCode(),response.body());var body=http.body(response);assertEquals("LEAD",((Map<?,?>)body.get("resultFact")).get("factType"));assertEquals("SUCCEEDED",body.get("outcome"));
             var before=counts();var replay=http.request("POST","/api/v1/leads",payload,Map.of("Idempotency-Key",command.toString()));assertEquals(201,replay.statusCode());assertEquals(body,http.body(replay));assertEquals(before,counts());
+            var capturedId=UUID.fromString(scalar("select lead_id::text from lead.lead where tenant_id=? and customer_name_ciphertext is not null",seed.tenant()));
+            var taskId=scalar("select task_occurrence_id::text from responsibility.task_occurrence where tenant_id=? and subject_id=? and state='OPEN'",seed.tenant(),capturedId);
+            var card=http.request("GET","/api/v1/workcards/current?taskId="+taskId,null,Map.of());assertEquals(200,card.statusCode(),card.body());assertTrue(card.body().contains("华启制造"));assertTrue(card.body().contains("王女士"));
+            var summaries=(List<Map<String,Object>>)http.body(card).get("myTasks");
+            String factRef=(String)((Map<?,?>)body.get("resultFact")).get("factRef");
+            assertEquals(List.of(taskId),summaries.stream().filter(item->factRef.equals(item.get("subjectFactRef"))).map(item->item.get("taskId")).toList());
             var read=http.request("GET","/api/v1/commands/"+command+"/receipt",null,Map.of());assertEquals(200,read.statusCode());assertEquals(body,http.body(read));
         }
     }

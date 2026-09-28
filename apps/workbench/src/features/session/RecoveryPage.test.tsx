@@ -82,6 +82,19 @@ function fixture(
   return { controller, api, marker, requests, logins: () => logins };
 }
 const query = () => screen.getByRole("button", { name: "查询原操作结果" });
+it("recovers opportunity progress using its business name and then reads the current task without replaying", async () => {
+  const f = fixture(async r => jsonResponse(r.url.endsWith("/receipt") ? receipt(selectorId, "OPPORTUNITY_PROGRESS") : envelope()), { commandType: "RECORD_OPPORTUNITY_PROGRESS" });
+  render(<RecoveryPage controller={f.controller} api={f.api} />);
+  await waitFor(() => expect(query()).toBeEnabled());
+  expect(screen.getByRole("heading", { name: "记录商机进展" })).toBeVisible();
+  expect(f.requests).toHaveLength(0);
+  fireEvent.click(query());
+  await waitFor(() => expect(f.api.recovery.read()).toBeNull());
+  await waitFor(() => expect(screen.getByRole("button", { name: "继续" })).toBeEnabled());
+  expect(f.requests).toHaveLength(2);
+  expect(f.requests.every(r => r.method === "GET")).toBe(true);
+  expect(document.body.textContent).not.toContain(selectorId);
+});
 async function mounted(f: ReturnType<typeof fixture>, onReady?: () => void) {
   const view = render(
     <RecoveryPage controller={f.controller} api={f.api} onReady={onReady} />,

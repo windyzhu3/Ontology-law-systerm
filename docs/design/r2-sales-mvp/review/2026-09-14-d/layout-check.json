@@ -1,0 +1,182 @@
+[
+  {
+    "scene": "list",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "assign",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "confirm",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "pending",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "unknown",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "success",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "empty",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "coordinate",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "recorded",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "stale",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "denied",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "operations",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "task",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "resolved",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "viewonly",
+    "width": 1440,
+    "client": 1425,
+    "scroll": 1425
+  },
+  {
+    "scene": "list",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "assign",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "confirm",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "pending",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "unknown",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "success",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "empty",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "coordinate",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "recorded",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "stale",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "denied",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "operations",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "task",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "resolved",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  },
+  {
+    "scene": "viewonly",
+    "width": 360,
+    "client": 345,
+    "scroll": 345
+  }
+]

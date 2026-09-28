@@ -1,11 +1,26 @@
 import type { components } from "../../generated/api/schema";
+import { opportunityCandidate, validOpportunityDraft, validOpportunityValues } from "./opportunityProgress";
 export type Schema = components["schemas"];
 export type PublicReceipt = Schema["CommandReceipt"];
-export type Card = Schema["CurrentCard"];
+export const transferTaskActions={PREPARE_TRANSFER:'SUBMIT_TRANSFER',SUPPLEMENT_TRANSFER:'RESUBMIT_TRANSFER',REVIEW_TRANSFER:'RECORD_TRANSFER_CONFLICT_REVIEW',ACCEPT_TRANSFER:'RECORD_TRANSFER_INTAKE',CLASSIFY_MATTER:'CLASSIFY_MATTER'} as const;
+export const isTransferTask=(taskType:string):taskType is keyof typeof transferTaskActions=>Object.hasOwn(transferTaskActions,taskType);
+export const isTransferCard=(card:Card):card is Schema['R2TransferCurrentCardV1']=>isTransferTask(card.taskType);
+const transferCompletion:Record<string,string>={SUBMIT_TRANSFER:'TRANSFER_SUBMISSION',RESUBMIT_TRANSFER:'TRANSFER_SUBMISSION',RECORD_TRANSFER_CONFLICT_REVIEW:'TRANSFER_CONFLICT_REVIEW',RECORD_TRANSFER_INTAKE:'TRANSFER_INTAKE',CLASSIFY_MATTER:'MATTER_CLASSIFICATION'};
+export const contractTaskActions={CHECK_CONTRACT_RECEIPT:'RECORD_CONTRACT_RECEIPT_REVIEW',SUPPLEMENT_CONTRACT_RECEIPT:'SUPPLEMENT_CONTRACT_RECEIPT',CHECK_CONTRACT_EXECUTION:'VERIFY_CONTRACT_EXECUTION_CONDITIONS',REVIEW_CONTRACT_TERMINATION:'RECORD_CONTRACT_TERMINATION_REVIEW',ARRANGE_CONTRACT_SIGNATURE:'CONFIRM_CONTRACT_SIGNATURE_ARRANGEMENT',COLLECT_CONTRACT_SIGNATURE:'SUBMIT_CONTRACT_SIGNATURE',VERIFY_CONTRACT_SIGNATURE:'RECORD_CONTRACT_SIGNATURE_VERIFICATION',ARCHIVE_CONTRACT_SIGNATURE:'ARCHIVE_CONTRACT_SIGNATURE',REQUEST_CONTRACT_PREPARATION:'REQUEST_CONTRACT_PREPARATION',DECIDE_CONTRACT_PREPARATION:'RECORD_CONTRACT_PREPARATION_DECISION',PREPARE_CONTRACT:'FORM_CONTRACT',SUBMIT_CONTRACT_REVIEW:'REQUEST_CONTRACT_REVIEW',REVIEW_CONTRACT:'RECORD_CONTRACT_REVIEW',SUBMIT_CONTRACT_APPROVAL:'REQUEST_CONTRACT_APPROVAL',APPROVE_CONTRACT:'RECORD_CONTRACT_DECISION',SUPPLEMENT_CONTRACT_REVIEW:'REQUEST_CONTRACT_REVIEW'} as const;
+export const isContractTask=(taskType:string):taskType is keyof typeof contractTaskActions=>Object.hasOwn(contractTaskActions,taskType);
+type ContractPurposeCard=Schema["R2ContractCurrentCardV1"];
+export type Card = Schema["R2CurrentCardV1"];
+export const isContractCard=(card:Card):card is ContractPurposeCard=>isContractTask(card.taskType);
+export type StandardCard = Exclude<Card,Schema["R2QuoteCurrentCardV1"]|ContractPurposeCard|Schema["R2TransferCurrentCardV1"]>;
+export const isQuoteCard=(card:Card):card is Schema["R2QuoteCurrentCardV1"]=>isQuoteTask(card.taskType);
 export type Envelope = Schema["CurrentWorkCardEnvelope"];
 export type Values = Record<string, unknown>;
-export type Action = Schema["ActionCode"];
+export type Action = Schema["ActionCode"] | "RECORD_SOURCE_REQUEST_CONTINUATION";
+export const quoteTaskActions = {PREPARE_QUOTE:'FORM_QUOTE',SUBMIT_QUOTE_APPROVAL:'REQUEST_QUOTE_APPROVAL',APPROVE_QUOTE:'RECORD_QUOTE_DECISION',DELIVER_QUOTE:'RECORD_QUOTE_DELIVERY',RECORD_QUOTE_REPLY:'RECORD_QUOTE_RESPONSE',RESOLVE_QUOTE_AUTHORITY:'REQUEST_QUOTE_APPROVAL'} as const;
+export const isQuoteTask = (taskType:string):taskType is keyof typeof quoteTaskActions => Object.hasOwn(quoteTaskActions,taskType);
+const quoteCompletion:Record<string,string>={FORM_QUOTE:'QUOTE_REVISION',REQUEST_QUOTE_APPROVAL:'QUOTE_APPROVAL_REQUEST',RECORD_QUOTE_DECISION:'QUOTE_APPROVAL_DECISION',RECORD_QUOTE_DELIVERY:'QUOTE_ISSUE',RECORD_QUOTE_RESPONSE:'QUOTE_RESPONSE'};
 export const actions = {
+  RESOLVE_SOURCE_REQUEST: "RECORD_SOURCE_REQUEST_CONTINUATION",
   RESOLVE_LEAD_DUPLICATE: "RESOLVE_DUPLICATE_LEAD",
   COMPLETE_LEAD_INGRESS: "COMPLETE_LEAD_INGRESS",
   ASSIGN_LEAD: "ASSIGN_LEAD",
@@ -15,6 +30,7 @@ export const actions = {
   REVIEW_LEAD_VALIDITY: "REVIEW_LEAD_VALIDITY",
 } as const;
 const editable: Record<Action, string[]> = {
+  RECORD_SOURCE_REQUEST_CONTINUATION: ["decisionCode","ownerAppointmentId","reviewAt","rationaleSummary"],
   RESOLVE_DUPLICATE_LEAD: ["decisionCode", "rationaleSummary"],
   COMPLETE_LEAD_INGRESS: ["phone", "email", "sourceCode", "sourceSummary"],
   ASSIGN_LEAD: ["ownerAppointmentId"],
@@ -29,6 +45,7 @@ const editable: Record<Action, string[]> = {
   REVIEW_LEAD_VALIDITY: ["decisionCode", "rationaleSummary"],
 };
 const selectors: Record<Action, string[]> = {
+  RECORD_SOURCE_REQUEST_CONTINUATION: [],
   RESOLVE_DUPLICATE_LEAD: [
     "candidateLeadId",
     "candidateLeadRevision",
@@ -53,6 +70,7 @@ const selectors: Record<Action, string[]> = {
   ],
 };
 const choices: Record<string, readonly string[]> = {
+  RECORD_SOURCE_REQUEST_CONTINUATION: ["ASSIGN_SELECTED","SCHEDULE_REVIEW","END_LEAD"],
   RESOLVE_DUPLICATE_LEAD: ["LINK_EXISTING_PARTY", "KEEP_SEPARATE"],
   RECORD_ROUTING_DISPOSITION: [
     "SCHEDULE_ROUTING_REVIEW",
@@ -134,6 +152,9 @@ function validValues(action: Action, v: unknown, complete: boolean): boolean {
   }
   if (!complete) return true;
   if (action === "ASSIGN_LEAD") return uuid(v.ownerAppointmentId);
+  if(action === "RECORD_SOURCE_REQUEST_CONTINUATION") return safeText(v.rationaleSummary) && choices[action].includes(String(v.decisionCode)) &&
+    (v.decisionCode === "ASSIGN_SELECTED" ? uuid(v.ownerAppointmentId) && v.reviewAt === undefined : v.ownerAppointmentId === undefined &&
+      (v.decisionCode === "SCHEDULE_REVIEW" ? instant(v.reviewAt) : v.reviewAt === undefined));
   if (action === "COMPLETE_LEAD_INGRESS")
     return (
       !!(v.phone || v.email) &&
@@ -192,7 +213,7 @@ function validFields(action: Action, value: unknown) {
         ? "TEL"
         : f.name === "email"
           ? "EMAIL"
-          : f.name === "evidenceSubmissionId"
+          : (f.name === "evidenceSubmissionId" || f.name === "reviewAt")
             ? "TEXT"
             : f.name === "decisionCode" ||
                 f.name === "ownerAppointmentId" ||
@@ -202,7 +223,7 @@ function validFields(action: Action, value: unknown) {
     if (f.control !== control) return false;
     if (control !== "SELECT") return f.options.length === 0;
     return (
-      f.options.length > 0 &&
+      (f.options.length > 0 || action === "RECORD_SOURCE_REQUEST_CONTINUATION" && f.name === "ownerAppointmentId") &&
       f.options.every(
         (o) =>
           isObject(o) &&
@@ -237,8 +258,9 @@ export function validPreconditions(
 }
 export function validDraft(
   v: unknown,
-  action: Action,
-): v is Schema["ActionDraftProjection"] {
+  action: Action | "RECORD_OPPORTUNITY_PROGRESS",
+): v is Schema["ActionDraftProjection"] | Schema["OpportunityProgressDraftProjectionV1"] | Schema["RecordSourceRequestContinuationDraftProjection"] {
+  if(action === "RECORD_OPPORTUNITY_PROGRESS") return validOpportunityDraft(v);
   return (
     isObject(v) &&
     keys(v, [
@@ -279,7 +301,10 @@ export function parseEnvelope(value: unknown): Envelope {
       "nextSummaries",
       "waitingCount",
       "chatComposer",
-    ]) ||
+      "myTasks",
+      "selectionNotice",
+      "recommendedTaskId",
+    ], ["todaySummary", "currentCard", "nextSummaries", "waitingCount", "chatComposer"]) ||
     !safeText(value.todaySummary) ||
     !revision(value.waitingCount) ||
     !Array.isArray(value.nextSummaries) ||
@@ -290,7 +315,8 @@ export function parseEnvelope(value: unknown): Envelope {
     !value.nextSummaries.every(
       (n) =>
         isObject(n) &&
-        keys(n, ["taskId", "businessPurpose", "priority", "timeHint"]) &&
+        keys(n, ["taskId", "businessPurpose", "priority", "timeHint", "subjectTitle", "subjectFactRef"], ["taskId", "businessPurpose", "priority", "timeHint"]) &&
+        (n.subjectTitle === undefined || safeText(n.subjectTitle, 200)) && (n.subjectFactRef === undefined || (typeof n.subjectFactRef === "string" && /^[A-Za-z0-9_-]{43}$/.test(n.subjectFactRef))) &&
         uuid(n.taskId) &&
         labeled(n.businessPurpose) &&
         ["URGENT", "NORMAL"].includes(String(n.priority)) &&
@@ -298,6 +324,10 @@ export function parseEnvelope(value: unknown): Envelope {
     )
   )
     return fail();
+  if (value.selectionNotice !== undefined && !safeText(value.selectionNotice)) return fail();
+  if (value.myTasks !== undefined && (!Array.isArray(value.myTasks) || !value.myTasks.every(n =>
+    isObject(n) && keys(n, ["taskId", "businessPurpose", "priority", "timeHint", "subjectTitle", "subjectFactRef"], ["taskId", "businessPurpose", "priority", "timeHint"]) && (n.subjectTitle === undefined || safeText(n.subjectTitle, 200)) && (n.subjectFactRef === undefined || (typeof n.subjectFactRef === "string" && /^[A-Za-z0-9_-]{43}$/.test(n.subjectFactRef))) && uuid(n.taskId) && labeled(n.businessPurpose) && ["URGENT", "NORMAL"].includes(String(n.priority)) && safeText(n.timeHint, 200)))) return fail();
+  if (value.recommendedTaskId !== undefined && value.recommendedTaskId !== null && !uuid(value.recommendedTaskId)) return fail();
   const c = value.currentCard;
   if (c !== null) {
     if (
@@ -320,12 +350,13 @@ export function parseEnvelope(value: unknown): Envelope {
       !uuid(c.taskId) ||
       !revision(c.taskRevision) ||
       typeof c.taskType !== "string" ||
-      !(c.taskType in actions)
+      (!(c.taskType in actions) && c.taskType !== "PROGRESS_OPPORTUNITY" && !isQuoteTask(c.taskType) && !isContractTask(c.taskType) && !isTransferTask(c.taskType))
     )
       return fail();
-    const action = actions[c.taskType as keyof typeof actions];
+    const quoteTask=isQuoteTask(c.taskType)||isContractTask(c.taskType)||isTransferTask(c.taskType);
+    const action = isTransferTask(c.taskType)?transferTaskActions[c.taskType]:isContractTask(c.taskType)?contractTaskActions[c.taskType]:isQuoteTask(c.taskType) ? quoteTaskActions[c.taskType] : c.taskType === "PROGRESS_OPPORTUNITY" ? "RECORD_OPPORTUNITY_PROGRESS" : actions[c.taskType as keyof typeof actions];
     const completion =
-      c.taskType === "CONTACT_LEAD"
+      isTransferTask(c.taskType)?transferCompletion[action]:isContractTask(c.taskType)?({RECORD_CONTRACT_RECEIPT_REVIEW:'CONTRACT_PAYMENT_REVIEW',SUPPLEMENT_CONTRACT_RECEIPT:'CONTRACT_PAYMENT_REVIEW',VERIFY_CONTRACT_EXECUTION_CONDITIONS:'CONTRACT_EXECUTION_VERIFICATION',RECORD_CONTRACT_TERMINATION_REVIEW:'CONTRACT_NEGOTIATION_DISPOSITION',CONFIRM_CONTRACT_SIGNATURE_ARRANGEMENT:'CONTRACT_SIGNATURE_ARRANGEMENT',SUBMIT_CONTRACT_SIGNATURE:'CONTRACT_SIGNATURE_SUBMISSION',RECORD_CONTRACT_SIGNATURE_VERIFICATION:'CONTRACT_SIGNATURE_VERIFICATION',ARCHIVE_CONTRACT_SIGNATURE:'CONTRACT_SIGNATURE_ARCHIVE',REQUEST_CONTRACT_PREPARATION:'CONTRACT_PREPARATION_REQUEST',RECORD_CONTRACT_PREPARATION_DECISION:'CONTRACT_PREPARATION_DECISION',FORM_CONTRACT:'CONTRACT_REVISION',REQUEST_CONTRACT_REVIEW:'CONTRACT_REVIEW_REQUEST',RECORD_CONTRACT_REVIEW:'CONTRACT_REVIEW_DECISION',REQUEST_CONTRACT_APPROVAL:'CONTRACT_APPROVAL_REQUEST',RECORD_CONTRACT_DECISION:'CONTRACT_APPROVAL_DECISION'} as Record<string,string>)[action]:quoteTask ? quoteCompletion[action] : c.taskType === "PROGRESS_OPPORTUNITY" ? "OPPORTUNITY_PROGRESS" : c.taskType === "CONTACT_LEAD"
         ? "LEAD_CONTACT_RESULT"
         : c.taskType === "ASSIGN_LEAD"
           ? "LEAD_ASSIGNMENT"
@@ -350,7 +381,7 @@ export function parseEnvelope(value: unknown): Envelope {
         ["subjectType", "subjectRef", "subjectRevision", "title", "subtitle"],
         ["subjectType", "subjectRef", "subjectRevision", "title"],
       ) ||
-      c.subject.subjectType !== "LEAD" ||
+      c.subject.subjectType !== (quoteTask || c.taskType === "PROGRESS_OPPORTUNITY" ? "OPPORTUNITY" : "LEAD") ||
       !safeText(c.subject.subjectRef, 512) ||
       !revision(c.subject.subjectRevision) ||
       !safeText(c.subject.title, 200) ||
@@ -385,12 +416,14 @@ export function parseEnvelope(value: unknown): Envelope {
       ]) ||
       c.commandForm.actionCode !== action ||
       c.commandForm.schemaVersion !== 1 ||
-      !validValues(action, c.commandForm.values, false) ||
-      !validFields(action, c.commandForm.fields) ||
+      !(quoteTask ? isObject(c.commandForm.values) && Object.keys(c.commandForm.values).length===0 && Array.isArray(c.commandForm.fields) && c.commandForm.fields.length===0
+        : action === "RECORD_OPPORTUNITY_PROGRESS"
+        ? isObject(c.commandForm.values) && (Object.keys(c.commandForm.values).length===0 || validOpportunityValues(c.commandForm.values)) && Array.isArray(c.commandForm.fields) && c.commandForm.fields.length===0
+        : validValues(action as Action, c.commandForm.values, false) && validFields(action as Action, c.commandForm.fields)) ||
       !validPreconditions(c.preconditions)
     )
       return fail();
-    if (c.actionDraft !== null && !validDraft(c.actionDraft, action))
+    if (c.actionDraft !== null && (quoteTask || !validDraft(c.actionDraft, action as Action)))
       return fail();
     if ((c.actionDraft === null) !== (c.preconditions.draftETag === null))
       return fail();
@@ -412,9 +445,16 @@ export function parseEnvelope(value: unknown): Envelope {
 export function candidate(
   card: Card,
   input: Values,
-): Schema["SaveActionDraftV1"] {
+): Schema["SaveActionDraftV1"] | Schema["SaveOpportunityProgressDraftV1"] | Schema["SaveSourceRequestDraftV1"] {
+  if(isQuoteCard(card)||isContractCard(card)||isTransferCard(card)) throw new Error("请通过报价工作卡办理当前事项。");
+  if(card.taskType === "PROGRESS_OPPORTUNITY") return opportunityCandidate(input);
   const action = card.commandForm.actionCode;
   const values = { ...input };
+  if(action === "RECORD_SOURCE_REQUEST_CONTINUATION") {
+    if(values.decisionCode !== "ASSIGN_SELECTED") delete values.ownerAppointmentId;
+    if(values.decisionCode !== "SCHEDULE_REVIEW") delete values.reviewAt;
+    else if(!instant(values.reviewAt) || Date.parse(String(values.reviewAt)) <= Date.now()) throw new Error("请选择未来的复查时间。");
+  }
   // Exact selectors are retained from the authorized card, never accepted from text input.
   for (const name of selectors[action]) {
     const server = (card.commandForm.values as Values)[name];
@@ -444,7 +484,7 @@ export function candidate(
     );
   for (const f of card.commandForm.fields) {
     if (
-      f.control === "SELECT" &&
+      f.control === "SELECT" && !(action === "RECORD_SOURCE_REQUEST_CONTINUATION" && f.name === "ownerAppointmentId" && values.decisionCode !== "ASSIGN_SELECTED") &&
       !f.options.some((o) => o.value === values[f.name] && !o.disabled)
     )
       throw new Error("请选择当前可用的选项。");
@@ -458,7 +498,7 @@ export function candidate(
     actionCode: action,
     schemaVersion: 1,
     values,
-  } as Schema["SaveActionDraftV1"];
+  } as Schema["SaveActionDraftV1"] | Schema["SaveSourceRequestDraftV1"];
 }
 export function sameValues(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) && Array.isArray(b))
@@ -492,6 +532,7 @@ export function validReceipt(v: unknown, key: string): v is PublicReceipt {
         "rejectionCode",
       ]) &&
       [
+        "VALIDATION_FAILED",
         "NOT_AUTHORIZED",
         "NOT_FOUND",
         "APPOINTMENT_INACTIVE",
@@ -502,6 +543,24 @@ export function validReceipt(v: unknown, key: string): v is PublicReceipt {
         "STALE_TASK",
         "STALE_DRAFT",
         "STALE_SUBJECT",
+        "STALE_EVIDENCE",
+        "CUSTOMER_CONFIRMATION_REQUIRED",
+        "CONTRACT_HANDLING_PAUSED",
+        "CONTRACT_PREPARATION_SOURCE_REQUIRED",
+        "CONTRACT_RESPONSIBILITY_REQUIRED",
+        "CONTRACT_REVIEW_SCOPE_REQUIRED",
+        "CONTRACT_REVIEW_NOT_CLEAR",
+        "CONTRACT_REVIEW_SCOPE_COMPLETE",
+        "CONTRACT_REVIEW_FINDING_REQUIRED",
+        "CONTRACT_REVIEW_WAIVER_UNAVAILABLE",
+        "CONTRACT_CONFLICT_DECISION_REQUIRED",
+        "COMMERCIAL_AUTHORIZATION_REQUIRED",
+        "CONTRACT_APPROVAL_POLICY_CHANGED",
+        "CONTRACT_APPROVAL_POLICY_REQUIRED",
+        "CONTRACT_REVIEW_REQUIRED",
+        "CONTRACT_SOURCE_AMBIGUOUS",
+        "CONTRACT_VERSION_BASIS_CHANGED",
+
         "SUPERVISOR_UNRESOLVED",
         "SOURCE_INTAKE_OWNER_UNRESOLVED",
         "IDENTITY_BINDING_CONFLICT",
@@ -510,6 +569,9 @@ export function validReceipt(v: unknown, key: string): v is PublicReceipt {
         "IDENTITY_LAST_ADMIN",
         "IDENTITY_ORGANIZATION_DEPENDENCY",
         "IDENTITY_RESPONSIBILITY_DEPENDENCY",
+        "OPPORTUNITY_CLOSED",
+        "OPPORTUNITY_HAS_DOWNSTREAM_FACTS",
+        "STALE_CUSTOMER_BASIS", "STALE_REVIEW", "STALE_TRANSFER_PARTY", "STALE_TRANSFER_REVIEW_BASIS", "RECIPIENT_UNAVAILABLE", "TRANSFER_REVIEW_OUTCOME_UNAVAILABLE",
         "STALE_IDENTITY",
       ].includes(String(v.rejectionCode))
     );
@@ -539,14 +601,27 @@ export function validReceipt(v: unknown, key: string): v is PublicReceipt {
       "DECISION_RECORD",
       "LEAD_ASSIGNMENT",
       "LEAD_CONTACT_RESULT",
+      "OPPORTUNITY_OWNER_EXCEPTION",
+      "OPPORTUNITY_CLOSURE",
+      "OPPORTUNITY_MATERIAL_UPLOAD",
+      "OPPORTUNITY_MATERIAL_VERSION",
+      "TRANSFER_SUBMISSION", "TRANSFER_CONFLICT_REVIEW", "TRANSFER_INTAKE", "MATTER_CLASSIFICATION", "CONTRACT_PAYMENT_REQUEST", "CONTRACT_PAYMENT_REVIEW", "CONTRACT_PAYMENT_WORKFLOW", "CONTRACT_EXECUTION_VERIFICATION", "CONTRACT_EXECUTION_WORKFLOW", "CONTRACT_NEGOTIATION_DISPOSITION", "CONTRACT_SIGNATURE_DRAFT", "CONTRACT_SIGNATURE_ARRANGEMENT", "CONTRACT_SIGNATURE_SUBMISSION", "CONTRACT_SIGNATURE_VERIFICATION", "CONTRACT_SIGNATURE_ARCHIVE", "CONTRACT_SIGNATURE_REVISION_RETURN", "CONTRACT_PREPARATION_REQUEST", "CONTRACT_PREPARATION_DECISION", "CONTRACT", "CONTRACT_DRAFT", "CONTRACT_REVISION", "CONTRACT_REVIEW_REQUEST", "CONTRACT_REVIEW_DECISION", "CONTRACT_APPROVAL_REQUEST", "CONTRACT_APPROVAL_DECISION", "FOLLOWUP_ATTEMPT", "QUOTE_TERMINATION", "QUOTE_PREPARATION_INTENT", "QUOTE_DRAFT", "QUOTE_REVISION", "QUOTE_APPROVAL_REQUEST", "QUOTE_APPROVAL_DECISION", "QUOTE_ISSUE", "QUOTE_RESPONSE",
+      "OPPORTUNITY_CUSTOMER_DRAFT",
+      "OPPORTUNITY_CUSTOMER_CONFIRMATION",
+      "OPPORTUNITY_PROGRESS",
       "IDENTITY_PRINCIPAL",
       "ORGANIZATION_UNIT",
       "APPOINTMENT",
       "AUTHORITY_GRANT",
     ].includes(String(f.factType)) &&
     safeText(f.factRef, 512) &&
-    (["DECISION_RECORD", "LEAD_CONTACT_RESULT"].includes(String(f.factType))
+    (["FOLLOWUP_ATTEMPT", "DECISION_RECORD", "LEAD_CONTACT_RESULT", "OPPORTUNITY_PROGRESS", "QUOTE_REVISION", "QUOTE_RESPONSE", "CONTRACT_REVISION"].includes(String(f.factType))
       ? hash(f.digest) && f.revision === undefined
-      : revision(f.revision) && f.digest === undefined)
+      : revision(f.revision) && (!(String(f.factType).startsWith('CONTRACT_SIGNATURE_')||f.factType==='CONTRACT_NEGOTIATION_DISPOSITION')||f.revision===0) && f.digest === undefined)
   );
 }
+
+
+
+
+

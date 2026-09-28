@@ -17,6 +17,7 @@ import java.util.UUID;
 import org.jooq.Check;
 import org.jooq.Condition;
 import org.jooq.Field;
+import org.jooq.ForeignKey;
 import org.jooq.Index;
 import org.jooq.Name;
 import org.jooq.PlainSQL;
@@ -208,6 +209,76 @@ public class TaskOccurrence extends TableImpl<Record> {
      */
     public final TableField<Record, byte[]> COMPLETION_FACT_HASH = createField(DSL.name("completion_fact_hash"), SQLDataType.BLOB, this, "完成待办所产生的准确业务Fact的准确规范摘要；按修订冻结时为空。");
 
+    /**
+     * The column
+     * <code>responsibility.task_occurrence.predecessor_task_occurrence_id</code>.
+     * 前序责任身份：R2商机后继跟进绑定已完成责任；初始责任与历史记录为空，创建后不可变。
+     */
+    public final TableField<Record, UUID> PREDECESSOR_TASK_OCCURRENCE_ID = createField(DSL.name("predecessor_task_occurrence_id"), SQLDataType.UUID, this, "前序责任身份：R2商机后继跟进绑定已完成责任；初始责任与历史记录为空，创建后不可变。");
+
+    /**
+     * The column
+     * <code>responsibility.task_occurrence.responsibility_basis_type</code>.
+     * 当前有效责任依据的静态注册类型。
+     */
+    public final TableField<Record, String> RESPONSIBILITY_BASIS_TYPE = createField(DSL.name("responsibility_basis_type"), SQLDataType.VARCHAR(64), this, "当前有效责任依据的静态注册类型。");
+
+    /**
+     * The column
+     * <code>responsibility.task_occurrence.responsibility_basis_id</code>.
+     * 当前有效责任依据在所属租户内的准确标识。
+     */
+    public final TableField<Record, UUID> RESPONSIBILITY_BASIS_ID = createField(DSL.name("responsibility_basis_id"), SQLDataType.UUID, this, "当前有效责任依据在所属租户内的准确标识。");
+
+    /**
+     * The column
+     * <code>responsibility.task_occurrence.responsibility_basis_revision</code>.
+     * 当前有效责任依据的准确修订号；按哈希冻结时为空。
+     */
+    public final TableField<Record, Long> RESPONSIBILITY_BASIS_REVISION = createField(DSL.name("responsibility_basis_revision"), SQLDataType.BIGINT, this, "当前有效责任依据的准确修订号；按哈希冻结时为空。");
+
+    /**
+     * The column
+     * <code>responsibility.task_occurrence.responsibility_basis_hash</code>.
+     * 当前有效责任依据的准确规范摘要；按修订冻结时为空。
+     */
+    public final TableField<Record, byte[]> RESPONSIBILITY_BASIS_HASH = createField(DSL.name("responsibility_basis_hash"), SQLDataType.BLOB, this, "当前有效责任依据的准确规范摘要；按修订冻结时为空。");
+
+    /**
+     * The column
+     * <code>responsibility.task_occurrence.cancellation_fact_type</code>.
+     * 交接取消依据的静态注册类型。
+     */
+    public final TableField<Record, String> CANCELLATION_FACT_TYPE = createField(DSL.name("cancellation_fact_type"), SQLDataType.VARCHAR(64), this, "交接取消依据的静态注册类型。");
+
+    /**
+     * The column
+     * <code>responsibility.task_occurrence.cancellation_fact_id</code>.
+     * 交接取消依据在所属租户内的准确标识。
+     */
+    public final TableField<Record, UUID> CANCELLATION_FACT_ID = createField(DSL.name("cancellation_fact_id"), SQLDataType.UUID, this, "交接取消依据在所属租户内的准确标识。");
+
+    /**
+     * The column
+     * <code>responsibility.task_occurrence.cancellation_fact_revision</code>.
+     * 交接取消依据的准确修订号；按哈希冻结时为空。
+     */
+    public final TableField<Record, Long> CANCELLATION_FACT_REVISION = createField(DSL.name("cancellation_fact_revision"), SQLDataType.BIGINT, this, "交接取消依据的准确修订号；按哈希冻结时为空。");
+
+    /**
+     * The column
+     * <code>responsibility.task_occurrence.cancellation_fact_hash</code>.
+     * 交接取消依据的准确规范摘要；按修订冻结时为空。
+     */
+    public final TableField<Record, byte[]> CANCELLATION_FACT_HASH = createField(DSL.name("cancellation_fact_hash"), SQLDataType.BLOB, this, "交接取消依据的准确规范摘要；按修订冻结时为空。");
+
+    /**
+     * The column
+     * <code>responsibility.task_occurrence.handoff_predecessor_task_occurrence_id</code>.
+     * T01同租户准确身份。
+     */
+    public final TableField<Record, UUID> HANDOFF_PREDECESSOR_TASK_OCCURRENCE_ID = createField(DSL.name("handoff_predecessor_task_occurrence_id"), SQLDataType.UUID, this, "T01同租户准确身份。");
+
     private TaskOccurrence(Name alias, Table<Record> aliased) {
         this(alias, aliased, (Field<?>[]) null, null);
     }
@@ -255,12 +326,29 @@ public class TaskOccurrence extends TableImpl<Record> {
     }
 
     @Override
+    public List<UniqueKey<Record>> getUniqueKeys() {
+        return Arrays.asList(Keys.UQ_TASK_OCCURRENCE__PROGRESS_SUCCESSOR);
+    }
+
+    @Override
+    public List<ForeignKey<Record, ?>> getReferences() {
+        return Arrays.asList(Keys.TASK_OCCURRENCE__FK_TASK_OCCURRENCE__HANDOFF_PREDECESSOR_TASK_OCCURRENCE_ID, Keys.TASK_OCCURRENCE__FK_TASK_OCCURRENCE__PROGRESS_PREDECESSOR);
+    }
+
+    @Override
     public List<Check<Record>> getChecks() {
         return Arrays.asList(
+            Internal.createCheck(this, DSL.name("ck_task_occurrence__cancellation_fact_exact"), "((((cancellation_fact_type IS NOT NULL) AND (cancellation_fact_id IS NOT NULL) AND (((cancellation_fact_revision IS NOT NULL) AND (cancellation_fact_revision >= 0) AND (cancellation_fact_hash IS NULL)) OR ((cancellation_fact_revision IS NULL) AND (cancellation_fact_hash IS NOT NULL)))) OR ((cancellation_fact_type IS NULL) AND (cancellation_fact_id IS NULL) AND (cancellation_fact_revision IS NULL) AND (cancellation_fact_hash IS NULL))))", true),
+            Internal.createCheck(this, DSL.name("ck_task_occurrence__cancellation_fact_hash_length"), "((octet_length(cancellation_fact_hash) = 32))", true),
             Internal.createCheck(this, DSL.name("ck_task_occurrence__completion_fact_exact"), "((((completion_fact_type IS NOT NULL) AND (completion_fact_id IS NOT NULL) AND (((completion_fact_revision IS NOT NULL) AND (completion_fact_revision >= 0) AND (completion_fact_hash IS NULL)) OR ((completion_fact_revision IS NULL) AND (completion_fact_hash IS NOT NULL)))) OR ((completion_fact_type IS NULL) AND (completion_fact_id IS NULL) AND (completion_fact_revision IS NULL) AND (completion_fact_hash IS NULL))))", true),
             Internal.createCheck(this, DSL.name("ck_task_occurrence__completion_fact_hash_length"), "((octet_length(completion_fact_hash) = 32))", true),
             Internal.createCheck(this, DSL.name("ck_task_occurrence__completion_type"), "(((completion_fact_type IS NULL) OR ((completion_fact_type)::text = (expected_completion_fact_type)::text)))", true),
+            Internal.createCheck(this, DSL.name("ck_task_occurrence__handoff_cancellation"), "(((cancellation_fact_type IS NULL) OR (((state)::text = 'CANCELLED'::text) AND (cancellation_fact_revision IS NOT NULL) AND (cancellation_fact_revision = 0) AND (cancellation_fact_hash IS NULL) AND ((((cancellation_reason_code)::text = 'R2_OPPORTUNITY_HANDOFF_V1'::text) AND ((cancellation_fact_type)::text = 'opportunity.responsibility_handoff'::text)) OR (((cancellation_reason_code)::text = 'R2_OPPORTUNITY_CLOSE_V1'::text) AND ((cancellation_fact_type)::text = 'opportunity.closure'::text))))))", true),
+            Internal.createCheck(this, DSL.name("ck_task_occurrence__handoff_predecessor"), "(((handoff_predecessor_task_occurrence_id IS NULL) OR (((business_purpose_code)::text = ANY ((ARRAY['PROGRESS_OPPORTUNITY'::character varying, 'PREPARE_QUOTE'::character varying, 'SUBMIT_QUOTE_APPROVAL'::character varying, 'DELIVER_QUOTE'::character varying, 'RECORD_QUOTE_REPLY'::character varying, 'REQUEST_CONTRACT_PREPARATION'::character varying, 'PREPARE_CONTRACT'::character varying, 'SUBMIT_CONTRACT_REVIEW'::character varying, 'SUBMIT_CONTRACT_APPROVAL'::character varying, 'SUPPLEMENT_CONTRACT_REVIEW'::character varying])::text[])) AND (handoff_predecessor_task_occurrence_id <> task_occurrence_id) AND (predecessor_task_occurrence_id IS NULL) AND (responsibility_basis_type IS NOT NULL) AND ((responsibility_basis_type)::text = 'opportunity.responsibility_handoff'::text))))", true),
             Internal.createCheck(this, DSL.name("ck_task_occurrence__original_sla_seconds_nonnegative"), "((original_sla_seconds >= 0))", true),
+            Internal.createCheck(this, DSL.name("ck_task_occurrence__progress_predecessor"), "(((predecessor_task_occurrence_id IS NULL) OR (((business_purpose_code)::text = 'PROGRESS_OPPORTUNITY'::text) AND (predecessor_task_occurrence_id <> task_occurrence_id))))", true),
+            Internal.createCheck(this, DSL.name("ck_task_occurrence__responsibility_basis_exact"), "((((responsibility_basis_type IS NOT NULL) AND (responsibility_basis_id IS NOT NULL) AND (((responsibility_basis_revision IS NOT NULL) AND (responsibility_basis_revision >= 0) AND (responsibility_basis_hash IS NULL)) OR ((responsibility_basis_revision IS NULL) AND (responsibility_basis_hash IS NOT NULL)))) OR ((responsibility_basis_type IS NULL) AND (responsibility_basis_id IS NULL) AND (responsibility_basis_revision IS NULL) AND (responsibility_basis_hash IS NULL))))", true),
+            Internal.createCheck(this, DSL.name("ck_task_occurrence__responsibility_basis_hash_length"), "((octet_length(responsibility_basis_hash) = 32))", true),
             Internal.createCheck(this, DSL.name("ck_task_occurrence__revision_nonnegative"), "((revision >= 0))", true),
             Internal.createCheck(this, DSL.name("ck_task_occurrence__state"), "(((state)::text = ANY ((ARRAY['OPEN'::character varying, 'WAITING'::character varying, 'DONE'::character varying, 'CANCELLED'::character varying])::text[])))", true),
             Internal.createCheck(this, DSL.name("ck_task_occurrence__subject_exact"), "(((subject_type IS NOT NULL) AND (subject_id IS NOT NULL) AND (((subject_revision IS NOT NULL) AND (subject_revision >= 0) AND (subject_hash IS NULL)) OR ((subject_revision IS NULL) AND (subject_hash IS NOT NULL)))))", true),

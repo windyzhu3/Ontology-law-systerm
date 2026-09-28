@@ -31,7 +31,7 @@ describe("workbench status through real App and transport", () => {
     expect(screen.getByRole("heading", { name: count ? "当前无可处理责任，另有等待事项" : "当前暂无可处理责任" })).toBeVisible();
     expect(screen.getByText(`等待 ${count}`)).toBeVisible();
     expect(screen.getByText("今日已处理八项责任。")).toBeVisible();
-    expect(screen.getByRole("button", { name: "保存候选" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "保存草稿" })).not.toBeInTheDocument();
   });
 
   it.each([0, 1, 2])("shows %i server next summaries without extra write actions", async (count) => {
@@ -100,12 +100,12 @@ describe("workbench status through real App and transport", () => {
     render(<App session={testSession()} api={api} />);
     await screen.findByLabelText("联系说明");
     if (kind === "draft") {
-      fireEvent.click(screen.getByRole("button", { name: "保存候选" }));
+      fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
       await screen.findByText("候选已保存，请核对后确认。");
       fireEvent.click(refresh());
     } else {
       fireEvent.click(submit());
-      if (kind === "recovery") fireEvent.click(await screen.findByRole("button", { name: "查询原回执" }));
+      if (kind === "recovery") fireEvent.click(await screen.findByRole("button", { name: "核对本次结果" }));
     }
     await screen.findByText(kind === "draft" ? "候选已保存，当前责任刷新失败。可手动刷新。" : "结果已记录，当前责任刷新失败。可手动刷新。");
     expect(screen.queryByText(/正在刷新当前责任/)).not.toBeInTheDocument();
@@ -139,13 +139,13 @@ describe("workbench status through real App and transport", () => {
     });
     render(<App session={testSession()} api={api} />);
     await screen.findByLabelText("联系说明"); fireEvent.click(submit());
-    fireEvent.click(await screen.findByRole("button", { name: "查询原回执" }));
+    fireEvent.click(await screen.findByRole("button", { name: "核对本次结果" }));
     const rejected = await screen.findByText("本次请求未被接受，请刷新后核对。");
     expect(rejected).not.toHaveClass("success");
     expect(screen.queryByText(/结果已记录/)).not.toBeInTheDocument();
   });
 
-  it.each([304, 200])("keeps dirty input, disabled completion and focus on same-scope %i", async (status) => {
+  it.each([304, 200])("keeps dirty input and focus before guarded confirmation on same-scope %i", async (status) => {
     let reads = 0;
     const api = createWorkbenchApi(async () => ++reads === 1 || status === 200 ? jsonResponse(envelope(5, true)) : new Response(null, { status: 304, headers: { ETag: `"wb.${digest}"` } }));
     render(<App session={testSession()} api={api} />);
@@ -153,7 +153,7 @@ describe("workbench status through real App and transport", () => {
     fireEvent.change(input, { target: { value: "尚未保存的新说明" } }); input.focus();
     fireEvent(window, new Event("focus"));
     await waitFor(() => expect(refresh()).toBeEnabled());
-    expect(reads).toBe(2); expect(input).toHaveFocus(); expect(input).toHaveValue("尚未保存的新说明"); expect(submit()).toBeDisabled();
+    expect(reads).toBe(2); expect(input).toHaveFocus(); expect(input).toHaveValue("尚未保存的新说明"); expect(submit()).toBeEnabled();
   });
 
   it("caps six dispatched waiting reads across hidden time, token rotation and manual refresh; resets for a new epoch", async () => {
@@ -197,14 +197,25 @@ describe("workbench status through real App and transport", () => {
     hidden = true; await tick(120_000); expect(receiptReads).toBe(0);
     hidden = false; await tick(30_000); expect(receiptReads).toBe(1);
     view.rerender(<App session={{ ...session }} api={api} />);
-    fireEvent.click(screen.getByRole("button", { name: "查询原回执" })); await tick(1); expect(receiptReads).toBe(2);
+    fireEvent.click(screen.getByRole("button", { name: "核对本次结果" })); await tick(1); expect(receiptReads).toBe(2);
     await tick(60_000); expect(receiptReads).toBe(4);
     expect(screen.getByText("自动回执查询已暂停，可手动查询原回执。")).toBeVisible();
     await tick(120_000); expect(receiptReads).toBe(4);
     expect(api.recovery.read()).toEqual(marker);
     expect(requests.filter(r => r.method === "POST")).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "查询原回执" })); await tick(1); expect(receiptReads).toBe(5);
+    fireEvent.click(screen.getByRole("button", { name: "核对本次结果" })); await tick(1); expect(receiptReads).toBe(5);
     await tick(60_000); expect(receiptReads).toBe(5);
+  });
+
+  it("replaces endless initial loading with an actionable timeout", async () => {
+    vi.useFakeTimers(); const pending = deferred<Response>();
+    const api = createWorkbenchApi(async () => pending.promise);
+    render(<App session={testSession()} api={api} />); await tick(1);
+    expect(screen.getByText("正在读取当前责任…")).toBeVisible();
+    await tick(25_000);
+    expect(screen.queryByText("正在读取当前责任…")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("读取当前责任超时，请点击刷新重试。");
+    expect(refresh()).toBeEnabled();
   });
 
   it("does not spend waiting quota or cancel a slow read on timer ticks", async () => {
@@ -214,7 +225,8 @@ describe("workbench status through real App and transport", () => {
       return requests.length === 2 ? slow.promise : jsonResponse(empty(2));
     });
     render(<App session={testSession()} api={api} />); await tick(1);
-    fireEvent.click(refresh()); await tick(180_000);
+    await tick(20_000);
+    fireEvent.click(refresh()); await tick(20_000);
     expect(requests).toHaveLength(2);
     expect(requests[1].signal.aborted).toBe(false);
     expect(screen.queryByText("自动刷新已暂停，可手动刷新。")).not.toBeInTheDocument();
@@ -250,7 +262,7 @@ describe("workbench status through real App and transport", () => {
       await tick(1);
       const interrupted = requests.filter(r => r.url.endsWith("/workcards/current"))[1];
       expect(refresh()).toBeDisabled();
-      fireEvent.click(screen.getByRole("button", { name: "查询原回执" }));
+      fireEvent.click(screen.getByRole("button", { name: "核对本次结果" }));
       await tick(1);
       expect(interrupted.signal.aborted).toBe(true);
       expect.soft(refresh()).toBeEnabled();
@@ -278,7 +290,7 @@ describe("workbench status through real App and transport", () => {
     });
     render(<App session={testSession()} api={api} />);
     await screen.findByLabelText("联系说明");
-    fireEvent.click(screen.getByRole("button", { name: "保存候选" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
     await screen.findByText("候选已保存，请核对后确认。");
     fireEvent.click(submit());
     expect(await screen.findByRole("alert")).toHaveTextContent("尚未确认保存结果");
@@ -302,7 +314,7 @@ describe("workbench status through real App and transport", () => {
     const marker = api.recovery.read();
     fireEvent.click(refresh());
     expect(await screen.findByText("结果尚未确认，当前责任暂时无法读取。请核对原回执；请勿重复发起。")).toBeVisible();
-    expect(screen.getByRole("button", { name: "查询原回执" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "核对本次结果" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "使用原请求重试" })).toBeEnabled();
     expect(api.recovery.read()).toEqual(marker);
     expect(requests.filter(r => r.method === "POST")).toHaveLength(1);
@@ -319,7 +331,7 @@ describe("workbench status through real App and transport", () => {
     });
     render(<App session={testSession()} api={api} />);
     await screen.findByLabelText("联系说明"); fireEvent.click(submit());
-    fireEvent.click(await screen.findByRole("button", { name: "查询原回执" }));
+    fireEvent.click(await screen.findByRole("button", { name: "核对本次结果" }));
     const rejected = await screen.findByText("本次请求未被接受，当前责任刷新失败。可手动刷新。");
     expect(rejected).not.toHaveClass("success");
     expect(screen.queryByText(/结果已记录/)).not.toBeInTheDocument();

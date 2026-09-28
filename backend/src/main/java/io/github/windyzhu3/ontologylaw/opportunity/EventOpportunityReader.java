@@ -9,5 +9,7 @@ public interface EventOpportunityReader {
     record Opportunity(Subject selector, UUID leadId, UUID assignmentId, UUID contactId, UUID owner) {}
     Opportunity forContact(Connection c, UUID tenant, UUID contactId) throws SQLException;
     Opportunity byId(Connection c,UUID tenant,UUID id)throws SQLException;
+    /** Raw creation-path rows only; caller must hold the tenant business fence. */
+    default io.github.windyzhu3.ontologylaw.identity.AuthorizationService.ReadScope fencedReadScope(Connection c,UUID tenant)throws SQLException{return ()->{};}
     static EventOpportunityReader databaseBacked(){return new io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.JooqEventOpportunityReader();}
 }

@@ -1,0 +1,157 @@
+{
+  "kind": "STATIC_DESIGN_ONLY",
+  "results": [
+    {
+      "width": 1487,
+      "scene": "normal",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 1487,
+      "scene": "loading",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 1487,
+      "scene": "empty",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 1487,
+      "scene": "nomatch",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 1487,
+      "scene": "readonly",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 1487,
+      "scene": "other",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 1487,
+      "scene": "future",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 1487,
+      "scene": "stale",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 1487,
+      "scene": "revoked",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 1487,
+      "scene": "failed",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 1487,
+      "scene": "unknown",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 1487,
+      "scene": "progressHidden",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 360,
+      "scene": "normal",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 360,
+      "scene": "loading",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 360,
+      "scene": "empty",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 360,
+      "scene": "nomatch",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 360,
+      "scene": "readonly",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 360,
+      "scene": "other",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 360,
+      "scene": "future",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 360,
+      "scene": "stale",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 360,
+      "scene": "revoked",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 360,
+      "scene": "failed",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 360,
+      "scene": "unknown",
+      "overflow": false,
+      "passed": true
+    },
+    {
+      "width": 360,
+      "scene": "progressHidden",
+      "overflow": false,
+      "passed": true
+    }
+  ],
+  "interactions": [
+    "search clears old detail",
+    "mobile selection and same-row reselection",
+    "return restores row focus and query",
+    "read retry",
+    "review scenario navigation"
+  ],
+  "errors": []
+}

@@ -1,5 +1,7 @@
 # MVP Delivery Ledger
 
+> **2026-09-28 当前执行入口：** 用户已确认 [R2.5](../superpowers/plans/2026-09-28-r2.5-mvp-replan.md)，进展见 [唯一执行记录](2026-09-28-r2.5-execution.md)。以下交付行和历史证据状态保留；源码已有不等于整体验收或发布通过。
+
 Task10.1 checkpoint (2026-09-13): bounded CI preflight source implemented in `b0ffd32`, schema-CWD correction in `5b7e663`; four focused tests passed and independent scoped re-review APPROVED. Hosted CI and real golden/failure runtime remain unexecuted; no delivery-row promotion. Next: isolated environment/fixture and real E2E closure. W09 remains DEFERRED_BY_USER. [Unified R1 status](../evidence/r1/README.md).
 
 Current execution amendment (2026-09-13): Task9.1–9.5 source phases completed; real identity-chain, six-card subset and specified waiting-refresh scenarios have recorded evidence; U01–U03 are USER_CONFIRMED_CLOSED. Full Task9 acceptance remains open, including failed/unreported logout attempt. User explicitly defers actual scheduled Worker recovery T9-W09 (`DEFERRED_BY_USER`), so its due date no longer blocks independent Task10 implementation. Task10 evidence reconciliation and E2E/CI gap closure start now; no delivery-row promotion, release claim or R2 entry is implied. Earlier current-status paragraphs below are historical. [Current Task9 evidence](2026-09-09-task9-local-chain-acceptance.md).

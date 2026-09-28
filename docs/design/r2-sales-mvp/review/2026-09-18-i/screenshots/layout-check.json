@@ -1,0 +1,207 @@
+{
+  "checks": [
+    {
+      "scene": "entry",
+      "width": 1487,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "empty",
+      "width": 1487,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "select",
+      "width": 1487,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "edit",
+      "width": 1487,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "review",
+      "width": 1487,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "saved",
+      "width": 1487,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "waiting",
+      "width": 1487,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "shared",
+      "width": 1487,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "downstream",
+      "width": 1487,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "stale",
+      "width": 1487,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "unknown",
+      "width": 1487,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "readonly",
+      "width": 1487,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "closed",
+      "width": 1487,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "revoked",
+      "width": 1487,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "loading",
+      "width": 1487,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "failed",
+      "width": 1487,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "entry",
+      "width": 360,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "empty",
+      "width": 360,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "select",
+      "width": 360,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "edit",
+      "width": 360,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "review",
+      "width": 360,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "saved",
+      "width": 360,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "waiting",
+      "width": 360,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "shared",
+      "width": 360,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "downstream",
+      "width": 360,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "stale",
+      "width": 360,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "unknown",
+      "width": 360,
+      "overflow": false,
+      "primary": 1
+    },
+    {
+      "scene": "readonly",
+      "width": 360,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "closed",
+      "width": 360,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "revoked",
+      "width": 360,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "loading",
+      "width": 360,
+      "overflow": false,
+      "primary": 0
+    },
+    {
+      "scene": "failed",
+      "width": 360,
+      "overflow": false,
+      "primary": 0
+    }
+  ],
+  "interactions": [
+    "required-fields",
+    "dirty-leave",
+    "confirm-return",
+    "unknown-receipt-only",
+    "future-wait-kept",
+    "subject-selection",
+    "masked-phone-replacement",
+    "revoked-clears"
+  ],
+  "pageErrors": 0
+}

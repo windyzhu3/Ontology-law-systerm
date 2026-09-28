@@ -1,0 +1,764 @@
+{
+  "desktop": [
+    {
+      "scene": "entry",
+      "heading": "商机台账",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "prepare",
+      "heading": "准备收费方案",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "draft",
+      "heading": "准备收费方案",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "review",
+      "heading": "确认报价版本",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "created",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "submit",
+      "heading": "提交报价审批",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "pending",
+      "heading": "查看报价审批进展",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "approval",
+      "heading": "记录报价授权决定",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "returned",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "authorized",
+      "heading": "办理报价交付",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "delivery",
+      "heading": "记录报价交付",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "deliveryReview",
+      "heading": "确认报价交付",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "issued",
+      "heading": "跟进客户回复",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "response",
+      "heading": "记录客户报价回复",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "responseReview",
+      "heading": "确认客户报价回复",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "accepted",
+      "heading": "衔接合同准备",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "deferred",
+      "heading": "按约定继续跟进",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "rejected",
+      "heading": "处理报价拒绝",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "ambiguous",
+      "heading": "核实客户报价回复",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "revise",
+      "heading": "修订报价",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "history",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "missing",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "expired",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "unassigned",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "stale",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "unknown",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "readonly",
+      "heading": "核对本次报价状态",
+      "primary": 0,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "closed",
+      "heading": "核对本次报价状态",
+      "primary": 0,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "revoked",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "failed",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "loading",
+      "heading": "核对本次报价状态",
+      "primary": 0,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "handoff",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "waiting",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "withinAuthority",
+      "heading": "确认权限内报价授权",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "scene": "partialApproval",
+      "heading": "等待其余授权决定",
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    }
+  ],
+  "mobile": [
+    {
+      "scene": "entry",
+      "heading": "商机台账",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "prepare",
+      "heading": "准备收费方案",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "draft",
+      "heading": "准备收费方案",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "review",
+      "heading": "确认报价版本",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "created",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "submit",
+      "heading": "提交报价审批",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "pending",
+      "heading": "查看报价审批进展",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "approval",
+      "heading": "记录报价授权决定",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "returned",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "authorized",
+      "heading": "办理报价交付",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "delivery",
+      "heading": "记录报价交付",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "deliveryReview",
+      "heading": "确认报价交付",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "issued",
+      "heading": "跟进客户回复",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "response",
+      "heading": "记录客户报价回复",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "responseReview",
+      "heading": "确认客户报价回复",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "accepted",
+      "heading": "衔接合同准备",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "deferred",
+      "heading": "按约定继续跟进",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "rejected",
+      "heading": "处理报价拒绝",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "ambiguous",
+      "heading": "核实客户报价回复",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "revise",
+      "heading": "修订报价",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "history",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "missing",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "expired",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "unassigned",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "stale",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "unknown",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "readonly",
+      "heading": "核对本次报价状态",
+      "primary": 0,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "closed",
+      "heading": "核对本次报价状态",
+      "primary": 0,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "revoked",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "scene": "failed",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "loading",
+      "heading": "核对本次报价状态",
+      "primary": 0,
+      "scroll": 390,
+      "width": 390
+    },
+    {
+      "scene": "handoff",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "waiting",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "withinAuthority",
+      "heading": "确认权限内报价授权",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "partialApproval",
+      "heading": "等待其余授权决定",
+      "primary": 1,
+      "scroll": 375,
+      "width": 375
+    },
+    {
+      "scene": "entry",
+      "heading": "商机台账",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "prepare",
+      "heading": "准备收费方案",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "draft",
+      "heading": "准备收费方案",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "review",
+      "heading": "确认报价版本",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "created",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "submit",
+      "heading": "提交报价审批",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "pending",
+      "heading": "查看报价审批进展",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "approval",
+      "heading": "记录报价授权决定",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "returned",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "authorized",
+      "heading": "办理报价交付",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "delivery",
+      "heading": "记录报价交付",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "deliveryReview",
+      "heading": "确认报价交付",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "issued",
+      "heading": "跟进客户回复",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "response",
+      "heading": "记录客户报价回复",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "responseReview",
+      "heading": "确认客户报价回复",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "accepted",
+      "heading": "衔接合同准备",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "deferred",
+      "heading": "按约定继续跟进",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "rejected",
+      "heading": "处理报价拒绝",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "ambiguous",
+      "heading": "核实客户报价回复",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "revise",
+      "heading": "修订报价",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "history",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "missing",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "expired",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "unassigned",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "stale",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "unknown",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "readonly",
+      "heading": "核对本次报价状态",
+      "primary": 0,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "closed",
+      "heading": "核对本次报价状态",
+      "primary": 0,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "revoked",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 360,
+      "width": 360
+    },
+    {
+      "scene": "failed",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "loading",
+      "heading": "核对本次报价状态",
+      "primary": 0,
+      "scroll": 360,
+      "width": 360
+    },
+    {
+      "scene": "handoff",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "waiting",
+      "heading": "核对本次报价状态",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "withinAuthority",
+      "heading": "确认权限内报价授权",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    },
+    {
+      "scene": "partialApproval",
+      "heading": "等待其余授权决定",
+      "primary": 1,
+      "scroll": 345,
+      "width": 345
+    }
+  ],
+  "branches": [
+    {
+      "reply": "暂不接受",
+      "headings": [
+        "按约定继续跟进",
+        "客户暂不接受"
+      ]
+    },
+    {
+      "reply": "明确拒绝",
+      "headings": [
+        "处理报价拒绝",
+        "客户明确拒绝本版报价"
+      ]
+    },
+    {
+      "reply": "回复不明确",
+      "headings": [
+        "核实客户报价回复",
+        "客户回复仍需核实"
+      ]
+    }
+  ]
+}

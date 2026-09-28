@@ -178,7 +178,7 @@ export const variants = [
 export function envelope(
   index = 5,
   withDraft = false,
-): S["CurrentWorkCardEnvelope"] {
+): Omit<S["CurrentWorkCardEnvelope"],"currentCard"> & {currentCard:S["CurrentCard"]} {
   const selected = variants[index];
   const v = {
     ...selected,
@@ -346,3 +346,4 @@ export function deferred<T>() {
   });
   return { promise, resolve };
 }
+

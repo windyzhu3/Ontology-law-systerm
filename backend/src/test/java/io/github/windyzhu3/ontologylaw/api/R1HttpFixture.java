@@ -32,8 +32,13 @@ abstract class R1HttpFixture extends ContactFlowFixture {
     java.util.function.UnaryOperator<java.sql.Connection> disclosureConnection=java.util.function.UnaryOperator.identity();
     java.util.function.UnaryOperator<java.sql.Connection> credentialConnection=java.util.function.UnaryOperator.identity();
     ActorContextResolver realHumanResolver;
+    List<LeadIntakeSources.Source> intakeSources = List.of();
+    io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection;
+    R25AiModel aiModel=R25ResponsesAiModel.disabled();
+    io.github.windyzhu3.ontologylaw.evidence.MaterialObjectStore materialStore;
+    io.github.windyzhu3.ontologylaw.contract.ContractProtection contractProtection;
     String realHumanToken;
-    @org.junit.jupiter.api.BeforeEach void resetDisclosureFault(){disclosureConnection=java.util.function.UnaryOperator.identity();credentialConnection=java.util.function.UnaryOperator.identity();}
+    @org.junit.jupiter.api.BeforeEach void resetDisclosureFault(){disclosureConnection=java.util.function.UnaryOperator.identity();credentialConnection=java.util.function.UnaryOperator.identity();aiModel=R25ResponsesAiModel.disabled();}
     static KeyPair signing(){try{var g=KeyPairGenerator.getInstance("RSA");g.initialize(2048);return g.generateKeyPair();}catch(Exception e){throw new AssertionError(e);}}
     protected AuthorizationServiceIT.Seed seedFor(TaskFactory.Type type)throws Exception{return AuthorizationServiceIT.seed(database,"HUMAN",type.authority,this::credentialHmac);}
     byte[] credentialHmac(UUID tenant){try{byte[] key=new byte[32];new SecureRandom().nextBytes(key);credentialKeys.put(tenant,key);var mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec(key,"HmacSHA256"));return mac.doFinal(SUBJECT.getBytes(java.nio.charset.StandardCharsets.UTF_8));}catch(Exception e){throw new AssertionError(e);}}
@@ -42,6 +47,8 @@ abstract class R1HttpFixture extends ContactFlowFixture {
         var claims=new JWTClaimsSet.Builder().issuer(ISSUER).audience(AUDIENCE).subject(subject).issueTime(Date.from(Instant.now().minusSeconds(1))).expirationTime(Date.from(Instant.now().plusSeconds(300))).claim("tenantId",UUID.randomUUID().toString()).claim("authority","FORGED_ADMIN").build();
         var jwt=new SignedJWT(new JWSHeader(JWSAlgorithm.RS256),claims);jwt.sign(new RSASSASigner(signing.getPrivate()));return jwt.serialize();
     }
+    io.github.windyzhu3.ontologylaw.payment.PaymentWorkflowService paymentWorkflow(){return null;}
+    UUID transferDestination(UUID tenant){return null;}
     final class HttpHarness implements AutoCloseable {
         final ConfigurableApplicationContext context;final HttpClient client;final URI origin;final String bearer;
         io.github.windyzhu3.ontologylaw.worker.R1WorkerTenantBindings.Binding workerBinding;
@@ -56,7 +63,7 @@ abstract class R1HttpFixture extends ContactFlowFixture {
             this.bearer=realHumanToken==null?bearer(subject):realHumanToken;var authenticated=publicActor==null?seed.request().actor():publicActor;
             byte[] release=HexFormat.of().parseHex("11".repeat(32)),manifest=HexFormat.of().parseHex("22".repeat(32));
             try(var c=database.migratorConnection()){sql(c,"update platform_meta.deployment_state set operating_mode='ACTIVE',active_release_digest=?,active_manifest_hash=?,revision=revision+1,changed_at=clock_timestamp() where deployment_state_key='PRIMARY' and (operating_mode,active_release_digest,active_manifest_hash) is distinct from ('ACTIVE',?,?)",release,manifest,release,manifest);}
-            var runtimeDatabase=RuntimeDatabase.databaseBacked(database::apiConnection,RuntimeDatabase.Role.API,new RuntimeDatabase.Expected("52-plus-2-v1.2",release,manifest));
+            var runtimeDatabase=RuntimeDatabase.databaseBacked(database::apiConnection,RuntimeDatabase.Role.API,new RuntimeDatabase.Expected("52-plus-2-r2-v20",release,manifest));
             var certificateBindings=new ArrayList<ActorContextResolver.CertificateRegistration>();var properties=new ArrayList<>(List.of("ols.runtime-role=api","server.port=0","spring.main.banner-mode=off","logging.level.root=OFF"));
             if(tls!=null){var server=tls.key("server");var worker=tls.key("worker");var serverTrust=tls.trust("server-trust",worker);var clientTrust=tls.trust("client-trust",server);certificateBindings.add(new ActorContextResolver.CertificateRegistration(tls.sha256(worker),"FIXTURE",serviceActor));client=HttpClient.newBuilder().sslContext(tls.client(worker,clientTrust)).build();
                 workerBinding=new io.github.windyzhu3.ontologylaw.worker.R1WorkerTenantBindings.Binding(serviceActor.tenantId(),serviceActor.principalId(),serviceActor.appointmentId(),worker.alias(),tls.sha256(worker));
@@ -66,7 +73,7 @@ abstract class R1HttpFixture extends ContactFlowFixture {
             var resolver=realHumanResolver!=null?realHumanResolver:new ActorContextResolver(()->credentialConnection.apply(runtimeDatabase.open()),new ExternalSubjectProtection(credentialKeys::get),List.of(new ActorContextResolver.Trust(ISSUER,AUDIENCE,(RSAPublicKey)signing.getPublic())),List.of(new ActorContextResolver.Registration(ISSUER,AUDIENCE,"FIXTURE",authenticated)),certificateBindings);
             var sourceBindings=entries.isEmpty()?null:new R1AssemblyValidationRuntime().validate(runtimeDatabase,c->R1ServiceSourceBinding.validate(c,entries,policies));
             var disclosureDatabase=new RuntimeDatabase(){public java.sql.Connection open()throws java.sql.SQLException{return disclosureConnection.apply(runtimeDatabase.open());}public boolean healthy(){return runtimeDatabase.healthy();}};
-            var services=new R1ApiServices(disclosureDatabase,policies,protection,sourceBindings,"HTTP_IT",new byte[32]);
+            var services=new R1ApiServices(disclosureDatabase,policies,protection,sourceBindings,"HTTP_IT",new byte[32],intakeSources,opportunityProtection,materialStore==null?io.github.windyzhu3.ontologylaw.api.internal.storage.MaterialObjectStoreFactory.configured():materialStore,contractProtection,paymentWorkflow(),R1HttpFixture.this::transferDestination,aiModel);
             context=new SpringApplicationBuilder(OntologyLawApplication.class).initializers(c->{var beans=(GenericApplicationContext)c;beans.registerBean(ActorContextResolver.class,()->resolver);beans.registerBean(R1ApiServices.class,()->services);
                 beans.registerBean("httpRequestCounterFixture",org.springframework.boot.web.servlet.FilterRegistrationBean.class,()->{var registration=new org.springframework.boot.web.servlet.FilterRegistrationBean<jakarta.servlet.Filter>((request,response,chain)->{received.incrementAndGet();chain.doFilter(request,response);});registration.setOrder(Integer.MIN_VALUE);return registration;});})
                     .properties(properties.toArray(String[]::new)).run();

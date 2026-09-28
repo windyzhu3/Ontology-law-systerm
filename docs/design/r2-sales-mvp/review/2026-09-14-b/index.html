@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>R2 录入与导入 · 关键状态已确认</title><link rel="icon" href="data:,"><link rel="stylesheet" href="review.css"></head>
+<body>
+<header class="review"><div><strong>R2 高保真补充 B · 已确认</strong><p>仅设计演示 · 使用合成数据 · 不上传文件、不提交业务</p></div><div class="review-controls"><label>审阅场景<select id="scene"><option value="file">07 选择文件</option><option value="preview">08 核对与修正</option><option value="submitting">09 提交中</option><option value="unknown">10 结果待确认</option><option value="resolved">11 核对后继续</option><option value="success">12 录入结果与承接</option><option value="lost">13 会话中断</option><option value="no-source">14 暂无可用来源</option><option value="manual">15 手工录入与 AI 状态</option></select></label><button id="size" aria-pressed="false">查看小屏</button><a href="README.md">范围与检查清单</a></div></header>
+<div id="canvas" class="canvas">
+<header class="app-header"><div class="brand"><svg width="30" height="30" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M16 3v24M9 28h14M4 8h24M8 8L3 20h10L8 8m16 0-5 12h10L24 8M3 20q5 7 10 0m6 0q5 7 10 0"/></svg><strong>律所工作助手</strong></div><span class="account">陈晓 · 销售一组 / 业务管理 <b>陈</b></span></header>
+<div class="shell"><aside class="sidebar"><p>业务管理</p><nav aria-label="业务导航"><span class="active">线索与客户</span><span>商机与报价</span><span>合同与收款</span><span>转案与案件</span><span>团队待办</span></nav><span class="back">← 返回工作台</span></aside><main id="content" tabindex="-1"></main></div></div>
+<footer class="review-note" id="note"></footer>
+<dialog id="leave"><h2>放弃本次未保存内容？</h2><p>已录入的线索不受影响。尚未提交的表单和预览只保留在当前页面。</p><div class="actions"><button data-close>继续填写</button><button class="primary" data-next="file">放弃并返回</button></div></dialog>
+<script src="review.js"></script></body></html>
+

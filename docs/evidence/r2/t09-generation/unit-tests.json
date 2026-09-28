@@ -1,0 +1,142 @@
+[
+  {
+    "name": "io.github.windyzhu3.ontologylaw.api.ContractHttpBoundaryTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.api.ContractPreparationRecoveryProtocolTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.api.OpenApiContractTest",
+    "tests": "22",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.api.R2ContractInputTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ContractCanonicalJsonTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ContractConflictSnapshotTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ContractDocumentRendererTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ContractGenerationBasisTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ContractGenerationProofTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ContractPreparationSourceTest",
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ContractProtectionTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ContractVersionInputTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ContractWorkflowProtocolTest",
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.execution.MaterialExecutionContractTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.execution.R2OpportunityCommandContractTest",
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.identity.OpportunityLedgerGrantContractTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.identity.OwnerExceptionGrantContractTest",
+    "tests": "2",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.query.ContractWorkCardQueryTest",
+    "tests": "1",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.responsibility.ContractTaskRegistrationTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.worker.ContractPreparationCheckpointTest",
+    "tests": "3",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  }
+]

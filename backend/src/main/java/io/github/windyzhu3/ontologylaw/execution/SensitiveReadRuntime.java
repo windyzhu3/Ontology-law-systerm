@@ -30,13 +30,16 @@ public final class SensitiveReadRuntime {
         if(actor.principalKind()!=PrincipalKind.HUMAN)throw new Failure(403,"NOT_AUTHORIZED");
         Objects.requireNonNull(correlation);
         boolean[] awaitingCommitAcknowledgement={false};
-        try {
-            return inTransaction(connection,Capability.QUERY,c->{
-                fence.shared(c,actor.tenantId());
-                work.read(c,SensitiveReadClock.now(c));
-                authorization.lockForEvaluation(c,actor.tenantId());
-                // Discard the entire first pass. Identity changes while waiting regenerate all content and bindings.
-                var prepared=work.read(c,SensitiveReadClock.now(c));
+        try(var metrics=new io.github.windyzhu3.ontologylaw.execution.internal.persistence.SensitiveReadMetrics(correlation)) {
+            return inTransaction(metrics.connection(connection),Capability.QUERY,c->{
+                fence.shared(c,actor.tenantId());metrics.mark("businessLock");
+                // Lock order: business fence, then identity; identity writers never take a business lock.
+                // No content is built before the lock, so a contended identity read has nothing stale to discard.
+                Prepared prepared;
+                try(var identityRead=authorization.lockedReadScope(c,actor.tenantId())) {
+                    metrics.mark("identityLock");
+                    prepared=work.read(c,SensitiveReadClock.now(c));metrics.mark("prepare");
+                }
                 boolean sensitive=prepared.envelope().get("currentCard")!=null;
                 if(sensitive&&prepared.disclosure().entries().isEmpty())throw new IllegalArgumentException("Missing disclosure sources");
                 String etag=etag(actor,prepared);
@@ -44,10 +47,11 @@ public final class SensitiveReadRuntime {
                 if(sensitive) {
                     try {
                         setLocalRole(c,Capability.AUDIT);
-                        for(var source:prepared.disclosure().entries())audit.append(c,new AuditAppender.ReadDisclosureEntry(UUID.randomUUID(),correlation,
-                            source.disclosedSource(),source.authorizationAnchor(),source.authorization(),matched?AuditAppender.ResponseMode.CACHE_REVALIDATED:AuditAppender.ResponseMode.BODY));
+                        audit.appendWorkcards(c,prepared.disclosure().entries().stream().map(source->new AuditAppender.ReadDisclosureEntry(UUID.randomUUID(),correlation,
+                            source.disclosedSource(),source.authorizationAnchor(),source.authorization(),matched?AuditAppender.ResponseMode.CACHE_REVALIDATED:AuditAppender.ResponseMode.BODY)).toList());
                     } catch(SQLException|RuntimeException failure) {throw new Failure(503,"SERVICE_UNAVAILABLE");}
                 }
+                metrics.mark("etagAndAudit");
                 var result=new Committed(matched?304:200,matched?null:prepared.envelope(),etag);
                 // Anything after this callback returns belongs to commit/connection restoration,
                 // whose outcome cannot safely authorize releasing the prepared response.
@@ -75,7 +79,8 @@ public final class SensitiveReadRuntime {
         scope.put("representedPrincipal",actor.onBehalfPrincipalId()==null?null:actor.onBehalfPrincipalId().toString());scope.put("representedAppointment",actor.onBehalfAppointmentId()==null?null:actor.onBehalfAppointmentId().toString());
         var entries=new ArrayList<Object>();for(var entry:prepared.disclosure().entries())entries.add(Map.of("source",selector(entry.disclosedSource()),"anchor",selector(entry.authorizationAnchor()),"authorization",stable(entry.authorization())));
         var dependencies=prepared.disclosure().dependencies().stream().map(SensitiveReadRuntime::stable).sorted().distinct().toList();
-        String canonical=CanonicalJson.encode(Map.of("profile","R1_CURRENT_WORKCARD_DISCLOSURE_V1","version",1,"actor",scope,"envelope",prepared.envelope(),"sources",entries,"authorizationDependencies",dependencies));
+        String profile=prepared.disclosure().entries().stream().anyMatch(e->"opportunity.opportunity".equals(e.disclosedSource().type()))?"R2_CURRENT_WORKCARD_DISCLOSURE_V1":"R1_CURRENT_WORKCARD_DISCLOSURE_V1";
+        String canonical=CanonicalJson.encode(Map.of("profile",profile,"version",1,"actor",scope,"envelope",prepared.envelope(),"sources",entries,"authorizationDependencies",dependencies));
         return "\"wb."+Base64.getUrlEncoder().withoutPadding().encodeToString(CanonicalJson.digest(canonical))+"\"";
     }
     private static String stable(AuthorizationSnapshot snapshot) {if(!snapshot.allowed()||snapshot.stableDependencies()==null)throw new IllegalArgumentException("Stable authorization dependencies required");return snapshot.stableDependencies();}

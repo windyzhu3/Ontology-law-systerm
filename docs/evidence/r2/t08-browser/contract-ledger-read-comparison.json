@@ -1,0 +1,98 @@
+{
+  "recordedAt": "2026-09-21T11:08:25.500183+00:00",
+  "deployment": "before-t08-20260921-190528",
+  "method": "Authenticated GET /api/v1/contracts; exact synthetic case mapping and owner/original SLA compared with read-only SQL; no case mutations",
+  "baseline": {
+    "contracts": 8,
+    "seconds": 26.82
+  },
+  "after": {
+    "contracts": 8,
+    "seconds": 12.61,
+    "nextCursor": null
+  },
+  "improvementPercent": 53.0,
+  "note": "C40 is a completed signature-readiness boundary with no active task; no owner/deadline is fabricated. Single-run timings are local acceptance observations, not a load benchmark.",
+  "checks": [
+    {
+      "case": "C33",
+      "state": "待形成合同",
+      "version": "未形成版本",
+      "exactSyntheticCustomer": true,
+      "ownerMatchesCurrentTask": true,
+      "deadlineMatchesOriginalSla": true,
+      "completedBoundaryHasNoInventedTask": false,
+      "canHandle": true
+    },
+    {
+      "case": "C34",
+      "state": "待提交签约前审查",
+      "version": "第 1 版",
+      "exactSyntheticCustomer": true,
+      "ownerMatchesCurrentTask": true,
+      "deadlineMatchesOriginalSla": true,
+      "completedBoundaryHasNoInventedTask": false,
+      "canHandle": true
+    },
+    {
+      "case": "C35",
+      "state": "待签约前审查",
+      "version": "第 1 版",
+      "exactSyntheticCustomer": true,
+      "ownerMatchesCurrentTask": true,
+      "deadlineMatchesOriginalSla": true,
+      "completedBoundaryHasNoInventedTask": false,
+      "canHandle": true
+    },
+    {
+      "case": "C36",
+      "state": "待补充审查资料",
+      "version": "第 1 版",
+      "exactSyntheticCustomer": true,
+      "ownerMatchesCurrentTask": true,
+      "deadlineMatchesOriginalSla": true,
+      "completedBoundaryHasNoInventedTask": false,
+      "canHandle": true
+    },
+    {
+      "case": "C37",
+      "state": "待提交审批",
+      "version": "第 1 版",
+      "exactSyntheticCustomer": true,
+      "ownerMatchesCurrentTask": true,
+      "deadlineMatchesOriginalSla": true,
+      "completedBoundaryHasNoInventedTask": false,
+      "canHandle": true
+    },
+    {
+      "case": "C38",
+      "state": "待审批",
+      "version": "第 1 版",
+      "exactSyntheticCustomer": true,
+      "ownerMatchesCurrentTask": true,
+      "deadlineMatchesOriginalSla": true,
+      "completedBoundaryHasNoInventedTask": false,
+      "canHandle": true
+    },
+    {
+      "case": "C39",
+      "state": "合同已退回",
+      "version": "第 1 版",
+      "exactSyntheticCustomer": true,
+      "ownerMatchesCurrentTask": true,
+      "deadlineMatchesOriginalSla": true,
+      "completedBoundaryHasNoInventedTask": false,
+      "canHandle": true
+    },
+    {
+      "case": "C40",
+      "state": "签署准备已就绪",
+      "version": "第 1 版",
+      "exactSyntheticCustomer": true,
+      "ownerMatchesCurrentTask": null,
+      "deadlineMatchesOriginalSla": null,
+      "completedBoundaryHasNoInventedTask": true,
+      "canHandle": false
+    }
+  ]
+}

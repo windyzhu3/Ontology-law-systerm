@@ -1,0 +1,28 @@
+{
+  "opportunityId": "01a0e261-44d4-788f-b905-ad718699d212",
+  "transfer": {
+    "stage": "COMPLETE",
+    "task": null,
+    "canHandle": false,
+    "canCorrectClassification": true
+  },
+  "matter": {
+    "id": "01a0e27c-043c-749e-9656-deb295f31b0a",
+    "number": "R2-01a0e27c-043c-749e-9656-deb295f31b0a"
+  },
+  "category": "ENFORCEMENT",
+  "classificationHistory": [
+    {
+      "label": "案件分类及承接",
+      "summary": "综法业务 · 分类及承接已确认；案件编号：R2-01a0e27c-043c-749e-9656-deb295f31b0a",
+      "occurredAt": "2026-09-27T10:49:59.695319Z",
+      "id": "01a0e27c-6a96-7fb6-9f05-fe21062dedb7"
+    },
+    {
+      "label": "案件分类及承接",
+      "summary": "执行业务 · 分类及承接已确认；案件编号：R2-01a0e27c-043c-749e-9656-deb295f31b0a",
+      "occurredAt": "2026-09-27T10:50:48.959559Z",
+      "id": "01a0e27d-2b08-7a69-9ca5-755831117f4f"
+    }
+  ]
+}

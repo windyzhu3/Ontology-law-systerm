@@ -1,0 +1,12 @@
+import {describe,it,expect,vi} from 'vitest';
+import {createOwnerExceptionTransport,type OwnerExceptionWrite} from './ownerExceptionTransport';
+import {RecoveryStore} from '../features/session/recoveryMarker';
+import {testSession} from '../test/fixtures';
+const id='11111111-1111-4111-8111-111111111111';
+const write:OwnerExceptionWrite={key:id,kind:'transfer',body:{opportunityId:id,expectedOpportunityRevision:0,exceptionId:id,expectedExceptionRevision:1,expectedBasis:{type:'OPPORTUNITY',id,revision:0},expectedTask:null,expectedWait:null,reason:'继续办理',receiverAppointmentId:id}};
+const receipt={commandId:id,receiptId:id,completedAt:'2026-09-15T01:00:00Z',outcome:'SUCCEEDED',resultFact:{factType:'OPPORTUNITY_OWNER_EXCEPTION',factRef:id,revision:2}};
+describe('owner exception real transport',()=>{
+ it('reserves before dispatch and retains unknown, then recovers only original command id',async()=>{const store=new RecoveryStore(sessionStorage);const fetcher=vi.fn<typeof fetch>().mockRejectedValueOnce(new TypeError('network')).mockResolvedValueOnce(new Response(JSON.stringify(receipt)));const api=createOwnerExceptionTransport(store,fetcher);const s=testSession();await expect(api.write(s,write,new AbortController().signal)).rejects.toThrow();expect(store.read()?.commandId).toBe(id);await api.receipt(s,new AbortController().signal);expect(fetcher.mock.calls[1]?.[0]).toBe(`/api/v1/commands/${id}/receipt`);expect(store.read()).toBeNull();expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual(write.body);});
+ it('rejects receipts for another command without clearing recovery',async()=>{const store=new RecoveryStore(sessionStorage);const fetcher=vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({...receipt,commandId:'22222222-2222-4222-8222-222222222222'})));const api=createOwnerExceptionTransport(store,fetcher);await expect(api.write(testSession(),write,new AbortController().signal)).rejects.toThrow();expect(store.read()?.commandId).toBe(id);});
+ it('does not dispatch receipt with another actor scope',async()=>{const store=new RecoveryStore(sessionStorage);store.reserveWrite(id,'TRANSFER_OPPORTUNITY_RESPONSIBILITY',testSession().actorScopeKey,write);const fetcher=vi.fn<typeof fetch>();const api=createOwnerExceptionTransport(store,fetcher);await expect(api.receipt({...testSession(),actorScopeKey:'ask1.'+'b'.repeat(43)},new AbortController().signal)).rejects.toThrow();expect(fetcher).not.toHaveBeenCalled();});
+});

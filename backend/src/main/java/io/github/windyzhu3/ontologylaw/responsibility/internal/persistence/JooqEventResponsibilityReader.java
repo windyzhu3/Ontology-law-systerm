@@ -62,6 +62,10 @@ public final class JooqEventResponsibilityReader implements EventResponsibilityR
         fields.put("entered_waiting_at",timestamp(r.get(w.ENTERED_WAITING_AT)));fields.put("resume_due_at",timestamp(r.get(w.RESUME_DUE_AT)));
         fields.put("recorded_by_appointment_id",r.get(w.RECORDED_BY_APPOINTMENT_ID).toString());fields.put("awaited_fact_type",r.get(w.AWAITED_FACT_TYPE));
         fields.put("awaited_fact_id",r.get(w.AWAITED_FACT_ID)==null?null:r.get(w.AWAITED_FACT_ID).toString());fields.put("awaited_fact_revision",r.get(w.AWAITED_FACT_REVISION));fields.put("awaited_fact_hash",base64(r.get(w.AWAITED_FACT_HASH)));
+        if(java.util.Set.of("R2_OPPORTUNITY_HANDOFF_WAIT_V1","R2_ATTEMPT_HANDOFF_WAIT_V1").contains(r.get(w.WAIT_CONTRACT_CODE))) {
+            var extra=DSL.using(c,SQLDialect.POSTGRES).fetchOne("select handoff_fact_id,handoff_fact_revision,inherited_wait_receipt_id,inherited_wait_hash,origin_progress_id,origin_progress_hash,original_sla_due_at from responsibility.wait_receipt where tenant_id=? and wait_receipt_id=?",tenant,r.get(w.WAIT_RECEIPT_ID));
+            for(var f:extra.fields()){Object value=extra.get(f);fields.put(f.getName(),value instanceof byte[] bytes?base64(bytes):value instanceof OffsetDateTime time?timestamp(time):value instanceof UUID uuid?uuid.toString():value);}
+        }
         return new R1EventFacts.Wait(new Subject("responsibility.wait_receipt",r.get(w.WAIT_RECEIPT_ID),null,base64(CanonicalJson.digest(CanonicalJson.encode(fields)))),
                 taskId,r.get(w.TASK_REVISION),r.get(w.WAIT_CONTRACT_CODE),r.get(w.WAIT_CONTRACT_VERSION),r.get(w.RESUME_DUE_AT)==null?null:r.get(w.RESUME_DUE_AT).toInstant());
     }

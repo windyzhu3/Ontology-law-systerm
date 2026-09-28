@@ -16,10 +16,14 @@ public final class JooqRuntimeDatabase implements RuntimeDatabase {
     public Connection open()throws SQLException {
         Connection c=null;
         try {
-            c=connections.open();if(!c.getAutoCommit())throw unavailable();capabilities(db(c));
-            inTransaction(c,role==Role.API?Capability.QUERY:Capability.WORKER,x->{deployment(db(x));return null;});return c;
+            long started=System.nanoTime();c=connections.open();long connected=System.nanoTime();
+            if(!c.getAutoCommit())throw unavailable();capabilities(db(c));long checked=System.nanoTime();
+            inTransaction(c,role==Role.API?Capability.QUERY:Capability.WORKER,x->{deployment(db(x));return null;});
+            if(Boolean.getBoolean("ols.read.metrics"))org.slf4j.LoggerFactory.getLogger(JooqRuntimeDatabase.class).info("RUNTIME_CONNECTION_TIMING role={} acquireMs={} capabilityMs={} deploymentMs={}",role,(connected-started)/1000000,(checked-connected)/1000000,(System.nanoTime()-checked)/1000000);
+            return c;
         }catch(SQLException|RuntimeException failure){if(c!=null)try{c.close();}catch(SQLException ignored){}throw unavailable();}
     }
+    public void close(){connections.close();}
     public boolean healthy(){try(var c=open()){return true;}catch(SQLException|RuntimeException unavailable){return false;}}
     private void deployment(DSLContext db)throws SQLException {
         var row=db.fetchOne("select operating_mode,schema_contract_version,active_release_digest,active_manifest_hash from platform_meta.deployment_state where deployment_state_key='PRIMARY'");

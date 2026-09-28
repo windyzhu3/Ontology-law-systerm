@@ -9,7 +9,13 @@ import org.jooq.impl.DSL;
 import static io.github.windyzhu3.ontologylaw.identity.internal.persistence.jooq.Tables.*;
 
 public final class JooqWorkcardOwnerReader implements WorkcardOwnerReader {
+    private record OwnerFacts(UUID appointment) {}
     public Owner read(Connection c,UUID tenant,UUID appointment) {
+        // Raw identity rows are stable only inside the already locked read scope.
+        // Effective-time decisions remain with callers; no result survives scope closure.
+        return JooqAuthorizationService.lockedFacts(c,tenant,new OwnerFacts(appointment),()->readUncached(c,tenant,appointment));
+    }
+    private Owner readUncached(Connection c,UUID tenant,UUID appointment) {
         var a=APPOINTMENT;var p=PRINCIPAL;var o=ORGANIZATION_UNIT;
         var r=DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false))
                 .select(a.APPOINTMENT_ID,a.REVISION,a.PRINCIPAL_ID,a.ORGANIZATION_UNIT_ID,a.ROLE_CODE,a.STATE,a.EFFECTIVE_FROM,a.EFFECTIVE_UNTIL,

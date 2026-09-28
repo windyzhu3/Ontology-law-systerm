@@ -28,7 +28,7 @@ public final class JooqCommandReceiptAuthorizationReader implements CommandRecei
                 .and(field("entry_type",String.class).eq("EVENT")).and(type.isNotNull()).limit(2).fetch();
         if(rows.isEmpty())return null;
         if(rows.size()!=1)throw new InvalidMetadata();var row=rows.getFirst();
-        if(Set.of("REOPEN_DUE_CONTACT_TASKS","REOPEN_DUE_ROUTING_REVIEW_TASKS","BOOTSTRAP_IDENTITY_ADMIN").contains(row.get(type)))return null;
+        if(Set.of("REPAIR_SUPERSEDED_OPPORTUNITY_TASK","RESTORE_SOURCE_REQUEST_TASK","REOPEN_DUE_CONTACT_TASKS","REOPEN_DUE_ROUTING_REVIEW_TASKS","REOPEN_DUE_SOURCE_REQUEST_TASKS","BOOTSTRAP_IDENTITY_ADMIN").contains(row.get(type)))return null;
         try {
             if(io.github.windyzhu3.ontologylaw.identity.IdentityCommands.registered(row.get(type))) {
                 if(actor.onBehalfAppointmentId()!=null||!row.get(type).equals(row.get(action))||!"R1_IDENTITY_COMMAND_AUDIT_V1".equals(row.get(schema))||!Integer.valueOf(1).equals(row.get(version)))throw new InvalidMetadata();

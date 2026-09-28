@@ -9,6 +9,43 @@ import org.jooq.impl.DSL;
 import static io.github.windyzhu3.ontologylaw.audit.internal.persistence.jooq.Tables.AUDIT_ENTRY;
 
 public final class JooqAuditAppender implements AuditAppender {
+    public void appendWorkcards(Connection c,java.util.List<ReadDisclosureEntry> entries)throws SQLException {
+        batch(c,entries,e->insert(c,e.id(),null,null,e.correlationId(),"READ_CURRENT_WORKCARD","SUCCEEDED",e.authorization(),e.disclosedSource(),e.schemaCode(),1,e.summary(),e.summaryDigest()));
+    }
+    public void appendManagement(Connection c,java.util.List<ManagementDisclosureEntry> entries)throws SQLException {
+        batch(c,entries,e->insert(c,e.id(),null,null,e.correlationId(),"READ_BUSINESS_MANAGEMENT","SUCCEEDED",e.authorization(),e.disclosedSource(),"R2_MANAGEMENT_DISCLOSURE_AUDIT_V1",1,e.summary(),e.digest()));
+    }
+    public void appendContracts(Connection c,java.util.List<ContractDisclosureEntry> entries)throws SQLException {
+        batch(c,entries,e->insert(c,e.id(),null,null,e.correlationId(),"READ_CONTRACT","SUCCEEDED",e.authorization(),e.disclosedSource(),"R2_CONTRACT_DISCLOSURE_AUDIT_V1",1,e.summary(),e.digest()));
+    }
+    public void appendOpportunityLedger(Connection c,java.util.List<OpportunityLedgerDisclosureEntry> entries,java.util.List<QuoteDisclosureEntry> quotes)throws SQLException {
+        batch(c,entries,e->insert(c,e.id(),null,null,e.correlationId(),"READ_OPPORTUNITY_LEDGER","SUCCEEDED",e.authorization(),e.disclosedSource(),"R2_OPPORTUNITY_LEDGER_DISCLOSURE_AUDIT_V1",1,e.summary(),e.digest()));
+        batch(c,quotes,e->insert(c,e.id(),null,null,e.correlationId(),"READ_QUOTE","SUCCEEDED",e.authorization(),e.disclosedSource(),"R2_QUOTE_DISCLOSURE_AUDIT_V1",1,e.summary(),e.digest()));
+    }
+    private static <T>void batch(Connection c,java.util.List<T> entries,java.util.function.Function<T,Query> statement)throws SQLException {
+        if(c.getAutoCommit()||c.getTransactionIsolation()!=Connection.TRANSACTION_READ_COMMITTED)throw new SQLException("Audit requires transaction","25001");
+        var db=DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false));
+        for(int offset=0;offset<entries.size();offset+=128) {
+            int end=Math.min(entries.size(),offset+128);var first=statement.apply(entries.get(offset));var batch=db.batch(first);
+            for(int i=offset;i<end;i++)batch.bind((i==offset?first:statement.apply(entries.get(i))).getBindValues().toArray());
+            int[] counts=batch.execute();
+            if(counts.length!=end-offset)throw new SQLException("Incomplete disclosure audit batch","58000");
+            for(int count:counts)if(count!=1&&count!=java.sql.Statement.SUCCESS_NO_INFO)throw new SQLException("Disclosure audit append failed","58000");
+        }
+        // Caller retains the AUDIT transaction and awaits commit; no asynchronous queue,
+        // deduplication, INSERT RETURNING, or permission to return partially audited data.
+    }
+    public void append(Connection c,ContractDisclosureEntry e)throws SQLException{write(c,e.id(),null,null,e.correlationId(),"READ_CONTRACT","SUCCEEDED",e.authorization(),e.disclosedSource(),"R2_CONTRACT_DISCLOSURE_AUDIT_V1",1,e.summary(),e.digest());}
+    public void append(Connection c,FollowupAttemptDisclosureEntry e)throws SQLException{write(c,e.id(),null,null,e.correlationId(),"READ_FOLLOWUP_ATTEMPT","SUCCEEDED",e.authorization(),e.disclosedSource(),"R2_FOLLOWUP_ATTEMPT_DISCLOSURE_AUDIT_V1",1,e.summary(),e.digest());}
+    public void append(Connection c,QuoteDisclosureEntry e)throws SQLException{write(c,e.id(),null,null,e.correlationId(),"READ_QUOTE","SUCCEEDED",e.authorization(),e.disclosedSource(),"R2_QUOTE_DISCLOSURE_AUDIT_V1",1,e.summary(),e.digest());}
+    public void append(Connection c,MaterialDisclosureEntry e)throws SQLException{write(c,e.id(),null,null,e.correlationId(),"READ_OPPORTUNITY_MATERIAL","SUCCEEDED",e.authorization(),e.disclosedSource(),"R2_MATERIAL_DISCLOSURE_AUDIT_V1",1,e.summary(),e.digest());}
+    public void append(Connection c,CustomerRequirementsDisclosureEntry e)throws SQLException{write(c,e.id(),null,null,e.correlationId(),"READ_CUSTOMER_REQUIREMENTS","SUCCEEDED",e.authorization(),e.disclosedSource(),"R2_CUSTOMER_REQUIREMENTS_DISCLOSURE_AUDIT_V1",1,e.summary(),e.digest());}
+
+    public void append(Connection c,OpportunityClosureDisclosureEntry e)throws SQLException {write(c,e.id(),null,null,e.correlationId(),"READ_OPPORTUNITY_CLOSURE","SUCCEEDED",e.authorization(),e.disclosedSource(),"R2_OPPORTUNITY_CLOSURE_DISCLOSURE_AUDIT_V1",1,e.summary(),e.digest());}
+    public void append(Connection c,OpportunityLedgerDisclosureEntry e)throws SQLException {write(c,e.id(),null,null,e.correlationId(),"READ_OPPORTUNITY_LEDGER","SUCCEEDED",e.authorization(),e.disclosedSource(),"R2_OPPORTUNITY_LEDGER_DISCLOSURE_AUDIT_V1",1,e.summary(),e.digest());}
+
+    public void append(Connection c,OwnerExceptionDisclosureEntry e)throws SQLException {write(c,e.id(),null,null,e.correlationId(),"READ_OPPORTUNITY_OWNER_EXCEPTION","SUCCEEDED",e.authorization(),e.disclosedSource(),"R2_OWNER_EXCEPTION_DISCLOSURE_AUDIT_V1",1,e.summary(),e.digest());}
+    public void append(Connection c,OwnerValidationEntry e)throws SQLException {write(c,e.id(),null,null,e.correlationId(),"OBSERVE_OPPORTUNITY_OWNER_VALIDATION","SUCCEEDED",e.authorization(),e.opportunity(),"R2_OPPORTUNITY_OWNER_VALIDATION_V1",1,e.summary(),e.digest());}
     public void append(Connection c,IdentityEntry e)throws SQLException {
         var values=io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.object(io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.parse(e.summary()));
         io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.fields(values,"result","authorizationEvidence","receiptRecovery");
@@ -88,7 +125,7 @@ public final class JooqAuditAppender implements AuditAppender {
     }
     private static SQLException invalidBootstrap(){return new SQLException("BOOTSTRAP_AUDIT_UNAVAILABLE","23000");}
     public void append(Connection connection,ReadDisclosureEntry e)throws SQLException {
-        write(connection,e.id(),null,null,e.correlationId(),"READ_CURRENT_WORKCARD","SUCCEEDED",e.authorization(),e.disclosedSource(),"R1_CURRENT_WORKCARD_DISCLOSURE_AUDIT_V1",1,e.summary(),e.summaryDigest());
+        write(connection,e.id(),null,null,e.correlationId(),"READ_CURRENT_WORKCARD","SUCCEEDED",e.authorization(),e.disclosedSource(),e.schemaCode(),1,e.summary(),e.summaryDigest());
     }
     public void append(Connection connection,ReceiptDisclosureEntry e)throws SQLException {
         write(connection,e.id(),null,null,e.correlationId(),"READ_COMMAND_RECEIPT","SUCCEEDED",e.authorization(),e.disclosedSource(),"R1_COMMAND_RECEIPT_DISCLOSURE_AUDIT_V1",1,e.summary(),e.summaryDigest());
@@ -96,8 +133,13 @@ public final class JooqAuditAppender implements AuditAppender {
     private void write(Connection connection,java.util.UUID id,java.util.UUID commandId,String commandType,java.util.UUID correlation,
             String action,String result,io.github.windyzhu3.ontologylaw.identity.AuthorizationSnapshot snapshot,
             io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Subject subject,String schema,int schemaVersion,String summary,byte[] summaryDigest) {
+        insert(connection,id,commandId,commandType,correlation,action,result,snapshot,subject,schema,schemaVersion,summary,summaryDigest).execute();
+    }
+    private Query insert(Connection connection,java.util.UUID id,java.util.UUID commandId,String commandType,java.util.UUID correlation,
+            String action,String result,io.github.windyzhu3.ontologylaw.identity.AuthorizationSnapshot snapshot,
+            io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Subject subject,String schema,int schemaVersion,String summary,byte[] summaryDigest) {
         var a=AUDIT_ENTRY;var request=snapshot.request();var actor=request.actor();var fact=snapshot.authorityFact();
-        DSL.using(connection,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false))
+        return DSL.using(connection,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false))
                 .insertInto(a).set(a.TENANT_ID,actor.tenantId()).set(a.AUDIT_ENTRY_ID,id).set(a.ENTRY_TYPE,"EVENT")
                 .set(a.AUDIT_SCOPE_CODE,"OBJECT").set(a.TRUSTED_AT,OffsetDateTime.ofInstant(snapshot.checkedAt(),ZoneOffset.UTC))
                 .set(a.ACTION_CODE,action).set(a.RESULT_CODE,result).set(a.ACTOR_PRINCIPAL_ID,actor.principalId())
@@ -108,7 +150,7 @@ public final class JooqAuditAppender implements AuditAppender {
                 .set(a.TRACE_ID,correlation).set(a.SERVICE_ROLE_CODE,"API").set(a.EXECUTION_NODE_CODE,executionNodeCode)
                 .set(a.SUMMARY_SCHEMA_CODE,schema).set(a.SUMMARY_SCHEMA_VERSION,schemaVersion).set(a.CHANGE_SUMMARY,JSONB.valueOf(summary)).set(a.CHANGE_SUMMARY_DIGEST,summaryDigest)
                 .set(a.SUBJECT_TYPE,subject.type()).set(a.SUBJECT_ID,subject.id()).set(a.SUBJECT_REVISION,subject.revision()).set(a.SUBJECT_HASH,subject.hash()==null?null:Base64.getUrlDecoder().decode(subject.hash()))
-                .set(a.AUTHORIZATION_FACT_TYPE,fact==null?null:fact.type()).set(a.AUTHORIZATION_FACT_ID,fact==null?null:fact.id()).set(a.AUTHORIZATION_FACT_REVISION,fact==null?null:fact.revision()).execute();
+                .set(a.AUTHORIZATION_FACT_TYPE,fact==null?null:fact.type()).set(a.AUTHORIZATION_FACT_ID,fact==null?null:fact.id()).set(a.AUTHORIZATION_FACT_REVISION,fact==null?null:fact.revision());
         // No INSERT RETURNING: the append-only role deliberately has no SELECT privilege.
     }
 }

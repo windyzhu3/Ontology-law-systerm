@@ -35,6 +35,25 @@ class R1ResourceTagsTest {
             if(kind.equals("draft"))assertNotEquals(token,R1ResourceTags.draft(actor,source,"CONFIRMED"));
         }
     }
+    @Test void opportunity_subject_tag_is_exact_actor_bound_and_separate_from_lead_tags() {
+        var actor=new Actor(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),null,null);
+        var opportunity=new Subject("opportunity.opportunity",UUID.randomUUID(),0L,null);
+        var tag=R1ResourceTags.opportunitySubject(actor,opportunity);
+        assertNotEquals(tag,R1ResourceTags.subject(actor,new Subject("lead.lead",opportunity.id(),0L,null)));
+        assertNotEquals(tag,R1ResourceTags.opportunitySubject(actor,new Subject(opportunity.type(),opportunity.id(),1L,null)));
+        assertNotEquals(tag,R1ResourceTags.opportunitySubject(new Actor(actor.tenantId(),UUID.randomUUID(),actor.appointmentId(),null,null),opportunity));
+        assertThrows(IllegalArgumentException.class,()->R1ResourceTags.subject(actor,opportunity));
+        assertThrows(IllegalArgumentException.class,()->R1ResourceTags.opportunitySubject(actor,new Subject("lead.lead",opportunity.id(),0L,null)));
+        assertFalse(tag.contains(opportunity.id().toString()));
+    }
+    @Test void opportunity_task_tag_binds_exact_handoff_basis() {
+        var actor=new Actor(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),null,null);
+        var task=new Subject("responsibility.task_occurrence",UUID.randomUUID(),0L,null);
+        var first=new Subject("opportunity.responsibility_handoff",UUID.randomUUID(),0L,null);
+        var second=new Subject("opportunity.responsibility_handoff",UUID.randomUUID(),0L,null);
+        assertNotEquals(R1ResourceTags.task(actor,task,"OPEN",first),R1ResourceTags.task(actor,task,"OPEN",second));
+        assertNotEquals(R1ResourceTags.task(actor,task,"OPEN"),R1ResourceTags.task(actor,task,"OPEN",first));
+    }
     private String token(String kind,Actor actor,Subject source) {
         return kind.equals("draft")?R1ResourceTags.draft(actor,source,"DRAFT"):R1ResourceTags.subject(actor,source);
     }

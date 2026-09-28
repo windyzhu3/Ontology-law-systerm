@@ -11,6 +11,13 @@ public final class R1ResourceTags {
                 || !Set.of("OPEN","WAITING","DONE","CANCELLED").contains(state))throw new IllegalArgumentException("Exact Task required");
         return tag(actor,task,"task",state);
     }
+    public static String task(Actor actor,Subject task,String state,Subject basis) {
+        String legacy=task(actor,task,state);
+        if(basis==null||"opportunity.opportunity".equals(basis.type()))return legacy;
+        if(!"opportunity.responsibility_handoff".equals(basis.type())||basis.revision()==null||basis.hash()!=null)throw new IllegalArgumentException("Exact responsibility basis required");
+        var value=Map.of("profile","R2_OPPORTUNITY_RESPONSIBILITY_TASK_TAG_V1","taskTag",legacy,"basisType",basis.type(),"basisId",basis.id().toString(),"basisRevision",basis.revision());
+        return "\"task."+Base64.getUrlEncoder().withoutPadding().encodeToString(CanonicalJson.digest(CanonicalJson.encode(value)))+"\"";
+    }
     public static String draft(Actor actor,Subject draft,String state) {
         if(!draft.type().equals("responsibility.action_draft")||draft.revision()==null||!Set.of("DRAFT","CONFIRMED").contains(state))
             throw new IllegalArgumentException("Exact Draft required");
@@ -20,9 +27,14 @@ public final class R1ResourceTags {
         if(!lead.type().equals("lead.lead")||lead.revision()==null)throw new IllegalArgumentException("Exact Lead required");
         return tag(actor,lead,"subject",null);
     }
-    private static String tag(Actor actor,Subject task,String kind,String state) {
+    public static String opportunitySubject(Actor actor,Subject opportunity) {
+        if(!opportunity.type().equals("opportunity.opportunity")||opportunity.revision()==null)throw new IllegalArgumentException("Exact Opportunity required");
+        return tag(actor,opportunity,"subject",null,"R2_OPPORTUNITY_RESOURCE_TAG_V1");
+    }
+    private static String tag(Actor actor,Subject task,String kind,String state) {return tag(actor,task,kind,state,"R1_RESOURCE_TAG_V1");}
+    private static String tag(Actor actor,Subject task,String kind,String state,String profile) {
         var values=new TreeMap<String,Object>();
-        values.put("profile","R1_RESOURCE_TAG_V1");values.put("projectionVersion",1);values.put("kind",kind);
+        values.put("profile",profile);values.put("projectionVersion",1);values.put("kind",kind);
         values.put("tenantId",actor.tenantId().toString());values.put("principalId",actor.principalId().toString());
         values.put("appointmentId",actor.appointmentId().toString());values.put("principalKind",actor.principalKind().name());
         values.put("onBehalfPrincipalId",actor.onBehalfPrincipalId()==null?null:actor.onBehalfPrincipalId().toString());

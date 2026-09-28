@@ -108,10 +108,9 @@ it("T9-L07 retains dirty input through an actual controller renewal and submits 
   expect(screen.getByLabelText("结果说明")).toBe(input);
   expect(screen.getByLabelText("结果说明")).toHaveValue("尚未保存的输入");
   expect(input).toHaveFocus();
-  expect(screen.getByText("候选尚未保存，请先保存后确认。")).toBeVisible();
-  expect(screen.getByRole("button", { name: "记录联系结果" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "记录联系结果" })).toBeEnabled();
   expect(requests.filter((r) => r.method === "POST")).toHaveLength(0);
-  fireEvent.click(screen.getByRole("button", { name: "保存候选" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "记录联系结果" })).toBeEnabled(),
   );
@@ -161,7 +160,7 @@ it("T9-L11 clears expired sensitive view and recovers a persisted unknown POST o
   expect(screen.queryByText("王某 · 劳动仲裁咨询")).not.toBeInTheDocument();
   expect(sessionStorage.getItem(markerKey)).not.toBeNull();
   await act(async () => controller.initialize());
-  const recover = await screen.findByRole("button", { name: "查询原回执" });
+  const recover = await screen.findByRole("button", { name: "核对本次结果" });
   expect(
     screen.queryByRole("button", { name: "使用原请求重试" }),
   ).not.toBeInTheDocument();

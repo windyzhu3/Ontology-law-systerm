@@ -8,12 +8,24 @@ import static io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.*;
 
 /** Typed restricted recovery selectors. Never serialize or log this internal metadata. */
 public final class ReceiptRecoveryMetadata {
-    private static final Set<String> PRIMARY=Set.of("RESOLVE_DUPLICATE_LEAD","COMPLETE_LEAD_INGRESS","ASSIGN_LEAD","RECORD_ROUTING_DISPOSITION","ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST","RECORD_CONTACT_RESULT","REVIEW_LEAD_VALIDITY");
+    private static final Set<String> PRIMARY=Set.of("RECORD_SOURCE_REQUEST_CONTINUATION","RESOLVE_DUPLICATE_LEAD","COMPLETE_LEAD_INGRESS","ASSIGN_LEAD","RECORD_ROUTING_DISPOSITION","ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST","RECORD_CONTACT_RESULT","REVIEW_LEAD_VALIDITY");
     private final String commandType,account,sourceKey,action;
     private final UUID tenant,task;
     private final Subject lead,draft,submission,evidenceBinding;
     private final Long taskRevision;
     private final byte[] scopeDigest;
+    private Map<String,Object> ownerExceptionScope;
+    private Map<String,Object> opportunityClosureScope;
+    private Map<String,Object> customerRequirementsScope;
+    private Map<String,Object> materialsScope;
+    private Map<String,Object> transfersScope;
+    public Map<String,Object> transfersScope(){return transfersScope;}
+    private Map<String,Object> contractsScope;
+    public Map<String,Object> contractsScope(){return contractsScope;}
+    private Map<String,Object> attemptScope;
+    public Map<String,Object> attemptScope(){return attemptScope;}
+    private Map<String,Object> quotesScope;
+    public Map<String,Object> quotesScope(){return quotesScope;}
     private Map<String,Object> identityScope;
     private Subject identityTarget,identityAnchor;
 
@@ -42,17 +54,77 @@ public final class ReceiptRecoveryMetadata {
         this.commandType=commandType;tenant=uuid(scope.get("tenantId"));scopeDigest=digest(encode(scope));
         UUID parsedTask=null;String parsedAccount=null,parsedKey=null,parsedAction=null;
         Subject parsedLead=null,parsedDraft=null,parsedSubmission=null,parsedBinding=null;Long parsedRevision=null;
-        if("CAPTURE_LEAD".equals(commandType)) {
+        if(Set.of("SUBMIT_TRANSFER","RESUBMIT_TRANSFER","RECORD_TRANSFER_CONFLICT_REVIEW","RECORD_TRANSFER_INTAKE","CLASSIFY_MATTER").contains(commandType)) {
+            fields(scope,"profile","tenantId","commandType","principalId","appointmentId","opportunity","workflow");equal(scope.get("profile"),"R2_"+commandType+"_SCOPE_V1");equal(scope.get("commandType"),commandType);uuid(scope.get("principalId"));uuid(scope.get("appointmentId"));parsedLead=selector(scope.get("opportunity"),"opportunity.opportunity",false);var workflow=selector(scope.get("workflow"),"transfer.workflow",false);if(!Long.valueOf(0).equals(workflow.revision()))throw invalid();fields(binding,"kind");equal(binding.get("kind"),"TRANSFERS");transfersScope=scope;
+        } else if(Set.of("REQUEST_CONTRACT_RECEIPT_REVIEW","RECORD_CONTRACT_RECEIPT_REVIEW","SUPPLEMENT_CONTRACT_RECEIPT","VERIFY_CONTRACT_EXECUTION_CONDITIONS","END_CONTRACT_NEGOTIATION","REQUEST_CONTRACT_TERMINATION_REVIEW","RECORD_CONTRACT_TERMINATION_REVIEW","RETURN_CONTRACT_SIGNATURE_FOR_REVISION","SAVE_CONTRACT_SIGNATURE_DRAFT","CONFIRM_CONTRACT_SIGNATURE_ARRANGEMENT","SUBMIT_CONTRACT_SIGNATURE","RECORD_CONTRACT_SIGNATURE_VERIFICATION","ARCHIVE_CONTRACT_SIGNATURE","RETURN_CONTRACT_FOR_REVISION","REQUEST_CONTRACT_PREPARATION","RECORD_CONTRACT_PREPARATION_DECISION","START_CONTRACT_PREPARATION","SAVE_CONTRACT_DRAFT","FORM_CONTRACT","REQUEST_CONTRACT_REVIEW","RECORD_CONTRACT_REVIEW","REQUEST_CONTRACT_APPROVAL","RECORD_CONTRACT_DECISION").contains(commandType)) {
+            fields(scope,"profile","tenantId","commandType","principalId","appointmentId","opportunity","basis","confirmation","draft","contract","version","workflow");
+            equal(scope.get("profile"),"R2_"+commandType+"_SCOPE_V1");equal(scope.get("commandType"),commandType);uuid(scope.get("principalId"));uuid(scope.get("appointmentId"));
+            parsedLead=selector(scope.get("opportunity"),"opportunity.opportunity",false);
+            var basis=object(scope.get("basis"));if(!Set.of("opportunity.opportunity","opportunity.responsibility_handoff").contains(basis.get("type")))throw invalid();selector(basis,(String)basis.get("type"),false);
+            for(var entry:Map.of("confirmation","opportunity.customer_requirement_confirmation","draft","contract.preparation_draft","workflow","contract.preparation_workflow").entrySet())if(scope.get(entry.getKey())!=null){var exact=selector(scope.get(entry.getKey()),entry.getValue(),false);if(!Long.valueOf(0).equals(exact.revision()))throw invalid();}
+            if(scope.get("contract")!=null)selector(scope.get("contract"),"contract.contract",false);
+            if(scope.get("version")!=null)selector(scope.get("version"),"contract.contract_revision",true);
+            fields(binding,"kind");equal(binding.get("kind"),"CONTRACTS");contractsScope=scope;
+        } else if(Set.of("RECORD_OPPORTUNITY_FOLLOWUP_ATTEMPT","RECORD_QUOTE_FOLLOWUP_ATTEMPT").contains(commandType)) {
+            fields(scope,"profile","tenantId","commandType","principalId","appointmentId","opportunity","basis","task","wait","workflow");equal(scope.get("profile"),"R2_"+commandType+"_SCOPE_V1");equal(scope.get("commandType"),commandType);uuid(scope.get("principalId"));uuid(scope.get("appointmentId"));
+            parsedLead=selector(scope.get("opportunity"),"opportunity.opportunity",false);
+            var basis=object(scope.get("basis"));if(!Set.of("opportunity.opportunity","opportunity.responsibility_handoff").contains(basis.get("type")))throw invalid();selector(basis,(String)basis.get("type"),false);
+            selector(scope.get("task"),"responsibility.task_occurrence",false);if(scope.get("wait")!=null)selector(scope.get("wait"),"responsibility.wait_receipt",true);
+            if("RECORD_QUOTE_FOLLOWUP_ATTEMPT".equals(commandType)!=(scope.get("workflow")!=null))throw invalid();if(scope.get("workflow")!=null&&!Long.valueOf(0).equals(selector(scope.get("workflow"),"opportunity.quote_workflow",false).revision()))throw invalid();
+            fields(binding,"kind");equal(binding.get("kind"),"FOLLOWUP_ATTEMPT");attemptScope=scope;
+        } else if(Set.of("END_QUOTE_NEGOTIATION","START_QUOTE_PREPARATION","SAVE_QUOTE_DRAFT","FORM_QUOTE","REQUEST_QUOTE_APPROVAL","RECORD_QUOTE_DECISION","RECORD_QUOTE_DELIVERY","RECORD_QUOTE_RESPONSE").contains(commandType)) {
+            fields(scope,"profile","tenantId","commandType","principalId","appointmentId","opportunity","basis","confirmation","draft","quote","workflow");
+            equal(scope.get("profile"),"R2_"+commandType+"_SCOPE_V1");equal(scope.get("commandType"),commandType);uuid(scope.get("principalId"));uuid(scope.get("appointmentId"));
+            parsedLead=selector(scope.get("opportunity"),"opportunity.opportunity",false);
+            var basis=object(scope.get("basis"));if(!Set.of("opportunity.opportunity","opportunity.responsibility_handoff").contains(basis.get("type")))throw invalid();selector(basis,(String)basis.get("type"),false);
+            for(var entry:Map.of("confirmation","opportunity.customer_requirement_confirmation","draft","opportunity.quote_draft","workflow","opportunity.quote_workflow").entrySet())if(scope.get(entry.getKey())!=null){var exact=selector(scope.get(entry.getKey()),entry.getValue(),false);if(!Long.valueOf(0).equals(exact.revision()))throw invalid();}
+            if(scope.get("quote")!=null)selector(scope.get("quote"),"opportunity.quote_revision",true);
+            fields(binding,"kind");equal(binding.get("kind"),"QUOTES");quotesScope=scope;
+        } else if(Set.of("OPEN_OPPORTUNITY_MATERIAL_UPLOAD","ACCEPT_OPPORTUNITY_MATERIAL").contains(commandType)) {
+            fields(scope,"profile","tenantId","commandType","principalId","appointmentId","opportunity","basis","confirmation","previous","upload");
+            equal(scope.get("profile"),"R2_"+commandType+"_SCOPE_V1");equal(scope.get("commandType"),commandType);uuid(scope.get("principalId"));uuid(scope.get("appointmentId"));
+            parsedLead=selector(scope.get("opportunity"),"opportunity.opportunity",false);
+            var basis=object(scope.get("basis"));if(!Set.of("opportunity.opportunity","opportunity.responsibility_handoff").contains(basis.get("type")))throw invalid();selector(basis,(String)basis.get("type"),false);
+            for(var entry:Map.of("confirmation","opportunity.customer_requirement_confirmation","previous","opportunity.material_version","upload","evidence.material_upload_basis").entrySet())if(scope.get(entry.getKey())!=null){var exact=selector(scope.get(entry.getKey()),entry.getValue(),false);if(!Long.valueOf(0).equals(exact.revision()))throw invalid();}
+            if("ACCEPT_OPPORTUNITY_MATERIAL".equals(commandType)!=(scope.get("upload")!=null))throw invalid();
+            fields(binding,"kind");equal(binding.get("kind"),"MATERIALS");materialsScope=scope;
+        } else if(Set.of("SAVE_OPPORTUNITY_CUSTOMER_DRAFT","CONFIRM_OPPORTUNITY_CUSTOMER_REQUIREMENTS").contains(commandType)) {
+            fields(scope,"profile","tenantId","commandType","principalId","appointmentId","opportunity","basis","draft","confirmation");
+            equal(scope.get("profile"),"R2_"+commandType+"_SCOPE_V1");equal(scope.get("commandType"),commandType);
+            uuid(scope.get("principalId"));uuid(scope.get("appointmentId"));
+            parsedLead=selector(scope.get("opportunity"),"opportunity.opportunity",false);
+            var basis=object(scope.get("basis"));if(!Set.of("opportunity.opportunity","opportunity.responsibility_handoff").contains(basis.get("type")))throw invalid();selector(basis,(String)basis.get("type"),false);
+            if(scope.get("draft")!=null)parsedDraft=selector(scope.get("draft"),"opportunity.customer_requirement_draft",false);
+            if("CONFIRM_OPPORTUNITY_CUSTOMER_REQUIREMENTS".equals(commandType)&&parsedDraft==null)throw invalid();
+            if(scope.get("confirmation")!=null)selector(scope.get("confirmation"),"opportunity.customer_requirement_confirmation",false);
+            fields(binding,"kind");equal(binding.get("kind"),"CUSTOMER_REQUIREMENTS");customerRequirementsScope=scope;
+        } else if(Set.of("TRANSFER_OPPORTUNITY_RESPONSIBILITY","RECORD_OPPORTUNITY_OWNER_COORDINATION").contains(commandType)) {
+            fields(scope,"profile","tenantId","commandType","principalId","appointmentId","opportunity","exception","basis","task","wait");equal(scope.get("profile"),"R2_"+commandType+"_SCOPE_V1");equal(scope.get("commandType"),commandType);uuid(scope.get("principalId"));uuid(scope.get("appointmentId"));
+            parsedLead=selector(scope.get("opportunity"),"opportunity.opportunity",false);selector(scope.get("exception"),"opportunity.owner_exception",false);
+            var basis=object(scope.get("basis"));if(!Set.of("opportunity.opportunity","opportunity.responsibility_handoff").contains(basis.get("type")))throw invalid();selector(basis,(String)basis.get("type"),false);
+            if(scope.get("task")!=null)selector(scope.get("task"),"responsibility.task_occurrence",false);if(scope.get("wait")!=null){if(scope.get("task")==null)throw invalid();selector(scope.get("wait"),"responsibility.wait_receipt",true);}
+            fields(binding,"kind");equal(binding.get("kind"),"OWNER_EXCEPTION");ownerExceptionScope=scope;
+        } else if("CLOSE_OPPORTUNITY".equals(commandType)) {
+            fields(scope,"profile","tenantId","commandType","principalId","appointmentId","opportunity","basis","task","wait");equal(scope.get("profile"),"R2_CLOSE_OPPORTUNITY_SCOPE_V1");equal(scope.get("commandType"),commandType);uuid(scope.get("principalId"));uuid(scope.get("appointmentId"));
+            parsedLead=selector(scope.get("opportunity"),"opportunity.opportunity",false);
+            var basis=object(scope.get("basis"));if(!Set.of("opportunity.opportunity","opportunity.responsibility_handoff").contains(basis.get("type")))throw invalid();selector(basis,(String)basis.get("type"),false);
+            if(scope.get("task")!=null)selector(scope.get("task"),"responsibility.task_occurrence",false);if(scope.get("wait")!=null){if(scope.get("task")==null)throw invalid();selector(scope.get("wait"),"responsibility.wait_receipt",true);}
+            fields(binding,"kind");equal(binding.get("kind"),"OPPORTUNITY_CLOSURE");opportunityClosureScope=scope;
+        } else if("CAPTURE_LEAD".equals(commandType)) {
             fields(scope,"profile","tenantId","sourceAccountCode","sourceRecordKeyDigest");equal(scope.get("profile"),"R1_CAPTURE_SCOPE_V1");
             fields(binding,"kind");equal(binding.get("kind"),"CAPTURE");
             parsedAccount=string(scope.get("sourceAccountCode"));if(parsedAccount.isEmpty()||parsedAccount.length()>128)throw invalid();
             parsedKey=hash(scope.get("sourceRecordKeyDigest"));
         } else if("SAVE_ACTION_DRAFT".equals(commandType)) {
             fields(scope,"profile","tenantId","taskId","actionCode");equal(scope.get("profile"),"R1_DRAFT_SCOPE_V1");
-            parsedTask=uuid(scope.get("taskId"));parsedAction=string(scope.get("actionCode"));if(!PRIMARY.contains(parsedAction))throw invalid();
+            parsedTask=uuid(scope.get("taskId"));parsedAction=string(scope.get("actionCode"));if(!PRIMARY.contains(parsedAction)&&!"RECORD_OPPORTUNITY_PROGRESS".equals(parsedAction))throw invalid();
             fields(binding,"kind","lead","taskRevision","draft");equal(binding.get("kind"),"DRAFT");
-            parsedLead=selector(binding.get("lead"),"lead.lead",false);parsedRevision=revision(binding.get("taskRevision"));
+            parsedLead=selector(binding.get("lead"),"RECORD_OPPORTUNITY_PROGRESS".equals(parsedAction)?"opportunity.opportunity":"lead.lead",false);parsedRevision=revision(binding.get("taskRevision"));
             if(binding.get("draft")!=null)parsedDraft=selector(binding.get("draft"),"responsibility.action_draft",false);
+        } else if("RECORD_OPPORTUNITY_PROGRESS".equals(commandType)) {
+            fields(scope,"profile","tenantId","commandType","taskId","subject");equal(scope.get("profile"),"R2_OPPORTUNITY_COMMAND_SCOPE_V1");equal(scope.get("commandType"),commandType);
+            parsedTask=uuid(scope.get("taskId"));parsedLead=selector(scope.get("subject"),"opportunity.opportunity",false);parsedAction=commandType;
+            fields(binding,"kind","evidence");equal(binding.get("kind"),"TASK");if(binding.get("evidence")!=null)throw invalid();
         } else if(PRIMARY.contains(commandType)) {
             fields(scope,"profile","tenantId","commandType","taskId","lead","bindings");equal(scope.get("profile"),"R1_COMMAND_SCOPE_V1");equal(scope.get("commandType"),commandType);
             parsedTask=uuid(scope.get("taskId"));parsedLead=selector(scope.get("lead"),"lead.lead",false);parsedAction=commandType;
@@ -90,6 +162,10 @@ public final class ReceiptRecoveryMetadata {
     private static String hash(Object value){String text=string(value);try{byte[] bytes=Base64.getUrlDecoder().decode(text);if(bytes.length!=32||!Base64.getUrlEncoder().withoutPadding().encodeToString(bytes).equals(text))throw invalid();return text;}catch(IllegalArgumentException bad){throw invalid();}}
     public String commandType(){return commandType;}public UUID tenantId(){return tenant;}public UUID taskId(){return task;}
     private static void term(Map<String,Object> fields,String prefix){var start=java.time.Instant.parse(string(fields.get(prefix+"From")));if(fields.get(prefix+"Until")!=null&&!java.time.Instant.parse(string(fields.get(prefix+"Until"))).isAfter(start))throw invalid();}
+    public Map<String,Object> opportunityClosureScope(){return opportunityClosureScope;}
+    public Map<String,Object> materialsScope(){return materialsScope;}
+    public Map<String,Object> customerRequirementsScope(){return customerRequirementsScope;}
+    public Map<String,Object> ownerExceptionScope(){return ownerExceptionScope;}
     public boolean identity(){return identityScope!=null;}
     public Map<String,Object> identityScope(){return identityScope;}
     public Subject identityTarget(){return identityTarget;}

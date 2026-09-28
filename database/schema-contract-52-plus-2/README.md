@@ -1,5 +1,7 @@
 # 待办驱动律所系统：52＋2 Schema 合同
 
+当前 R2 开发后继为 `52-plus-2-r2-v3`：52 张业务表＋3 张技术表＝55 张物理表。新增的唯一技术检查点及边界决定见 [ADR-0016](../../docs/adr/ADR-0016-r2-worker-technical-checkpoint.md) 和 [R2 后继合同](R2-SCHEMA-SUCCESSOR.md)。以下固定 52＋2 描述为历史冻结合同，不代表 V890 的当前清单；历史迁移字节及发布证据不变。
+
 本目录只对52＋2数据库结构与物理合同负责，并把[当前MVP语义基线](../../docs/baseline/CURRENT-MVP-BASELINE.md)落实为静态 Python 字段合同，机械生成 PostgreSQL/Flyway DDL、字段说明和机器可读清单；它不独立产生领域、拓扑或生命周期规则。交付边界固定为 **52 张应用事实表＋2 张 `platform_meta` 技术表**；任何第 55 张受管表都属于合同漂移。
 
 ## 冻结边界

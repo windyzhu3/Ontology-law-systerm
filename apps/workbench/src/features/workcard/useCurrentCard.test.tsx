@@ -14,6 +14,117 @@ import { testSession } from "../../test/fixtures";
 const session = testSession();
 afterEach(() => vi.useRealTimers());
 describe("workcard concurrency and recovery", () => {
+  it("late automatic timeout preserves the paused business card", async()=>{
+    vi.useFakeTimers();const pending=deferred<Response>();let reads=0;
+    const api=createWorkbenchApi(async()=>++reads===2?pending.promise:jsonResponse(envelope()));
+    const view=renderHook(({paused})=>useCurrentCard(session,api,{pauseAutomaticRead:paused}),{initialProps:{paused:false}});
+    await act(async()=>{await vi.advanceTimersByTimeAsync(1);});
+    await act(async()=>window.dispatchEvent(new Event('focus')));view.rerender({paused:true});
+    await act(async()=>{await vi.advanceTimersByTimeAsync(25001);});
+    expect(view.result.current.envelope).not.toBeNull();expect(view.result.current.loading).toBe(false);
+    view.unmount();
+  });
+
+  it.each([503,401,'network'])("late automatic failure %s preserves committed card except revoked access", async failure => {
+    const pending=deferred<Response>();let reads=0;
+    const api=createWorkbenchApi(async()=>++reads===2?pending.promise:jsonResponse(envelope()));
+    const view=renderHook(({paused})=>useCurrentCard(session,api,{pauseAutomaticRead:paused}),{initialProps:{paused:false}});
+    await waitFor(()=>expect(view.result.current.envelope).not.toBeNull());
+    await act(async()=>window.dispatchEvent(new Event('focus')));view.rerender({paused:true});
+    await act(async()=>{if(failure==='network')pending.resolve(Promise.reject(Error('network unavailable')) as unknown as Response);else pending.resolve(new Response('{}',{status:failure as number,headers:{'Content-Type':'application/json'}}));});
+    if(failure===401)expect(view.result.current.envelope).toBeNull();else expect(view.result.current.envelope).not.toBeNull();
+    expect(view.result.current.loading).toBe(false);
+  });
+
+  it("does not publish an automatic response started before a business receipt paused navigation", async () => {
+    const pending=deferred<Response>();let reads=0;
+    const api=createWorkbenchApi(async()=>++reads===2?pending.promise:jsonResponse(envelope()));
+    const view=renderHook(({paused})=>useCurrentCard(session,api,{pauseAutomaticRead:paused}),{initialProps:{paused:false}});
+    await waitFor(()=>expect(view.result.current.envelope).not.toBeNull());
+    await act(async()=>window.dispatchEvent(new Event('focus')));
+    await waitFor(()=>expect(reads).toBe(2));view.rerender({paused:true});
+    await act(async()=>pending.resolve(jsonResponse({...envelope(),todaySummary:'旧自动读取返回的其他事项'})));
+    expect(view.result.current.envelope?.todaySummary).not.toBe('旧自动读取返回的其他事项');
+    expect(view.result.current.loading).toBe(false);
+    await act(async()=>{await view.result.current.refresh();});expect(reads).toBe(3);
+  });
+
+  it("pauses timer and focus reads while an embedded business card is editing or submitting", async () => {
+    vi.useFakeTimers();const fetcher=vi.fn(async()=>jsonResponse({...envelope(),waitingCount:1}));
+    const api=createWorkbenchApi(fetcher);
+    const view=renderHook(({paused})=>useCurrentCard(session,api,{pauseAutomaticRead:paused}),{initialProps:{paused:true}});
+    await act(async()=>{await vi.advanceTimersByTimeAsync(1);});expect(fetcher).toHaveBeenCalledTimes(1);
+    await act(async()=>{window.dispatchEvent(new Event('focus'));await vi.advanceTimersByTimeAsync(30000);});expect(fetcher).toHaveBeenCalledTimes(1);
+    view.rerender({paused:false});await act(async()=>{await vi.advanceTimersByTimeAsync(30000);});expect(fetcher).toHaveBeenCalledTimes(2);
+    view.unmount();
+  });
+  it("ends a stalled responsibility read, permits retry and ignores its late response", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<Response>(); const requests: Request[] = [];
+    const api = createWorkbenchApi(async request => { requests.push(request); return requests.length === 1 ? pending.promise : jsonResponse({...envelope(), todaySummary:"重试后的责任"}); });
+    const view = renderHook(() => useCurrentCard(session, api));
+    await act(async () => { await vi.advanceTimersByTimeAsync(25001); });
+    expect(view.result.current.loading).toBe(false);
+    expect(view.result.current.readFailed).toBe(true);
+    expect(view.result.current.error).toBe("读取当前责任超时，请点击刷新重试。");
+    expect(requests[0].signal.aborted).toBe(true);
+    await act(async () => { await view.result.current.refresh(); });
+    expect(view.result.current.envelope?.todaySummary).toBe("重试后的责任");
+    await act(async () => pending.resolve(jsonResponse({...envelope(), todaySummary:"迟到的旧责任"})));
+    expect(view.result.current.envelope?.todaySummary).toBe("重试后的责任");
+    expect(requests.every(r=>r.method==="GET")).toBe(true);
+    view.unmount();
+  });
+
+  it("cleans up a stalled responsibility read deadline when unmounted", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<Response>();
+    const api = createWorkbenchApi(async () => pending.promise);
+    const view = renderHook(() => useCurrentCard(session, api));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    await act(async () => view.unmount());
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("coalesces focus reads and lets explicit task selection supersede a cached background read", async () => {
+    const pending = deferred<Response>(); const requests: Request[] = [];
+    const api = createWorkbenchApi(async request => { requests.push(request); return requests.length === 2 ? pending.promise : jsonResponse(envelope()); });
+    const { result } = renderHook(() => useCurrentCard(session, api));
+    await waitFor(() => expect(result.current.envelope).not.toBeNull());
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    await waitFor(() => expect(requests).toHaveLength(2));
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(requests).toHaveLength(2);
+    await act(async () => { await result.current.selectTask(envelope().currentCard!.taskId); });
+    expect(requests).toHaveLength(3);
+    expect(requests[1].signal.aborted).toBe(true);
+    expect(result.current.loading).toBe(false);
+    await act(async () => pending.resolve(jsonResponse({ ...envelope(), todaySummary: "旧后台读取" })));
+    expect(result.current.envelope?.todaySummary).not.toBe("旧后台读取");
+  });
+
+  it("releases an aborted background read on hide without unlocking stale writes", async () => {
+    let hidden = false;
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockImplementation(() => hidden ? "hidden" : "visible");
+    const pending = deferred<Response>(); let reads = 0;
+    const api = createWorkbenchApi(async () => ++reads === 2 ? pending.promise : jsonResponse(envelope()));
+    const view = renderHook(() => useCurrentCard(session, api));
+    try {
+      await waitFor(() => expect(view.result.current.envelope).not.toBeNull());
+      act(() => { void view.result.current.refresh(); });
+      await waitFor(() => expect(view.result.current.loading).toBe(true));
+      act(() => { hidden = true; document.dispatchEvent(new Event("visibilitychange")); });
+      expect(view.result.current.loading).toBe(false);
+      expect(view.result.current.needsRefresh).toBe(true);
+      expect(view.result.current.envelope).not.toBeNull();
+      await act(async () => pending.resolve(jsonResponse({ ...envelope(), todaySummary: "过期响应" })));
+      expect(view.result.current.envelope?.todaySummary).not.toBe("过期响应");
+      act(() => { hidden = false; document.dispatchEvent(new Event("visibilitychange")); });
+      await waitFor(() => expect(view.result.current.needsRefresh).toBe(false));
+      expect(view.result.current.loading).toBe(false);
+    } finally { view.unmount(); visibility.mockRestore(); }
+  });
+
   it("ignores an older GET arriving after a newer GET", async () => {
     const old = deferred<Response>();
     let n = 0;
@@ -207,4 +318,18 @@ describe("workcard concurrency and recovery", () => {
     });
     expect(gets).toBe(7);
   });
+});
+
+it.each(['revision','etag','id'] as const)('refuses stale ledger %s without showing a replacement card',async(field)=>{
+ const card=envelope(5,false).currentCard!;
+ const fetcher=vi.fn(async()=>jsonResponse(envelope(5,false)));
+ const api=createWorkbenchApi(fetcher);
+ const {result}=renderHook(()=>useCurrentCard(session,api,{deferInitialRead:true}));
+ const expected={id:card.taskId,revision:card.taskRevision,etag:card.preconditions.taskETag};
+ if(field==='revision')expected.revision++;
+ if(field==='etag')expected.etag='"task.other"';
+ if(field==='id')expected.id='019c7000-0000-7000-8000-000000000099';
+ await act(async()=>result.current.selectTask(expected.id,expected));
+ expect(result.current.envelope).toBeNull();
+ expect(result.current.error).toBe('当前待办已变化，请返回商机台账重新查询后办理。');
 });

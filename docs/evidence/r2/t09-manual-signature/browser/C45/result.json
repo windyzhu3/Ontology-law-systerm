@@ -1,0 +1,137 @@
+{
+  "success": true,
+  "opportunityId": "01a0cd92-890a-7375-a8e6-85da6eaec5ba",
+  "qa": [
+    {
+      "name": "00-initial",
+      "width": 1440,
+      "overflow": false,
+      "primary": [
+        "记录本次核验结果"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "00-initial",
+      "width": 390,
+      "overflow": false,
+      "primary": [
+        "记录本次核验结果"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "00-initial",
+      "width": 360,
+      "overflow": false,
+      "primary": [
+        "记录本次核验结果"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "01-verify",
+      "width": 1440,
+      "overflow": false,
+      "primary": [
+        "提交签署核验"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "01-verify",
+      "width": 390,
+      "overflow": false,
+      "primary": [
+        "提交签署核验"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "01-verify",
+      "width": 360,
+      "overflow": false,
+      "primary": [
+        "提交签署核验"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "02-submit",
+      "width": 1440,
+      "overflow": false,
+      "primary": [
+        "记录本次核验结果"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "02-submit",
+      "width": 390,
+      "overflow": false,
+      "primary": [
+        "记录本次核验结果"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "02-submit",
+      "width": 360,
+      "overflow": false,
+      "primary": [
+        "记录本次核验结果"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "03-verify",
+      "width": 1440,
+      "overflow": false,
+      "primary": [
+        "确认完整归档"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "03-verify",
+      "width": 390,
+      "overflow": false,
+      "primary": [
+        "确认完整归档"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "03-verify",
+      "width": 360,
+      "overflow": false,
+      "primary": [
+        "确认完整归档"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "04-archive",
+      "width": 1440,
+      "overflow": false,
+      "primary": [],
+      "shell": 1
+    },
+    {
+      "name": "04-archive",
+      "width": 390,
+      "overflow": false,
+      "primary": [],
+      "shell": 1
+    },
+    {
+      "name": "04-archive",
+      "width": 360,
+      "overflow": false,
+      "primary": [],
+      "shell": 1
+    }
+  ],
+  "issues": [],
+  "network": []
+}

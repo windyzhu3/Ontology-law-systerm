@@ -18,10 +18,11 @@ import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
 
 /** Immutable deployment-only assembly; configuration is never accepted from an HTTP request. */
-final class R1ApiDeployment {
+final class R1ApiDeployment implements AutoCloseable {
+    public void close(){database.close();}
     record Settings(String semanticBaseline,Database database,String node,String cursorKey,List<Trust> trusts,List<Registration> registrations,
                     List<Certificate> certificates,Map<UUID,TenantKeys> tenantKeys,Map<String,R1SourcePolicyRegistry.SourcePolicy> sources,
-                    List<HumanTrust> humanTrusts,String identityTrustStorePath,String identityTrustStorePasswordPath,IdentityAdministration identityAdministration) {
+                    List<HumanTrust> humanTrusts,String identityTrustStorePath,String identityTrustStorePasswordPath,IdentityAdministration identityAdministration,List<LeadIntakeSources.Source> intakeSources) {
         public String toString(){return "R1ApiSettings[restricted]";}
     }
     record Database(String url,String username,String password,String schemaVersion,String releaseDigest,String manifestHash) {
@@ -37,9 +38,10 @@ final class R1ApiDeployment {
     record Certificate(String sha256,String identityProviderCode,UUID tenantId,UUID principalId,UUID appointmentId) {
         Actor actor(){return new Actor(tenantId,principalId,appointmentId,null,null,PrincipalKind.SERVICE);}
     }
-    record TenantKeys(String encryption,String phoneHmac,String emailHmac,String sourceHmac,String credentialSubjectHmac,String actorScopeHmac) {
+    record TenantKeys(String encryption,String phoneHmac,String emailHmac,String sourceHmac,String credentialSubjectHmac,String actorScopeHmac,PaymentSettings payment,UUID transferDestinationOrganizationId) {
         public String toString(){return "R1ApiTenantKeys[restricted]";}
     }
+    record PaymentSettings(String transactionHmac,String accountCode,String accountLabel){public String toString(){return "PaymentSettings[restricted]";}}
     final RuntimeDatabase database;
     final ActorContextResolver actors;
     final R1ApiServices services;
@@ -47,13 +49,16 @@ final class R1ApiDeployment {
     final IdentityAdminController.Services identities;
     private R1ApiDeployment(RuntimeDatabase database,ActorContextResolver actors,R1ApiServices services,SessionContextController.Services session,HumanCredentialVerifier humans,IdentityAdminController.Services identities){this.database=database;this.actors=actors;this.services=services;this.session=session;this.humans=humans;this.identities=identities;}
     static R1ApiDeployment from(Environment environment) {
+        RuntimeDatabase opened=null;
         try {
             var settings=Binder.get(environment).bind("ols.api",Settings.class).orElseThrow(()->new IllegalArgumentException());
             if(!"MVP-2026-09-08.3".equals(settings.semanticBaseline())||settings.node()==null||!settings.node().matches("[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}"))throw new IllegalArgumentException();
             if(!"want".equals(environment.getProperty("server.ssl.client-auth"))||environment.getProperty("server.ssl.key-store")==null||environment.getProperty("server.ssl.trust-store")==null||"false".equals(environment.getProperty("server.ssl.enabled")))throw new IllegalArgumentException();
             var db=Objects.requireNonNull(settings.database());
+            var expected=new RuntimeDatabase.Expected(db.schemaVersion(),digest(db.releaseDigest()),digest(db.manifestHash()));
             var database=RuntimeDatabase.databaseBacked(RuntimeDatabase.jdbc(new RuntimeDatabase.JdbcLogin(db.url(),db.username(),db.password().toCharArray())),RuntimeDatabase.Role.API,
-                    new RuntimeDatabase.Expected(db.schemaVersion(),digest(db.releaseDigest()),digest(db.manifestHash())));
+                    expected);
+            opened=database;
             if(!database.healthy())throw new IllegalArgumentException();
             if(settings.trusts()==null||settings.trusts().isEmpty()||settings.registrations()==null||settings.registrations().isEmpty()||settings.certificates()==null||settings.certificates().isEmpty()||settings.sources()==null||settings.sources().isEmpty())throw new IllegalArgumentException();
             if(settings.humanTrusts()==null||settings.humanTrusts().isEmpty()||settings.registrations().stream().anyMatch(r->r.principalKind()!=PrincipalKind.SERVICE||r.onBehalfPrincipalId()!=null||r.onBehalfAppointmentId()!=null))throw new IllegalArgumentException();
@@ -62,10 +67,12 @@ final class R1ApiDeployment {
             var tenants=new HashSet<UUID>();settings.registrations().forEach(r->tenants.add(r.tenantId()));settings.certificates().forEach(r->tenants.add(r.tenantId()));settings.humanTrusts().forEach(r->tenants.add(r.tenantId()));
             if(settings.tenantKeys()==null||!settings.tenantKeys().keySet().equals(tenants))throw new IllegalArgumentException();
             var encryption=new HashMap<UUID,javax.crypto.SecretKey>();var hmac=new HashMap<UUID,Map<LeadProtection.Purpose,javax.crypto.SecretKey>>();var subjects=new HashMap<UUID,byte[]>();var scopes=new HashMap<UUID,byte[]>();
+            var transferDestinations=new HashMap<UUID,UUID>();var paymentKeys=new HashMap<UUID,javax.crypto.SecretKey>();var paymentAccounts=new HashMap<UUID,io.github.windyzhu3.ontologylaw.payment.PaymentWorkflowService.Account>();
             var distinctKeys=new HashSet<String>();
             for(var entry:settings.tenantKeys().entrySet()) {
-                var keys=entry.getValue();var encoded=List.of(keys.encryption(),keys.phoneHmac(),keys.emailHmac(),keys.sourceHmac(),keys.credentialSubjectHmac(),keys.actorScopeHmac());
+                var keys=entry.getValue();if(keys.transferDestinationOrganizationId()!=null)transferDestinations.put(entry.getKey(),keys.transferDestinationOrganizationId());var encoded=List.of(keys.encryption(),keys.phoneHmac(),keys.emailHmac(),keys.sourceHmac(),keys.credentialSubjectHmac(),keys.actorScopeHmac());
                 for(String key:encoded)if(!distinctKeys.add(Base64.getEncoder().encodeToString(key(key))))throw new IllegalArgumentException();
+                if(keys.payment()!=null){var configured=keys.payment();byte[] material=key(configured.transactionHmac());if(!distinctKeys.add(Base64.getEncoder().encodeToString(material)))throw new IllegalArgumentException();paymentKeys.put(entry.getKey(),new SecretKeySpec(material,"HmacSHA256"));paymentAccounts.put(entry.getKey(),new io.github.windyzhu3.ontologylaw.payment.PaymentWorkflowService.Account(configured.accountCode(),configured.accountLabel()));}
                 encryption.put(entry.getKey(),new SecretKeySpec(key(keys.encryption()),"AES"));subjects.put(entry.getKey(),key(keys.credentialSubjectHmac()));
                 scopes.put(entry.getKey(),key(keys.actorScopeHmac()));
                 hmac.put(entry.getKey(),Map.of(LeadProtection.Purpose.LEAD_PHONE_EXACT,new SecretKeySpec(key(keys.phoneHmac()),"HmacSHA256"),LeadProtection.Purpose.LEAD_EMAIL_EXACT,new SecretKeySpec(key(keys.emailHmac()),"HmacSHA256"),LeadProtection.Purpose.SOURCE_RECORD_KEY,new SecretKeySpec(key(keys.sourceHmac()),"HmacSHA256")));
@@ -97,8 +104,13 @@ final class R1ApiDeployment {
                 var directory=new io.github.windyzhu3.ontologylaw.api.security.KeycloakDirectoryReader(new io.github.windyzhu3.ontologylaw.api.security.KeycloakDirectoryReader.Trust(trust.issuer(),trust.directoryClientId(),directorySecret),IdentityDeploymentFiles.tls(settings.identityTrustStorePath(),settings.identityTrustStorePasswordPath()));
                 if(adminServices.put(trust.tenantId(),new IdentityAdminController.Services(database::open,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(settings.node()),adminResources,adminCandidates,new ExternalSubjectProtection(subjects::get),trust.identityProviderCode(),directory))!=null)throw new IllegalArgumentException();
             }
-            return new R1ApiDeployment(database,actors,new R1ApiServices(database,sources,protection,bindings,settings.node(),cursor),new SessionContextController.Services(database::open,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(settings.node()),new ActorScopeProtection(scopes::get)),humans,new IdentityAdminController.Services(adminServices));
-        }catch(Exception invalid){throw new IllegalStateException("R1_API_CONFIGURATION_UNAVAILABLE");}
+            if(!paymentKeys.isEmpty()&&!paymentKeys.keySet().equals(tenants))throw new IllegalArgumentException();
+            var opportunityProtection=io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection.aesGcm(tenant->Objects.requireNonNull(encryption.get(tenant)));
+            var contractProtection=io.github.windyzhu3.ontologylaw.contract.ContractProtection.aesGcm(tenant->Objects.requireNonNull(encryption.get(tenant)));
+            var materialStore=io.github.windyzhu3.ontologylaw.api.internal.storage.MaterialObjectStoreFactory.configured();
+            var payments=paymentKeys.isEmpty()?null:io.github.windyzhu3.ontologylaw.payment.PaymentWorkflowService.databaseBacked(io.github.windyzhu3.ontologylaw.payment.PaymentTransactionProtection.hmac(tenant->Objects.requireNonNull(paymentKeys.get(tenant))),new PaymentWorkflowPorts(contractProtection,opportunityProtection,materialStore,paymentAccounts::get));
+            return new R1ApiDeployment(database,actors,new R1ApiServices(database,sources,protection,bindings,settings.node(),cursor,settings.intakeSources()==null?List.of():settings.intakeSources(),opportunityProtection,materialStore,contractProtection,payments,Map.copyOf(transferDestinations)::get,R25AiConfiguration.model(environment)),new SessionContextController.Services(database::open,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(settings.node()),new ActorScopeProtection(scopes::get)),humans,new IdentityAdminController.Services(adminServices));
+        }catch(Exception invalid){if(opened!=null)opened.close();throw new IllegalStateException("R1_API_CONFIGURATION_UNAVAILABLE");}
     }
     private static RSAPublicKey publicKey(String file)throws Exception {
         var path=Path.of(file);if(!path.isAbsolute()||!Files.isRegularFile(path)||Files.size(path)>16384)throw new IllegalArgumentException();

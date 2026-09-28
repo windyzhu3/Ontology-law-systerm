@@ -51,14 +51,15 @@ class IngressQueryCapabilityIT extends PostgresIntegrationTest {
     }
 
     @Test void runtime_assertions_accept_successor_and_fail_closed_for_inventory_version_and_extra_grants() throws Exception {
+        try(var historical=Database.start("860")) {
         String schemaSql = Files.readString(repositoryRoot().resolve("database/schema-contract-52-plus-2/runtime/sql/assert_schema_contract.sql"));
         String capabilitySql = Files.readString(repositoryRoot().resolve("database/schema-contract-52-plus-2/runtime/sql/assert_capabilities.sql"));
-        try (var admin = database.adminConnection()) {
+        try (var admin = historical.adminConnection()) {
             execute(admin, schemaSql);
             execute(admin, capabilitySql);
         }
         for (String fault : List.of("inventory", "version", "extra_grant", "grant_option")) {
-            try (var admin = database.adminConnection()) {
+            try (var admin = historical.adminConnection()) {
                 admin.setAutoCommit(false);
                 try {
                     if (fault.equals("inventory")) execute(admin, "DELETE FROM platform_meta.flyway_schema_history WHERE version='860'");
@@ -74,6 +75,7 @@ class IngressQueryCapabilityIT extends PostgresIntegrationTest {
                 execute(admin, schemaSql);
                 admin.rollback();
             }
+        }
         }
     }
 
@@ -93,7 +95,7 @@ class IngressQueryCapabilityIT extends PostgresIntegrationTest {
                 deployment = scalar(admin, "SELECT schema_contract_version||':'||revision FROM platform_meta.deployment_state");
             }
             assertEquals("52-plus-2-v1.1:1", deployment);
-            assertEquals(1, old.migrations(null).migrate().migrationsExecuted);
+            assertEquals(1, old.migrations("860").migrate().migrationsExecuted);
             try (var admin = old.adminConnection(); var api = old.apiConnection(); var worker = old.workerConnection()) {
                 assertTrue(business.equals(business(admin)), "Upgrade changed retained business rows");
                 assertEquals(permissions, permissions(admin));
@@ -103,8 +105,8 @@ class IngressQueryCapabilityIT extends PostgresIntegrationTest {
                 assertEquals("42501", assertThrows(SQLException.class, () -> execute(api, "SELECT ingress_completion_phone_hmac FROM lead.lead")).getSQLState());
                 assertEquals("42501", assertThrows(SQLException.class, () -> inTransaction(worker, Capability.QUERY, c -> null)).getSQLState());
             }
-            old.migrations(null).validate();
-            assertEquals(0, old.migrations(null).migrate().migrationsExecuted);
+            old.migrations("860").validate();
+            assertEquals(0, old.migrations("860").migrate().migrationsExecuted);
             try (var admin = old.adminConnection()) {
                 assertTrue(business.equals(business(admin)), "No-op restart changed retained business rows");
                 assertEquals("52-plus-2-v1.2:2", scalar(admin, "SELECT schema_contract_version||':'||revision FROM platform_meta.deployment_state"));
@@ -121,7 +123,7 @@ class IngressQueryCapabilityIT extends PostgresIntegrationTest {
             }
             String before;
             try (var admin = old.adminConnection()) { before = scalar(admin, "SELECT to_jsonb(d)::text FROM platform_meta.deployment_state d"); }
-            var failure = assertThrows(FlywayException.class, () -> old.migrations(null).migrate());
+            var failure = assertThrows(FlywayException.class, () -> old.migrations("860").migrate());
             Throwable cause = failure;
             while (cause.getCause() != null) cause = cause.getCause();
             assertEquals("55000", assertInstanceOf(SQLException.class, cause).getSQLState());
@@ -133,9 +135,9 @@ class IngressQueryCapabilityIT extends PostgresIntegrationTest {
                 execute(admin, "UPDATE platform_meta.deployment_state SET schema_contract_version='52-plus-2-v1.1'");
                 execute(admin, "ALTER TABLE platform_meta.deployment_state ENABLE TRIGGER USER");
             }
-            assertEquals(1, old.migrations(null).migrate().migrationsExecuted);
-            old.migrations(null).validate();
-            assertEquals(0, old.migrations(null).migrate().migrationsExecuted);
+            assertEquals(1, old.migrations("860").migrate().migrationsExecuted);
+            old.migrations("860").validate();
+            assertEquals(0, old.migrations("860").migrate().migrationsExecuted);
         }
     }
 

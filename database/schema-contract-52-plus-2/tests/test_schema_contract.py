@@ -20,21 +20,26 @@ EXPECTED_LEDGER = {
     ),
     "evidence": (
         "upload_session", "received_source_object", "evidence_submission",
-        "evidence_binding",
+        "evidence_binding", "material_upload_basis", "material_upload_check",
     ),
-    "party": ("party",),
+    "party": ("party", "profile_version"),
     "lead": ("lead", "lead_assignment", "lead_contact_result"),
     "opportunity": (
         "opportunity", "opportunity_participation", "opportunity_progress",
         "quote_revision", "quote_service_scope", "quote_line",
         "quote_payment_term", "quote_issue", "quote_response",
+        "owner_exception", "owner_exception_disposition", "responsibility_handoff", "closure",
+        "customer_requirement_draft", "customer_requirement_confirmation", "customer_requirement_participant", "customer_requirement_draft_party", "material_version", "quote_draft", "quote_package_basis",
+        "quote_approval_policy", "quote_approval_policy_signer", "quote_approval_request", "quote_approval_member", "quote_approval_decision", "quote_manual_delivery", "quote_response_basis", "contract_preparation_source", "quote_workflow",
     ),
     "conflict": ("conflict_review", "conflict_review_party", "conflict_finding"),
     "contract": (
         "contract", "contract_revision", "contract_participation",
         "contract_fee_term", "payment_gate", "signature_plan",
         "contract_signature", "contract_execution", "payment_confirmation",
-        "contract_termination",
+        "contract_termination", "preparation_request", "preparation_decision",
+        "approval_policy", "approval_policy_member", "preparation_workflow", "revision_approval_request", "preparation_draft", "template_version", "clause_version", "revision_clause", "revision_review_request", "revision_review_decision", "revision_review_binding", "revision_approval_requirement", "revision_approval_decision", "signature_readiness",
+        "template_signing_party", "signature_arrangement", "signature_draft", "signature_submission", "signature_verification", "signature_archive", "signature_revision_return", "signature_workflow", "signature_handoff",
     ),
     "transfer": ("transfer_request", "transfer_snapshot", "transfer_return_item"),
 }
@@ -48,10 +53,10 @@ EXPECTED_MUTABLE = {
     "external_action.external_action", "external_action.external_action_outbox",
     "evidence.upload_session", "evidence.evidence_binding",
     "party.party", "lead.lead", "lead.lead_assignment",
-    "opportunity.opportunity", "opportunity.quote_issue",
+    "opportunity.opportunity", "opportunity.quote_issue", "opportunity.owner_exception",
     "conflict.conflict_review", "contract.contract", "contract.payment_gate",
     "contract.contract_signature", "contract.contract_termination",
-    "transfer.transfer_request", "platform_meta.deployment_state",
+    "transfer.transfer_request", "platform_meta.deployment_state", "platform_meta.r2_opportunity_checkpoint",
 }
 
 
@@ -72,8 +77,8 @@ class SchemaContractTest(unittest.TestCase):
             for name in EXPECTED_LEDGER
         }
         self.assertEqual(EXPECTED_LEDGER, actual)
-        self.assertEqual(52, sum(len(names) for names in actual.values()))
-        self.assertEqual(("deployment_state",), tuple(
+        self.assertEqual(100, sum(len(names) for names in actual.values()))
+        self.assertEqual(("deployment_state", "r2_opportunity_checkpoint"), tuple(
             table.name for table in self.by_name["platform_meta"].tables
         ))
 

@@ -1,0 +1,27 @@
+{
+  "date": "2026-09-24",
+  "status": "PENDING_USER_REVIEW",
+  "layout": {
+    "scenes": 18,
+    "widths": [
+      1440,
+      390,
+      360
+    ],
+    "checks": 54,
+    "horizontalOverflow": false,
+    "multiplePrimaryActions": false,
+    "refreshHeight": 44,
+    "myTasksHeight": 44
+  },
+  "browserInteractions": [
+    "source assignment -> contact responsibility",
+    "source review -> dated supervisor wait",
+    "source close -> explicit lead terminal",
+    "supervisor continue -> returned responsibility",
+    "customer confirmation -> original quote preparation",
+    "explicit quote preparation -> takeover result"
+  ],
+  "browserErrors": [],
+  "syntheticOnly": true
+}

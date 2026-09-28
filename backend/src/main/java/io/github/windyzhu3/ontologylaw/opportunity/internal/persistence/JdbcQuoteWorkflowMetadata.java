@@ -1,0 +1,22 @@
+package io.github.windyzhu3.ontologylaw.opportunity.internal.persistence;
+import io.github.windyzhu3.ontologylaw.opportunity.QuoteWorkflowService;
+import io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Subject;
+import java.sql.*;import java.time.*;import java.util.*;
+/** Safe metadata-only lookup; exact selectors and same-transaction provenance are checked before event emission. */
+public final class JdbcQuoteWorkflowMetadata {
+ private JdbcQuoteWorkflowMetadata(){}
+ public static QuoteWorkflowService.Metadata read(Connection c,UUID tenant,Subject exact)throws SQLException{
+  String query=switch(exact.type()){
+   case "opportunity.quote_termination" -> "select opportunity_id oid,recorded_by actor,created_at,revision,null::bytea digest,created_in_transaction=pg_current_xact_id() fresh from opportunity.quote_termination where tenant_id=? and quote_termination_id=?";
+   case "opportunity.quote_preparation_intent" -> "select opportunity_id oid,requested_by actor,created_at,revision,null::bytea digest,created_in_transaction=pg_current_xact_id() fresh from opportunity.quote_preparation_intent where tenant_id=? and quote_preparation_intent_id=?";
+   case "opportunity.quote_draft" -> "select opportunity_id oid,owner_appointment_id actor,created_at,revision,null::bytea digest,created_in_transaction=pg_current_xact_id() fresh from opportunity.quote_draft where tenant_id=? and quote_draft_id=?";
+   case "opportunity.quote_revision" -> "select q.opportunity_id oid,q.created_by_appointment_id actor,q.created_at,null::bigint revision,q.content_digest digest,b.created_in_transaction=pg_current_xact_id() fresh from opportunity.quote_revision q join opportunity.quote_package_basis b on b.tenant_id=q.tenant_id and b.quote_revision_id=q.quote_revision_id where q.tenant_id=? and q.quote_revision_id=?";
+   case "opportunity.quote_approval_request" -> "select q.opportunity_id oid,r.requested_by actor,r.created_at,r.revision,null::bytea digest,r.created_in_transaction=pg_current_xact_id() fresh from opportunity.quote_approval_request r join opportunity.quote_revision q on q.tenant_id=r.tenant_id and q.quote_revision_id=r.quote_revision_id where r.tenant_id=? and r.quote_approval_request_id=?";
+   case "opportunity.quote_approval_decision" -> "select q.opportunity_id oid,m.appointment_id actor,d.created_at,d.revision,null::bytea digest,d.created_in_transaction=pg_current_xact_id() fresh from opportunity.quote_approval_decision d join opportunity.quote_approval_member m on m.tenant_id=d.tenant_id and m.quote_approval_member_id=d.member_id join opportunity.quote_approval_request a on a.tenant_id=m.tenant_id and a.quote_approval_request_id=m.request_id join opportunity.quote_revision q on q.tenant_id=a.tenant_id and q.quote_revision_id=a.quote_revision_id where d.tenant_id=? and d.quote_approval_decision_id=?";
+   case "opportunity.quote_issue" -> "select q.opportunity_id oid,m.recorded_by actor,i.created_at,i.revision,null::bytea digest,i.created_in_transaction=pg_current_xact_id() fresh from opportunity.quote_issue i join opportunity.quote_revision q on q.tenant_id=i.tenant_id and q.quote_revision_id=i.quote_revision_id join opportunity.quote_manual_delivery m on m.tenant_id=i.tenant_id and m.quote_manual_delivery_id=i.delivery_fact_id where i.tenant_id=? and i.quote_issue_id=?";
+   case "opportunity.quote_response" -> "select q.opportunity_id oid,r.recorded_by_appointment_id actor,r.created_at,null::bigint revision,r.response_content_digest digest,r.created_in_transaction=pg_current_xact_id() fresh from opportunity.quote_response r join opportunity.quote_issue i on i.tenant_id=r.tenant_id and i.quote_issue_id=r.quote_issue_id join opportunity.quote_revision q on q.tenant_id=i.tenant_id and q.quote_revision_id=i.quote_revision_id where r.tenant_id=? and r.quote_response_id=?";
+   default -> null;
+  };if(query==null)return null;
+  try(var p=c.prepareStatement(query)){p.setObject(1,tenant);p.setObject(2,exact.id());try(var r=p.executeQuery()){if(!r.next())return null;Long revision=(Long)r.getObject("revision");byte[] digest=r.getBytes("digest");if(!Objects.equals(revision,exact.revision())||!Objects.equals(digest==null?null:Base64.getUrlEncoder().withoutPadding().encodeToString(digest),exact.hash()))return null;return new QuoteWorkflowService.Metadata(r.getObject("oid",UUID.class),r.getObject("actor",UUID.class),r.getObject("created_at",OffsetDateTime.class).toInstant(),r.getBoolean("fresh"));}}
+ }
+}

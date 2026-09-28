@@ -1,4 +1,6 @@
-import type { Card, Values } from "./contract";
+import type { StandardCard as Card, Values } from "./contract";
+import { localTime } from "./localTime";
+import { OpportunityProgressForm } from "./OpportunityProgressForm";
 
 interface Props {
   card: Card;
@@ -11,7 +13,7 @@ export function ActionDraftForm({ card, values, onChange, disabled }: Props) {
     const descriptor = card.commandForm.fields.find((f) => f.name === name);
     if (!descriptor && !fallback) return null;
     const label = descriptor?.label ?? fallback!;
-    const required =
+    const required = name === "reviewAt" || name === "ownerAppointmentId" && card.taskType === "RESOLVE_SOURCE_REQUEST" ? true :
       name === "legalNeed"
         ? values.resultCode === "CONNECTED_VALID"
         : descriptor?.required;
@@ -52,6 +54,8 @@ export function ActionDraftForm({ card, values, onChange, disabled }: Props) {
               </option>
             ))}
           </select>
+        ) : name === "reviewAt" ? (
+          <input {...common} type="datetime-local" value={localTime(value)} onChange={event => {const date=new Date(event.target.value);onChange(name,Number.isFinite(date.getTime())?date.toISOString():"");}} />
         ) : name === "phone" || name === "email" ? (
           <input
             {...common}
@@ -71,6 +75,8 @@ export function ActionDraftForm({ card, values, onChange, disabled }: Props) {
   }
   // Seven explicit registrations; server metadata only supplies authorized labels and choices.
   switch (card.taskType) {
+    case "PROGRESS_OPPORTUNITY":
+      return <OpportunityProgressForm values={values} disabled={disabled} onChange={onChange} />;
     case "RESOLVE_LEAD_DUPLICATE":
       return (
         <>
@@ -94,6 +100,8 @@ export function ActionDraftForm({ card, values, onChange, disabled }: Props) {
       );
     case "ASSIGN_LEAD":
       return <>{field("ownerAppointmentId")}</>;
+    case "RESOLVE_SOURCE_REQUEST":
+      return <>{field("decisionCode")}{values.decisionCode === "ASSIGN_SELECTED" && field("ownerAppointmentId")}{values.decisionCode === "SCHEDULE_REVIEW" && field("reviewAt")}{field("rationaleSummary")}</>;
     case "RESOLVE_LEAD_ROUTING_GAP":
       return (
         <>
@@ -122,3 +130,4 @@ export function ActionDraftForm({ card, values, onChange, disabled }: Props) {
       );
   }
 }
+

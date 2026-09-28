@@ -11,20 +11,39 @@ import io.github.windyzhu3.ontologylaw.identity.AuthorizationService;
 import java.time.Instant;
 
 class CurrentWorkCardIT extends WorkcardTestFixture {
+    @Test void changed_lead_basis_disables_all_seven_r1_cards_without_rebasing_on_read()throws Exception {
+        for(var type:r1TaskTypes()) {
+            setupCard(type);
+            try(var c=database.adminConnection();var q=c.prepareStatement("update lead.lead set disposition_code='KEEP_SEPARATE',revision=revision+1 where tenant_id=? and lead_id=?")) {
+                q.setObject(1,seed.tenant());q.setObject(2,current.lead().id());assertEquals(1,q.executeUpdate());
+            }
+            var response=readCard(null);assertEquals(200,response.status());
+            var card=(Map<?,?>)response.body().get("currentCard");
+            // Some exact causal projections safely suppress a stale task altogether.
+            assertEquals(false,((Map<?,?>)response.body().get("chatComposer")).get("enabled"),type.name());
+            if(card==null)continue;
+            assertEquals("REFRESH_RECOMMENDED",card.get("versionStatus"));
+            assertEquals(false,((Map<?,?>)card.get("primaryCommand")).get("enabled"),type.name());
+            assertEquals(current.selector().revision(),card.get("taskRevision"));
+        }
+    }
     // Catches a missing variant, wrong Owner/source selectors, leaked fields, and a missing per-source Audit.
     @Test void seven_cards_have_exact_sources_owner_and_frozen_shape()throws Exception {
         int[] counts={7,5,8,5,6,6,6};int index=0;
-        for(var type:TaskFactory.Type.values()) {
+        for(var type:r1TaskTypes()) {
             setupCard(type);
             try(var c=database.apiConnection()) {
                 var response=new CurrentWorkCardDisclosureService(protection,policies,"WORKCARD_IT").read(c,seed.request().actor(),UUID.randomUUID(),null);
                 assertNotNull(response);assertEquals(200,response.status());var body=response.body();assertNotNull(body);
                 OpenApiContractTest.assertCurrentWorkcardWire(body);
-                assertEquals(Set.of("todaySummary","currentCard","nextSummaries","waitingCount","chatComposer"),body.keySet());
+                assertEquals(Set.of("todaySummary","currentCard","nextSummaries","waitingCount","chatComposer","myTasks","recommendedTaskId"),body.keySet());
                 var card=(Map<?,?>)body.get("currentCard");assertNotNull(card);assertEquals(type.name(),card.get("taskType"));assertEquals(current.selector().id().toString(),card.get("taskId"));
                 assertEquals(Set.of("taskId","taskType","taskRevision","subject","owner","businessPurpose","primaryCommand","expectedCompletionFact","sla","versionStatus","commandForm","actionDraft","preconditions"),card.keySet());
                 assertEquals(Map.of("displayName","fixture","organizationLabel","fixture"),card.get("owner"));
                 assertEquals(type.command,((Map<?,?>)card.get("primaryCommand")).get("code"));assertNull(card.get("actionDraft"));
+                var mine=(List<Map<String,Object>>)body.get("myTasks");
+                assertEquals(1,mine.size());
+                assertEquals(io.github.windyzhu3.ontologylaw.execution.PublicFactReferences.reference(seed.request().actor(),current.lead().type(),current.lead().id()),mine.getFirst().get("subjectFactRef"));
                 assertEquals(List.of(),body.get("nextSummaries"));assertEquals(0,body.get("waitingCount"));
                 assertEquals("private, no-cache",response.cacheControl());assertEquals("Authorization",response.vary());
                 assertTrue(response.etag().matches("\"wb\\.[A-Za-z0-9_-]{43}\""));
@@ -107,9 +126,10 @@ class CurrentWorkCardIT extends WorkcardTestFixture {
     }
     @Test void every_variant_restores_and_seals_its_validated_draft_with_one_extra_exact_audit_source()throws Exception {
         int[] counts={8,6,9,6,7,7,7};int index=0;
-        for(var type:TaskFactory.Type.values()) {
+        for(var type:r1TaskTypes()) {
             setupCard(type);
             Map<String,Object> values=switch(type) {
+                case CLASSIFY_MATTER,ACCEPT_TRANSFER,SUPPLEMENT_TRANSFER,PREPARE_TRANSFER,REVIEW_TRANSFER,CHECK_CONTRACT_RECEIPT,SUPPLEMENT_CONTRACT_RECEIPT,CHECK_CONTRACT_EXECUTION,RESOLVE_SOURCE_REQUEST,REVIEW_CONTRACT_TERMINATION,ARRANGE_CONTRACT_SIGNATURE,COLLECT_CONTRACT_SIGNATURE,VERIFY_CONTRACT_SIGNATURE,ARCHIVE_CONTRACT_SIGNATURE,REQUEST_CONTRACT_PREPARATION,DECIDE_CONTRACT_PREPARATION,PREPARE_CONTRACT,SUBMIT_CONTRACT_REVIEW,REVIEW_CONTRACT,SUBMIT_CONTRACT_APPROVAL,APPROVE_CONTRACT,SUPPLEMENT_CONTRACT_REVIEW,PREPARE_QUOTE,SUBMIT_QUOTE_APPROVAL,APPROVE_QUOTE,DELIVER_QUOTE,RECORD_QUOTE_REPLY,RESOLVE_QUOTE_AUTHORITY,PROGRESS_OPPORTUNITY -> throw new IllegalArgumentException("R1 fixture requires an activated Lead command");
                 case RESOLVE_LEAD_DUPLICATE -> Map.of("decisionCode","KEEP_SEPARATE","candidateLeadId",secondaryLead.toString(),"candidateLeadRevision",1L,"partyId",secondaryParty.toString(),"partyRevision",0L,"rationaleSummary","归属说明");
                 case COMPLETE_LEAD_INGRESS -> Map.of("phone","+12025550126","sourceCode","OWNER_CONFIRMED","sourceSummary","来源说明");
                 case ASSIGN_LEAD -> Map.of("ownerAppointmentId",secondaryAppointment.toString());
@@ -123,5 +143,11 @@ class CurrentWorkCardIT extends WorkcardTestFixture {
             saveDraft(values,true);var sealed=readCard(open.etag());assertEquals(200,sealed.status());OpenApiContractTest.assertCurrentWorkcardWire(sealed.body());
             assertEquals(false,((Map<?,?>)((Map<?,?>)sealed.body().get("currentCard")).get("actionDraft")).get("editable"));assertEquals(counts[index++]*2L,auditCount());
         }
+    }
+    private static List<TaskFactory.Type> r1TaskTypes() {
+        return List.of(TaskFactory.Type.RESOLVE_LEAD_DUPLICATE, TaskFactory.Type.COMPLETE_LEAD_INGRESS,
+                TaskFactory.Type.ASSIGN_LEAD, TaskFactory.Type.RESOLVE_LEAD_ROUTING_GAP,
+                TaskFactory.Type.ACK_SOURCE_INTAKE_STOP_REQUEST, TaskFactory.Type.CONTACT_LEAD,
+                TaskFactory.Type.REVIEW_LEAD_VALIDITY);
     }
 }

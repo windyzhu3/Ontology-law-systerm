@@ -1,0 +1,97 @@
+{
+  "C31": {
+    "label": "合同直接申请待填写",
+    "opportunityId": "01a0c371-6a01-7b39-977e-e099d9c62a65",
+    "stage": null,
+    "actions": [
+      "REQUEST_CONTRACT_PREPARATION"
+    ],
+    "historyCount": 0
+  },
+  "C32": {
+    "label": "合同直接申请待授权",
+    "opportunityId": "01a0c371-a186-768f-9814-e6229b7f7ceb",
+    "stage": "DIRECT_REVIEW",
+    "actions": [
+      "RECORD_CONTRACT_PREPARATION_DECISION"
+    ],
+    "historyCount": 1
+  },
+  "C33": {
+    "label": "合同准备待形成",
+    "opportunityId": "01a0c371-d6fe-774e-a1d9-556105d13cb0",
+    "stage": "PREPARE",
+    "actions": [
+      "REQUEST_CONTRACT_PREPARATION",
+      "SAVE_CONTRACT_DRAFT",
+      "FORM_CONTRACT"
+    ],
+    "historyCount": 3
+  },
+  "C34": {
+    "label": "合同待提交审查",
+    "opportunityId": "01a0c372-0bcb-7db4-a684-34d83c141087",
+    "stage": "SUBMIT_REVIEW",
+    "actions": [
+      "REQUEST_CONTRACT_REVIEW"
+    ],
+    "historyCount": 4
+  },
+  "C35": {
+    "label": "合同冲突审查待处理",
+    "opportunityId": "01a0c372-b850-7f21-b41e-f670ce46e4b5",
+    "stage": "AWAIT_REVIEW",
+    "actions": [
+      "RECORD_CONTRACT_REVIEW"
+    ],
+    "historyCount": 7
+  },
+  "C36": {
+    "label": "合同审查待补正",
+    "opportunityId": "01a0c372-ecac-7795-a15e-3bf658f6e0e6",
+    "stage": "REVIEW_SUPPLEMENT",
+    "actions": [
+      "REQUEST_CONTRACT_PREPARATION",
+      "SAVE_CONTRACT_DRAFT",
+      "FORM_CONTRACT",
+      "REQUEST_CONTRACT_REVIEW"
+    ],
+    "historyCount": 6
+  },
+  "C37": {
+    "label": "合同待提交审批",
+    "opportunityId": "01a0c373-20bf-76bd-8913-f7b35f12b652",
+    "stage": "SUBMIT_APPROVAL",
+    "actions": [
+      "REQUEST_CONTRACT_APPROVAL"
+    ],
+    "historyCount": 6
+  },
+  "C38": {
+    "label": "合同审批待处理",
+    "opportunityId": "01a0c373-547b-7aed-abd9-b2dda711018e",
+    "stage": "AWAIT_APPROVAL",
+    "actions": [
+      "RECORD_CONTRACT_DECISION"
+    ],
+    "historyCount": 7
+  },
+  "C39": {
+    "label": "合同退回待修订",
+    "opportunityId": "01a0c373-8808-7cf3-85b6-db7b1f889487",
+    "stage": "RETURNED",
+    "actions": [
+      "REQUEST_CONTRACT_PREPARATION",
+      "SAVE_CONTRACT_DRAFT",
+      "FORM_CONTRACT"
+    ],
+    "historyCount": 8
+  },
+  "C40": {
+    "label": "合同审批完成待后继安排",
+    "opportunityId": "01a0c373-bb10-746d-8aca-b4eff3ae75da",
+    "stage": "READY_FOR_SIGNATURE",
+    "actions": [],
+    "historyCount": 8
+  }
+}

@@ -61,6 +61,10 @@ ADR = 'docs/adr/ADR-0015-task9-delegated-context.md'
 # DTO/response bindings and metadata; independent inventory checks below give
 # actionable diagnostics and count actual security declarations.
 OPENAPI_SHA256 = '988d8676e0955956d32ef4a33ee65756acb0d6ab221ec023e1be3eeb4650b251'
+try:
+    from scripts.baseline.r2_task_selection_contract import r1_transport_projection
+except ModuleNotFoundError:
+    from r2_task_selection_contract import r1_transport_projection
 
 def canonical_hash(document):
     return hashlib.sha256(json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
@@ -93,6 +97,7 @@ def validate_document(document):
         return ['Task9 OpenAPI transport shape is invalid']
 
 def _validate_document(document):
+    document = r1_transport_projection(document)
     findings = []
     if not isinstance(document, dict) or not isinstance(document.get('paths'), dict):
         return ['Task9 OpenAPI must have real paths']
@@ -210,7 +215,7 @@ def _validate_document(document):
             for value in node:
                 inspect(value)
     inspect(document)
-    if canonical_hash(document) != OPENAPI_SHA256:
+    if canonical_hash(r1_transport_projection(document)) != OPENAPI_SHA256:
         findings.append('Task9 exact approved transport DTO/security/condition contract differs')
     return findings
 

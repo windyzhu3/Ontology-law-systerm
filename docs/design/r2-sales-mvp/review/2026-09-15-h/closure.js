@@ -1,0 +1,24 @@
+const app=document.querySelector('#app');
+const scenes=['entry','waiting','edit','confirm','closed','stale','unknown','revoked','readonly','blocked'];
+let scene=new URLSearchParams(location.search).get('scene')||'entry';if(!scenes.includes(scene))scene='entry';
+let reason='',note='',error='',waiting=scene==='waiting';
+if(scene==='confirm'||scene==='unknown'){reason='客户明确拒绝';note='客户已确认不再继续本次委托洽谈。';}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const btn=(s,a,c='')=>`<button class="${c}" data-action="${a}">${s}</button>`;
+const facts=rows=>`<dl class="detail-facts">${rows.map(([k,v])=>`<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`;
+function detail(){
+ if(scene==='revoked')return '<div class="empty"><h2>当前无法查看此记录</h2><p>权限已变化，客户信息与操作已清除。</p></div>';
+ let out='<h2>海宁公司</h2>'+facts([['负责人','林悦'],['当前事项',scene==='closed'?'本商机已结束':waiting?'等待约定时间后跟进':'联系客户并记录进展'],['原跟进时间','2026-09-18 10:00']]);
+ if(scene==='entry'||scene==='waiting')return out+`<div class="compact-confirm">${waiting?'<p>尚未到约定时间，普通跟进仍按原时间恢复。</p>':btn('办理本次跟进','handle','primary')}<details><summary>其他业务处理</summary><p class="help">仅在本次洽谈确已结束时使用。</p>${btn('结束本次商机','edit')}</details></div>`;
+ if(scene==='readonly')return out+'<p class="help">你可以查看此记录，没有结束商机的权限。</p>';
+ if(scene==='blocked')return out+'<p class="help">已有后续业务需要核对，当前不能从此处结束商机。请交由对应业务负责人处理。</p>';
+ if(scene==='stale')return out+'<div role="status"><h3>当前事项已变化</h3><p>原核对依据已失效，请重新读取后决定。</p>'+btn('重新读取','refresh')+'</div>';
+ if(scene==='closed')return out+facts([['结束原因',reason||'客户明确拒绝'],['说明',note||'客户已确认不再继续本次委托洽谈。'],['处理结果','普通商机跟进已停止；历史记录保留']])+'<p class="help">本商机已结束，不再显示办理或重复结束入口。</p>';
+ if(scene==='unknown')return out+'<h3>正在核对结束结果</h3><p>结果尚未确认，请勿重复提交。确认前保留本次核对内容。</p>'+facts([['结束原因',reason],['说明',note]])+btn('核对本次结果','resolve','primary');
+ if(scene==='confirm')return out+'<h3>核对本次结束</h3>'+facts([['结束原因',reason],['说明',note],['影响',waiting?'取消等待中的普通跟进，不会提前办理':'停止当前普通跟进，不记录虚假的完成进展'],['后续','不再自动生成普通跟进，已有历史保留']])+`<p class="help">结束商机不代表成交、合同签署或案件创建。</p><div class="compact-confirm">${btn('确认结束本次商机','submit','primary')}${btn('返回修改','edit')}</div>`;
+ return out+`<h3>结束本次商机</h3><label class="field">结束原因 *<select id="reason"><option value="">请选择原因</option>${['客户明确拒绝','客户取消需求','其他明确结束原因'].map(x=>`<option ${reason===x?'selected':''}>${x}</option>`).join('')}</select></label><label class="field">情况说明 *<textarea id="note" rows="4" maxlength="1000">${esc(note)}</textarea></label><p class="help">暂时没有回复或等待材料，请继续原跟进安排。</p>${error?'<p role="alert">'+error+'</p>':''}<div class="compact-confirm">${btn('核对结束影响','review','primary')}${btn('继续原跟进安排','cancel')}</div>`;
+}
+function render(){let locked=scene==='unknown'||scene==='confirm'||scene==='edit';app.innerHTML=`<header class="app-header"><div class="brand"><img class="icon" src="../2026-09-14-e/assets/Scales-green.svg" alt="">律所工作助手</div><div class="session">林悦 · 销售</div></header><div class="admin-shell"><aside class="sidebar"><p>业务管理</p><button class="active" aria-current="page">商机台账</button></aside><main id="main" class="admin-main"><div class="admin-heading"><div><h1>商机台账</h1><p>查看有权业务记录，接着办理当前事项。</p></div></div><div class="ledger-split"><section class="list-pane"><div class="toolbar"><label class="search"><span class="sr-only">搜索客户</span><input placeholder="搜索客户" disabled></label></div>${scene==='revoked'?'<div class="empty">当前无法查看这些记录</div>':`<table class="record-table"><thead><tr><th>客户</th><th>状态</th><th>下次行动</th></tr></thead><tbody><tr class="selected"><td><button data-action="detail" ${locked?'disabled':''}>海宁公司</button></td><td data-label="状态">${scene==='closed'?'已结束':waiting?'等待约定时间':'待跟进'}</td><td data-label="下次行动">${scene==='closed'?'无普通跟进事项':'按约定联系客户'}</td></tr></tbody></table>`}<p class="list-foot">仅显示当前有权查看的商机。</p></section><section class="detail-pane">${!locked?btn('返回列表','back','link-button mobile-return'):''}<div id="detail" tabindex="-1">${detail()}</div></section></div></main></div>`;}
+app.addEventListener('input',e=>{if(e.target.id==='note')note=e.target.value;});app.addEventListener('change',e=>{if(e.target.id==='reason')reason=e.target.value;});
+app.addEventListener('click',e=>{const a=e.target.closest('[data-action]')?.dataset.action;if(!a)return;if(a==='detail'){document.querySelector('#detail').focus();document.querySelector('#detail').scrollIntoView({block:'start'});return;}if(a==='back'){document.querySelector('[data-action="detail"]').focus();document.querySelector('.list-pane').scrollIntoView({block:'start'});return;}if(a==='edit'){scene='edit';error='';}if(a==='review'){if(!reason||!note.trim()){error='请填写结束原因和情况说明。';}else scene='confirm';}if(a==='cancel'){scene=waiting?'waiting':'entry';note='';reason='';error='';}if(a==='submit'||a==='resolve')scene='closed';if(a==='refresh')scene='entry';if(a==='handle'){return;}render();});render();
+

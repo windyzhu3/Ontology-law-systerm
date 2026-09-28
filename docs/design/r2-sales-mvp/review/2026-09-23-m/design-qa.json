@@ -1,0 +1,156 @@
+{
+  "checks": [
+    {
+      "width": 1440,
+      "scene": "generate"
+    },
+    {
+      "width": 1440,
+      "scene": "generated"
+    },
+    {
+      "width": 1440,
+      "scene": "generationFailed"
+    },
+    {
+      "width": 1440,
+      "scene": "generationStale"
+    },
+    {
+      "width": 1440,
+      "scene": "templateUnavailable"
+    },
+    {
+      "width": 1440,
+      "scene": "created"
+    },
+    {
+      "width": 1440,
+      "scene": "conflict"
+    },
+    {
+      "width": 1440,
+      "scene": "supplement"
+    },
+    {
+      "width": 1440,
+      "scene": "approval"
+    },
+    {
+      "width": 1440,
+      "scene": "returned"
+    },
+    {
+      "width": 1440,
+      "scene": "allApproved"
+    },
+    {
+      "width": 1440,
+      "scene": "unknown"
+    },
+    {
+      "width": 390,
+      "scene": "generate"
+    },
+    {
+      "width": 390,
+      "scene": "generated"
+    },
+    {
+      "width": 390,
+      "scene": "generationFailed"
+    },
+    {
+      "width": 390,
+      "scene": "generationStale"
+    },
+    {
+      "width": 390,
+      "scene": "templateUnavailable"
+    },
+    {
+      "width": 390,
+      "scene": "created"
+    },
+    {
+      "width": 390,
+      "scene": "conflict"
+    },
+    {
+      "width": 390,
+      "scene": "supplement"
+    },
+    {
+      "width": 390,
+      "scene": "approval"
+    },
+    {
+      "width": 390,
+      "scene": "returned"
+    },
+    {
+      "width": 390,
+      "scene": "allApproved"
+    },
+    {
+      "width": 390,
+      "scene": "unknown"
+    },
+    {
+      "width": 360,
+      "scene": "generate"
+    },
+    {
+      "width": 360,
+      "scene": "generated"
+    },
+    {
+      "width": 360,
+      "scene": "generationFailed"
+    },
+    {
+      "width": 360,
+      "scene": "generationStale"
+    },
+    {
+      "width": 360,
+      "scene": "templateUnavailable"
+    },
+    {
+      "width": 360,
+      "scene": "created"
+    },
+    {
+      "width": 360,
+      "scene": "conflict"
+    },
+    {
+      "width": 360,
+      "scene": "supplement"
+    },
+    {
+      "width": 360,
+      "scene": "approval"
+    },
+    {
+      "width": 360,
+      "scene": "returned"
+    },
+    {
+      "width": 360,
+      "scene": "allApproved"
+    },
+    {
+      "width": 360,
+      "scene": "unknown"
+    }
+  ],
+  "pageErrors": [],
+  "interactions": [
+    "human-confirm-required",
+    "generated-to-review",
+    "retry-generation",
+    "revision-regeneration"
+  ],
+  "scope": "synthetic prototype only"
+}

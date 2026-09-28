@@ -37,7 +37,7 @@ class GeneratedSqlTest(unittest.TestCase):
             self.render(root)
             actual = {str(p.relative_to(root)).replace('\\', '/'): hashlib.sha256(p.read_bytes()).hexdigest()
                       for p in (root / 'db/migration').glob('*.sql')}
-            self.assertEqual(set(HISTORICAL_MIGRATION_SHA256) | {'db/migration/V860__lead_ingress_query_read_capability.sql'}, set(actual))
+            self.assertEqual(set(HISTORICAL_MIGRATION_SHA256) | {'db/migration/V860__lead_ingress_query_read_capability.sql', 'db/migration/V870__r2_lead_independent_names.sql', 'db/migration/V880__r2_opportunity_progress.sql', 'db/migration/V890__r2_opportunity_checkpoint.sql', 'db/migration/V900__r2_owner_exception.sql', 'db/migration/V910__r2_opportunity_closure.sql', 'db/migration/V920__r2_customer_requirements.sql', 'db/migration/V930__r2_materials.sql', 'db/migration/V940__r2_quotes.sql', 'db/migration/V950__r2_quote_runtime.sql', 'db/migration/V960__r2_quote_transaction.sql', 'db/migration/V970__r2_contract_preparation.sql', 'db/migration/V980__r2_contract_versions.sql', 'db/migration/V990__r2_manual_signature.sql'}, set(actual))
             for name, digest in HISTORICAL_MIGRATION_SHA256.items():
                 self.assertEqual(digest, actual[name], name)
 
@@ -68,7 +68,7 @@ class GeneratedSqlTest(unittest.TestCase):
         self.assertNotIn("DROP TABLE", sql)
         self.assertEqual(
             {"lead.lead"},
-            set(re.findall(r"ALTER TABLE ([a-z_]+\.[a-z_]+)", sql)),
+            set(re.findall(r"ALTER TABLE ([a-z0-9_]+\.[a-z0-9_]+)", sql)),
         )
         for column in (
             "ingress_completion_phone_ciphertext",
@@ -195,10 +195,10 @@ class GeneratedSqlTest(unittest.TestCase):
             root = Path(directory)
             self.render(root)
             sql = "\n".join(path.read_text(encoding="utf-8") for path in sorted(root.rglob("*.sql")))
-            created = re.findall(r"CREATE TABLE ([a-z_]+\.[a-z_]+)", sql)
+            created = re.findall(r"CREATE TABLE ([a-z0-9_]+\.[a-z0-9_]+)", sql)
             app_tables = [name for name in created if not name.startswith("platform_meta.")]
-            self.assertEqual(52, len(app_tables))
-            self.assertEqual(["platform_meta.deployment_state"], [name for name in created if name.startswith("platform_meta.")])
+            self.assertEqual(100, len(app_tables))
+            self.assertEqual(["platform_meta.deployment_state", "platform_meta.r2_opportunity_checkpoint"], [name for name in created if name.startswith("platform_meta.")])
             self.assertNotIn("CREATE TABLE platform_meta.flyway_schema_history", sql)
 
     def test_generated_sql_contains_no_forbidden_referential_actions_or_business_enum(self):
@@ -217,7 +217,7 @@ class GeneratedSqlTest(unittest.TestCase):
             root = Path(directory)
             self.render(root)
             sql = "\n".join(path.read_text(encoding="utf-8") for path in sorted(root.rglob("*.sql")))
-            created = re.findall(r"CREATE TABLE ([a-z_]+\.[a-z_]+)", sql)
+            created = re.findall(r"CREATE TABLE ([a-z0-9_]+\.[a-z0-9_]+)", sql)
             for qualified in created:
                 self.assertRegex(sql, rf"COMMENT ON TABLE {re.escape(qualified)} IS '[^']*[\u4e00-\u9fff][^']*'", qualified)
                 self.assertRegex(sql, rf"COMMENT ON TABLE {re.escape(qualified)} IS 'Fact Owner：[^；]+；", qualified)
@@ -227,18 +227,18 @@ class GeneratedSqlTest(unittest.TestCase):
             root = Path(directory)
             self.render(root)
             sql = "\n".join(path.read_text(encoding="utf-8") for path in sorted(root.rglob("*.sql")))
-            created_tables = re.findall(r"CREATE TABLE ([a-z_]+)\.([a-z_]+)", sql)
+            created_tables = re.findall(r"CREATE TABLE ([a-z0-9_]+)\.([a-z0-9_]+)", sql)
             for schema, table in created_tables:
                 self.assertRegex(
                     sql,
                     rf"COMMENT ON INDEX {schema}\.pk_{table} IS '[^']*[\u4e00-\u9fff][^']*'",
                     f"{schema}.pk_{table}",
                 )
-            unique_constraints = re.findall(r"CONSTRAINT ([a-z_]+) UNIQUE \(", sql)
+            unique_constraints = re.findall(r"CONSTRAINT ([a-z0-9_]+) UNIQUE \(", sql)
             for name in unique_constraints:
                 self.assertRegex(
                     sql,
-                    rf"COMMENT ON INDEX [a-z_]+\.{name} IS '[^']*[\u4e00-\u9fff][^']*'",
+                    rf"COMMENT ON INDEX [a-z0-9_]+\.{name} IS '[^']*[\u4e00-\u9fff][^']*'",
                     name,
                 )
 
@@ -247,20 +247,20 @@ class GeneratedSqlTest(unittest.TestCase):
             root = Path(directory)
             self.render(root)
             sql = "\n".join(path.read_text(encoding="utf-8") for path in sorted(root.rglob("*.sql")))
-            for schema in re.findall(r"CREATE SCHEMA IF NOT EXISTS ([a-z_]+);", sql):
+            for schema in re.findall(r"CREATE SCHEMA IF NOT EXISTS ([a-z0-9_]+);", sql):
                 self.assertRegex(
                     sql,
                     rf"COMMENT ON SCHEMA {schema} IS '[^']*[\u4e00-\u9fff][^']*'",
                     schema,
                 )
-            for function in re.findall(r"CREATE FUNCTION ([a-z_]+\.[a-z_]+)\(\)", sql):
+            for function in re.findall(r"CREATE FUNCTION ([a-z0-9_]+\.[a-z0-9_]+)\(\)", sql):
                 self.assertRegex(
                     sql,
                     rf"COMMENT ON FUNCTION {re.escape(function)}\(\) IS\s*'[^']*[\u4e00-\u9fff][^']*'",
                     function,
                 )
             trigger_pattern = re.compile(
-                r"CREATE (?:CONSTRAINT )?TRIGGER ([a-z_]+)\s+.*?\sON ([a-z_]+\.[a-z_]+)\s",
+                r"CREATE (?:CONSTRAINT )?TRIGGER ([a-z0-9_]+)\s+.*?\sON ([a-z0-9_]+\.[a-z0-9_]+)\s",
                 re.DOTALL,
             )
             for trigger, table in trigger_pattern.findall(sql):
@@ -269,7 +269,7 @@ class GeneratedSqlTest(unittest.TestCase):
                     rf"COMMENT ON TRIGGER {trigger} ON {re.escape(table)} IS\s*'[^']*[\u4e00-\u9fff][^']*'",
                     f"{table}.{trigger}",
                 )
-            for view in re.findall(r"CREATE VIEW ([a-z_]+\.[a-z_]+)", sql):
+            for view in re.findall(r"CREATE VIEW ([a-z0-9_]+\.[a-z0-9_]+)", sql):
                 self.assertRegex(
                     sql,
                     rf"COMMENT ON VIEW {re.escape(view)} IS\s*'[^']*[\u4e00-\u9fff][^']*'",
@@ -394,17 +394,17 @@ class GeneratedSqlTest(unittest.TestCase):
             self.render(root)
             manifest = json.loads((root / "schema-contract-manifest.json").read_text(encoding="utf-8"))
             self.assertRegex(manifest["contractSha256"], r"^[0-9a-f]{64}$")
-            self.assertEqual("52-plus-2-v1.2", manifest["contractVersion"])
-            self.assertEqual(21, len(manifest["generatedArtifactSha256"]))
+            self.assertEqual("52-plus-2-r2-v13", manifest["contractVersion"])
+            self.assertEqual(34, len(manifest["generatedArtifactSha256"]))
             for digest in manifest["generatedArtifactSha256"].values():
                 self.assertRegex(digest, r"^[0-9a-f]{64}$")
-            self.assertEqual(52, manifest["applicationTableCount"])
+            self.assertEqual(100, manifest["applicationTableCount"])
             self.assertGreater(len(manifest["physicalForeignKeyWhitelist"]), 52)
-            self.assertEqual(22, len(manifest["typedReferenceRegistry"]))
+            self.assertEqual(24, len(manifest["typedReferenceRegistry"]))
             for slot, entry in manifest["typedReferenceRegistry"].items():
                 self.assertTrue(entry["allowedTargetTypes"], slot)
             tables = [table for schema in manifest["schemas"] for table in schema["tables"]]
-            self.assertEqual(53, len(tables))
+            self.assertEqual(102, len(tables))
             sample = next(table for table in tables if table["qualifiedName"] == "evidence.evidence_binding")
             self.assertIn("columns", sample)
             self.assertIn("constraints", sample)
@@ -444,6 +444,19 @@ class GeneratedSqlTest(unittest.TestCase):
                 "V840__schema_contract_validation.sql",
                 "V850__lead_ingress_completion_slot.sql",
                 "V860__lead_ingress_query_read_capability.sql",
+                "V870__r2_lead_independent_names.sql",
+                "V880__r2_opportunity_progress.sql",
+            "V890__r2_opportunity_checkpoint.sql",
+            "V900__r2_owner_exception.sql",
+            "V910__r2_opportunity_closure.sql",
+            "V920__r2_customer_requirements.sql",
+            "V930__r2_materials.sql",
+            "V940__r2_quotes.sql",
+            "V950__r2_quote_runtime.sql",
+            "V960__r2_quote_transaction.sql",
+        "V970__r2_contract_preparation.sql",
+        "V980__r2_contract_versions.sql",
+        "V990__r2_manual_signature.sql",
             ], names)
 
 

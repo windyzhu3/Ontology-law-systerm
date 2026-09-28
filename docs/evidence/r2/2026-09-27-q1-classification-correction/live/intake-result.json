@@ -1,0 +1,14 @@
+{
+  "phase": "intake",
+  "opportunityId": "01a0e261-44d4-788f-b905-ad718699d212",
+  "receipts": [
+    {
+      "path": "/api/v1/opportunities/01a0e261-44d4-788f-b905-ad718699d212/transfers/intake-decisions",
+      "status": 200,
+      "outcome": "SUCCEEDED",
+      "receiptId": "01a0e27c-29be-775e-a80a-2a8cac4f48cf"
+    }
+  ],
+  "matterContexts": [],
+  "errors": []
+}

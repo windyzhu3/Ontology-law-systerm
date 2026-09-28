@@ -1,0 +1,14 @@
+{
+  "phase": "prepare",
+  "opportunityId": "01a0e261-44d4-788f-b905-ad718699d212",
+  "receipts": [
+    {
+      "path": "/api/v1/opportunities/01a0e261-44d4-788f-b905-ad718699d212/transfers/submissions",
+      "status": 200,
+      "outcome": "SUCCEEDED",
+      "receiptId": "01a0e279-d23e-74b9-b831-07deb0852280"
+    }
+  ],
+  "matterContexts": [],
+  "errors": []
+}

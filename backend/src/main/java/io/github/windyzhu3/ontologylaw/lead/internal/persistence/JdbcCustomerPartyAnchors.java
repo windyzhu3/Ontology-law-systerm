@@ -1,0 +1,6 @@
+package io.github.windyzhu3.ontologylaw.lead.internal.persistence;
+import io.github.windyzhu3.ontologylaw.lead.CustomerPartyAnchors;import io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Subject;
+import java.sql.*;import java.util.*;
+public final class JdbcCustomerPartyAnchors implements CustomerPartyAnchors {
+ public List<Anchor> page(Connection c,UUID tenant,UUID after,int limit)throws SQLException{var out=new ArrayList<Anchor>();try(var p=c.prepareStatement("select l.lead_id,l.revision,a.lead_assignment_id,a.revision,a.owner_appointment_id,l.parsed_party_id from lead.lead l join lead.lead_assignment a on a.tenant_id=l.tenant_id and a.lead_assignment_id=l.current_assignment_id where l.tenant_id=? and l.parsed_party_id is not null and (?::uuid is null or l.lead_id>?::uuid) order by l.lead_id limit ?")){p.setObject(1,tenant);p.setObject(2,after);p.setObject(3,after);p.setInt(4,limit);try(var r=p.executeQuery()){while(r.next())out.add(new Anchor(new Subject("lead.lead",r.getObject(1,UUID.class),r.getLong(2),null),new Subject("lead.lead_assignment",r.getObject(3,UUID.class),r.getLong(4),null),r.getObject(5,UUID.class),r.getObject(6,UUID.class)));}}return List.copyOf(out);}
+}

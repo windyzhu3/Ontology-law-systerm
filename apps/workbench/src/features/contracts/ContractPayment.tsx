@@ -1,0 +1,13 @@
+import {useState} from 'react';
+import {PaymentReview} from './PaymentReview';
+import type {ContractCommand,ContractContext} from './types';
+export const paymentLabels={CHECK_RECEIPT:'核对本笔收款',SUPPLEMENT_RECEIPT:'补充收款凭证',COMPLETE:'本笔收款已核对',OWNER_EXCEPTION:'等待安排收款责任人'};
+export function ContractPayment({context,allowed,submit,onDirty}:{context:ContractContext;allowed:(c:ContractCommand)=>boolean;submit:(c:ContractCommand,v:Record<string,unknown>)=>Promise<boolean>;onDirty:()=>void}){
+ const payment=context.selectedPayment!;const [later,setLater]=useState(false),[error,setError]=useState('');
+ const materials=(context.documents??[]).map(v=>({id:v.id,sha256:v.bodySha256,fileName:v.label}));
+ const command=payment.stage==='COMPLETE'?'REQUEST_CONTRACT_RECEIPT_REVIEW':'SUPPLEMENT_CONTRACT_RECEIPT';
+ if(payment.stage==='CHECK_RECEIPT')return <PaymentReview requiredMinor={payment.requiredMinor} confirmedMinor={payment.confirmedMinor} remainingMinor={payment.remainingMinor} accountLabel={payment.accountLabel??''} materials={materials} disabled={!allowed('RECORD_CONTRACT_RECEIPT_REVIEW')} onDirty={onDirty} submit={input=>submit('RECORD_CONTRACT_RECEIPT_REVIEW',{...input,expectedPaymentWorkflow:payment.selector})}/>;
+ if(payment.stage==='OWNER_EXCEPTION')return <><h2>当前事项等待安排责任人</h2><p>原办理期限保留，安排有权责任人后继续。</p></>;
+ if(payment.stage==='COMPLETE'&&!later)return <><h2>本笔核对已完成</h2><p>已记录本笔核对结果，后续凭证将形成独立事项。</p>{allowed(command)&&<button className="primary" onClick={()=>setLater(true)}>提交后续收款凭证</button>}</>;
+ return <><h2>{later?'提交后续收款凭证':'补充本笔收款材料'}</h2>{payment.explanation&&<p>{payment.explanation}</p>}<form onChange={onDirty} onSubmit={async e=>{e.preventDefault();if(!allowed(command))return;const data=new FormData(e.currentTarget),material=materials.find(v=>v.id===data.get('material')),explanation=String(data.get('explanation')??'').trim();if(!material||!explanation){setError('请选择已接收的凭证，并填写补充说明。');return;}setError('');await submit(command,{expectedPaymentWorkflow:payment.selector,materialVersionId:material.id,materialSha256:material.sha256,explanation});}}><fieldset disabled={!allowed(command)}><legend className="sr-only">收款凭证</legend><label className="field"><span className="field-label">本笔收款凭证</span><select name="material" required defaultValue=""><option value="">请选择已接收的凭证</option>{materials.map(m=><option key={m.id} value={m.id}>{m.fileName}</option>)}</select></label><label className="field"><span className="field-label">补充说明</span><textarea name="explanation" required maxLength={2000} rows={3}/></label>{error&&<p role="alert" className="feedback">{error}</p>}<div className="actions"><button className="primary" type="submit">提交财务核对</button></div></fieldset></form></>;
+}

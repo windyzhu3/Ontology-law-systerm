@@ -135,6 +135,56 @@ public class TaskOccurrence implements Serializable {
      */
     private final byte[] completionFactHash;
 
+    /**
+     * 前序责任身份：R2商机后继跟进绑定已完成责任；初始责任与历史记录为空，创建后不可变。
+     */
+    private final UUID predecessorTaskOccurrenceId;
+
+    /**
+     * 当前有效责任依据的静态注册类型。
+     */
+    private final String responsibilityBasisType;
+
+    /**
+     * 当前有效责任依据在所属租户内的准确标识。
+     */
+    private final UUID responsibilityBasisId;
+
+    /**
+     * 当前有效责任依据的准确修订号；按哈希冻结时为空。
+     */
+    private final Long responsibilityBasisRevision;
+
+    /**
+     * 当前有效责任依据的准确规范摘要；按修订冻结时为空。
+     */
+    private final byte[] responsibilityBasisHash;
+
+    /**
+     * 交接取消依据的静态注册类型。
+     */
+    private final String cancellationFactType;
+
+    /**
+     * 交接取消依据在所属租户内的准确标识。
+     */
+    private final UUID cancellationFactId;
+
+    /**
+     * 交接取消依据的准确修订号；按哈希冻结时为空。
+     */
+    private final Long cancellationFactRevision;
+
+    /**
+     * 交接取消依据的准确规范摘要；按修订冻结时为空。
+     */
+    private final byte[] cancellationFactHash;
+
+    /**
+     * T01同租户准确身份。
+     */
+    private final UUID handoffPredecessorTaskOccurrenceId;
+
     public TaskOccurrence(TaskOccurrence value) {
         this.tenantId = value.tenantId;
         this.taskOccurrenceId = value.taskOccurrenceId;
@@ -159,6 +209,16 @@ public class TaskOccurrence implements Serializable {
         this.completionFactId = value.completionFactId;
         this.completionFactRevision = value.completionFactRevision;
         this.completionFactHash = value.completionFactHash;
+        this.predecessorTaskOccurrenceId = value.predecessorTaskOccurrenceId;
+        this.responsibilityBasisType = value.responsibilityBasisType;
+        this.responsibilityBasisId = value.responsibilityBasisId;
+        this.responsibilityBasisRevision = value.responsibilityBasisRevision;
+        this.responsibilityBasisHash = value.responsibilityBasisHash;
+        this.cancellationFactType = value.cancellationFactType;
+        this.cancellationFactId = value.cancellationFactId;
+        this.cancellationFactRevision = value.cancellationFactRevision;
+        this.cancellationFactHash = value.cancellationFactHash;
+        this.handoffPredecessorTaskOccurrenceId = value.handoffPredecessorTaskOccurrenceId;
     }
 
     public TaskOccurrence(
@@ -184,7 +244,17 @@ public class TaskOccurrence implements Serializable {
         String completionFactType,
         UUID completionFactId,
         Long completionFactRevision,
-        byte[] completionFactHash
+        byte[] completionFactHash,
+        UUID predecessorTaskOccurrenceId,
+        String responsibilityBasisType,
+        UUID responsibilityBasisId,
+        Long responsibilityBasisRevision,
+        byte[] responsibilityBasisHash,
+        String cancellationFactType,
+        UUID cancellationFactId,
+        Long cancellationFactRevision,
+        byte[] cancellationFactHash,
+        UUID handoffPredecessorTaskOccurrenceId
     ) {
         this.tenantId = tenantId;
         this.taskOccurrenceId = taskOccurrenceId;
@@ -209,6 +279,16 @@ public class TaskOccurrence implements Serializable {
         this.completionFactId = completionFactId;
         this.completionFactRevision = completionFactRevision;
         this.completionFactHash = completionFactHash;
+        this.predecessorTaskOccurrenceId = predecessorTaskOccurrenceId;
+        this.responsibilityBasisType = responsibilityBasisType;
+        this.responsibilityBasisId = responsibilityBasisId;
+        this.responsibilityBasisRevision = responsibilityBasisRevision;
+        this.responsibilityBasisHash = responsibilityBasisHash;
+        this.cancellationFactType = cancellationFactType;
+        this.cancellationFactId = cancellationFactId;
+        this.cancellationFactRevision = cancellationFactRevision;
+        this.cancellationFactHash = cancellationFactHash;
+        this.handoffPredecessorTaskOccurrenceId = handoffPredecessorTaskOccurrenceId;
     }
 
     /**
@@ -407,6 +487,96 @@ public class TaskOccurrence implements Serializable {
         return this.completionFactHash;
     }
 
+    /**
+     * Getter for
+     * <code>responsibility.task_occurrence.predecessor_task_occurrence_id</code>.
+     * 前序责任身份：R2商机后继跟进绑定已完成责任；初始责任与历史记录为空，创建后不可变。
+     */
+    public UUID getPredecessorTaskOccurrenceId() {
+        return this.predecessorTaskOccurrenceId;
+    }
+
+    /**
+     * Getter for
+     * <code>responsibility.task_occurrence.responsibility_basis_type</code>.
+     * 当前有效责任依据的静态注册类型。
+     */
+    public String getResponsibilityBasisType() {
+        return this.responsibilityBasisType;
+    }
+
+    /**
+     * Getter for
+     * <code>responsibility.task_occurrence.responsibility_basis_id</code>.
+     * 当前有效责任依据在所属租户内的准确标识。
+     */
+    public UUID getResponsibilityBasisId() {
+        return this.responsibilityBasisId;
+    }
+
+    /**
+     * Getter for
+     * <code>responsibility.task_occurrence.responsibility_basis_revision</code>.
+     * 当前有效责任依据的准确修订号；按哈希冻结时为空。
+     */
+    public Long getResponsibilityBasisRevision() {
+        return this.responsibilityBasisRevision;
+    }
+
+    /**
+     * Getter for
+     * <code>responsibility.task_occurrence.responsibility_basis_hash</code>.
+     * 当前有效责任依据的准确规范摘要；按修订冻结时为空。
+     */
+    public byte[] getResponsibilityBasisHash() {
+        return this.responsibilityBasisHash;
+    }
+
+    /**
+     * Getter for
+     * <code>responsibility.task_occurrence.cancellation_fact_type</code>.
+     * 交接取消依据的静态注册类型。
+     */
+    public String getCancellationFactType() {
+        return this.cancellationFactType;
+    }
+
+    /**
+     * Getter for
+     * <code>responsibility.task_occurrence.cancellation_fact_id</code>.
+     * 交接取消依据在所属租户内的准确标识。
+     */
+    public UUID getCancellationFactId() {
+        return this.cancellationFactId;
+    }
+
+    /**
+     * Getter for
+     * <code>responsibility.task_occurrence.cancellation_fact_revision</code>.
+     * 交接取消依据的准确修订号；按哈希冻结时为空。
+     */
+    public Long getCancellationFactRevision() {
+        return this.cancellationFactRevision;
+    }
+
+    /**
+     * Getter for
+     * <code>responsibility.task_occurrence.cancellation_fact_hash</code>.
+     * 交接取消依据的准确规范摘要；按修订冻结时为空。
+     */
+    public byte[] getCancellationFactHash() {
+        return this.cancellationFactHash;
+    }
+
+    /**
+     * Getter for
+     * <code>responsibility.task_occurrence.handoff_predecessor_task_occurrence_id</code>.
+     * T01同租户准确身份。
+     */
+    public UUID getHandoffPredecessorTaskOccurrenceId() {
+        return this.handoffPredecessorTaskOccurrenceId;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (this == obj)
@@ -554,6 +724,66 @@ public class TaskOccurrence implements Serializable {
         }
         else if (!Arrays.equals(this.completionFactHash, other.completionFactHash))
             return false;
+        if (this.predecessorTaskOccurrenceId == null) {
+            if (other.predecessorTaskOccurrenceId != null)
+                return false;
+        }
+        else if (!this.predecessorTaskOccurrenceId.equals(other.predecessorTaskOccurrenceId))
+            return false;
+        if (this.responsibilityBasisType == null) {
+            if (other.responsibilityBasisType != null)
+                return false;
+        }
+        else if (!this.responsibilityBasisType.equals(other.responsibilityBasisType))
+            return false;
+        if (this.responsibilityBasisId == null) {
+            if (other.responsibilityBasisId != null)
+                return false;
+        }
+        else if (!this.responsibilityBasisId.equals(other.responsibilityBasisId))
+            return false;
+        if (this.responsibilityBasisRevision == null) {
+            if (other.responsibilityBasisRevision != null)
+                return false;
+        }
+        else if (!this.responsibilityBasisRevision.equals(other.responsibilityBasisRevision))
+            return false;
+        if (this.responsibilityBasisHash == null) {
+            if (other.responsibilityBasisHash != null)
+                return false;
+        }
+        else if (!Arrays.equals(this.responsibilityBasisHash, other.responsibilityBasisHash))
+            return false;
+        if (this.cancellationFactType == null) {
+            if (other.cancellationFactType != null)
+                return false;
+        }
+        else if (!this.cancellationFactType.equals(other.cancellationFactType))
+            return false;
+        if (this.cancellationFactId == null) {
+            if (other.cancellationFactId != null)
+                return false;
+        }
+        else if (!this.cancellationFactId.equals(other.cancellationFactId))
+            return false;
+        if (this.cancellationFactRevision == null) {
+            if (other.cancellationFactRevision != null)
+                return false;
+        }
+        else if (!this.cancellationFactRevision.equals(other.cancellationFactRevision))
+            return false;
+        if (this.cancellationFactHash == null) {
+            if (other.cancellationFactHash != null)
+                return false;
+        }
+        else if (!Arrays.equals(this.cancellationFactHash, other.cancellationFactHash))
+            return false;
+        if (this.handoffPredecessorTaskOccurrenceId == null) {
+            if (other.handoffPredecessorTaskOccurrenceId != null)
+                return false;
+        }
+        else if (!this.handoffPredecessorTaskOccurrenceId.equals(other.handoffPredecessorTaskOccurrenceId))
+            return false;
         return true;
     }
 
@@ -584,6 +814,16 @@ public class TaskOccurrence implements Serializable {
         result = prime * result + ((this.completionFactId == null) ? 0 : this.completionFactId.hashCode());
         result = prime * result + ((this.completionFactRevision == null) ? 0 : this.completionFactRevision.hashCode());
         result = prime * result + ((this.completionFactHash == null) ? 0 : Arrays.hashCode(this.completionFactHash));
+        result = prime * result + ((this.predecessorTaskOccurrenceId == null) ? 0 : this.predecessorTaskOccurrenceId.hashCode());
+        result = prime * result + ((this.responsibilityBasisType == null) ? 0 : this.responsibilityBasisType.hashCode());
+        result = prime * result + ((this.responsibilityBasisId == null) ? 0 : this.responsibilityBasisId.hashCode());
+        result = prime * result + ((this.responsibilityBasisRevision == null) ? 0 : this.responsibilityBasisRevision.hashCode());
+        result = prime * result + ((this.responsibilityBasisHash == null) ? 0 : Arrays.hashCode(this.responsibilityBasisHash));
+        result = prime * result + ((this.cancellationFactType == null) ? 0 : this.cancellationFactType.hashCode());
+        result = prime * result + ((this.cancellationFactId == null) ? 0 : this.cancellationFactId.hashCode());
+        result = prime * result + ((this.cancellationFactRevision == null) ? 0 : this.cancellationFactRevision.hashCode());
+        result = prime * result + ((this.cancellationFactHash == null) ? 0 : Arrays.hashCode(this.cancellationFactHash));
+        result = prime * result + ((this.handoffPredecessorTaskOccurrenceId == null) ? 0 : this.handoffPredecessorTaskOccurrenceId.hashCode());
         return result;
     }
 
@@ -614,6 +854,16 @@ public class TaskOccurrence implements Serializable {
         sb.append(", ").append(completionFactId);
         sb.append(", ").append(completionFactRevision);
         sb.append(", ").append("[binary...]");
+        sb.append(", ").append(predecessorTaskOccurrenceId);
+        sb.append(", ").append(responsibilityBasisType);
+        sb.append(", ").append(responsibilityBasisId);
+        sb.append(", ").append(responsibilityBasisRevision);
+        sb.append(", ").append("[binary...]");
+        sb.append(", ").append(cancellationFactType);
+        sb.append(", ").append(cancellationFactId);
+        sb.append(", ").append(cancellationFactRevision);
+        sb.append(", ").append("[binary...]");
+        sb.append(", ").append(handoffPredecessorTaskOccurrenceId);
 
         sb.append(")");
         return sb.toString();

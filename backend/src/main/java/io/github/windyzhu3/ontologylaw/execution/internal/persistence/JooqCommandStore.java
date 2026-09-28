@@ -22,7 +22,7 @@ public final class JooqCommandStore {
     /** Caller already authorized and locked roots/command. Existing keys never rerun new recovery eligibility. */
     public CommandResult existingOrValidateNew(CommandEnvelope e,CommandScope scope,byte[] payloadDigest,CapabilityRoleExecutor.SqlWork<Void> recoveryEligibility)throws SQLException {
         var existing=existing(e,scope,payloadDigest);
-        if(existing==null && e.type().recovery())recoveryEligibility.run(connection);
+        if(existing==null && e.type().internalMaintenance())recoveryEligibility.run(connection);
         return existing;
     }
     private CommandResult existing(CommandEnvelope e,CommandScope scope,byte[] payloadDigest)throws SQLException {

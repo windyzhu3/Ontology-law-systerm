@@ -1,0 +1,112 @@
+{
+  "C44": {
+    "stage": "ARRANGE",
+    "actions": [
+      "SAVE_CONTRACT_SIGNATURE_DRAFT",
+      "CONFIRM_CONTRACT_SIGNATURE_ARRANGEMENT",
+      "RETURN_CONTRACT_FOR_REVISION"
+    ],
+    "task": null,
+    "signatureKeys": [
+      "workflow",
+      "parties",
+      "arrangements",
+      "draftSelector",
+      "draft",
+      "submissions",
+      "handoff"
+    ],
+    "contractStage": "READY_FOR_SIGNATURE",
+    "signingTask": {
+      "revision": 0,
+      "id": "01a0cda7-8f45-706b-95ee-d86c53d1b880"
+    },
+    "handoff": null,
+    "historyCount": 0
+  },
+  "C45": {
+    "stage": "SIGNATURE_COMPLETE",
+    "actions": [],
+    "task": null,
+    "signatureKeys": [
+      "workflow",
+      "parties",
+      "arrangements",
+      "draftSelector",
+      "draft",
+      "submissions",
+      "handoff"
+    ],
+    "contractStage": "READY_FOR_SIGNATURE",
+    "signingTask": null,
+    "handoff": {
+      "state": "AWAITING_EXECUTION_CONDITIONS",
+      "message": "\u7b7e\u7f72\u53ca\u5f52\u6863\u5b8c\u6210\uff1b\u7b49\u5f85\u540e\u7eed\u6267\u884c\u6761\u4ef6\u529e\u7406\u80fd\u529b\uff0c\u5c1a\u672a\u786e\u8ba4\u5408\u540c\u6267\u884c\u3002"
+    },
+    "historyCount": 6
+  },
+  "C46": {
+    "stage": "SUPPLEMENT",
+    "actions": [
+      "SAVE_CONTRACT_SIGNATURE_DRAFT",
+      "SUBMIT_CONTRACT_SIGNATURE",
+      "RETURN_CONTRACT_FOR_REVISION"
+    ],
+    "task": null,
+    "signatureKeys": [
+      "workflow",
+      "parties",
+      "arrangements",
+      "draftSelector",
+      "draft",
+      "submissions",
+      "handoff"
+    ],
+    "contractStage": "READY_FOR_SIGNATURE",
+    "signingTask": {
+      "revision": 0,
+      "id": "01a0cdba-d07a-7cc2-a84a-9b26182dc738"
+    },
+    "handoff": null,
+    "historyCount": 3
+  },
+  "C47": {
+    "stage": "ARRANGE",
+    "actions": [
+      "SAVE_CONTRACT_SIGNATURE_DRAFT",
+      "CONFIRM_CONTRACT_SIGNATURE_ARRANGEMENT",
+      "RETURN_CONTRACT_FOR_REVISION"
+    ],
+    "task": null,
+    "signatureKeys": [
+      "workflow",
+      "parties",
+      "arrangements",
+      "draftSelector",
+      "draft",
+      "submissions",
+      "handoff"
+    ],
+    "contractStage": "READY_FOR_SIGNATURE",
+    "signingTask": {
+      "revision": 0,
+      "id": "01a0cdbb-caa4-744c-9604-3e3efcedbad4"
+    },
+    "handoff": null,
+    "historyCount": 3
+  },
+  "C48": {
+    "stage": null,
+    "actions": [
+      "REQUEST_CONTRACT_PREPARATION",
+      "SAVE_CONTRACT_DRAFT",
+      "FORM_CONTRACT"
+    ],
+    "task": null,
+    "signatureKeys": [],
+    "contractStage": "RETURNED",
+    "signingTask": null,
+    "handoff": null,
+    "historyCount": 2
+  }
+}

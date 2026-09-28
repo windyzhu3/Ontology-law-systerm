@@ -1,4 +1,18 @@
+import {BusinessOverviewPage} from '../businessOverview/BusinessOverviewPage';
+import {createBusinessOverviewTransport} from '../../lib/businessOverviewTransport';
+import {LeadManagementPage} from '../leadManagement/LeadManagementPage';
+import {createLeadManagementTransport} from '../../lib/leadManagementTransport';
+import {TeamManagementRoute} from '../teamManagement/TeamManagementRoute';
+import {createTeamTransport} from '../../lib/teamTransport';
+import {createOwnerExceptionTransport} from '../../lib/ownerExceptionTransport';
+import {ContractLedgerPage} from '../contracts/ContractLedgerPage';
+import {createContractsTransport} from '../../lib/contractsTransport';
+const isLedgerRoute = (path:string) => path === "/management/opportunities";
+const isOwnerManagementRoute = (path: string) => ["/management/team-tasks", "/management/team-tasks/operations"].includes(path);
+import { LeadIntakeApplication, leadIntakeRoute } from "../lead-intake/LeadIntakeApplication";
+import { createLeadIntakeApi } from "../lead-intake/leadIntakeApi";
 import { LoginPage } from "./LoginPage";
+import { consumeLoginDestination, rememberLoginDestination } from './loginDestination';
 import type { SessionRuntime } from "./sessionConfiguration";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -21,8 +35,9 @@ export function SessionApplication({
   controller,
   api,
   identityApi,
+  intakeApi,
   configurationError,
-}: SessionRuntime & { identityApi?: IdentityApi }) {
+}: SessionRuntime & { identityApi?: IdentityApi; intakeApi?: ReturnType<typeof createLeadIntakeApi> }) {
   const [path, setPath] = useState(location.pathname);
   const leaveGuard = useRef<IdentityLeaveGuard | null>(null);
   const currentPath = useRef(path); currentPath.current = path;
@@ -31,7 +46,7 @@ export function SessionApplication({
   useEffect(() => {
     const changed = () => {
       const target = location.pathname;
-      if (leaveGuard.current && isIdentityAdminRoute(currentPath.current)) {
+      if (leaveGuard.current && (isIdentityAdminRoute(currentPath.current) || currentPath.current === leadIntakeRoute)) {
         history.replaceState(null, "", currentPath.current);
         leaveGuard.current(() => { history.replaceState(null, "", target); setPath(target); });
       } else setPath(target);
@@ -51,7 +66,7 @@ export function SessionApplication({
     () => identityApi ?? (controller ? createIdentityApi(controller.recovery, undefined, location.origin) : undefined),
     [controller, identityApi],
   );
-  if (!["/", "/login", "/auth/callback", "/workbench"].includes(path) && !isIdentityAdminRoute(path))
+  if (!["/", "/login", "/auth/callback", "/workbench", leadIntakeRoute].includes(path) && !isIdentityAdminRoute(path) && !isOwnerManagementRoute(path) && !isLedgerRoute(path) && path!=="/management/contracts" && path!=="/management/leads" && path!=="/management/overview")
     return <LoginPage message="此入口暂不可用，请通过工作台入口继续。" />;
   if (!controller || !transport)
     return <LoginPage message={configurationError} />;
@@ -61,6 +76,7 @@ export function SessionApplication({
         controller={controller}
         api={transport}
         identityApi={identityTransport!}
+        intakeApi={intakeApi}
         path={path}
         registerLeaveGuard={registerLeaveGuard}
         guardedLeave={guardedLeave}
@@ -76,12 +92,13 @@ type Admission = {
   controller: SessionController;
   epoch: number;
   scope: string | null;
-  stage: "workbench" | "admin" | "recovery" | "unqualified" | "choosing";
+  stage: "businessOverview" | "leadManagement" | "businessManagement" | "ledger" | "management" | "workbench" | "intake" | "admin" | "recovery" | "unqualified" | "choosing";
 };
 function SessionRoutes({
   controller,
   api,
   identityApi,
+  intakeApi: providedIntakeApi,
   path,
   navigate,
   registerLeaveGuard,
@@ -90,8 +107,9 @@ function SessionRoutes({
   controller: SessionController;
   api: NonNullable<SessionRuntime["api"]>;
   identityApi: IdentityApi;
+  intakeApi?: ReturnType<typeof createLeadIntakeApi>;
   path: string;
-  navigate: (path: "/login" | "/workbench" | IdentityAdminRoute) => void;
+  navigate: (path: "/login" | "/workbench" | typeof leadIntakeRoute | IdentityAdminRoute | "/management/team-tasks" | "/management/team-tasks/operations" | "/management/opportunities" | "/management/contracts" | "/management/leads" | "/management/overview") => void;
   registerLeaveGuard: (guard: IdentityLeaveGuard | null) => void;
   guardedLeave: IdentityLeaveGuard;
 }) {
@@ -99,9 +117,23 @@ function SessionRoutes({
     setup = useSessionSetupReady(),
     actor = useActorSession(),
     workbench = useWorkbenchSession();
+  const [intakeTask, setIntakeTask] = useState<{ id: string; epoch: number; scope: string } | null>(null);
   const [admission, setAdmission] = useState<Admission | null>(null);
   const context = state.context;
+  const loginDestination = useRef<ReturnType<typeof consumeLoginDestination> | null>(null);
+  const overviewIntent = path === "/management/overview";
+  const overviewTransport=useMemo(()=>createBusinessOverviewTransport(),[]);
+  const leadIntent = path === "/management/leads";
+  const leadTransport=useMemo(()=>createLeadManagementTransport(),[]);
+  const businessIntent = path === "/management/contracts";
+  const teamTransport=useMemo(()=>createTeamTransport(),[]);
+  const teamOwnerTransport=useMemo(()=>createOwnerExceptionTransport(controller.recovery),[controller]);
+  const managementContracts = useMemo(()=>createContractsTransport(controller.recovery),[controller]);
+  const ledgerIntent = isLedgerRoute(path);
+  const managementIntent = isOwnerManagementRoute(path);
   const adminIntent = isIdentityAdminRoute(path);
+  const intakeIntent = path === leadIntakeRoute;
+  const intakeApi = useMemo(() => providedIntakeApi ?? createLeadIntakeApi(controller.recovery), [controller, providedIntakeApi]);
   const current =
     admission?.controller === controller &&
     admission.epoch === state.identityEpoch &&
@@ -110,8 +142,14 @@ function SessionRoutes({
   useEffect(() => {
     if (!setup || state.status === "INITIALIZING") return;
     if (state.status === "READY" || state.status === "SELECTING") {
-      if (path !== "/workbench" && !isIdentityAdminRoute(path)) navigate("/workbench");
-    } else if (path !== "/login") navigate("/login");
+      if (path !== "/workbench" && !isIdentityAdminRoute(path) && path !== leadIntakeRoute && !managementIntent && !ledgerIntent && !businessIntent && !leadIntent) {
+        loginDestination.current ??= consumeLoginDestination();
+        navigate(loginDestination.current);
+      }
+    } else if (path !== "/login") {
+      if (state.status === 'SIGNED_OUT') rememberLoginDestination(path);
+      navigate("/login");
+    }
   }, [setup, state.status, path]);
   function selectStage(next: Admission["stage"], expected?: SessionContext) {
     controller.checkLifetime();
@@ -156,13 +194,25 @@ function SessionRoutes({
     selectStage(
       pending
         ? "recovery"
-        : adminIntent
+        : overviewIntent
+          ? selected.canReadBusinessOverview === true && selected.selectedOnBehalfAppointmentId === null ? "businessOverview" : "unqualified"
+        : leadIntent
+          ? selected.canReadLeadManagement === true && selected.selectedOnBehalfAppointmentId === null ? "leadManagement" : "unqualified"
+        : businessIntent
+          ? selected.canReadBusinessManagement === true && selected.selectedOnBehalfAppointmentId === null ? "businessManagement" : "unqualified"
+        : ledgerIntent
+          ? selected.canReadOpportunityLedger === true && selected.selectedOnBehalfAppointmentId === null ? "ledger" : "unqualified"
+        : managementIntent
+          ? (selected.canManageOwnerExceptions === true || path!=="/management/team-tasks/operations"&&selected.canReadTeamTasks === true) && selected.selectedOnBehalfAppointmentId === null ? "management" : "unqualified"
+        : intakeIntent
+          ? selected.selectedOnBehalfAppointmentId === null ? "intake" : "unqualified"
+          : adminIntent
           ? selected.canEnterIdentityAdmin && selected.selectedOnBehalfAppointmentId === null
             ? "admin"
             : "unqualified"
           : selected.canEnterWorkbench
             ? "workbench"
-            : "unqualified",
+            : selected.canReadLeadManagement === true && selected.selectedOnBehalfAppointmentId === null ? "leadManagement" : selected.canReadBusinessManagement === true ? "businessManagement" : selected.canReadTeamTasks === true && selected.selectedOnBehalfAppointmentId === null ? "management" : selected.canReadBusinessOverview === true && selected.selectedOnBehalfAppointmentId === null ? "businessOverview" : "unqualified",
       selected,
     );
   }
@@ -215,6 +265,46 @@ function SessionRoutes({
       />
     );
   }
+  const onOverview = context?.canReadBusinessOverview === true && context.selectedOnBehalfAppointmentId === null ? () => { navigate('/management/overview'); selectStage('businessOverview',context); } : undefined;
+  const onLeads = context?.canReadLeadManagement === true && context.selectedOnBehalfAppointmentId === null ? () => { navigate('/management/leads'); selectStage('leadManagement',context); } : undefined;
+  if(stage === "businessOverview" && actor && context?.canReadBusinessOverview === true && context.selectedOnBehalfAppointmentId === null){
+    return <BusinessOverviewPage session={actor} api={overviewTransport} onLeads={onLeads}
+      onTasks={context.canEnterWorkbench?()=>{navigate('/workbench');selectStage('workbench',context);}:undefined}
+      onOpportunities={context.canReadOpportunityLedger?()=>{navigate('/management/opportunities');selectStage('ledger',context);}:undefined}
+      onContracts={context.canReadBusinessManagement?()=>{navigate('/management/contracts');selectStage('businessManagement',context);}:undefined}
+      onTeam={context.canReadTeamTasks||context.canManageOwnerExceptions?()=>{navigate('/management/team-tasks');selectStage('management',context);}:undefined}
+      sessionActions={<div className="session-actions"><span>{context.displayName}</span><button onClick={()=>selectStage('choosing')}>切换任职</button><button onClick={()=>void controller.logout()}>退出</button></div>}/>;
+  }
+  if(stage === "leadManagement" && actor && context?.canReadLeadManagement === true && context.selectedOnBehalfAppointmentId === null){
+    return <LeadManagementPage onOverview={onOverview} session={actor} api={leadTransport}
+      onTask={id=>{if(!context.canEnterWorkbench)throw Error('当前任职无办理权限');setIntakeTask({id,epoch:actor.identityEpoch,scope:actor.actorScopeKey});navigate('/workbench');selectStage('workbench',context);}}
+      onTasks={context.canEnterWorkbench?()=>{navigate('/workbench');selectStage('workbench',context);}:undefined}
+      onOpportunities={context.canReadOpportunityLedger?()=>{navigate('/management/opportunities');selectStage('ledger',context);}:undefined}
+      onContracts={context.canReadBusinessManagement?()=>{navigate('/management/contracts');selectStage('businessManagement',context);}:undefined}
+      onTeam={context.canReadTeamTasks||context.canManageOwnerExceptions?()=>{navigate('/management/team-tasks');selectStage('management',context);}:undefined}
+      onIntake={()=>{setIntakeTask(null);navigate(leadIntakeRoute);selectStage('intake',context);}}
+      sessionActions={<div className="session-actions"><span>{context.displayName}</span><button onClick={()=>selectStage('choosing')}>切换任职</button><button onClick={()=>void controller.logout()}>退出</button></div>}/>;
+  }
+  if(stage === "businessManagement" && actor && context?.canReadBusinessManagement === true && context.selectedOnBehalfAppointmentId === null){
+    return <ContractLedgerPage onLeads={onLeads} onOverview={onOverview} onTeam={context.canReadTeamTasks||context.canManageOwnerExceptions?()=>{navigate("/management/team-tasks");selectStage("management",context);}:undefined} session={actor} api={managementContracts} initialView="payments" onTasks={context.canEnterWorkbench?()=>{navigate('/workbench');selectStage('workbench',context);}:undefined} onBack={context.canReadOpportunityLedger?()=>{navigate('/management/opportunities');selectStage('ledger',context);}:undefined} onManagementTask={id=>{if(!context.canEnterWorkbench)throw Error('当前任职无办理权限');setIntakeTask({id,epoch:actor.identityEpoch,scope:actor.actorScopeKey});navigate('/workbench');selectStage('workbench',context);}} sessionActions={<div className="session-actions"><span>{context.displayName}</span><button onClick={()=>selectStage('choosing')}>切换任职</button><button onClick={()=>void controller.logout()}>退出</button></div>}/>;
+  }
+  if (stage === "ledger" && actor && context?.canReadOpportunityLedger === true && context.selectedOnBehalfAppointmentId === null) {
+    return <App onLeads={onLeads} onOverview={onOverview} onTeam={context.canReadTeamTasks||context.canManageOwnerExceptions?()=>{navigate("/management/team-tasks");selectStage("management",context);}:undefined} session={actor} api={api} sessionActions={<div className="session-actions"><span>{context.displayName}</span><button onClick={() => selectStage("choosing")}>切换任职</button><button onClick={() => void controller.logout()}>退出</button></div>} />;
+  }
+  if(stage === "management" && path!=="/management/team-tasks/operations" && actor && context?.canReadTeamTasks === true && context.selectedOnBehalfAppointmentId === null){
+    return <TeamManagementRoute onLeads={onLeads} onOverview={onOverview} key={`${actor.actorScopeKey}:${actor.identityEpoch}`} session={actor} api={teamTransport} ownerApi={teamOwnerTransport} sessionActions={<><span>{context.displayName} / 管理模式</span><button onClick={()=>selectStage('choosing')}>切换任职</button><button onClick={()=>void controller.logout()}>退出</button></>} onTask={id=>{if(!context.canEnterWorkbench)throw Error('当前任职无办理权限');setIntakeTask({id,epoch:actor.identityEpoch,scope:actor.actorScopeKey});navigate('/workbench');selectStage('workbench',context);}} onTasks={context.canEnterWorkbench?()=>{navigate('/workbench');selectStage('workbench',context);}:undefined} onOpportunities={context.canReadOpportunityLedger?()=>{navigate('/management/opportunities');selectStage('ledger',context);}:undefined} onContracts={context.canReadBusinessManagement?()=>{navigate('/management/contracts');selectStage('businessManagement',context);}:undefined}/>;
+  }
+  if (stage === "management" && managementIntent && actor && context?.canManageOwnerExceptions === true && context.selectedOnBehalfAppointmentId === null) {
+    return <App onLeads={onLeads} onOverview={onOverview} onTeam={context.canReadTeamTasks||context.canManageOwnerExceptions?()=>{navigate("/management/team-tasks");selectStage("management",context);}:undefined} session={actor} api={api} sessionActions={<div className="session-actions"><span>{context.displayName} / 管理模式</span><button onClick={() => selectStage("choosing")}>切换任职</button><button onClick={() => void controller.logout()}>退出</button></div>} />;
+  }
+  if (stage === "intake" && intakeIntent && actor && context?.selectedOnBehalfAppointmentId === null) {
+    return <LeadIntakeApplication returnLabel={onLeads?"返回客户与线索":undefined} session={actor} api={intakeApi} recovery={controller.recovery}
+      registerLeaveGuard={registerLeaveGuard}
+      onReturn={() => { if(onLeads)onLeads();else {navigate("/workbench"); selectStage(context.canEnterWorkbench ? "workbench" : "choosing");} }}
+      onRecover={() => selectStage("recovery")}
+      onOpenTask={id => { if (actor.isCurrent()) { setIntakeTask({ id, epoch: actor.identityEpoch, scope: actor.actorScopeKey }); navigate("/workbench"); selectStage("workbench", context); } }}
+      sessionActions={<div className="session-actions"><span>{context.displayName}</span><button onClick={() => guardedLeave(() => selectStage("choosing"))}>切换任职</button><button onClick={() => guardedLeave(() => void controller.logout())}>退出</button></div>} />;
+  }
   // Admission is an entry boundary, not a subscription to live App writes.
   // Keeping this branch first preserves its in-memory OriginalWrite and editor.
   if (stage === "workbench" && workbench && context) {
@@ -226,6 +316,11 @@ function SessionRoutes({
     )?.label;
     return (
       <App
+        onLeads={onLeads} onOverview={onOverview}
+        onTeam={context.canReadTeamTasks||context.canManageOwnerExceptions?()=>{navigate("/management/team-tasks");selectStage("management",context);}:undefined}
+        onBusinessManagement={context.canReadBusinessManagement?()=>{navigate("/management/contracts");selectStage("businessManagement",context);}:undefined}
+        initialTaskId={intakeTask?.epoch === state.identityEpoch && intakeTask.scope === context.actorScopeKey ? intakeTask.id : undefined}
+        onIntake={context.selectedOnBehalfAppointmentId === null ? () => { setIntakeTask(null); navigate(leadIntakeRoute); selectStage("intake", context); } : undefined}
         session={workbench}
         api={api}
         sessionActions={
@@ -268,13 +363,25 @@ function SessionRoutes({
           }
           selectStage(
             stage === "recovery"
-              ? adminIntent
+              ? overviewIntent
+                ? context.canReadBusinessOverview === true && context.selectedOnBehalfAppointmentId === null ? "businessOverview" : "unqualified"
+              : leadIntent
+                ? context.canReadLeadManagement === true && context.selectedOnBehalfAppointmentId === null ? "leadManagement" : "unqualified"
+              : businessIntent
+                ? context.canReadBusinessManagement === true && context.selectedOnBehalfAppointmentId === null ? "businessManagement" : "unqualified"
+              : ledgerIntent
+                ? context.canReadOpportunityLedger === true && context.selectedOnBehalfAppointmentId === null ? "ledger" : "unqualified"
+              : managementIntent
+                ? (context.canManageOwnerExceptions === true || path!=="/management/team-tasks/operations"&&context.canReadTeamTasks === true) && context.selectedOnBehalfAppointmentId === null ? "management" : "unqualified"
+              : intakeIntent
+                ? context.selectedOnBehalfAppointmentId === null ? "intake" : "unqualified"
+                : adminIntent
                 ? context.canEnterIdentityAdmin && context.selectedOnBehalfAppointmentId === null
                   ? "admin"
                   : "unqualified"
                 : context.canEnterWorkbench
                   ? "workbench"
-                  : "unqualified"
+                  : context.canReadLeadManagement === true && context.selectedOnBehalfAppointmentId === null ? "leadManagement" : context.canReadBusinessManagement === true ? "businessManagement" : context.canReadTeamTasks === true && context.selectedOnBehalfAppointmentId === null ? "management" : context.canReadBusinessOverview === true && context.selectedOnBehalfAppointmentId === null ? "businessOverview" : "unqualified"
               : "choosing",
             context,
           );
@@ -288,7 +395,13 @@ function SessionRoutes({
       onEnterIdentityAdmin={adminIntent ? undefined : enterIdentityAdmin}
       entryMessage={
         stage === "unqualified"
-          ? adminIntent
+          ? overviewIntent
+            ? "当前任职不能查看经营概览，请确认本人任职具备相关查询权限。"
+              : leadIntent
+            ? "当前任职不能查询客户与线索，请确认本人任职具备查看权限。"
+          : managementIntent
+            ? "当前任职不能进入团队待办，请确认本人任职具备管理资格。"
+          : adminIntent
             ? "当前任职不能进入身份管理；请确认本人任职具备管理资格。"
             : context?.canEnterIdentityAdmin
               ? "当前任职不能进入业务工作台；具备管理资格时可使用身份管理地址。"

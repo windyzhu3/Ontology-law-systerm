@@ -1,0 +1,132 @@
+{
+  "results": [
+    {
+      "scene": "entry",
+      "width": 1487,
+      "overflow": false,
+      "primaries": 1
+    },
+    {
+      "scene": "waiting",
+      "width": 1487,
+      "overflow": false,
+      "primaries": 0
+    },
+    {
+      "scene": "edit",
+      "width": 1487,
+      "overflow": false,
+      "primaries": 1
+    },
+    {
+      "scene": "confirm",
+      "width": 1487,
+      "overflow": false,
+      "primaries": 1
+    },
+    {
+      "scene": "closed",
+      "width": 1487,
+      "overflow": false,
+      "primaries": 0
+    },
+    {
+      "scene": "stale",
+      "width": 1487,
+      "overflow": false,
+      "primaries": 0
+    },
+    {
+      "scene": "unknown",
+      "width": 1487,
+      "overflow": false,
+      "primaries": 1
+    },
+    {
+      "scene": "revoked",
+      "width": 1487,
+      "overflow": false,
+      "primaries": 0
+    },
+    {
+      "scene": "readonly",
+      "width": 1487,
+      "overflow": false,
+      "primaries": 0
+    },
+    {
+      "scene": "blocked",
+      "width": 1487,
+      "overflow": false,
+      "primaries": 0
+    },
+    {
+      "scene": "entry",
+      "width": 360,
+      "overflow": false,
+      "primaries": 1
+    },
+    {
+      "scene": "waiting",
+      "width": 360,
+      "overflow": false,
+      "primaries": 0
+    },
+    {
+      "scene": "edit",
+      "width": 360,
+      "overflow": false,
+      "primaries": 1
+    },
+    {
+      "scene": "confirm",
+      "width": 360,
+      "overflow": false,
+      "primaries": 1
+    },
+    {
+      "scene": "closed",
+      "width": 360,
+      "overflow": false,
+      "primaries": 0
+    },
+    {
+      "scene": "stale",
+      "width": 360,
+      "overflow": false,
+      "primaries": 0
+    },
+    {
+      "scene": "unknown",
+      "width": 360,
+      "overflow": false,
+      "primaries": 1
+    },
+    {
+      "scene": "revoked",
+      "width": 360,
+      "overflow": false,
+      "primaries": 0
+    },
+    {
+      "scene": "readonly",
+      "width": 360,
+      "overflow": false,
+      "primaries": 0
+    },
+    {
+      "scene": "blocked",
+      "width": 360,
+      "overflow": false,
+      "primaries": 0
+    }
+  ],
+  "interactions": [
+    "required-fields",
+    "waiting-close",
+    "terminal-no-write",
+    "unknown-original-result",
+    "revoked-clears-facts"
+  ],
+  "errors": 0
+}

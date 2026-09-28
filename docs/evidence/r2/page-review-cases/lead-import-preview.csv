@@ -1,0 +1,4 @@
+﻿sourceRecordKey,customerName,contactName,phone,legalNeedSummary
+VISUAL-IMPORT-01,页面验收-导入正常行,合成联系人,+8613909190021,纯合成导入预览：服务需求沟通
+VISUAL-IMPORT-02,页面验收-导入待补联系方式,合成联系人,,纯合成导入预览：联系方式待补充
+VISUAL-IMPORT-03,页面验收-导入格式提示,合成联系人,invalid-phone,纯合成导入预览：展示号码格式校验

@@ -1,3 +1,4 @@
+import { createLeadIntakeApi } from "../lead-intake/leadIntakeApi";
 import { StrictMode } from "react";
 import {
   act,
@@ -45,7 +46,7 @@ it.each(["switch", "popstate", "logout"] as const)("guards a dirty identity edit
 it("explicitly leaves an unknown identity original for the existing recovery page without rewriting its clue or payload", async () => {
   history.replaceState(null, "", "/admin/identity/principals");
   const f = fixture({ context: { ...context, canEnterIdentityAdmin: true }, respond: async () => jsonResponse({}, 404) });
-  const identity = identityFixture("/admin/identity/principals", { recovery: f.controller.recovery, handle: async request => { if (request.method !== "GET") throw new Error("lost response"); } });
+  const identity = identityFixture("/admin/identity/principals", { recovery: f.controller.recovery, handle: async request => { if (request.method !== "GET") throw new Error("lost response"); return undefined; } });
   render(<SessionApplication controller={f.controller} api={f.api} identityApi={identity.api} />);
   const confirm = await screen.findByRole("button", { name: "确认本次身份" }); await waitFor(() => expect(confirm).toBeEnabled()); fireEvent.click(confirm);
   fireEvent.click(await screen.findByRole("button", { name: "修改名称" })); fireEvent.change(screen.getByLabelText("显示名称"), { target: { value: "私密改名" } }); fireEvent.click(screen.getByRole("button", { name: "保存名称" }));
@@ -623,10 +624,9 @@ it("T9-L07 keeps dirty input through real renewal and sends only an explicitly c
   });
   expect(screen.getByLabelText("结果说明")).toBe(input);
   expect(input).toHaveValue("尚未保存的输入");
-  expect(screen.getByText("候选尚未保存，请先保存后确认。")).toBeVisible();
-  expect(screen.getByRole("button", { name: "记录联系结果" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "记录联系结果" })).toBeEnabled();
   expect(f.requests.filter((r) => r.method === "POST")).toHaveLength(0);
-  fireEvent.click(screen.getByRole("button", { name: "保存候选" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "记录联系结果" })).toBeEnabled(),
   );
@@ -957,3 +957,138 @@ it.each(["replacement", "expiry"] as const)(
     ).not.toBeInTheDocument();
   },
 );
+
+it("enters real intake from the workbench and protects dirty contents on browser navigation", async () => {
+  const f = fixture();
+  const intakeApi = createLeadIntakeApi(f.controller.recovery, async () => new Response(JSON.stringify({ sources: [{ sourceAccountCode: "SALES", displayName: "客户转介绍", sourceChannelCode: "MANUAL", serviceCategoryCode: "CONSULTATION", jurisdictionCode: "CN", urgencyCode: "NORMAL" }] }), { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } }));
+  render(<SessionApplication controller={f.controller} api={f.api} intakeApi={intakeApi} />);
+  const confirm = await screen.findByRole("button", { name: "确认本次身份" }); await waitFor(() => expect(confirm).toBeEnabled()); fireEvent.click(confirm);
+  const entry = await screen.findByRole("button", { name: "录入线索" }); await waitFor(() => expect(entry).toBeEnabled()); fireEvent.click(entry);
+  fireEvent.change(await screen.findByLabelText("客户名称"), { target: { value: "未保存客户" } });
+  expect(location.pathname).toBe("/business/leads/intake");
+  act(() => { history.replaceState(null, "", "/workbench"); window.dispatchEvent(new PopStateEvent("popstate")); });
+  expect(screen.getByRole("dialog", { name: "放弃本次未保存内容？" })).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "继续填写" }));
+  expect(screen.getByLabelText("客户名称")).toHaveValue("未保存客户");
+  act(() => f.controller.invalidate("EXPIRED"));
+  expect(screen.queryByLabelText("客户名称")).not.toBeInTheDocument();
+});
+
+it("continues from confirmed intake to its exact task and completes it through the shared confirmation", async () => {
+ let completed = false;
+ const body = envelope(5, true), ref = "a".repeat(43);
+ const f = fixture({respond: async request => {
+  if (request.method === "POST") { completed = true; return jsonResponse(receipt(request.headers.get("Idempotency-Key")!)); }
+  return jsonResponse(completed ? {...body, currentCard: null, recommendedTaskId: null, myTasks: [], chatComposer: {...body.chatComposer, targetTaskId: null, enabled: false}} : body);
+ }});
+ const intakeApi = createLeadIntakeApi(f.controller.recovery, async request => {
+  const payload = request.url.endsWith("intake-sources") ? { sources: [{ sourceAccountCode: "SALES", displayName: "客户转介绍", sourceChannelCode: "MANUAL", serviceCategoryCode: "CONSULTATION", jurisdictionCode: "CN", urgencyCode: "NORMAL" }] }
+   : request.method === "POST" ? { ...receipt(request.headers.get("Idempotency-Key")!), resultFact: { factType: "LEAD", factRef: ref, revision: 0 } }
+   : { ...body, myTasks: [{ taskId, businessPurpose: { code: "CONTACT_LEAD", label: "记录联系结果" }, priority: "NORMAL", timeHint: "今天内", subjectFactRef: ref }] };
+  return new Response(JSON.stringify(payload), { status: request.method === "POST" ? 201 : 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "Location": `/api/v1/commands/${request.headers.get("Idempotency-Key")}/receipt` } });
+ });
+ render(<SessionApplication controller={f.controller} api={f.api} intakeApi={intakeApi} />);
+ const confirm = await screen.findByRole("button", { name: "确认本次身份" }); await waitFor(() => expect(confirm).toBeEnabled()); fireEvent.click(confirm);
+ const entry = await screen.findByRole("button", { name: "录入线索" }); await waitFor(() => expect(entry).toBeEnabled()); fireEvent.click(entry);
+ fireEvent.change(await screen.findByLabelText("需求描述"), { target: { value: "客户需求" } }); fireEvent.click(screen.getByRole("button", { name: "保存线索" }));
+ fireEvent.click(await screen.findByRole("button", { name: "继续办理：记录联系结果" }));
+ await waitFor(() => expect(f.requests.some(r => new URL(r.url).searchParams.get("taskId") === taskId)).toBe(true));
+ expect(location.pathname).toBe("/workbench");
+ const complete = await screen.findByRole("button", {name: "保存联系结果"});
+ await waitFor(() => expect(complete).toBeEnabled());
+ fireEvent.click(complete);
+ await waitFor(() => expect(screen.queryByRole("button", {name: "保存联系结果"})).toBeNull());
+ const commands = f.requests.filter(r => r.method === "POST");
+ expect(commands).toHaveLength(1);
+ expect(new URL(commands[0].url).pathname).toContain(taskId);
+ expect(f.requests.at(-1)?.method).toBe("GET");
+ expect(f.controller.recovery.read()).toBeNull();
+});
+it.each(['/management/team-tasks','/management/team-tasks/operations'])('admits management-only direct HUMAN session at %s',async path=>{
+ history.replaceState(null,'',path);
+ const f=fixture({context:{...context,canEnterWorkbench:false,canManageOwnerExceptions:true}});
+ const fetcher=vi.fn().mockResolvedValue(jsonResponse({items:[]}));vi.stubGlobal('fetch',fetcher);
+ render(<SessionApplication controller={f.controller} api={f.api}/>);
+ const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ await screen.findByRole('heading',{name:'团队待办'});
+ await screen.findByRole('heading',{name:'当前授权范围内没有待处置异常'});
+ expect(f.requests).toHaveLength(0);expect(fetcher).toHaveBeenCalledTimes(1);
+});
+it('does not admit manager routes from workbench qualification alone',async()=>{
+ history.replaceState(null,'','/management/team-tasks');const f=fixture();render(<SessionApplication controller={f.controller} api={f.api}/>);
+ const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ await screen.findByText('当前任职不能进入团队待办，请确认本人任职具备管理资格。');expect(f.requests).toHaveLength(0);
+});
+
+
+it.each(['/management/leads','/management/team-tasks','/management/team-tasks/operations','/management/opportunities','/business/leads/intake','/admin/identity/organizations'])('returns to %s after an actual signed-out entry and callback without admitting an appointment', async path => {
+ history.replaceState(null, '', path);
+ const signedOut=fixture({initialize:async()=>false});
+ const first=render(<SessionApplication controller={signedOut.controller} api={signedOut.api}/>);
+ await screen.findByRole('button',{name:'登录工作台'});
+ await waitFor(()=>expect(location.pathname).toBe('/login'));
+ first.unmount();
+ history.replaceState(null,'','/auth/callback');
+ const authenticated=fixture();
+ render(<SessionApplication controller={authenticated.controller} api={authenticated.api}/>);
+ await screen.findByRole('button',{name:'确认本次身份'});
+ await waitFor(()=>expect(location.pathname).toBe(path));
+ expect(screen.queryByRole('main',{name:'责任工作台'})).not.toBeInTheDocument();
+ expect(authenticated.requests).toHaveLength(0);
+});
+
+it('admits an independent management reader without workbench or contract body rights',async()=>{
+ history.replaceState(null,'','/management/contracts');
+ const reads=vi.fn().mockResolvedValue(jsonResponse({items:[],nextCursor:null}));vi.stubGlobal('fetch',reads);
+ const f=fixture({context:{...context,canEnterWorkbench:false,canReadOpportunityLedger:false,canReadBusinessManagement:true}});
+ render(<SessionApplication controller={f.controller} api={f.api}/>);
+ const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ await screen.findByRole('heading',{name:'合同台账'});await screen.findByText('暂无匹配记录。');
+ expect(screen.queryByRole('button',{name:'我的待办'})).toBeNull();expect(screen.queryByRole('button',{name:'商机台账'})).toBeNull();
+ expect(reads).toHaveBeenCalled();expect(reads.mock.calls.every(args=>String(args[0]).startsWith('/api/v1/business-management/payments'))).toBe(true);expect(f.requests).toHaveLength(0);
+ act(()=>f.controller.invalidate('EXPIRED'));expect(screen.queryByRole('heading',{name:'合同台账'})).toBeNull();
+});
+
+it('opens transfer directly for a transfer-only reader without probing payment or contract data',async()=>{
+ history.replaceState(null,'','/management/contracts');const reads=vi.fn().mockResolvedValue(jsonResponse({items:[],nextCursor:null}));vi.stubGlobal('fetch',reads);
+ const f=fixture({context:{...context,canEnterWorkbench:false,canReadBusinessManagement:true,businessManagementViews:['transfer']}});render(<SessionApplication controller={f.controller} api={f.api}/>);
+ const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);await screen.findByText('暂无匹配记录。');
+ expect(screen.getByLabelText('查看内容')).toHaveValue('transfer');expect(screen.queryByRole('option',{name:'收款'})).toBeNull();expect(reads.mock.calls.every(args=>String(args[0]).startsWith('/api/v1/business-management/transfer'))).toBe(true);
+});
+
+it.each(['/management/team-tasks','/workbench'])('admits team-only readers from %s without workcard or exception requests',async(path)=>{
+ history.replaceState(null,'',path);const reads=vi.fn().mockResolvedValue(jsonResponse({items:[],nextCursor:null}));vi.stubGlobal('fetch',reads);
+ const f=fixture({context:{...context,canEnterWorkbench:false,canReadTeamTasks:true,canManageOwnerExceptions:false}});
+ render(<SessionApplication controller={f.controller} api={f.api}/>);
+ const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ await screen.findByRole('heading',{name:'团队待办'});await screen.findByText('当前筛选下没有事项，不代表全部业务已完成。');
+ expect(screen.getByLabelText('查看内容')).toHaveValue('tasks');expect(screen.queryByRole('button',{name:'我的待办'})).toBeNull();expect(f.requests).toHaveLength(0);
+ expect(reads.mock.calls.every(args=>String(args[0]).startsWith('/api/v1/team-management/tasks'))).toBe(true);
+ act(()=>f.controller.invalidate('EXPIRED'));expect(screen.queryByRole('heading',{name:'团队待办'})).toBeNull();
+});
+
+it('returns from business management to team management for a read-only dual-scope reader',async()=>{
+ history.replaceState(null,'','/management/contracts');const reads=vi.fn().mockResolvedValue(jsonResponse({items:[],nextCursor:null}));vi.stubGlobal('fetch',reads);
+ const f=fixture({context:{...context,canEnterWorkbench:false,canReadOpportunityLedger:false,canReadBusinessManagement:true,canReadTeamTasks:true,canManageOwnerExceptions:false}});
+ render(<SessionApplication controller={f.controller} api={f.api}/>);const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ await screen.findByRole('heading',{name:'合同台账'});fireEvent.click(await screen.findByRole('button',{name:'团队待办'}));
+ await screen.findByRole('heading',{name:'团队待办'});expect(location.pathname).toBe('/management/team-tasks');expect(screen.queryByRole('button',{name:'我的待办'})).toBeNull();expect(f.requests).toHaveLength(0);
+});
+
+it.each(['/management/leads','/workbench'])('admits a lead-only reader from %s without requesting business tasks',async(path)=>{
+ history.replaceState(null,'',path);const reads=vi.fn().mockImplementation(async path=>jsonResponse(String(path).endsWith('/sources')?{items:[]}:{items:[],nextCursor:null}));vi.stubGlobal('fetch',reads);
+ const f=fixture({context:{...context,canEnterWorkbench:false,canReadLeadManagement:true,canReadTeamTasks:false,canManageOwnerExceptions:false}});
+ render(<SessionApplication controller={f.controller} api={f.api}/>);const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ await screen.findByRole('heading',{name:'客户与线索'});await screen.findByText('当前筛选下没有有权记录，可继续翻页核对。');expect(screen.queryByRole('button',{name:'我的待办'})).toBeNull();expect(f.requests).toHaveLength(0);expect(reads.mock.calls.every(args=>String(args[0]).startsWith('/api/v1/lead-management/'))).toBe(true);
+ act(()=>f.controller.invalidate('EXPIRED'));expect(screen.queryByRole('heading',{name:'客户与线索'})).toBeNull();
+});
+it('navigates from the read-only team view into the independently authorized lead view',async()=>{
+ history.replaceState(null,'','/management/team-tasks');vi.stubGlobal('fetch',vi.fn().mockImplementation(async path=>jsonResponse(String(path).endsWith('/sources')?{items:[]}:{items:[],nextCursor:null})));
+ const f=fixture({context:{...context,canEnterWorkbench:false,canReadTeamTasks:true,canReadLeadManagement:true,canManageOwnerExceptions:false}});render(<SessionApplication controller={f.controller} api={f.api}/>);const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ await screen.findByRole('heading',{name:'团队待办'});fireEvent.click(screen.getByRole('button',{name:'客户与线索'}));await screen.findByRole('heading',{name:'客户与线索'});expect(location.pathname).toBe('/management/leads');expect(f.requests).toHaveLength(0);
+});
+it.each(['/management/overview','/workbench'])('admits a read-only overview entry from %s and clears it on identity expiry',async(path)=>{
+ history.replaceState(null,'',path);const metrics=[['leads','新增线索'],['opportunities','有效商机'],['signedContracts','签署归档合同'],['acceptedMatters','已接收案件'],['overdueTasks','当前逾期待办']].map(([key,label])=>({key,label,status:'AVAILABLE',count:0}));const reads=vi.fn().mockResolvedValue(jsonResponse({month:'2026-09',asOf:'2026-09-28T01:00:00Z',metrics}));vi.stubGlobal('fetch',reads);
+ const f=fixture({context:{...context,canEnterWorkbench:false,canReadBusinessOverview:true,canReadOpportunityLedger:false,canReadBusinessManagement:false,canReadTeamTasks:false,canReadLeadManagement:false,canManageOwnerExceptions:false}});render(<SessionApplication controller={f.controller} api={f.api}/>);const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ await screen.findByRole('heading',{name:'经营概览'});await screen.findByText('新增线索');expect(f.requests).toHaveLength(0);expect(reads.mock.calls.every(args=>String(args[0])==='/api/v1/business-overview')).toBe(true);act(()=>f.controller.invalidate('EXPIRED'));expect(screen.queryByText('新增线索')).toBeNull();
+});

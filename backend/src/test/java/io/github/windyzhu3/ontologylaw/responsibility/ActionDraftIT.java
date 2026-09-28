@@ -137,7 +137,7 @@ class ActionDraftIT extends PostgresIntegrationTest {
         before(save(UUID.randomUUID(),routing("Reason"),null,"not-star"),"VALIDATION_FAILED");
         before(save(UUID.randomUUID(),routing("Reason"),"\"draft."+"A".repeat(43)+"\"",null),"NOT_FOUND");
     }
-    @ParameterizedTest @EnumSource(TaskFactory.Type.class)
+    @ParameterizedTest @EnumSource(value=TaskFactory.Type.class,names={"RESOLVE_LEAD_DUPLICATE","COMPLETE_LEAD_INGRESS","ASSIGN_LEAD","RESOLVE_LEAD_ROUTING_GAP","ACK_SOURCE_INTAKE_STOP_REQUEST","CONTACT_LEAD","REVIEW_LEAD_VALIDITY"})
     void each_frozen_action_saves_its_required_values_and_rejects_confirmation_fields(TaskFactory.Type type)throws Exception {
         setup(type);var values=candidate(type);
         var invalid=new TreeMap<>(values);invalid.put("draftId",UUID.randomUUID().toString());before(save(UUID.randomUUID(),invalid,null,"*"),"VALIDATION_FAILED");
@@ -153,6 +153,7 @@ class ActionDraftIT extends PostgresIntegrationTest {
     Map<String,Object> candidate(TaskFactory.Type type) {
         String id="10000000-0000-0000-0000-000000000001",hash="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
         return switch(type) {
+            case CLASSIFY_MATTER,ACCEPT_TRANSFER,SUPPLEMENT_TRANSFER,PREPARE_TRANSFER,REVIEW_TRANSFER,CHECK_CONTRACT_RECEIPT,SUPPLEMENT_CONTRACT_RECEIPT,CHECK_CONTRACT_EXECUTION,RESOLVE_SOURCE_REQUEST,REVIEW_CONTRACT_TERMINATION,ARRANGE_CONTRACT_SIGNATURE,COLLECT_CONTRACT_SIGNATURE,VERIFY_CONTRACT_SIGNATURE,ARCHIVE_CONTRACT_SIGNATURE,REQUEST_CONTRACT_PREPARATION,DECIDE_CONTRACT_PREPARATION,PREPARE_CONTRACT,SUBMIT_CONTRACT_REVIEW,REVIEW_CONTRACT,SUBMIT_CONTRACT_APPROVAL,APPROVE_CONTRACT,SUPPLEMENT_CONTRACT_REVIEW,PREPARE_QUOTE,SUBMIT_QUOTE_APPROVAL,APPROVE_QUOTE,DELIVER_QUOTE,RECORD_QUOTE_REPLY,RESOLVE_QUOTE_AUTHORITY,PROGRESS_OPPORTUNITY -> throw new IllegalArgumentException("R1 fixture requires an activated Lead command");
             case RESOLVE_LEAD_DUPLICATE -> Map.of("decisionCode","KEEP_SEPARATE","candidateLeadId",id,"candidateLeadRevision",0L,"partyId",id,"partyRevision",0L,"rationaleSummary","Reason");
             case COMPLETE_LEAD_INGRESS -> Map.of("phone","+12025550123","sourceCode","OWNER_CONFIRMED","sourceSummary","Source");
             case ASSIGN_LEAD -> Map.of("ownerAppointmentId",seed.appointment().toString());

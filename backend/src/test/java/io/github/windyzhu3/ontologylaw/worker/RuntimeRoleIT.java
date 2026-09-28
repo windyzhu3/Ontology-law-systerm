@@ -19,6 +19,19 @@ import org.junit.jupiter.api.io.TempDir;
 
 class RuntimeRoleIT extends R1ProductionFixture {
     @TempDir Path directory;
+    @Test void failed_worker_assembly_closes_the_new_pool()throws Exception {
+        setupContact();var deployed=deployment(directory);
+        var settings=new java.util.HashMap<String,Object>();settings.putAll(deployed.worker());
+        settings.put("ols.worker.api-origin","https://invalid.example");
+        // Force a deterministic failure after a successful database health check.
+        settings.put("ols.worker.bindings[0].key-store-path",directory.resolve("missing-keystore.p12").toString());
+        var environment=new org.springframework.core.env.StandardEnvironment();
+        environment.getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("pool-failure",settings));
+        var before=poolThreads();
+        assertThrows(IllegalStateException.class,()->R1WorkerDeployment.from(environment));
+        assertEquals(before,poolThreads(),"failed assembly leaked a pool housekeeper");
+    }
+    private static java.util.Set<String> poolThreads(){return Thread.getAllStackTraces().keySet().stream().filter(t->t.isAlive()&&t.getName().contains("HikariPool")&&t.getName().contains("housekeeper")).map(Thread::getName).collect(java.util.stream.Collectors.toSet());}
     @Test void production_worker_is_not_ready_before_all_remote_loops_have_succeeded()throws Exception {
         setupContact();var deployment=deployment(directory);int port;try(var socket=new ServerSocket(0)){port=socket.getLocalPort();}deployment.worker().put("ols.worker.api-origin","https://localhost:"+port);
         try(var context=new SpringApplicationBuilder(OntologyLawApplication.class).properties(deployment.worker()).run()) {

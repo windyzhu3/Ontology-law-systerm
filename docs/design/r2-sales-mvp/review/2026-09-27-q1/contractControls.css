@@ -1,0 +1,5 @@
+/* Keep the frozen E checked-label dimensions despite the application-wide text-input minimum. */
+.checked-label.contract-checkbox input[type="checkbox"] {
+  min-height: 18px;
+  padding: 0;
+}

@@ -1,0 +1,11 @@
+{
+  "receipts": [
+    {
+      "path": "/api/v1/opportunities/01a0e261-44d4-788f-b905-ad718699d212/transfers/classifications",
+      "status": 200,
+      "outcome": "SUCCEEDED",
+      "receiptId": "01a0e27d-447f-7b66-bfa7-79aba56e53b9"
+    }
+  ],
+  "errors": []
+}

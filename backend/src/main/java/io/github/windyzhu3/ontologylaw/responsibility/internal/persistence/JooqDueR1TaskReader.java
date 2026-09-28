@@ -10,7 +10,7 @@ import static io.github.windyzhu3.ontologylaw.responsibility.internal.persistenc
 
 public final class JooqDueR1TaskReader implements DueR1TaskReader {
     public List<Position> scan(Connection c,UUID tenant,TaskFactory.Type type,Set<UUID> owners,Instant observed,Position after,int limit) {
-        if(limit<1||limit>100||!Set.of(TaskFactory.Type.CONTACT_LEAD,TaskFactory.Type.RESOLVE_LEAD_ROUTING_GAP).contains(type))throw new IllegalArgumentException("Invalid due scan");
+        if(limit<1||limit>100||!Set.of(TaskFactory.Type.CONTACT_LEAD,TaskFactory.Type.RESOLVE_LEAD_ROUTING_GAP,TaskFactory.Type.RESOLVE_SOURCE_REQUEST).contains(type))throw new IllegalArgumentException("Invalid due scan");
         if(owners.isEmpty())return List.of();var t=TASK_OCCURRENCE;var w=WAIT_RECEIPT;var later=WAIT_RECEIPT.as("later_wait");
         Condition predicate=t.TENANT_ID.eq(tenant).and(t.OWNER_APPOINTMENT_ID.in(owners)).and(t.BUSINESS_PURPOSE_CODE.eq(type.name())).and(t.STATE.eq("WAITING"))
             .and(w.RESUME_DUE_AT.le(observed.atOffset(ZoneOffset.UTC)))

@@ -90,6 +90,14 @@ export function useActorSession(): WorkbenchSession | null {
       selectedAppointmentId: context.selectedAppointmentId,
       selectedOnBehalfAppointmentId: context.selectedOnBehalfAppointmentId,
       displayName: context.displayName,
+      canEnterWorkbench: context.canEnterWorkbench,
+      canReadOpportunityLedger: context.canReadOpportunityLedger,
+      canReadBusinessManagement: context.canReadBusinessManagement,
+      canReadTeamTasks: context.canReadTeamTasks,
+      canReadBusinessOverview: context.canReadBusinessOverview,
+      canReadLeadManagement: context.canReadLeadManagement,
+      canManageOwnerExceptions: context.canManageOwnerExceptions,
+      businessManagementViews: context.businessManagementViews,
       getValidAccessToken: () => controller.getValidAccessToken(),
       isCurrent: () =>
         controller.getSnapshot().identityEpoch === identityEpoch &&

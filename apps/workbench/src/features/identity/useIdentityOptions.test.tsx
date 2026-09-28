@@ -28,3 +28,11 @@ it("invalidates old page-qualified options immediately and ignores their late re
   first.resolve(json({ page: "APPOINTMENTS", optionKind: "PRINCIPAL", candidates: { items: [{ id: selectorId, label: "旧页面人员" }], nextCursor: null }, roleCodes: roles, grantableAuthorityCodes: [] }));
   await act(async () => {}); expect(result.current.items[0].label).toBe("新页面组织"); expect(result.current.roleCodes).toEqual([]);
 });
+
+it('retains all five registered T01 authority choices without issuing any grant',async()=>{
+ const f=fixture('/admin/identity/authority-grants');
+ const {result}=renderHook(()=>useIdentityOptions(f.session,f.api,'AUTHORITY_GRANTS','APPOINTMENT'));
+ await waitFor(()=>expect(result.current.loading).toBe(false));
+ await waitFor(()=>expect(result.current.authorityCodes).toEqual(expect.arrayContaining(['SALES_OPPORTUNITY_OWNER','OPPORTUNITY_OWNER_EXCEPTION_DISCOVER','OPPORTUNITY_OWNER_EXCEPTION_READ','OPPORTUNITY_OWNER_EXCEPTION_RESOLVE','OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ'])));
+ expect(result.current.authorityCodes).not.toContain('SYSTEM_ADMIN');expect(f.writes).toHaveLength(0);
+});

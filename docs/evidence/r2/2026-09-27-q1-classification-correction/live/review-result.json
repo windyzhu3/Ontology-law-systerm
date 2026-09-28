@@ -1,0 +1,14 @@
+{
+  "phase": "review",
+  "opportunityId": "01a0e261-44d4-788f-b905-ad718699d212",
+  "receipts": [
+    {
+      "path": "/api/v1/opportunities/01a0e261-44d4-788f-b905-ad718699d212/transfers/conflict-reviews",
+      "status": 200,
+      "outcome": "SUCCEEDED",
+      "receiptId": "01a0e27b-d558-7ec0-9336-7f26be176bc6"
+    }
+  ],
+  "matterContexts": [],
+  "errors": []
+}

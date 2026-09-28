@@ -1,0 +1,91 @@
+"""Exact R2_OPPORTUNITY_WORKCARD_V1 transport; keeps the R1 card registrations intact."""
+from copy import deepcopy
+PROFILE='R2_OPPORTUNITY_WORKCARD_V1'
+SCHEMAS={'R2OpportunitySubjectV1': {'type': 'object',
+                            'additionalProperties': False,
+                            'required': ['subjectType', 'subjectRef', 'subjectRevision', 'title'],
+                            'properties': {'subjectType': {'type': 'string', 'enum': ['OPPORTUNITY']},
+                                           'subjectRef': {'$ref': '#/components/schemas/OpaqueRef'},
+                                           'subjectRevision': {'$ref': '#/components/schemas/Revision'},
+                                           'title': {'$ref': '#/components/schemas/SafeText200'},
+                                           'subtitle': {'type': 'string',
+                                                        'minLength': 1,
+                                                        'maxLength': 300,
+                                                        'pattern': '^[^\\u0000-\\u001F\\u007F-\\u009F]+$'}}},
+ 'R2OpportunityFormV1': {'type': 'object',
+                         'additionalProperties': False,
+                         'required': ['actionCode', 'schemaVersion', 'values', 'fields'],
+                         'properties': {'actionCode': {'type': 'string',
+                                                       'enum': ['RECORD_OPPORTUNITY_PROGRESS']},
+                                        'schemaVersion': {'type': 'integer', 'enum': [1]},
+                                        'values': {'oneOf': [{'type': 'object',
+                                                              'additionalProperties': False,
+                                                              'maxProperties': 0},
+                                                             {'$ref': '#/components/schemas/OpportunityProgressValuesV1'}]},
+                                        'fields': {'type': 'array',
+                                                   'maxItems': 0,
+                                                   'items': {'$ref': '#/components/schemas/FormField'}}}},
+ 'R2OpportunityCurrentCardV1': {'type': 'object',
+                                'additionalProperties': False,
+                                'required': ['taskId',
+                                             'taskType',
+                                             'taskRevision',
+                                             'subject',
+                                             'owner',
+                                             'businessPurpose',
+                                             'primaryCommand',
+                                             'expectedCompletionFact',
+                                             'sla',
+                                             'versionStatus',
+                                             'commandForm',
+                                             'actionDraft',
+                                             'preconditions'],
+                                'properties': {'taskId': {'$ref': '#/components/schemas/Uuid'},
+                                               'taskType': {'type': 'string',
+                                                            'enum': ['PROGRESS_OPPORTUNITY']},
+                                               'taskRevision': {'$ref': '#/components/schemas/Revision'},
+                                               'subject': {'$ref': '#/components/schemas/R2OpportunitySubjectV1'},
+                                               'owner': {'$ref': '#/components/schemas/OwnerSummary'},
+                                               'businessPurpose': {'type': 'object',
+                                                                   'additionalProperties': False,
+                                                                   'required': ['code', 'label'],
+                                                                   'properties': {'code': {'type': 'string',
+                                                                                           'enum': ['PROGRESS_OPPORTUNITY']},
+                                                                                  'label': {'$ref': '#/components/schemas/SafeText200'}}},
+                                               'primaryCommand': {'type': 'object',
+                                                                  'additionalProperties': False,
+                                                                  'required': ['code', 'label', 'enabled'],
+                                                                  'properties': {'code': {'type': 'string',
+                                                                                          'enum': ['RECORD_OPPORTUNITY_PROGRESS']},
+                                                                                 'label': {'$ref': '#/components/schemas/SafeText200'},
+                                                                                 'enabled': {'type': 'boolean'}}},
+                                               'expectedCompletionFact': {'type': 'string',
+                                                                          'enum': ['OPPORTUNITY_PROGRESS']},
+                                               'sla': {'$ref': '#/components/schemas/SlaSummary'},
+                                               'versionStatus': {'type': 'string',
+                                                                 'enum': ['CURRENT', 'REFRESH_RECOMMENDED']},
+                                               'commandForm': {'$ref': '#/components/schemas/R2OpportunityFormV1'},
+                                               'actionDraft': {'oneOf': [{'$ref': '#/components/schemas/OpportunityProgressDraftProjectionV1'},
+                                                                         {'type': 'null'}]},
+                                               'preconditions': {'$ref': '#/components/schemas/PreconditionTokens'}}},
+ 'R2CurrentCardV1': {'oneOf': [{'$ref': '#/components/schemas/ResolveLeadDuplicateCurrentCard'},
+                               {'$ref': '#/components/schemas/CompleteLeadIngressCurrentCard'},
+                               {'$ref': '#/components/schemas/AssignLeadCurrentCard'},
+                               {'$ref': '#/components/schemas/ResolveLeadRoutingGapCurrentCard'},
+                               {'$ref': '#/components/schemas/AcknowledgeSourceIntakeStopRequestCurrentCard'},
+                               {'$ref': '#/components/schemas/ContactLeadCurrentCard'},
+                               {'$ref': '#/components/schemas/ReviewLeadValidityCurrentCard'},
+                               {'$ref': '#/components/schemas/R2OpportunityCurrentCardV1'}]}}
+
+def card_transport_projection(document):
+    result=deepcopy(document)
+    schemas=result['components']['schemas']
+    selection=schemas['CurrentWorkCardEnvelope']['properties']['currentCard']
+    old={'oneOf':[{'$ref':'#/components/schemas/CurrentCard'},{'type':'null'}]}
+    new={'oneOf':[{'$ref':'#/components/schemas/R2CurrentCardV1'},{'type':'null'}]}
+    if selection==old and not set(SCHEMAS).intersection(schemas):return result
+    if selection!=new:raise ValueError(PROFILE+': exact card selection required')
+    for name,value in SCHEMAS.items():
+        if schemas.pop(name,None)!=value:raise ValueError(PROFILE+': exact closed '+name+' required')
+    schemas['CurrentWorkCardEnvelope']['properties']['currentCard']=old
+    return result

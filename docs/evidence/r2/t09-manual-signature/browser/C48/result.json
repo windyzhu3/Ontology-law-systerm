@@ -1,0 +1,62 @@
+{
+  "success": true,
+  "opportunityId": "01a0cd92-b88e-7884-a4d8-7ea7c1027c6d",
+  "qa": [
+    {
+      "name": "00-initial",
+      "width": 1440,
+      "overflow": false,
+      "primary": [
+        "生成合同正文"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "00-initial",
+      "width": 390,
+      "overflow": false,
+      "primary": [
+        "生成合同正文"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "00-initial",
+      "width": 360,
+      "overflow": false,
+      "primary": [
+        "生成合同正文"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "01-inspect",
+      "width": 1440,
+      "overflow": false,
+      "primary": [
+        "生成合同正文"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "01-inspect",
+      "width": 390,
+      "overflow": false,
+      "primary": [
+        "生成合同正文"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "01-inspect",
+      "width": 360,
+      "overflow": false,
+      "primary": [
+        "生成合同正文"
+      ],
+      "shell": 1
+    }
+  ],
+  "issues": [],
+  "network": []
+}

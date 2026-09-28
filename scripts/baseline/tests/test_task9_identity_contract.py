@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 import yaml
+from scripts.baseline.r2_intake_sources_contract import intake_transport_projection
 
 ROOT = Path(__file__).resolve().parents[3]
 API = ROOT / 'contracts/openapi/ontology-law-api.yaml'
@@ -41,6 +42,7 @@ class Task9IdentityContractTest(unittest.TestCase):
         self.api = yaml.safe_load(API.read_text(encoding='utf-8'))
 
     def assert_inventory(self, document):
+        document = intake_transport_projection(document)
         operations = [(method, path, op) for path, item in document['paths'].items()
                       for method, op in item.items() if method in METHODS]
         self.assertEqual(37, len(operations))
@@ -59,7 +61,8 @@ class Task9IdentityContractTest(unittest.TestCase):
 
     def test_delegated_context_successor_shape(self):
         self.assertEqual('1.4.0', self.api['info']['version'])
-        schemas = self.api['components']['schemas']
+        # Validate the named T01 addition before checking the unchanged historical SELF shape.
+        schemas = intake_transport_projection(self.api)['components']['schemas']
         context = schemas['SessionContextV1']
         self.assertEqual(set(context['properties']), set(context['required']))
         self.assertIn('delegatedAppointmentChoices', context['required'])
@@ -68,7 +71,7 @@ class Task9IdentityContractTest(unittest.TestCase):
         self.assertEqual([], self.validator().validate_document(self.api))
 
     def test_every_public_selector_operation_requires_validation_error_transport(self):
-        public = [(path, method, operation) for path, item in self.api['paths'].items()
+        public = [(path, method, operation) for path, item in intake_transport_projection(self.api)['paths'].items()
                   for method, operation in item.items() if method in METHODS
                   and operation['security'] == [{'publicBearer': []}]]
         self.assertEqual(32, len(public))
@@ -150,9 +153,11 @@ class Task9IdentityContractTest(unittest.TestCase):
 
     def test_inventory_rejects_removed_operation_changed_security_and_missing_not_found(self):
         self.assert_inventory(self.api)
+        # Mutate the validated historical Task9 inventory, not a later successor's frozen delta.
+        historical = intake_transport_projection(self.api)
         for mutation in ('remove-operation', 'change-security', 'remove-not-found'):
             with self.subTest(mutation=mutation):
-                document = copy.deepcopy(self.api)
+                document = copy.deepcopy(historical)
                 if mutation == 'remove-operation':
                     del document['paths']['/api/v1/admin/identity/principals']['post']
                 elif mutation == 'change-security':

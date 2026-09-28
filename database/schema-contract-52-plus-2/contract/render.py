@@ -42,6 +42,7 @@ DOMAIN_OWNERS = {
 }
 
 TABLE_OWNER_OVERRIDES = {
+    "platform_meta.r2_opportunity_checkpoint": "R2OpportunityCheckpointStore",
     "execution.domain_event_outbox": "OutboxDispatcher",
     "external_action.external_action_outbox": "ExternalActionDispatcher",
     "external_action.provider_inbox": "ProviderIngress",
@@ -2301,6 +2302,17 @@ def _render_validation(schemas: Sequence[Schema]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _reference_targets(schemas, slot):
+    from .reference_registry import TYPED_REFERENCE_ALLOWED_TARGETS
+    available = {f"{schema.name}.{table.name}" for schema in schemas for table in schema.tables}
+    # V1050 adds the customer-participant basis to transfer conflict reviews.
+    # Earlier schema projections must retain their original source-item allowlist.
+    return tuple(target for target in TYPED_REFERENCE_ALLOWED_TARGETS[slot] if target in available
+                 and not (slot == 'conflict.conflict_review_party.source_item'
+                          and target == 'opportunity.customer_requirement_participant'
+                          and 'transfer.submission' not in available))
+
+
 def _render_markdown(schemas: Sequence[Schema]) -> str:
     from .reference_registry import TYPED_REFERENCE_ALLOWED_TARGETS
 
@@ -2397,7 +2409,7 @@ def _render_markdown(schemas: Sequence[Schema]) -> str:
                 lines.append(
                     f"| `{schema.name}.{table.name}` | `{ref.prefix}` | {'是' if ref.optional else '否'} | "
                     f"`{', '.join(column.name for column in ref.columns)}` | "
-                    f"`{', '.join(TYPED_REFERENCE_ALLOWED_TARGETS[f'{schema.name}.{table.name}.{ref.prefix}'])}` |"
+                    f"`{', '.join(_reference_targets(schemas, f'{schema.name}.{table.name}.{ref.prefix}'))}` |"
                 )
 
     lines.extend((
@@ -2445,7 +2457,12 @@ def _render_markdown(schemas: Sequence[Schema]) -> str:
         "- 结构验证迁移要求52张应用事实表加上述2张技术表恰好等于54张；任何额外第55张表都会使迁移失败。",
         "",
     ))
-    return "\n".join(lines).rstrip() + "\n"
+    text = "\n".join(lines).rstrip() + "\n"
+    if any(t.name == "r2_opportunity_checkpoint" for s in schemas if s.name == "platform_meta" for t in s.tables):
+        text = text.replace("# 待办驱动律所系统 52＋2 完整字段合同", "# 待办驱动律所系统完整字段合同：52业务表＋3技术表")
+        text = text.replace("是唯一自建技术表", "是发布状态技术表")
+        text = text.replace("- 结构验证迁移要求52张应用事实表加上述2张技术表恰好等于54张；任何额外第55张表都会使迁移失败。", "- 历史V840验证52张业务表和2张技术表；追加V890后为52张业务表和3张技术表，共55张。版本标识52-plus-2-r2-v3沿用合同谱系名称，不表示物理表数仍为54。\n- `platform_meta.r2_opportunity_checkpoint`是新增Worker专用技术检查点，仅保存有界版本化技术状态；Worker只可读取、插入和更新正文/修订/数据库时间，其他应用角色无访问权。")
+    return text
 
 
 def _manifest(
@@ -2464,9 +2481,9 @@ def _manifest(
     manifest = {
         "contractVersion": contract_version,
         "applicationTableCount": len(application_tables),
-        "selfManagedPlatformTableCount": 1,
+        "selfManagedPlatformTableCount": sum(len(s.tables) for s in schemas if s.name == "platform_meta"),
         "flywayManagedTable": "platform_meta.flyway_schema_history",
-        "physicalTableCountAfterFlywayBootstrap": len(application_tables) + 2,
+        "physicalTableCountAfterFlywayBootstrap": len(application_tables) + sum(len(s.tables) for s in schemas if s.name == "platform_meta") + 1,
         "generatedArtifactSha256": dict(sorted(generated_artifact_hashes.items())),
         "fieldContractSha256": field_contract_sha256,
         "schemas": [
@@ -2530,9 +2547,7 @@ def _manifest(
                                 "optional": ref.optional,
                                 "columns": [column.name for column in ref.columns],
                                 "allowedTargetTypes": list(
-                                    TYPED_REFERENCE_ALLOWED_TARGETS[
-                                        f"{schema.name}.{table.name}.{ref.prefix}"
-                                    ]
+                                    _reference_targets(schemas, f"{schema.name}.{table.name}.{ref.prefix}")
                                 ),
                                 "comment": ref.comment,
                             }
@@ -2572,8 +2587,9 @@ def _manifest(
             for fk in table.foreign_keys
         ],
         "typedReferenceRegistry": {
-            slot: {"allowedTargetTypes": list(targets)}
+            slot: {"allowedTargetTypes": list(_reference_targets(schemas, slot))}
             for slot, targets in sorted(TYPED_REFERENCE_ALLOWED_TARGETS.items())
+            if slot in {f"{schema.name}.{table.name}.{ref.prefix}" for schema in schemas for table in schema.tables for ref in table.typed_references}
         },
         "crossRowGuards": [
             {

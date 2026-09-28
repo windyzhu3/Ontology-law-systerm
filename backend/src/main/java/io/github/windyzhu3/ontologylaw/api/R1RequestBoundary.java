@@ -22,6 +22,28 @@ public class R1RequestBoundary implements WebMvcConfigurer {
     });}
     private void check(HttpServletRequest request)throws Exception {
         String path=request.getRequestURI();var op=R1HttpOperations.find(request.getMethod(),path);if(op==null)return;
+        if(path.startsWith("/api/v1/business-overview")||path.startsWith("/api/v1/lead-management/")||path.startsWith("/api/v1/team-management/")||path.startsWith("/api/v1/business-management/")||path.equals("/api/v1/opportunities")||path.startsWith("/api/v1/opportunities/")||path.startsWith("/api/v1/quote-tasks/")||path.startsWith("/api/v1/contract-tasks/")||path.startsWith("/api/v1/transfer-tasks/")||path.equals("/api/v1/contracts")){
+            Set<String> allowed=path.equals("/api/v1/business-overview")?Set.of("month"):path.startsWith("/api/v1/business-overview/")?Set.of("month","limit","cursor"):path.equals("/api/v1/lead-management/leads")?Set.of("limit","cursor","search","source","owner","state"):(path.matches("/api/v1/team-management/(?:tasks|waiting|exceptions|history)")||path.matches("/api/v1/business-management/(?:payments|transfer)")||path.equals("/api/v1/opportunities")||path.equals("/api/v1/contracts"))?Set.of("limit","cursor","search","state"):path.endsWith("/customer-requirements/parties")?Set.of("q"):path.matches("/api/v1/opportunities/[^/]+/materials/versions/[^/]+/content")?Set.of("disposition"):Set.of();
+            for(var parameter:request.getParameterMap().entrySet())if(!allowed.contains(parameter.getKey())||parameter.getValue().length!=1)throw R1HttpFailure.validation("/query","NOT_ALLOWED");
+            if(request.getMethod().equals("GET")&&(request.getContentLengthLong()>0||request.getHeader("Transfer-Encoding")!=null))throw R1HttpFailure.validation("/body","NOT_ALLOWED");
+            for(String header:Collections.list(request.getHeaderNames())){String name=header.toLowerCase(Locale.ROOT);if(name.contains("tenant")||Set.of("x-principal-id","if-match","if-none-match").contains(name))throw R1HttpFailure.validation("/headers","NOT_ALLOWED");}
+        }
+        if(path.startsWith("/api/v1/opportunity-owner-exceptions")||path.startsWith("/internal/v1/opportunity-owner-exceptions/")){
+            boolean internal=path.startsWith("/internal/");boolean get=request.getMethod().equals("GET");
+            Set<String> allowed=!get?Set.of():path.endsWith("/candidates")&&!internal?Set.of("expectedRevision","limit","cursor"):path.matches("/api/v1/opportunity-owner-exceptions/[0-9a-fA-F-]{36}")?Set.of():Set.of("limit","cursor");
+            for(var parameter:request.getParameterMap().entrySet())if(!allowed.contains(parameter.getKey())||parameter.getValue().length!=1)throw R1HttpFailure.validation("/query","NOT_ALLOWED");
+            if(get&&(request.getContentLengthLong()>0||request.getHeader("Transfer-Encoding")!=null))throw R1HttpFailure.validation("/body","NOT_ALLOWED");
+            for(String header:Collections.list(request.getHeaderNames())){String name=header.toLowerCase(Locale.ROOT);if(name.contains("tenant")||Set.of("x-principal-id","if-match","if-none-match").contains(name)||internal&&Set.of("x-appointment-id","x-on-behalf-appointment-id").contains(name))throw R1HttpFailure.validation("/headers","NOT_ALLOWED");}
+        }
+        if(path.startsWith("/internal/v1/opportunity-tasks/")){
+            var allowed=request.getMethod().equals("GET")?Set.of("kind","limit","cursor"):Set.<String>of();
+            for(var parameter:request.getParameterMap().entrySet())if(!allowed.contains(parameter.getKey())||parameter.getValue().length!=1)throw R1HttpFailure.validation("/query","NOT_ALLOWED");
+            if(request.getMethod().equals("GET")&&(request.getContentLengthLong()>0||request.getHeader("Transfer-Encoding")!=null))throw R1HttpFailure.validation("/body","NOT_ALLOWED");
+            for(String header:Collections.list(request.getHeaderNames())){
+                var name=header.toLowerCase(Locale.ROOT);
+                if(name.contains("tenant")||Set.of("x-appointment-id","x-on-behalf-appointment-id","x-principal-id","if-match","if-none-match").contains(name))throw R1HttpFailure.validation("/headers","NOT_ALLOWED");
+            }
+        }
         if(path.startsWith("/api/v1/admin/identity/")) {
             Set<String> allowed=request.getMethod().equals("GET")?path.endsWith("/provider-users")?Set.of("search","limit","cursor"):path.endsWith("/options")?Set.of("page","optionKind","limit","cursor"):Set.of("limit","cursor"):Set.of();
             for(var parameter:request.getParameterMap().entrySet())if(!allowed.contains(parameter.getKey())||parameter.getValue().length!=1)throw R1HttpFailure.validation("/query","NOT_ALLOWED");
@@ -44,7 +66,7 @@ public class R1RequestBoundary implements WebMvcConfigurer {
             if(matches.isEmpty()){var service=identities.getIfAvailable();if(service==null)throw new R1HttpFailure("SERVICE_UNAVAILABLE");var actor=(Actor)SecurityContextHolder.getContext().getAuthentication().getPrincipal();throw new IdentityHttpFailure("IDENTITY_PRECONDITION_REQUIRED",service.precondition(actor,command.command(),UUID.fromString(raw)),null);}
             if(!matches.getFirst().matches("\"identity\\.[A-Za-z0-9_-]{43}\""))throw R1HttpFailure.validation("/headers/If-Match","INVALID_FORMAT");return;
         }
-        if(op.command()==Type.CAPTURE_LEAD||op.command().recovery())return;
+        if(op.command().transfers()||op.command().followupAttempts()||op.command().contracts()||op.command().quotes()||op.command().materials()||op.command().customerRequirements()||op.command()==Type.CLOSE_OPPORTUNITY||op.command()==Type.CAPTURE_LEAD||op.command().internalMaintenance()||op.command().ownerException())return;
         var actor=(Actor)SecurityContextHolder.getContext().getAuthentication().getPrincipal();if(actor.principalKind()!=PrincipalKind.HUMAN)throw new R1HttpFailure("NOT_AUTHORIZED");
         String rawTask=path.split("/")[4];if(!rawTask.matches(UUID_TEXT))throw R1HttpFailure.validation("/path/taskId","INVALID_FORMAT");UUID task=UUID.fromString(rawTask);
         var matches=Collections.list(request.getHeaders("If-Match"));var nones=Collections.list(request.getHeaders("If-None-Match"));

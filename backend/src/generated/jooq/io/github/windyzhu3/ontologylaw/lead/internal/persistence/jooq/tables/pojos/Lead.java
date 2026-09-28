@@ -180,6 +180,16 @@ public class Lead implements Serializable {
      */
     private final byte[] ingressCompletionDigest;
 
+    /**
+     * 客户名称密文：独立可选原始接入事实，创建后不可变。
+     */
+    private final byte[] customerNameCiphertext;
+
+    /**
+     * 联系人名称密文：独立可选原始接入事实，创建后不可变。
+     */
+    private final byte[] contactNameCiphertext;
+
     public Lead(Lead value) {
         this.tenantId = value.tenantId;
         this.leadId = value.leadId;
@@ -213,6 +223,8 @@ public class Lead implements Serializable {
         this.ingressCompletedByAppointmentId = value.ingressCompletedByAppointmentId;
         this.ingressCompletedAt = value.ingressCompletedAt;
         this.ingressCompletionDigest = value.ingressCompletionDigest;
+        this.customerNameCiphertext = value.customerNameCiphertext;
+        this.contactNameCiphertext = value.contactNameCiphertext;
     }
 
     public Lead(
@@ -247,7 +259,9 @@ public class Lead implements Serializable {
         byte[] ingressCompletionSourceSummaryCiphertext,
         UUID ingressCompletedByAppointmentId,
         OffsetDateTime ingressCompletedAt,
-        byte[] ingressCompletionDigest
+        byte[] ingressCompletionDigest,
+        byte[] customerNameCiphertext,
+        byte[] contactNameCiphertext
     ) {
         this.tenantId = tenantId;
         this.leadId = leadId;
@@ -281,6 +295,8 @@ public class Lead implements Serializable {
         this.ingressCompletedByAppointmentId = ingressCompletedByAppointmentId;
         this.ingressCompletedAt = ingressCompletedAt;
         this.ingressCompletionDigest = ingressCompletionDigest;
+        this.customerNameCiphertext = customerNameCiphertext;
+        this.contactNameCiphertext = contactNameCiphertext;
     }
 
     /**
@@ -535,6 +551,22 @@ public class Lead implements Serializable {
         return this.ingressCompletionDigest;
     }
 
+    /**
+     * Getter for <code>lead.lead.customer_name_ciphertext</code>.
+     * 客户名称密文：独立可选原始接入事实，创建后不可变。
+     */
+    public byte[] getCustomerNameCiphertext() {
+        return this.customerNameCiphertext;
+    }
+
+    /**
+     * Getter for <code>lead.lead.contact_name_ciphertext</code>.
+     * 联系人名称密文：独立可选原始接入事实，创建后不可变。
+     */
+    public byte[] getContactNameCiphertext() {
+        return this.contactNameCiphertext;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (this == obj)
@@ -736,6 +768,18 @@ public class Lead implements Serializable {
         }
         else if (!Arrays.equals(this.ingressCompletionDigest, other.ingressCompletionDigest))
             return false;
+        if (this.customerNameCiphertext == null) {
+            if (other.customerNameCiphertext != null)
+                return false;
+        }
+        else if (!Arrays.equals(this.customerNameCiphertext, other.customerNameCiphertext))
+            return false;
+        if (this.contactNameCiphertext == null) {
+            if (other.contactNameCiphertext != null)
+                return false;
+        }
+        else if (!Arrays.equals(this.contactNameCiphertext, other.contactNameCiphertext))
+            return false;
         return true;
     }
 
@@ -775,6 +819,8 @@ public class Lead implements Serializable {
         result = prime * result + ((this.ingressCompletedByAppointmentId == null) ? 0 : this.ingressCompletedByAppointmentId.hashCode());
         result = prime * result + ((this.ingressCompletedAt == null) ? 0 : this.ingressCompletedAt.hashCode());
         result = prime * result + ((this.ingressCompletionDigest == null) ? 0 : Arrays.hashCode(this.ingressCompletionDigest));
+        result = prime * result + ((this.customerNameCiphertext == null) ? 0 : Arrays.hashCode(this.customerNameCiphertext));
+        result = prime * result + ((this.contactNameCiphertext == null) ? 0 : Arrays.hashCode(this.contactNameCiphertext));
         return result;
     }
 
@@ -813,6 +859,8 @@ public class Lead implements Serializable {
         sb.append(", ").append("[binary...]");
         sb.append(", ").append(ingressCompletedByAppointmentId);
         sb.append(", ").append(ingressCompletedAt);
+        sb.append(", ").append("[binary...]");
+        sb.append(", ").append("[binary...]");
         sb.append(", ").append("[binary...]");
 
         sb.append(")");

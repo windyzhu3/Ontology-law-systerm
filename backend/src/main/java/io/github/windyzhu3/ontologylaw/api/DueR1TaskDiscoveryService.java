@@ -19,6 +19,9 @@ import io.github.windyzhu3.ontologylaw.responsibility.*;
 public final class DueR1TaskDiscoveryService {
     public record Response(int status,DueR1TaskPageV1 page,String errorCode) {}
     private final byte[] cursorKey;
+    private io.github.windyzhu3.ontologylaw.lead.LeadIngressService sourceLeads;
+    private io.github.windyzhu3.ontologylaw.lead.R1SourcePolicyRegistry sourcePolicies;
+    public DueR1TaskDiscoveryService(byte[] key,io.github.windyzhu3.ontologylaw.lead.R1SourcePolicyRegistry policies,io.github.windyzhu3.ontologylaw.lead.LeadProtection protection){this(key);sourcePolicies=policies;sourceLeads=io.github.windyzhu3.ontologylaw.lead.LeadIngressService.databaseBacked(protection);}
     public DueR1TaskDiscoveryService(byte[] cursorKey) {if(cursorKey==null||cursorKey.length<32)throw new IllegalArgumentException("Cursor key required");this.cursorKey=cursorKey.clone();}
     public Response list(Connection c,Actor actor,RecoveryTypeV1 type,Integer requested,String cursor){
         try {
@@ -26,21 +29,29 @@ public final class DueR1TaskDiscoveryService {
             if(type==null||limit<1||limit>100)throw badCursor();
             return R1ServiceReadRuntime.read(c,actor,(connection,now)->{
                 var position=cursor==null?new Cursor(now,null):decode(actor,type,cursor,now);
-                boolean contact=type==RecoveryTypeV1.CONTACT_TASK;String code=contact?"CONTACT_TASK_RECOVER":"ROUTING_REVIEW_TASK_RECOVER";
+                boolean contact=type==RecoveryTypeV1.CONTACT_TASK;boolean source=type==RecoveryTypeV1.SOURCE_REQUEST_REVIEW_TASK;String code=contact?"CONTACT_TASK_RECOVER":"ROUTING_REVIEW_TASK_RECOVER";
                 var scope=R1ServiceAuthorityReader.databaseBacked().dueScope(connection,actor,code,now);
                 if(!scope.authorized())throw new R1ServiceReadRuntime.Failure(403,"NOT_AUTHORIZED");
-                var rows=DueR1TaskReader.databaseBacked().scan(connection,actor.tenantId(),contact?TaskFactory.Type.CONTACT_LEAD:TaskFactory.Type.RESOLVE_LEAD_ROUTING_GAP,scope.ownerAppointments(),position.observed(),position.after(),limit);
+                var rows=DueR1TaskReader.databaseBacked().scan(connection,actor.tenantId(),source?TaskFactory.Type.RESOLVE_SOURCE_REQUEST:contact?TaskFactory.Type.CONTACT_LEAD:TaskFactory.Type.RESOLVE_LEAD_ROUTING_GAP,scope.ownerAppointments(),position.observed(),position.after(),limit);
                 var candidates=new ArrayList<DueR1TaskCandidateV1>();var facts=R1EventReaders.databaseBacked();var identity=AuthorizationIdentityReader.databaseBacked();
                 for(var row:rows) {
                     try {
                         var task=CurrentTaskReader.databaseBacked().read(connection,actor.tenantId(),row.taskId());
                         var wait=facts.latestWait(connection,actor.tenantId(),row.taskId());
                         if(task==null||wait==null||!"WAITING".equals(task.state())||task.selector().revision()>=9007199254740991L||wait.taskRevision()!=task.selector().revision()
-                            ||wait.version()!=1||!wait.profile().equals(contact?"CONTACT_RETRY_V1":"R1_ROUTING_REVIEW_WAIT_V1")||!row.dueAt().equals(wait.resumeDue())){warn();continue;}
+                            ||wait.version()!=1||!wait.profile().equals(source?"R2_SOURCE_REQUEST_REVIEW_WAIT_V1":contact?"CONTACT_RETRY_V1":"R1_ROUTING_REVIEW_WAIT_V1")||!row.dueAt().equals(wait.resumeDue())){warn();continue;}
                         var lead=facts.lead(connection,actor.tenantId(),task.lead().id());var owner=identity.owner(connection,actor.tenantId(),task.owner(),now);
                         if(lead==null||owner==null||!owner.active()){warn();continue;}
                         var authorization=R1AuthorityReader.databaseBacked().select(connection,actor,task.selector(),owner.organizationId(),"SYSTEM_RECOVERY",code);
                         if(authorization==null||!AuthorizationService.databaseBacked().evaluate(connection,new Request(actor,lead,owner.organizationId(),authorization.requirement()),true).allowed()){warn();continue;}
+                        if(source){
+                            if(sourceLeads==null||sourcePolicies==null){warn();continue;}
+                            var header=sourceLeads.header(connection,actor.tenantId(),task.lead().id());
+                            if(header==null||!header.selector().equals(task.lead())||header.assignment()!=null||CurrentTaskReader.databaseBacked().causalSourceRequest(connection,actor.tenantId(),task)==null){warn();continue;}
+                            var policy=sourcePolicies.find(header.source());if(policy==null){warn();continue;}
+                            try{if(!new io.github.windyzhu3.ontologylaw.lead.AssignmentPolicy().sourceRequestOwner(connection,actor.tenantId(),new TaskFactory.Task(task.selector(),task.owner(),task.type(),task.lead(),task.state(),task.createdAt(),task.completion()),policy).equals(task.owner())){warn();continue;}}
+                            catch(CommandHandler.Rejected invalidOwner){warn();continue;}
+                        }
                         candidates.add(new DueR1TaskCandidateV1(type,row.taskId(),task.selector().revision(),wait.selector().id(),wait.selector().hash(),wait.resumeDue().atOffset(ZoneOffset.UTC),recoveryKey(actor.tenantId(),type,row.taskId(),wait.selector().id(),wait.selector().hash())));
                     } catch(IllegalArgumentException invalid){warn();}
                 }
@@ -72,7 +83,7 @@ public final class DueR1TaskDiscoveryService {
     private byte[] mac(byte[] input){try{var mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec(cursorKey,"HmacSHA256"));return mac.doFinal(input);}catch(GeneralSecurityException impossible){throw new IllegalStateException(impossible);}}
     public static UUID recoveryKey(UUID tenant,RecoveryTypeV1 type,UUID task,UUID wait,String digest){
         Objects.requireNonNull(type);var namespace=UUID.fromString("6ba7b811-9dad-11d1-80b4-00c04fd430c8");
-        String command=type==RecoveryTypeV1.CONTACT_TASK?"REOPEN_DUE_CONTACT_TASKS":"REOPEN_DUE_ROUTING_REVIEW_TASKS";
+        String command=type==RecoveryTypeV1.SOURCE_REQUEST_REVIEW_TASK?"REOPEN_DUE_SOURCE_REQUEST_TASKS":type==RecoveryTypeV1.CONTACT_TASK?"REOPEN_DUE_CONTACT_TASKS":"REOPEN_DUE_ROUTING_REVIEW_TASKS";
         String name="ontology-law:R1_DUE_RECOVERY_COMMAND_V1:"+tenant+":"+command+":"+task+":"+wait+":"+digest;
         try {var sha=MessageDigest.getInstance("SHA-1");sha.update(ByteBuffer.allocate(16).putLong(namespace.getMostSignificantBits()).putLong(namespace.getLeastSignificantBits()).array());
             byte[] hash=sha.digest(name.getBytes(StandardCharsets.UTF_8));hash[6]=(byte)((hash[6]&15)|0x50);hash[8]=(byte)((hash[8]&63)|0x80);var buffer=ByteBuffer.wrap(hash);return new UUID(buffer.getLong(),buffer.getLong());

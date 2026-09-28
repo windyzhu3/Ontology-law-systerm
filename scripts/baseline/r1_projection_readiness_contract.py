@@ -7,6 +7,11 @@ from pathlib import Path
 import yaml
 
 try:
+    from scripts.baseline.r2_intake_sources_contract import intake_transport_projection
+except ModuleNotFoundError:
+    from r2_intake_sources_contract import intake_transport_projection
+
+try:
     from scripts.baseline.r1_business_closure_contract import _StrictSafeLoader
     from scripts.baseline.r1_contact_evidence_contract import _table, _without_fenced_code
 except ModuleNotFoundError:
@@ -163,6 +168,11 @@ def validate(root: Path) -> list[str]:
         findings.append(f"R1 readiness OpenAPI must be strict YAML: {error}")
         return findings
     document = _mapping(document)
+    try:
+        document = intake_transport_projection(document)
+    except (KeyError, TypeError, ValueError, AttributeError) as error:
+        findings.append(f"R2 intake source transport is invalid: {error}")
+        return findings
     if _mapping(document.get("info")).get("version") != "1.4.0":
         findings.append("R1 readiness OpenAPI version must be exactly 1.4.0")
     if document.get("security") not in (None, []):

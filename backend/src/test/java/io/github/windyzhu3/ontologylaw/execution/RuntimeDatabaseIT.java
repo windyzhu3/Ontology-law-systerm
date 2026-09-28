@@ -9,16 +9,28 @@ import org.junit.jupiter.api.*;
 
 class RuntimeDatabaseIT extends PostgresIntegrationTest {
     final byte[] release=HexFormat.of().parseHex("11".repeat(32)),manifest=HexFormat.of().parseHex("22".repeat(32));
-    RuntimeDatabase.Expected expected(){return new RuntimeDatabase.Expected("52-plus-2-v1.2",release,manifest);}
+    RuntimeDatabase.Expected expected(){return new RuntimeDatabase.Expected("52-plus-2-r2-v3",release,manifest);}
     void state(String mode,String schema,byte[] digest,byte[] hash)throws Exception {
         try(var c=database.migratorConnection()){sql(c,"update platform_meta.deployment_state set operating_mode=?,schema_contract_version=?,active_release_digest=?,active_manifest_hash=?,revision=revision+1,changed_at=clock_timestamp() where deployment_state_key='PRIMARY' and (operating_mode,schema_contract_version,active_release_digest,active_manifest_hash) is distinct from (?,?,?,?)",mode,schema,digest,hash,mode,schema,digest,hash);}
     }
-    void active()throws Exception{state("ACTIVE","52-plus-2-v1.2",release,manifest);}
+    void active()throws Exception{state("ACTIVE","52-plus-2-r2-v3",release,manifest);}
     @Test void deployment_jdbc_factory_opens_both_real_nonowner_login_roles_without_secret_diagnostics()throws Exception {
         active();for(var role:RuntimeDatabase.Role.values()) {
             String password=role==RuntimeDatabase.Role.API?database.apiPassword():database.workerPassword();
             var login=new RuntimeDatabase.JdbcLogin(database.jdbcUrl(),role==RuntimeDatabase.Role.API?"law_api_login":"law_worker_login",password.toCharArray());assertFalse(login.toString().contains(password));
             try(var c=RuntimeDatabase.databaseBacked(RuntimeDatabase.jdbc(login),role,expected()).open()){assertTrue(c.isValid(2));}
+        }
+    }
+    @Test void repeated_runtime_borrows_reuse_physical_connection_without_session_role_or_transaction()throws Exception {
+        var connections=RuntimeDatabase.jdbc(new RuntimeDatabase.JdbcLogin(database.jdbcUrl(),"law_api_login",database.apiPassword().toCharArray()));
+        int first;
+        try(var c=connections.open();var st=c.createStatement()) {
+            try(var r=st.executeQuery("select pg_backend_pid()")){r.next();first=r.getInt(1);}
+            st.execute("set role law_app_query");st.execute("set statement_timeout='123ms'");
+            c.setAutoCommit(false);
+        }
+        try(var c=connections.open();var st=c.createStatement();var r=st.executeQuery("select pg_backend_pid(),session_user=current_user,current_setting('statement_timeout')")) {
+            assertTrue(c.getAutoCommit());r.next();assertEquals(first,r.getInt(1));assertTrue(r.getBoolean(2));assertEquals("0",r.getString(3));
         }
     }
     @Test void assembly_validation_uses_only_query_read_committed_and_closes_acknowledged_connection()throws Exception {
@@ -36,10 +48,10 @@ class RuntimeDatabaseIT extends PostgresIntegrationTest {
     }
     @Test void running_gate_rechecks_mode_and_every_independent_expected_field_without_database_writes()throws Exception {
         active();var gate=RuntimeDatabase.databaseBacked(database::apiConnection,RuntimeDatabase.Role.API,expected());assertTrue(gate.healthy());
-        for(var mode:List.of("BLOCKED","MAINTENANCE")){state(mode,"52-plus-2-v1.2",release,manifest);assertFalse(gate.healthy());assertThrows(SQLException.class,gate::open);active();assertTrue(gate.healthy());}
+        for(var mode:List.of("BLOCKED","MAINTENANCE")){state(mode,"52-plus-2-r2-v3",release,manifest);assertFalse(gate.healthy());assertThrows(SQLException.class,gate::open);active();assertTrue(gate.healthy());}
         state("ACTIVE","52-plus-2-v1.1",release,manifest);assertFalse(gate.healthy());
-        state("ACTIVE","52-plus-2-v1.2",manifest,manifest);assertFalse(gate.healthy());
-        state("ACTIVE","52-plus-2-v1.2",release,release);assertFalse(gate.healthy());
+        state("ACTIVE","52-plus-2-r2-v3",manifest,manifest);assertFalse(gate.healthy());
+        state("ACTIVE","52-plus-2-r2-v3",release,release);assertFalse(gate.healthy());
         try(var c=database.migratorConnection();var s=c.createStatement();var row=s.executeQuery("select revision from platform_meta.deployment_state")){row.next();long before=row.getLong(1);gate.healthy();gate.healthy();try(var again=s.executeQuery("select revision from platform_meta.deployment_state")){again.next();assertEquals(before,again.getLong(1));}}
     }
     @Test void wrong_runtime_login_and_owner_credentials_fail_closed()throws Exception {
@@ -55,8 +67,13 @@ class RuntimeDatabaseIT extends PostgresIntegrationTest {
     @Test void missing_malformed_zero_or_wrong_version_expectations_are_not_inferred_from_database() {
         assertThrows(RuntimeException.class,()->RuntimeDatabase.databaseBacked(database::apiConnection,RuntimeDatabase.Role.API,null));
         assertThrows(RuntimeException.class,()->new RuntimeDatabase.Expected(null,release,manifest));
-        assertThrows(RuntimeException.class,()->new RuntimeDatabase.Expected("52-plus-2-v1.2",new byte[31],manifest));
-        assertThrows(RuntimeException.class,()->new RuntimeDatabase.Expected("52-plus-2-v1.2",new byte[32],manifest));
+        assertThrows(RuntimeException.class,()->new RuntimeDatabase.Expected("52-plus-2-r2-v3",new byte[31],manifest));
+        assertThrows(RuntimeException.class,()->new RuntimeDatabase.Expected("52-plus-2-r2-v3",new byte[32],manifest));
         assertThrows(RuntimeException.class,()->new RuntimeDatabase.Expected("52-plus-2-v1.1",release,manifest));
+    }
+    @Test void previous_r2_runtime_expectation_cannot_open_current_progress_schema()throws Exception {
+        active();var old=new RuntimeDatabase.Expected("52-plus-2-r2-v1",release,manifest);
+        var gate=RuntimeDatabase.databaseBacked(database::apiConnection,RuntimeDatabase.Role.API,old);
+        assertFalse(gate.healthy());assertThrows(SQLException.class,gate::open);
     }
 }

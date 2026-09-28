@@ -15,17 +15,24 @@ final class LeadInputs {
     static void code(Map<String,Object> p,String key){if(!string(p,key).matches("[A-Z][A-Z0-9_]{0,63}"))throw new IllegalArgumentException("Code required");}
     static void contacts(Map<String,Object> p){if(p.containsKey("phone")){String s=LeadCanonicalization.phone(string(p,"phone"));if(s==null)p.remove("phone");else p.put("phone",s);}if(p.containsKey("email")){String s=LeadCanonicalization.email(string(p,"email"));if(s==null)p.remove("email");else {if(s.codePointCount(0,s.length())>320)throw new IllegalArgumentException("Email length");p.put("email",s);}}}
     static Map<String,Object> capture(Object value){
-        var p=object(value);fields(p,Set.of("sourceChannelCode","sourceAccountCode","sourceRecordKey","capturedAt","serviceCategoryCode","jurisdictionCode","urgencyCode","legalNeedSummary"),Set.of("capturedName","phone","email","cityCode"));
+        var p=object(value);fields(p,Set.of("sourceChannelCode","sourceAccountCode","sourceRecordKey","capturedAt","serviceCategoryCode","jurisdictionCode","urgencyCode","legalNeedSummary"),Set.of("customerName","contactName","capturedName","phone","email","cityCode"));
         for(String key:List.of("sourceChannelCode","serviceCategoryCode","jurisdictionCode","urgencyCode"))code(p,key);if(p.containsKey("cityCode"))code(p,"cityCode");
         for(String key:List.of("sourceAccountCode","sourceRecordKey")){String s=string(p,key);int n=s.codePointCount(0,s.length());if(n<1||n>(key.equals("sourceAccountCode")?128:256))throw new IllegalArgumentException("Source length");}
         Instant captured=OffsetDateTime.parse(string(p,"capturedAt")).toInstant();if(captured.getNano()%1000!=0)throw new IllegalArgumentException("Microsecond time required");p.put("capturedAt",new DateTimeFormatterBuilder().appendInstant(6).toFormatter().format(captured));
-        if(p.containsKey("capturedName"))p.put("capturedName",text(p,"capturedName",200));p.put("legalNeedSummary",text(p,"legalNeedSummary",2000));contacts(p);return p;
+        for(String name:List.of("capturedName","customerName","contactName"))if(p.containsKey(name))p.put(name,text(p,name,200));p.put("legalNeedSummary",text(p,"legalNeedSummary",2000));contacts(p);return p;
     }
     static Map<String,Object> candidate(CommandEnvelope.Type type,Object value){
         var p=object(value);
         switch(type){
             case COMPLETE_LEAD_INGRESS -> {fields(p,Set.of("sourceCode","sourceSummary"),Set.of("phone","email"));contacts(p);if(!p.containsKey("phone")&&!p.containsKey("email"))throw new IllegalArgumentException("Contact required");if(!Set.of("OWNER_CONFIRMED","CUSTOMER_PROVIDED").contains(string(p,"sourceCode")))throw new IllegalArgumentException("Source required");p.put("sourceSummary",text(p,"sourceSummary",500));}
             case ASSIGN_LEAD -> {fields(p,Set.of("ownerAppointmentId"),Set.of());p.put("ownerAppointmentId",uuid(p,"ownerAppointmentId").toString());}
+            case RECORD_SOURCE_REQUEST_CONTINUATION -> {
+                String decision=string(p,"decisionCode");if(!Set.of("ASSIGN_SELECTED","SCHEDULE_REVIEW","END_LEAD").contains(decision))throw new IllegalArgumentException("Source disposition required");
+                var required=new HashSet<>(Set.of("decisionCode","rationaleSummary"));if(decision.equals("ASSIGN_SELECTED"))required.add("ownerAppointmentId");if(decision.equals("SCHEDULE_REVIEW"))required.add("reviewAt");fields(p,required,Set.of());
+                if(decision.equals("ASSIGN_SELECTED"))p.put("ownerAppointmentId",uuid(p,"ownerAppointmentId").toString());
+                if(decision.equals("SCHEDULE_REVIEW")){var due=OffsetDateTime.parse(string(p,"reviewAt")).toInstant();if(due.getNano()%1000!=0)throw new IllegalArgumentException("Microsecond review time required");}
+                p.put("rationaleSummary",text(p,"rationaleSummary",500));
+            }
             case RECORD_ROUTING_DISPOSITION -> {fields(p,Set.of("decisionCode","rationaleSummary"),Set.of());if(!Set.of("SCHEDULE_ROUTING_REVIEW","RETRY_ASSIGNMENT_NOW","REQUEST_SOURCE_INTAKE_STOP").contains(string(p,"decisionCode")))throw new IllegalArgumentException("Decision required");p.put("rationaleSummary",text(p,"rationaleSummary",500));}
             case RESOLVE_DUPLICATE_LEAD -> {fields(p,Set.of("decisionCode","candidateLeadId","candidateLeadRevision","partyId","partyRevision","rationaleSummary"),Set.of());if(!Set.of("LINK_EXISTING_PARTY","KEEP_SEPARATE").contains(string(p,"decisionCode")))throw new IllegalArgumentException("Decision required");for(String key:List.of("candidateLeadId","partyId"))p.put(key,uuid(p,key).toString());for(String key:List.of("candidateLeadRevision","partyRevision"))p.put(key,revision(p,key));p.put("rationaleSummary",text(p,"rationaleSummary",500));}
             case ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST -> {fields(p,Set.of("causalDecisionId","causalDecisionHash","rationaleSummary"),Set.of());p.put("causalDecisionId",uuid(p,"causalDecisionId").toString());hash(p,"causalDecisionHash");p.put("rationaleSummary",text(p,"rationaleSummary",500));}

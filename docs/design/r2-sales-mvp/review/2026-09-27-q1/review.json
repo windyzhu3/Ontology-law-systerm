@@ -1,0 +1,11 @@
+{
+  "status": "CONFIRMED",
+  "scope": "Existing R2 classification correction only; same matter identity, history retained; no new case business module",
+  "styleHashes": {
+    "contractControls.css": "86e8531d69e5fb8e0e3186c959aa282dcfedd529b4861d90cdc7adca4717061c",
+    "ledgerMaster.css": "7ab59db1efa9ec39404ca189125bc9af820382ad7ab5b0e68c885a0447e65851",
+    "workbench.css": "604351c18af358cdb6ce830b73a1a50274b95579331e731b8eb243f5af9a7c49",
+    "workbenchControls.css": "438ebfc63712e6df25491144071ca0563af4e74eb1a77e0e6cbf5c62ca9130d3"
+  },
+  "validation": "Three viewports 1440/390/360; change, current-value refill and cancel PASS; no product writes"
+}

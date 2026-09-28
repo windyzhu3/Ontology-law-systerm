@@ -20,10 +20,21 @@ final class R1CommandService {
     private final CurrentLeadReader leads;
     private final R1TaskPreconditionRuntime tags;
     R1CommandService(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node) {
+        this(database,sources,protection,services,node,null);
+    }
+    R1CommandService(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection) {
+        this(database,sources,protection,services,node,opportunityProtection,null);
+    }
+    R1CommandService(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection,io.github.windyzhu3.ontologylaw.contract.ContractWorkflowService contracts) {
+        this(database,sources,protection,services,node,opportunityProtection,contracts,null);
+    }
+    R1CommandService(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection,io.github.windyzhu3.ontologylaw.contract.ContractWorkflowService contracts,io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowService transfers) {this(database,sources,protection,services,node,opportunityProtection,contracts,transfers,null);}
+    R1CommandService(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection,io.github.windyzhu3.ontologylaw.contract.ContractWorkflowService contracts,io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowService transfers,R2TransferRecoveryService transferRecovery) {
         this.database=database;leads=CurrentLeadReader.databaseBacked(protection);
-        var handlers=new ArrayList<>(new LeadCommands(sources,protection).handlers());handlers.addAll(new ActionDraftCommands(protection).handlers());
-        runtime=new CommandRuntime(handlers,AuthorizationService.databaseBacked(),AuditAppender.databaseBacked(node),R1AuthorizationReaders.databaseBacked(sources,services),R1EventReaders.databaseBacked());
-        tags=new R1TaskPreconditionRuntime(R1AuthorizationReaders.databaseBacked(sources,services),this::tag);
+        var facts=R1AuthorizationReaders.databaseBacked(sources,services);
+        if(opportunityProtection==null){var handlers=new ArrayList<>(new LeadCommands(sources,protection).handlers());handlers.addAll(new ActionDraftCommands(protection).handlers());runtime=new CommandRuntime(handlers,AuthorizationService.databaseBacked(),AuditAppender.databaseBacked(node),facts,R1EventReaders.databaseBacked());}
+        else runtime=R2OpportunityCommandRuntime.fromSourcePolicy(sources,protection,opportunityProtection,services,node,contracts,transfers,transferRecovery);
+        tags=new R1TaskPreconditionRuntime(opportunityProtection==null?facts:R2OpportunityCommandRuntime.authorization(facts),this::tag);
     }
     Map<String,Object> precondition(io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Actor actor,CommandEnvelope.Type operation,UUID taskId,String kind){
         try(var c=database.open()){String value=tags.read(c,actor,operation,taskId,R1TaskPreconditionRuntime.Kind.valueOf(kind));return value==null?null:Map.of("resourceKind",kind,"value",value);}
@@ -31,7 +42,11 @@ final class R1CommandService {
     }
     private String tag(Connection c,io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Actor actor,UUID taskId,R1TaskPreconditionRuntime.Kind kind)throws SQLException {
         var task=tasks.read(c,actor.tenantId(),taskId);if(task==null)return null;
-        return switch(kind){case TASK->R1ResourceTags.task(actor,task.selector(),task.state());case DRAFT->{var draft=drafts.read(c,actor.tenantId(),taskId);yield draft==null?null:R1ResourceTags.draft(actor,draft.selector(),draft.state());}case SUBJECT->{var lead=leads.selector(c,actor.tenantId(),task.lead().id());yield lead==null?null:R1ResourceTags.subject(actor,lead);}};
+        return switch(kind){case TASK->R1ResourceTags.task(actor,task.selector(),task.state());case DRAFT->{var draft=drafts.read(c,actor.tenantId(),taskId);yield draft==null?null:R1ResourceTags.draft(actor,draft.selector(),draft.state());}case SUBJECT->{yield subjectTag(c,actor,task);}};
+    }
+    private String subjectTag(Connection c,io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Actor actor,TaskFactory.Task task)throws SQLException {
+        if(task.type()==TaskFactory.Type.PROGRESS_OPPORTUNITY){var opportunity=io.github.windyzhu3.ontologylaw.opportunity.EventOpportunityReader.databaseBacked().byId(c,actor.tenantId(),task.subject().id());return opportunity==null?null:R1ResourceTags.opportunitySubject(actor,opportunity.selector());}
+        var lead=leads.selector(c,actor.tenantId(),task.lead().id());return lead==null?null:R1ResourceTags.subject(actor,lead);
     }
     Response execute(CommandEnvelope envelope) {
         try(var c=database.open()) {return runtime.executeProjected(c,envelope,(tx,result)->project(tx,envelope,result));}
@@ -60,14 +75,14 @@ final class R1CommandService {
         var draft=drafts.read(c,e.actor().tenantId(),e.draftPrecondition().taskId());
         if(task==null||draft==null||!draft.taskId().equals(task.selector().id())||!task.type().command.equals(draft.actionCode())||draft.schemaVersion()!=1)
             throw new SQLException("Draft projection unavailable","XX000");
-        var values=CurrentLeadReader.validatedDraftValues(draft.actionCode(),draft.values());
+        var values=task.type()==TaskFactory.Type.PROGRESS_OPPORTUNITY?R2OpportunityCommands.candidate(draft.values()):CurrentLeadReader.validatedDraftValues(draft.actionCode(),draft.values());
         if(!Base64.getUrlEncoder().withoutPadding().encodeToString(CanonicalJson.digest(CanonicalJson.encode(values))).equals(draft.digest()))throw new SQLException("Draft projection unavailable","XX000");
-        var lead=leads.selector(c,e.actor().tenantId(),task.lead().id());
-        if(lead==null)throw new SQLException("Draft projection unavailable","XX000");
+        var subjectTag=subjectTag(c,e.actor(),task);
+        if(subjectTag==null)throw new SQLException("Draft projection unavailable","XX000");
         var owner=e.actor().onBehalfAppointmentId()==null?e.actor().appointmentId():e.actor().onBehalfAppointmentId();
         String etag=R1ResourceTags.draft(e.actor(),draft.selector(),draft.state());
         var projection=new TreeMap<String,Object>();projection.put("draftId",draft.selector().id().toString());projection.put("draftRevision",draft.selector().revision());projection.put("actionCode",draft.actionCode());projection.put("schemaVersion",1);projection.put("values",values);projection.put("digest",draft.digest());projection.put("updatedAt",draft.updatedAt().toString());projection.put("editable","DRAFT".equals(draft.state())&&"OPEN".equals(task.state())&&task.owner().equals(owner));
-        var preconditions=Map.of("taskETag",R1ResourceTags.task(e.actor(),task.selector(),task.state()),"draftETag",etag,"subjectETag",R1ResourceTags.subject(e.actor(),lead));
+        var preconditions=Map.of("taskETag",R1ResourceTags.task(e.actor(),task.selector(),task.state()),"draftETag",etag,"subjectETag",subjectTag);
         return new Response(e.draftPrecondition().ifNoneMatch()!=null?201:200,Map.of("receipt",body,"draft",Collections.unmodifiableMap(projection),"preconditions",preconditions),etag,null,null);
     }
     static Map<String,Object> reference(CommandEnvelope e){return Map.of("commandId",e.commandId().toString(),"href","/api/v1/commands/"+e.commandId()+"/receipt");}

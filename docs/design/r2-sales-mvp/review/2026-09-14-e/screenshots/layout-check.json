@@ -1,0 +1,182 @@
+[
+  {
+    "scene": "progress",
+    "cards": 1,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "heading": "记录商机实质进展",
+    "primary": 1,
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "scene": "contact",
+    "cards": 1,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "heading": "记录本次联系结果",
+    "primary": 1,
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "scene": "import",
+    "cards": 0,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "heading": "线索导入结果",
+    "primary": 1,
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "scene": "contract",
+    "cards": 1,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "heading": "准备委托合同",
+    "primary": 1,
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "scene": "direct",
+    "cards": 1,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "heading": "准备委托合同",
+    "primary": 1,
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "scene": "transfer",
+    "cards": 1,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "heading": "提交转案资料",
+    "primary": 1,
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "scene": "ledger",
+    "cards": 0,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "heading": "商机与报价",
+    "primary": 1,
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "scene": "team",
+    "cards": 0,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "heading": "团队待办",
+    "primary": 1,
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "scene": "coordinate",
+    "cards": 0,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "heading": "团队待办",
+    "primary": 1,
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "scene": "readonly",
+    "cards": 0,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "heading": "团队待办",
+    "primary": 0,
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "cards": 1,
+    "documentWidth": 1487,
+    "primary": 1,
+    "scene": "progress",
+    "viewport": [
+      1487,
+      1058
+    ]
+  },
+  {
+    "cards": 1,
+    "documentWidth": 1487,
+    "primary": 1,
+    "scene": "contract",
+    "viewport": [
+      1487,
+      1058
+    ]
+  },
+  {
+    "cards": 0,
+    "documentWidth": 1487,
+    "primary": 1,
+    "scene": "team",
+    "viewport": [
+      1487,
+      1058
+    ]
+  },
+  {
+    "cards": 0,
+    "documentWidth": 1487,
+    "primary": 1,
+    "scene": "import",
+    "viewport": [
+      1487,
+      1058
+    ]
+  },
+  {
+    "cards": 1,
+    "documentWidth": 1487,
+    "primary": 1,
+    "scene": "transfer",
+    "viewport": [
+      1487,
+      1058
+    ]
+  },
+  {
+    "documentWidth": 1265,
+    "fixedEditors": 0,
+    "primaryBottom": 632,
+    "scene": "progress",
+    "viewport": [
+      1280,
+      720
+    ]
+  }
+]

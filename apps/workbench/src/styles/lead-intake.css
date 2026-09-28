@@ -1,0 +1,64 @@
+/* R2 HF-04: reuse the approved management layout and tokens; no second theme. */
+.lead-import-counts { display: flex; flex-wrap: wrap; gap: 16px 28px; margin-top: 28px; padding: 16px 20px; background: var(--mint); border: 1px solid var(--border); border-radius: var(--radius); }
+.lead-import-results .identity-page-grid { margin-top: 22px; }
+.lead-import-results .identity-detail-panel p { line-height: 1.7; overflow-wrap: anywhere; }
+.lead-import-results .identity-form-actions { flex-direction: column; margin-top: 28px; }
+.lead-import-caption { padding: 12px 20px; text-align: left; color: var(--muted); font-size: 14px; }
+.lead-import-table th:first-child { width: 96px; }
+.lead-import-table th:nth-child(3) { width: 136px; }
+.lead-import-results button:focus-visible { outline: 3px solid var(--emerald); outline-offset: 3px; }
+
+/* Approved HF-B: compact fields, one primary action, same management tokens. */
+.lead-capture-fields { border: 0; padding: 0; margin: 0; min-width: 0; display: grid; gap: 18px; }
+.lead-capture-fields textarea { min-height: 128px; resize: vertical; }
+.lead-capture-actions { justify-content: flex-end; flex-wrap: wrap; }
+.lead-capture-actions > p { margin-right: auto; }
+.lead-import-mapping { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin: 20px 0; }
+.lead-preview-table { width: 100%; table-layout: fixed; }
+.lead-preview-table td { overflow-wrap: anywhere; }
+.lead-return { margin-top: 24px; }
+.lead-intake-entry { display: flex; justify-content: flex-end; margin: 12px 0; }
+@media (max-width: 700px) {
+  .lead-import-mapping { grid-template-columns: 1fr; }
+  .lead-capture-actions { align-items: stretch; }
+  .lead-capture-actions > p { width: 100%; }
+  .lead-capture-actions > button { flex: 1; }
+}
+
+.lead-intake-shell .identity-page-grid { min-height: 0; align-items: start; margin-top: 24px; }
+.lead-intake-shell .identity-detail-panel { padding: 24px; min-height: 0; }
+.lead-intake-shell .identity-detail-panel > h2 { font-size: 20px; }
+.lead-capture-fields .identity-field, .lead-import-mapping .identity-field { margin: 0; }
+.lead-capture-fields .identity-form-help { margin: 0; }
+.lead-capture-fields textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); font: inherit; }
+.lead-capture-fields textarea:focus-visible { outline: 3px solid var(--emerald); outline-offset: 3px; }
+.lead-intake-shell .lead-return { margin-left: 24px; }
+@media (max-width: 700px) {
+ .lead-intake-shell .identity-detail-panel { padding: 18px; }
+ .lead-intake-shell .lead-return { margin: 12px 18px; }
+ .lead-capture-actions .identity-primary { flex-basis: 100%; order: -1; }
+}
+
+@media (max-width: 700px) {
+ .lead-intake-shell .identity-list-scroll { min-height: 0; overflow: visible; }
+ .lead-intake-shell .identity-list-panel { min-height: 0; }
+ .lead-intake-shell .identity-table, .lead-intake-shell .identity-table tbody, .lead-intake-shell .identity-table tr { display: block; width: 100%; min-width: 0; }
+ .lead-intake-shell .identity-table thead { display: none; }
+ .lead-intake-shell .identity-table tr { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+ .lead-intake-shell .identity-table td { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; padding: 6px 0; border: 0; width: auto; white-space: normal; overflow-wrap: anywhere; }
+ .lead-intake-shell .identity-table td::before { content: attr(data-label); color: var(--muted); font-size: 13px; }
+}
+
+@media (max-width: 700px) { .lead-intake-shell .lead-import-caption { display: block; width: 100%; } }
+
+.lead-capture-followup { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+.lead-capture-followup h2 { font-size: 20px; margin: 0 0 14px; }
+.lead-capture-followup > div + div { margin-top: 20px; }
+.lead-capture-followup p { overflow-wrap: anywhere; }
+@media (max-width: 700px) { .lead-capture-followup button { width: 100%; white-space: normal; } }
+
+.lead-mobile-return{display:none}.lead-import-results .identity-detail-panel:focus,.lead-import-results .identity-list-panel:focus{outline:none}@media(max-width:700px){.lead-mobile-return{display:inline-flex;background:transparent;border-color:transparent;color:var(--emerald);margin-bottom:16px}.lead-import-results .identity-detail-panel{scroll-margin-top:16px}}
+
+/* Four import columns fit the stacked layout without the identity table's minimum width. */
+.lead-import-results .lead-import-table { min-width: 0; }
+.lead-import-results .identity-list-panel { min-height: 0; }

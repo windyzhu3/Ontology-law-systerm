@@ -152,6 +152,50 @@ public class WaitReceipt extends TableImpl<Record> {
      */
     public final TableField<Record, byte[]> AWAITED_FACT_HASH = createField(DSL.name("awaited_fact_hash"), SQLDataType.BLOB, this, "本次进入等待所等待的准确外部或领域Fact的准确规范摘要；按修订冻结时为空。");
 
+    /**
+     * The column <code>responsibility.wait_receipt.handoff_fact_id</code>.
+     * T01同租户准确身份。
+     */
+    public final TableField<Record, UUID> HANDOFF_FACT_ID = createField(DSL.name("handoff_fact_id"), SQLDataType.UUID, this, "T01同租户准确身份。");
+
+    /**
+     * The column
+     * <code>responsibility.wait_receipt.handoff_fact_revision</code>.
+     * T01准确版本，JSON安全整数。
+     */
+    public final TableField<Record, Long> HANDOFF_FACT_REVISION = createField(DSL.name("handoff_fact_revision"), SQLDataType.BIGINT, this, "T01准确版本，JSON安全整数。");
+
+    /**
+     * The column
+     * <code>responsibility.wait_receipt.inherited_wait_receipt_id</code>.
+     * T01同租户准确身份。
+     */
+    public final TableField<Record, UUID> INHERITED_WAIT_RECEIPT_ID = createField(DSL.name("inherited_wait_receipt_id"), SQLDataType.UUID, this, "T01同租户准确身份。");
+
+    /**
+     * The column <code>responsibility.wait_receipt.inherited_wait_hash</code>.
+     * 准确原等待摘要。
+     */
+    public final TableField<Record, byte[]> INHERITED_WAIT_HASH = createField(DSL.name("inherited_wait_hash"), SQLDataType.BLOB, this, "准确原等待摘要。");
+
+    /**
+     * The column <code>responsibility.wait_receipt.origin_progress_id</code>.
+     * T01同租户准确身份。
+     */
+    public final TableField<Record, UUID> ORIGIN_PROGRESS_ID = createField(DSL.name("origin_progress_id"), SQLDataType.UUID, this, "T01同租户准确身份。");
+
+    /**
+     * The column <code>responsibility.wait_receipt.origin_progress_hash</code>.
+     * 准确原进展摘要。
+     */
+    public final TableField<Record, byte[]> ORIGIN_PROGRESS_HASH = createField(DSL.name("origin_progress_hash"), SQLDataType.BLOB, this, "准确原进展摘要。");
+
+    /**
+     * The column <code>responsibility.wait_receipt.original_sla_due_at</code>.
+     * T01数据库业务时刻。
+     */
+    public final TableField<Record, OffsetDateTime> ORIGINAL_SLA_DUE_AT = createField(DSL.name("original_sla_due_at"), SQLDataType.TIMESTAMPWITHTIMEZONE(6), this, "T01数据库业务时刻。");
+
     private WaitReceipt(Name alias, Table<Record> aliased) {
         this(alias, aliased, (Field<?>[]) null, null);
     }
@@ -205,7 +249,7 @@ public class WaitReceipt extends TableImpl<Record> {
 
     @Override
     public List<ForeignKey<Record, ?>> getReferences() {
-        return Arrays.asList(Keys.WAIT_RECEIPT__FK_WAIT_RECEIPT__TASK_OCCURRENCE);
+        return Arrays.asList(Keys.WAIT_RECEIPT__FK_WAIT_RECEIPT__INHERITED_WAIT_RECEIPT_ID, Keys.WAIT_RECEIPT__FK_WAIT_RECEIPT__TASK_OCCURRENCE);
     }
 
     @Override
@@ -214,9 +258,12 @@ public class WaitReceipt extends TableImpl<Record> {
             Internal.createCheck(this, DSL.name("ck_wait_receipt__awaited_fact_exact"), "((((awaited_fact_type IS NOT NULL) AND (awaited_fact_id IS NOT NULL) AND (((awaited_fact_revision IS NOT NULL) AND (awaited_fact_revision >= 0) AND (awaited_fact_hash IS NULL)) OR ((awaited_fact_revision IS NULL) AND (awaited_fact_hash IS NOT NULL)))) OR ((awaited_fact_type IS NULL) AND (awaited_fact_id IS NULL) AND (awaited_fact_revision IS NULL) AND (awaited_fact_hash IS NULL))))", true),
             Internal.createCheck(this, DSL.name("ck_wait_receipt__awaited_fact_hash_length"), "((octet_length(awaited_fact_hash) = 32))", true),
             Internal.createCheck(this, DSL.name("ck_wait_receipt__contract_version"), "((wait_contract_version > 0))", true),
+            Internal.createCheck(this, DSL.name("ck_wait_receipt__handoff_shape"), "(((((wait_contract_code)::text = 'R2_OPPORTUNITY_HANDOFF_WAIT_V1'::text) AND (wait_contract_version = 1) AND (handoff_fact_id IS NOT NULL) AND (handoff_fact_revision IS NOT NULL) AND (handoff_fact_revision = 0) AND (inherited_wait_receipt_id IS NOT NULL) AND (inherited_wait_hash IS NOT NULL) AND (origin_progress_id IS NOT NULL) AND (origin_progress_hash IS NOT NULL) AND (original_sla_due_at IS NOT NULL)) OR (((wait_contract_code)::text <> ALL ((ARRAY['R2_OPPORTUNITY_HANDOFF_WAIT_V1'::character varying, 'R2_QUOTE_HANDOFF_WAIT_V1'::character varying])::text[])) AND (handoff_fact_id IS NULL) AND (handoff_fact_revision IS NULL) AND (inherited_wait_receipt_id IS NULL) AND (inherited_wait_hash IS NULL) AND (origin_progress_id IS NULL) AND (origin_progress_hash IS NULL) AND (original_sla_due_at IS NULL)) OR (((wait_contract_code)::text = 'R2_QUOTE_HANDOFF_WAIT_V1'::text) AND (wait_contract_version = 1) AND (handoff_fact_id IS NOT NULL) AND (handoff_fact_revision IS NOT NULL) AND (handoff_fact_revision = 0) AND (inherited_wait_receipt_id IS NOT NULL) AND (inherited_wait_hash IS NOT NULL) AND (origin_progress_id IS NULL) AND (origin_progress_hash IS NULL) AND (original_sla_due_at IS NOT NULL) AND ((awaited_fact_type)::text = 'opportunity.quote_response'::text) AND (awaited_fact_id IS NOT NULL) AND (awaited_fact_revision IS NULL) AND (awaited_fact_hash IS NOT NULL))))", true),
+            Internal.createCheck(this, DSL.name("ck_wait_receipt__inherited_wait_hash_length"), "((octet_length(inherited_wait_hash) = 32))", true),
+            Internal.createCheck(this, DSL.name("ck_wait_receipt__origin_progress_hash_length"), "((octet_length(origin_progress_hash) = 32))", true),
             Internal.createCheck(this, DSL.name("ck_wait_receipt__positive_sequence"), "((wait_sequence > 0))", true),
-            Internal.createCheck(this, DSL.name("ck_wait_receipt__positive_task_revision"), "((task_revision > 0))", true),
-            Internal.createCheck(this, DSL.name("ck_wait_receipt__resume_after_entry"), "(((resume_due_at IS NULL) OR (resume_due_at > entered_waiting_at)))", true)
+            Internal.createCheck(this, DSL.name("ck_wait_receipt__positive_task_revision"), "(((task_revision > 0) OR (((wait_contract_code)::text = ANY ((ARRAY['R2_OPPORTUNITY_HANDOFF_WAIT_V1'::character varying, 'R2_QUOTE_HANDOFF_WAIT_V1'::character varying])::text[])) AND (task_revision = 0))))", true),
+            Internal.createCheck(this, DSL.name("ck_wait_receipt__resume_after_entry"), "(((resume_due_at IS NULL) OR (resume_due_at > entered_waiting_at) OR ((wait_contract_code)::text = ANY ((ARRAY['R2_OPPORTUNITY_HANDOFF_WAIT_V1'::character varying, 'R2_QUOTE_HANDOFF_WAIT_V1'::character varying])::text[]))))", true)
         );
     }
 

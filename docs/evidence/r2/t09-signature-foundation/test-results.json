@@ -1,0 +1,37 @@
+[
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ManualSignaturePlanTest",
+    "tests": "12",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ManualSignatureProtocolTest",
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ContractVersionInputTest",
+    "tests": "5",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ContractWorkflowProtocolTest",
+    "tests": "6",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  },
+  {
+    "name": "io.github.windyzhu3.ontologylaw.contract.ContractCanonicalJsonTest",
+    "tests": "4",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0"
+  }
+]
