@@ -1092,3 +1092,24 @@ it.each(['/management/overview','/workbench'])('admits a read-only overview entr
  const f=fixture({context:{...context,canEnterWorkbench:false,canReadBusinessOverview:true,canReadOpportunityLedger:false,canReadBusinessManagement:false,canReadTeamTasks:false,canReadLeadManagement:false,canManageOwnerExceptions:false}});render(<SessionApplication controller={f.controller} api={f.api}/>);const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
  await screen.findByRole('heading',{name:'经营概览'});await screen.findByText('新增线索');expect(f.requests).toHaveLength(0);expect(reads.mock.calls.every(args=>String(args[0])==='/api/v1/business-overview')).toBe(true);act(()=>f.controller.invalidate('EXPIRED'));expect(screen.queryByText('新增线索')).toBeNull();
 });
+
+it.each([true,false])('keeps all common navigation entries across leads, overview and team (team reader %s)',async(canReadTeamTasks)=>{
+ history.replaceState(null,'','/management/leads');
+ vi.stubGlobal('fetch',vi.fn().mockImplementation(async path=>jsonResponse(String(path)==='/api/v1/business-overview'?{month:'2026-09',asOf:'2026-09-28T01:00:00Z',metrics:[]}:String(path).endsWith('/sources')?{items:[]}:{items:[],nextCursor:null})));
+ const f=fixture({context:{...context,canEnterWorkbench:true,canReadLeadManagement:true,canReadBusinessOverview:true,canReadOpportunityLedger:true,canReadBusinessManagement:true,canReadTeamTasks,canManageOwnerExceptions:true}});
+ render(<SessionApplication controller={f.controller} api={f.api}/>);
+ const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ const names=['客户与线索','经营概览','来源与责任','商机台账','合同台账','团队待办','我的待办'];
+ await screen.findByRole('heading',{name:'客户与线索'});
+ const labels=()=>Array.from(document.querySelectorAll('aside.sidebar button')).map(b=>b.textContent);
+ expect(labels()).toEqual(names);
+ const push=vi.spyOn(history,'pushState');
+ fireEvent.click(screen.getByRole('button',{name:'经营概览'}));await screen.findByRole('heading',{name:'经营概览'});
+ expect(location.pathname).toBe('/management/overview');expect(labels()).toEqual(names);
+ fireEvent.click(screen.getByRole('button',{name:'团队待办'}));await screen.findByRole('heading',{name:'团队待办'});expect(labels()).toEqual(names);
+ expect(document.querySelector('aside.sidebar a[href="/workbench"]')).toBeNull();
+ await waitFor(()=>expect(screen.getByRole('button',{name:'来源与责任'})).toBeEnabled());
+ fireEvent.click(screen.getByRole('button',{name:'来源与责任'}));await screen.findByRole('heading',{name:'来源与责任'});expect(labels()).toEqual(names);
+ expect(push).toHaveBeenCalled();push.mockRestore();
+ act(()=>history.back());await waitFor(()=>expect(location.pathname).toBe('/management/team-tasks'));await screen.findByRole('heading',{name:'团队待办'});expect(labels()).toEqual(names);
+});

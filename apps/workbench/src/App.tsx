@@ -1,3 +1,4 @@
+import {BusinessNavigationContext} from './features/workcard/BusinessNavigation';
 import {ClassificationCorrectionCard} from './features/transfers/ClassificationCorrectionCard';
 import {TransferRuntimeCard} from './features/transfers/TransferRuntimeCard';
 import {createTransfersTransport} from './lib/transfersTransport';
@@ -15,7 +16,7 @@ import { createOpportunityLedgerTransport, type OpportunityLedgerTransport } fro
 import { OwnerExceptionPage } from "./features/ownerExceptions/OwnerExceptionPage";
 import { createOwnerExceptionTransport } from "./lib/ownerExceptionTransport";
 import { IdentityDialog } from "./features/identity/IdentityActionConfirmation";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Scales } from "@phosphor-icons/react/Scales";
 import { CheckCircle } from "@phosphor-icons/react/CheckCircle";
 import { ArrowClockwise } from "@phosphor-icons/react/ArrowClockwise";
@@ -96,6 +97,15 @@ function WorkbenchApp({
   const leaveLock = useRef(false);
   const activeSession = useRef(session); activeSession.current = session;
   const protectedWrite = contractLocked || (work.loading && !work.envelope) || work.busy || !!work.pending || !!work.recoveryMarker || work.recoveryBlocked;
+  const {registerLeaveGuard}=useContext(BusinessNavigationContext);
+  useEffect(()=>{
+    registerLeaveGuard?.(next=>{
+      if(protectedWrite||leaving||taskDialogOpen||intakeDiscard)return;
+      if(dirty){leaveDestination.current=next;setLeaveError('');setIntakeDiscard(document.activeElement as HTMLElement);}
+      else next();
+    });
+    return()=>registerLeaveGuard?.(null);
+  },[registerLeaveGuard,protectedWrite,leaving,taskDialogOpen,intakeDiscard,dirty]);
   const saveBeforeIntake = async () => {
     if (leaveLock.current || protectedWrite) return;
     const captured = session;

@@ -1,3 +1,4 @@
+import {BusinessNavigationContext,type BusinessNavigationActions} from '../workcard/BusinessNavigation';
 import {BusinessOverviewPage} from '../businessOverview/BusinessOverviewPage';
 import {createBusinessOverviewTransport} from '../../lib/businessOverviewTransport';
 import {LeadManagementPage} from '../leadManagement/LeadManagementPage';
@@ -46,7 +47,7 @@ export function SessionApplication({
   useEffect(() => {
     const changed = () => {
       const target = location.pathname;
-      if (leaveGuard.current && (isIdentityAdminRoute(currentPath.current) || currentPath.current === leadIntakeRoute)) {
+      if (leaveGuard.current) {
         history.replaceState(null, "", currentPath.current);
         leaveGuard.current(() => { history.replaceState(null, "", target); setPath(target); });
       } else setPath(target);
@@ -81,7 +82,10 @@ export function SessionApplication({
         registerLeaveGuard={registerLeaveGuard}
         guardedLeave={guardedLeave}
         navigate={(next) => {
-          history.replaceState(null, "", next);
+          if (next !== location.pathname) {
+            if (["/login", "/auth/callback", "/"].includes(location.pathname) || next === "/login") history.replaceState(null, "", next);
+            else history.pushState(null, "", next);
+          }
           setPath(next);
         }}
       />
@@ -117,6 +121,7 @@ function SessionRoutes({
     setup = useSessionSetupReady(),
     actor = useActorSession(),
     workbench = useWorkbenchSession();
+  const [leadView,setLeadView]=useState<'leads'|'sources'>('leads');
   const [intakeTask, setIntakeTask] = useState<{ id: string; epoch: number; scope: string } | null>(null);
   const [admission, setAdmission] = useState<Admission | null>(null);
   const context = state.context;
@@ -142,7 +147,7 @@ function SessionRoutes({
   useEffect(() => {
     if (!setup || state.status === "INITIALIZING") return;
     if (state.status === "READY" || state.status === "SELECTING") {
-      if (path !== "/workbench" && !isIdentityAdminRoute(path) && path !== leadIntakeRoute && !managementIntent && !ledgerIntent && !businessIntent && !leadIntent) {
+      if (path !== "/workbench" && !isIdentityAdminRoute(path) && path !== leadIntakeRoute && !managementIntent && !ledgerIntent && !businessIntent && !leadIntent && !overviewIntent) {
         loginDestination.current ??= consumeLoginDestination();
         navigate(loginDestination.current);
       }
@@ -243,6 +248,11 @@ function SessionRoutes({
     });
     navigate("/admin/identity/principals");
   }
+  useEffect(() => {
+    if (!current || !context || ["choosing","recovery","unqualified"].includes(stage)) return;
+    const target=intakeIntent?'intake':adminIntent?'admin':overviewIntent?'businessOverview':leadIntent?'leadManagement':businessIntent?'businessManagement':ledgerIntent?'ledger':managementIntent?'management':path==='/workbench'?'workbench':null;
+    if(target && target!==stage) confirmed(context);
+  },[path]);
   if (!setup || !["READY", "SELECTING"].includes(state.status))
     return <LoginEntry controller={controller} />;
   if (
@@ -266,7 +276,17 @@ function SessionRoutes({
     );
   }
   const onOverview = context?.canReadBusinessOverview === true && context.selectedOnBehalfAppointmentId === null ? () => { navigate('/management/overview'); selectStage('businessOverview',context); } : undefined;
-  const onLeads = context?.canReadLeadManagement === true && context.selectedOnBehalfAppointmentId === null ? () => { navigate('/management/leads'); selectStage('leadManagement',context); } : undefined;
+  const onLeads = context?.canReadLeadManagement === true && context.selectedOnBehalfAppointmentId === null ? () => { setLeadView('leads'); navigate('/management/leads'); selectStage('leadManagement',context); } : undefined;
+  const navigation:BusinessNavigationActions & {registerLeaveGuard:typeof registerLeaveGuard}=context?.selectedOnBehalfAppointmentId===null?{
+    registerLeaveGuard,onLeads,onOverview,
+    onSources:onLeads?()=>{setLeadView('sources');navigate('/management/leads');selectStage('leadManagement',context);}:undefined,
+    onOpportunities:context.canReadOpportunityLedger?()=>{navigate('/management/opportunities');selectStage('ledger',context);}:undefined,
+    onContracts:context.canReadBusinessManagement?()=>{navigate('/management/contracts');selectStage('businessManagement',context);}:undefined,
+    onTeam:context.canReadTeamTasks||context.canManageOwnerExceptions?()=>{navigate('/management/team-tasks');selectStage('management',context);}:undefined,
+    onTasks:context.canEnterWorkbench?()=>{navigate('/workbench');selectStage('workbench',context);}:undefined,
+  }:{registerLeaveGuard};
+  return <BusinessNavigationContext.Provider value={navigation}>{renderBusinessRoute()}</BusinessNavigationContext.Provider>;
+  function renderBusinessRoute(){
   if(stage === "businessOverview" && actor && context?.canReadBusinessOverview === true && context.selectedOnBehalfAppointmentId === null){
     return <BusinessOverviewPage session={actor} api={overviewTransport} onLeads={onLeads}
       onTasks={context.canEnterWorkbench?()=>{navigate('/workbench');selectStage('workbench',context);}:undefined}
@@ -276,7 +296,7 @@ function SessionRoutes({
       sessionActions={<div className="session-actions"><span>{context.displayName}</span><button onClick={()=>selectStage('choosing')}>切换任职</button><button onClick={()=>void controller.logout()}>退出</button></div>}/>;
   }
   if(stage === "leadManagement" && actor && context?.canReadLeadManagement === true && context.selectedOnBehalfAppointmentId === null){
-    return <LeadManagementPage onOverview={onOverview} session={actor} api={leadTransport}
+    return <LeadManagementPage initialView={leadView} onViewChange={setLeadView} onOverview={onOverview} session={actor} api={leadTransport}
       onTask={id=>{if(!context.canEnterWorkbench)throw Error('当前任职无办理权限');setIntakeTask({id,epoch:actor.identityEpoch,scope:actor.actorScopeKey});navigate('/workbench');selectStage('workbench',context);}}
       onTasks={context.canEnterWorkbench?()=>{navigate('/workbench');selectStage('workbench',context);}:undefined}
       onOpportunities={context.canReadOpportunityLedger?()=>{navigate('/management/opportunities');selectStage('ledger',context);}:undefined}
@@ -412,4 +432,5 @@ function SessionRoutes({
       }
     />
   );
+  }
 }
