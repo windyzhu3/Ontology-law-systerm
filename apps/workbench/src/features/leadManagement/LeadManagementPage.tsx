@@ -5,12 +5,13 @@ import {readWithDeadline} from '../../lib/readDeadline';
 import {BusinessNavigation} from '../workcard/BusinessNavigation';
 import master from '../opportunities/ledgerMaster.css?inline';
 import scales from '../opportunities/assets/Scales-green.svg';
-export type LeadManagementProps={session:WorkbenchSession;api:LeadManagementTransport;onTask:(id:string)=>void|Promise<void>;sessionActions?:ReactNode;onTasks?:()=>void;onOpportunities?:()=>void;onContracts?:()=>void;onTeam?:()=>void;onOverview?:()=>void;onIntake?:()=>void};
+export type LeadManagementProps={initialView?:'leads'|'sources';onViewChange?:(view:'leads'|'sources')=>void;session:WorkbenchSession;api:LeadManagementTransport;onTask:(id:string)=>void|Promise<void>;sessionActions?:ReactNode;onTasks?:()=>void;onOpportunities?:()=>void;onContracts?:()=>void;onTeam?:()=>void;onOverview?:()=>void;onIntake?:()=>void};
 const businessTime=new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
 function time(value:string){return /^\d{4}-\d{2}-\d{2}T/.test(value)&&!Number.isNaN(Date.parse(value))?businessTime.format(new Date(value)):value;}
 function SessionPage(p:LeadManagementProps){
  const {session,api}=p;
- const [view,setView]=useState<'leads'|'sources'>('leads'),[query,setQuery]=useState<LeadQuery>({}),[refresh,setRefresh]=useState(0),[selected,setSelected]=useState<string|null>(null),[selectedSource,setSelectedSource]=useState<string|null>(null);
+ const [view,setView]=useState<'leads'|'sources'>(p.initialView??'leads'),[query,setQuery]=useState<LeadQuery>({}),[refresh,setRefresh]=useState(0),[selected,setSelected]=useState<string|null>(null),[selectedSource,setSelectedSource]=useState<string|null>(null);
+ useEffect(()=>setView(p.initialView??'leads'),[p.initialView]);
  const [page,setPage]=useState<LeadPage|null>(null),[detail,setDetail]=useState<LeadDetail|null>(null),[sources,setSources]=useState<LeadSource[]>([]),[owners,setOwners]=useState<Record<string,string>>({});
  const [error,setError]=useState(''),[denied,setDenied]=useState(false),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const alive=useRef(true),actionRead=useRef<AbortController|null>(null),listPane=useRef<HTMLElement>(null);
@@ -45,7 +46,7 @@ function SessionPage(p:LeadManagementProps){
  const shown=!denied&&!loading&&!error&&detail?.id===selected&&rows.some(r=>r.id===selected)?detail:null;
  const source=!denied&&!loading&&!error?sources.find(s=>s.code===selectedSource):null;
  return <><header className="app-header"><div className="brand"><img className="icon" src={scales} alt="" aria-hidden="true"/>律所工作助手</div><div className="session">{p.sessionActions}</div></header>
- <div className="admin-shell"><BusinessNavigation onOverview={p.onOverview} active={view} onLeads={()=>setView('leads')} onSources={()=>setView('sources')} onTasks={p.onTasks} onOpportunities={p.onOpportunities} onContracts={p.onContracts} onTeam={p.onTeam}/><main className="admin-main">
+ <div className="admin-shell"><BusinessNavigation onOverview={p.onOverview} active={view} onLeads={()=>{setView('leads');p.onViewChange?.('leads');}} onSources={()=>{setView('sources');p.onViewChange?.('sources');}} onTasks={p.onTasks} onOpportunities={p.onOpportunities} onContracts={p.onContracts} onTeam={p.onTeam}/><main className="admin-main">
  <h1>{view==='leads'?'客户与线索':'来源与责任'}</h1><p>{view==='leads'?'查询当前有权客户与线索；同一客户的不同接入分别保留。时间按北京时间显示。':'查看有权来源、当前责任范围及分配结果。'}</p>
  {denied?<p role="alert">查看权限已变化，列表与详情已清除。</p>:error?<p role="alert">{error}</p>:null}
  {view==='leads'?<>

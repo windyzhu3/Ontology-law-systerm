@@ -1,4 +1,6 @@
+import {BusinessNavigationContext} from './features/workcard/BusinessNavigation';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -249,4 +251,18 @@ it('keeps the original unsaved workcard guard when navigating to lead management
 it('keeps the unsaved original draft when navigating to the overview',async()=>{
  const onOverview=vi.fn();render(<App session={session} api={createWorkbenchApi(async()=>jsonResponse(envelope()))} onOverview={onOverview}/>);
  fireEvent.change(await screen.findByLabelText('联系说明'),{target:{value:'概览不绕过原草稿'}});fireEvent.click(screen.getByRole('button',{name:'经营概览'}));expect(screen.getByRole('dialog')).toBeVisible();expect(onOverview).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'继续填写'}));expect(screen.getByLabelText('联系说明')).toHaveValue('概览不绕过原草稿');
+});
+
+it('guards browser navigation with the same unsaved draft confirmation',async()=>{
+ let guard:((next:()=>void)=>void)|null=null;
+ const registerLeaveGuard=(value:typeof guard)=>{guard=value;};
+ const next=vi.fn();const api=createWorkbenchApi(async()=>jsonResponse(envelope(5,true)));
+ render(<BusinessNavigationContext.Provider value={{registerLeaveGuard}}><App session={testSession()} api={api}/></BusinessNavigationContext.Provider>);
+ fireEvent.change(await screen.findByLabelText('联系说明'),{target:{value:'返回前保留草稿'}});
+ fireEvent.click(screen.getByLabelText('联系说明'));
+ expect(guard).not.toBeNull();
+ // Simulate the route layer asking the registered guard before applying history navigation.
+ act(()=>guard?.(next));
+ expect(screen.getByRole('dialog',{name:'离开当前待办？'})).toBeVisible();expect(next).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('button',{name:'继续填写'}));expect(screen.getByLabelText('联系说明')).toHaveValue('返回前保留草稿');expect(next).not.toHaveBeenCalled();
 });
