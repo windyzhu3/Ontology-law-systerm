@@ -1,4 +1,7 @@
 import createClient from "openapi-fetch";
+import { createOpportunityWriter } from "./opportunityTransport";
+import type { OpportunityWrite } from "./opportunityTransport";
+export type { OpportunityWrite } from "./opportunityTransport";
 
 import type { paths, components } from "../generated/api/schema";
 import { RecoveryStore } from "../features/session/recoveryMarker";
@@ -27,6 +30,7 @@ export {
 export const apiClient = createClient<paths>();
 type S = components["schemas"];
 export const commandPaths = {
+  RECORD_SOURCE_REQUEST_CONTINUATION: "/api/v1/tasks/{taskId}/commands/record-source-request-continuation",
   RESOLVE_DUPLICATE_LEAD:
     "/api/v1/tasks/{taskId}/commands/resolve-duplicate-lead",
   COMPLETE_LEAD_INGRESS:
@@ -39,8 +43,8 @@ export const commandPaths = {
   RECORD_CONTACT_RESULT:
     "/api/v1/tasks/{taskId}/commands/record-contact-result",
   REVIEW_LEAD_VALIDITY: "/api/v1/tasks/{taskId}/commands/review-lead-validity",
-} as const satisfies Record<S["ActionCode"], keyof paths>;
-type CommandBody =
+} as const satisfies Record<S["ActionCode"]|"RECORD_SOURCE_REQUEST_CONTINUATION", keyof paths>;
+type CommandBody = S["RecordSourceRequestContinuationV1"]
   | S["ResolveDuplicateLeadV1"]
   | S["CompleteLeadIngressV1"]
   | S["AssignLeadV1"]
@@ -48,13 +52,17 @@ type CommandBody =
   | S["AcknowledgeSourceIntakeStopRequestV1"]
   | S["RecordContactResultV1"]
   | S["ReviewLeadValidityV1"];
-export type OriginalWrite = {
+type LegacyWrite = {
   key: string;
   taskId: string;
   headers: Record<string, string>;
 } & (
-  | { kind: "draft"; body: S["SaveActionDraftV1"] }
-  | { kind: "command"; action: S["ActionCode"]; body: CommandBody }
+  | { kind: "draft"; body: S["SaveActionDraftV1"]|S["SaveSourceRequestDraftV1"] }
+  | { kind: "command"; action: S["ActionCode"]|"RECORD_SOURCE_REQUEST_CONTINUATION"; body: CommandBody }
+);
+export type OriginalWrite = Omit<LegacyWrite,"kind"|"body"|"action"> & (
+  | {kind:"draft";body:S["SaveActionDraftV1"]|S["SaveOpportunityProgressDraftV1"]|S["SaveSourceRequestDraftV1"]}
+  | {kind:"command";action:S["ActionCode"]|"RECORD_OPPORTUNITY_PROGRESS"|"RECORD_SOURCE_REQUEST_CONTINUATION";body:CommandBody|S["RecordOpportunityProgressV1"]}
 );
 /** Public-only adapter. Credentials live in the injected session, never browser storage. */
 export function createWorkbenchApi(
@@ -67,17 +75,21 @@ export function createWorkbenchApi(
     ...(fetcher ? { fetch: fetcher } : {}),
   });
   const { assertCurrent, auth, checked } = createSessionTransport(true);
+  const opportunityWrite = createOpportunityWriter(client,recovery);
   return {
     recovery,
+    opportunityWrite,
     async current(
       session: WorkbenchSession,
       tag: string | null,
       signal: AbortSignal,
+      taskId?: string | null,
     ) {
       return checked(
         session,
         signal,
         await client.GET("/api/v1/workcards/current", {
+          params: { query: taskId ? { taskId } : {} },
           headers: {
             ...(await auth(session, signal)),
             ...(tag ? { "If-None-Match": tag } : {}),
@@ -90,9 +102,12 @@ export function createWorkbenchApi(
     },
     async write(
       session: WorkbenchSession,
-      original: OriginalWrite,
+      input: OriginalWrite,
       signal: AbortSignal,
     ) {
+      if(input.kind === "draft" ? input.body.actionCode === "RECORD_OPPORTUNITY_PROGRESS" : input.action === "RECORD_OPPORTUNITY_PROGRESS")
+        return opportunityWrite(session,input as OpportunityWrite,signal);
+      const original=input as LegacyWrite;
       if (
         Object.keys(original.headers).some(
           (k) => !["If-Match", "If-None-Match"].includes(k),
@@ -116,7 +131,7 @@ export function createWorkbenchApi(
       };
       const r =
         original.kind === "draft"
-          ? await client.PUT("/api/v1/tasks/{taskId}/draft", {
+          ? await client.PUT(original.body.actionCode === "RECORD_SOURCE_REQUEST_CONTINUATION" ? "/api/v1/tasks/{taskId}/source-request-draft" : "/api/v1/tasks/{taskId}/draft", {
               params,
               headers,
               body: original.body,

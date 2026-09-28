@@ -11,7 +11,7 @@ public final class CommandReceiptRecoveryService {
     private final io.github.windyzhu3.ontologylaw.execution.CommandReceiptReadRuntime runtime;
     public CommandReceiptRecoveryService(R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node) {
         Objects.requireNonNull(protection);
-        runtime=new io.github.windyzhu3.ontologylaw.execution.CommandReceiptReadRuntime(R1AuthorizationReaders.databaseBacked(sources,services),io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node));
+        runtime=new io.github.windyzhu3.ontologylaw.execution.CommandReceiptReadRuntime(R2OpportunityCommandRuntime.authorization(R1AuthorizationReaders.databaseBacked(sources,services)),io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node));
     }
     public Response read(Connection c,Actor actor,UUID command,UUID correlation) {
         try {return new Response(200,runtime.read(c,actor,command,correlation).body(),"no-store",null);}

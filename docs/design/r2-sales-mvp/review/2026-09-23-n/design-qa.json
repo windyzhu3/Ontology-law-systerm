@@ -1,0 +1,376 @@
+{
+  "checks": [
+    {
+      "scene": "prepare",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "submit",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "scanning",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "waiting",
+      "width": 1440,
+      "overflow": false,
+      "primary": 0,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "review",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "supplement",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "changed",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "partial",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "archive",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "complete",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "unknown",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "unassigned",
+      "width": 1440,
+      "overflow": false,
+      "primary": 0,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "revoked",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "ledger",
+      "width": 1440,
+      "overflow": false,
+      "primary": 0,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "readonly",
+      "width": 1440,
+      "overflow": false,
+      "primary": 0,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "prepare",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "submit",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "scanning",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "waiting",
+      "width": 390,
+      "overflow": false,
+      "primary": 0,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "review",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "supplement",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "changed",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "partial",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "archive",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "complete",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "unknown",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "unassigned",
+      "width": 390,
+      "overflow": false,
+      "primary": 0,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "revoked",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "ledger",
+      "width": 390,
+      "overflow": false,
+      "primary": 0,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "readonly",
+      "width": 390,
+      "overflow": false,
+      "primary": 0,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "prepare",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "submit",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "scanning",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "waiting",
+      "width": 360,
+      "overflow": false,
+      "primary": 0,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "review",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "supplement",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "changed",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "partial",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "archive",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "complete",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "unknown",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "unassigned",
+      "width": 360,
+      "overflow": false,
+      "primary": 0,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "revoked",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "ledger",
+      "width": 360,
+      "overflow": false,
+      "primary": 0,
+      "styles": 4,
+      "images": true
+    },
+    {
+      "scene": "readonly",
+      "width": 360,
+      "overflow": false,
+      "primary": 0,
+      "styles": 4,
+      "images": true
+    }
+  ],
+  "tested": [
+    "plan confirmation required",
+    "missing evidence cannot submit",
+    "review requires checks and hands off without role escalation",
+    "changed version returns to sales",
+    "archive guards and execution handoff",
+    "unknown result locks navigation",
+    "dirty navigation retains input",
+    "ledger enters shared workbench"
+  ],
+  "errors": [],
+  "requests": []
+}

@@ -5,6 +5,9 @@ package io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq;
 
 
 import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.Opportunity;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.OpportunityProgress;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.OwnerException;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.ResponsibilityHandoff;
 
 import org.jooq.Index;
 import org.jooq.OrderField;
@@ -23,5 +26,9 @@ public class Indexes {
     // -------------------------------------------------------------------------
 
     public static final Index IX_OPPORTUNITY__OWNER_OPEN = Internal.createIndex(DSL.name("ix_opportunity__owner_open"), Opportunity.OPPORTUNITY_, new OrderField[] { Opportunity.OPPORTUNITY_.TENANT_ID, Opportunity.OPPORTUNITY_.OWNER_APPOINTMENT_ID, Opportunity.OPPORTUNITY_.CREATED_AT }, false);
+    public static final Index IX_OPPORTUNITY_PROGRESS__TIMELINE = Internal.createIndex(DSL.name("ix_opportunity_progress__timeline"), OpportunityProgress.OPPORTUNITY_PROGRESS, new OrderField[] { OpportunityProgress.OPPORTUNITY_PROGRESS.TENANT_ID, OpportunityProgress.OPPORTUNITY_PROGRESS.OPPORTUNITY_ID, OpportunityProgress.OPPORTUNITY_PROGRESS.OCCURRED_AT }, false);
+    public static final Index UQ_OWNER_EXCEPTION__ACTIVE_SLOT = Internal.createIndex(DSL.name("uq_owner_exception__active_slot"), OwnerException.OWNER_EXCEPTION, new OrderField[] { OwnerException.OWNER_EXCEPTION.TENANT_ID, OwnerException.OWNER_EXCEPTION.OPPORTUNITY_ID, OwnerException.OWNER_EXCEPTION.RESPONSIBILITY_SLOT }, true);
+    public static final Index UQ_OWNER_EXCEPTION__CURRENT = Internal.createIndex(DSL.name("uq_owner_exception__current"), OwnerException.OWNER_EXCEPTION, new OrderField[] { OwnerException.OWNER_EXCEPTION.TENANT_ID, OwnerException.OWNER_EXCEPTION.OWNER_EXCEPTION_ID }, true);
+    public static final Index UQ_RESPONSIBILITY_HANDOFF__INITIAL = Internal.createIndex(DSL.name("uq_responsibility_handoff__initial"), ResponsibilityHandoff.RESPONSIBILITY_HANDOFF, new OrderField[] { ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.TENANT_ID, ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.OPPORTUNITY_ID }, true);
     public static final Index UX_OPPORTUNITY__SOURCE_ASSIGNMENT = Internal.createIndex(DSL.name("ux_opportunity__source_assignment"), Opportunity.OPPORTUNITY_, new OrderField[] { Opportunity.OPPORTUNITY_.TENANT_ID, Opportunity.OPPORTUNITY_.SOURCE_ASSIGNMENT_ID }, true);
 }

@@ -1,0 +1,92 @@
+[
+  {
+    "concurrency": 1,
+    "elapsedMs": 2477,
+    "maxMs": 72,
+    "meanSql": 22,
+    "p50Ms": 20,
+    "p95Ms": 30,
+    "samples": 100,
+    "tasks": 0
+  },
+  {
+    "concurrency": 5,
+    "elapsedMs": 672,
+    "maxMs": 71,
+    "meanSql": 22,
+    "p50Ms": 27,
+    "p95Ms": 43,
+    "samples": 100,
+    "tasks": 0
+  },
+  {
+    "concurrency": 10,
+    "elapsedMs": 430,
+    "maxMs": 87,
+    "meanSql": 22,
+    "p50Ms": 34,
+    "p95Ms": 59,
+    "samples": 100,
+    "tasks": 0
+  },
+  {
+    "concurrency": 1,
+    "elapsedMs": 32874,
+    "maxMs": 474,
+    "meanSql": 506,
+    "p50Ms": 316,
+    "p95Ms": 402,
+    "samples": 100,
+    "tasks": 20
+  },
+  {
+    "concurrency": 5,
+    "elapsedMs": 8004,
+    "maxMs": 562,
+    "meanSql": 506,
+    "p50Ms": 390,
+    "p95Ms": 437,
+    "samples": 100,
+    "tasks": 20
+  },
+  {
+    "concurrency": 10,
+    "elapsedMs": 9436,
+    "maxMs": 1484,
+    "meanSql": 506,
+    "p50Ms": 904,
+    "p95Ms": 1314,
+    "samples": 100,
+    "tasks": 20
+  },
+  {
+    "concurrency": 1,
+    "elapsedMs": 175255,
+    "maxMs": 2682,
+    "meanSql": 2426,
+    "p50Ms": 1603,
+    "p95Ms": 2433,
+    "samples": 100,
+    "tasks": 100
+  },
+  {
+    "concurrency": 5,
+    "elapsedMs": 38437,
+    "maxMs": 2225,
+    "meanSql": 2426,
+    "p50Ms": 1898,
+    "p95Ms": 2198,
+    "samples": 100,
+    "tasks": 100
+  },
+  {
+    "concurrency": 10,
+    "elapsedMs": 26509,
+    "maxMs": 2803,
+    "meanSql": 2426,
+    "p50Ms": 2624,
+    "p95Ms": 2773,
+    "samples": 100,
+    "tasks": 100
+  }
+]

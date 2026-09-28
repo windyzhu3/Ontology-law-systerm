@@ -1,0 +1,11 @@
+import {it,expect,vi} from 'vitest';
+import {createFollowupAttemptsTransport,validAttemptContext} from './followupAttemptsTransport';
+import {RecoveryStore} from '../features/session/recoveryMarker';
+import {testSession,taskId,selectorId} from '../test/fixtures';
+export const attemptContext={opportunity:{id:selectorId,revision:0},responsibilityBasis:{type:'opportunity.opportunity',id:selectorId,revision:0},task:{id:taskId,revision:1},taskState:'WAITING',waitReceipt:{id:selectorId,hash:'a'.repeat(43)},expectedWorkflow:null,nextCheckAt:'2099-10-01T00:00:00Z',command:'RECORD_OPPORTUNITY_FOLLOWUP_ATTEMPT',history:[]};
+it('requires exact task and wait selectors and keeps quote context explicit',()=>{expect(validAttemptContext(attemptContext,selectorId)).toBe(true);expect(validAttemptContext({...attemptContext,waitReceipt:null},selectorId)).toBe(false);expect(validAttemptContext({...attemptContext,command:'RECORD_QUOTE_FOLLOWUP_ATTEMPT'},selectorId)).toBe(false);expect(validAttemptContext(attemptContext,taskId)).toBe(false);});
+it('recovers a lost attempt through the original receipt without storing private input',async()=>{
+ const receipt={commandId:taskId,receiptId:selectorId,completedAt:'2026-09-25T00:00:00Z',outcome:'SUCCEEDED',resultFact:{factType:'FOLLOWUP_ATTEMPT',factRef:'r'.repeat(43),digest:'h'.repeat(43)}},fetcher=vi.fn<typeof fetch>().mockRejectedValueOnce(Error('lost')).mockResolvedValueOnce(new Response(JSON.stringify(receipt))),recovery=new RecoveryStore(sessionStorage),api=createFollowupAttemptsTransport(recovery,fetcher),session=testSession();
+ await expect(api.write(session,{key:taskId,opportunityId:selectorId,command:'RECORD_OPPORTUNITY_FOLLOWUP_ATTEMPT',body:{expectedOpportunityRevision:0,responsibilityBasis:attemptContext.responsibilityBasis,task:attemptContext.task,waitReceipt:attemptContext.waitReceipt,expectedWorkflow:null,values:{type:'NO_REPLY',summary:'private attempt',occurredAt:'2026-09-25T00:00:00Z',nextCheckAt:'2099-10-01T00:00:00Z'}}} as never,new AbortController().signal)).rejects.toThrow();
+ expect(JSON.stringify(recovery.read())).not.toContain('private');await api.receipt(session,new AbortController().signal);expect(fetcher.mock.calls[1][0]).toBe('/api/v1/commands/'+taskId+'/receipt');expect(fetcher.mock.calls[1][1]?.method).toBe('GET');expect(recovery.read()).toBeNull();
+});

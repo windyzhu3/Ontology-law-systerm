@@ -246,6 +246,18 @@ public class Lead extends TableImpl<Record> {
      */
     public final TableField<Record, byte[]> INGRESS_COMPLETION_DIGEST = createField(DSL.name("ingress_completion_digest"), SQLDataType.BLOB, this, "补全完成摘要：覆盖规范化补全值、来源、执行任命与完成时间的32字节摘要。");
 
+    /**
+     * The column <code>lead.lead.customer_name_ciphertext</code>.
+     * 客户名称密文：独立可选原始接入事实，创建后不可变。
+     */
+    public final TableField<Record, byte[]> CUSTOMER_NAME_CIPHERTEXT = createField(DSL.name("customer_name_ciphertext"), SQLDataType.BLOB, this, "客户名称密文：独立可选原始接入事实，创建后不可变。");
+
+    /**
+     * The column <code>lead.lead.contact_name_ciphertext</code>.
+     * 联系人名称密文：独立可选原始接入事实，创建后不可变。
+     */
+    public final TableField<Record, byte[]> CONTACT_NAME_CIPHERTEXT = createField(DSL.name("contact_name_ciphertext"), SQLDataType.BLOB, this, "联系人名称密文：独立可选原始接入事实，创建后不可变。");
+
     private Lead(Name alias, Table<Record> aliased) {
         this(alias, aliased, (Field<?>[]) null, null);
     }

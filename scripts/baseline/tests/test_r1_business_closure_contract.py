@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
 COMMAND = "docs/contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md"
@@ -17,7 +20,7 @@ def validate(root: Path) -> list[str]:
     module = importlib.util.find_spec("scripts.baseline.r1_business_closure_contract")
     if module is None:
         return ["R1 business closure validator is missing"]
-    return importlib.import_module(module.name).validate(root)
+    return importlib.import_module(module.name).validate(root, allow_r2_schema=True)
 
 
 class R1BusinessClosureContractTest(unittest.TestCase):
@@ -33,6 +36,16 @@ class R1BusinessClosureContractTest(unittest.TestCase):
                 ROOT / "database/schema-contract-52-plus-2/generated",
                 root / "database/schema-contract-52-plus-2/generated", dirs_exist_ok=True,
             )
+            # This historical evidence test intentionally stays at the exact v1.2 stage.
+            from scripts.baseline.r2_schema_successor_contract import historical_projection, MIGRATION
+            generated = root / "database/schema-contract-52-plus-2/generated"
+            manifest_path = generated / "schema-contract-manifest.json"
+            import json
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest_path.write_text(json.dumps(historical_projection(generated, manifest), ensure_ascii=False), encoding="utf-8")
+            projected = historical_projection(generated, manifest)
+            for artifact in set(manifest['generatedArtifactSha256']) - set(projected['generatedArtifactSha256']):
+                (generated / artifact).unlink()
             self.assertEqual([], r1_business_closure_contract.validate_ingress_query_capability(root))
             structural_findings = []
             gates = verify_baseline.verify_delivery_ledger(root, structural_findings)
@@ -56,8 +69,11 @@ class R1BusinessClosureContractTest(unittest.TestCase):
                 with self.subTest(fault=fault):
                     manifest.write_text(original_manifest, encoding="utf-8")
                     migration.write_text(original_sql, encoding="utf-8")
-                    if fault == "old_version": manifest.write_text(original_manifest.replace('52-plus-2-v1.2', '52-plus-2-v1.1'), encoding="utf-8")
-                    if fault == "wrong_hash": manifest.write_text(original_manifest.replace('a4beeb91ed93be455736eafa3abb829f6a94fed3a263be5996832e458b7c4b39', '0' * 64), encoding="utf-8")
+                    if fault == "old_version": manifest.write_text(original_manifest.replace('52-plus-2-r2-v1', '52-plus-2-v1.1'), encoding="utf-8")
+                    if fault == "wrong_hash":
+                        import json
+                        original_hash = json.loads(original_manifest)['contractSha256']
+                        manifest.write_text(original_manifest.replace(original_hash, '0' * 64), encoding="utf-8")
                     if fault == "missing_migration": migration.unlink()
                     if fault == "unauthorized_grant": migration.write_text(original_sql + '\nGRANT SELECT ON lead.lead TO law_app_query;\n', encoding="utf-8")
                     self.assertTrue(any('ingress QUERY capability' in finding for finding in validate(root)), fault)
@@ -76,6 +92,22 @@ class R1BusinessClosureContractTest(unittest.TestCase):
             self.assertIn(old, text)
             path.write_text(text.replace(old, new, 1), encoding="utf-8")
             self.assertTrue(validate(root), f"mutation escaped: {old}")
+
+    def api_mutation(self, keys, change, expected_finding):
+        """Mutate the named contract node, independent of YAML presentation."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for folder in ("docs/adr", "docs/contracts/r1", "docs/baseline", "contracts/openapi", "contracts/events", "database/schema-contract-52-plus-2/generated"):
+                shutil.copytree(ROOT / folder, root / folder)
+            path = root / API
+            document = yaml.safe_load(path.read_text(encoding="utf-8"))
+            target = document
+            for key in keys:
+                target = target[key]
+            change(target)
+            path.write_text(yaml.safe_dump(document, sort_keys=False, allow_unicode=True), encoding="utf-8")
+            # A different validator failure must not hide an escaped mutation.
+            self.assertIn(expected_finding, validate(root))
 
     def test_service_capture_row_is_required(self):
         self.mutation(COMMAND, "| CAPTURE_LEAD | SERVICE_ACTOR | SERVICE | SYSTEM | SOURCE_INTAKE_OWNER | LEAD_CAPTURE | sourceIntakeRootCode | existing-lead:LEAD_CAPTURE-DENY | NONE | NONE |\n", "")
@@ -108,52 +140,52 @@ class R1BusinessClosureContractTest(unittest.TestCase):
         self.mutation(API, "      x-error-codes:\n", "      x-error-codes:\n        - STALE_OUTBOX_CLAIM\n")
 
     def test_due_limit_bounds_are_scoped_to_due_parameter(self):
-        self.mutation(API, "schema: { type: integer, minimum: 1, maximum: 100, default: 50 }", "schema: { type: integer, minimum: 1, maximum: 101, default: 50 }")
+        self.api_mutation(("components", "parameters", "DueLimitQuery", "schema"), lambda node: node.update(maximum=101), "R1 DueLimitQuery differs from exact contract")
 
     def test_recovery_type_query_ref_is_exact(self):
-        self.mutation(API, "schema: { $ref: '#/components/schemas/RecoveryTypeV1' }", "schema: { type: string }")
+        self.api_mutation(("components", "parameters", "RecoveryTypeQuery"), lambda node: node.update(schema={"type": "string"}), "R1 RecoveryTypeQuery differs from exact contract")
 
     def test_cursor_constraints_are_scoped(self):
-        self.mutation(API, "schema: { type: string, minLength: 1, maxLength: 2048 }", "schema: { type: string, minLength: 0, maxLength: 2048 }")
+        self.api_mutation(("components", "parameters", "DueCursorQuery", "schema"), lambda node: node.update(minLength=0), "R1 DueCursorQuery differs from exact contract")
 
     def test_due_candidate_exact_properties_are_scoped(self):
-        self.mutation(API, "required: [recoveryType, taskId, expectedTaskRevision, waitReceiptId, waitReceiptHash, dueCutoff, idempotencyKey]", "required: [recoveryType, taskId, expectedTaskRevision, waitReceiptId, waitReceiptHash, dueCutoff]")
+        self.api_mutation(("components", "schemas", "DueR1TaskCandidateV1", "required"), lambda node: node.remove("idempotencyKey"), "R1 DueR1TaskCandidateV1 differs from exact scoped contract")
 
     def test_consume_exact_properties_are_scoped(self):
-        self.mutation(API, "required: [domainEventOutboxId, domainEventId, expectedOutboxRevision, leaseOwner, fencingToken]", "required: [domainEventOutboxId, domainEventId, expectedOutboxRevision, leaseOwner]")
+        self.api_mutation(("components", "schemas", "ConsumeR1ProjectionV1", "required"), lambda node: node.remove("fencingToken"), "R1 ConsumeR1ProjectionV1 differs from exact scoped contract")
 
     def test_due_page_must_be_closed_and_require_candidates(self):
-        self.mutation(API, "DueR1TaskPageV1:\n      type: object\n      additionalProperties: false", "DueR1TaskPageV1:\n      type: object\n      additionalProperties: true")
+        self.api_mutation(("components", "schemas", "DueR1TaskPageV1"), lambda node: node.update(additionalProperties=True), "R1 DueR1TaskPageV1 differs from exact scoped contract")
 
     def test_candidate_property_refs_are_exact(self):
-        self.mutation(API, "waitReceiptHash: { $ref: '#/components/schemas/Digest32' }", "waitReceiptHash: { $ref: '#/components/schemas/Uuid' }")
+        self.api_mutation(("components", "schemas", "DueR1TaskCandidateV1", "properties"), lambda node: node.update(waitReceiptHash={"$ref": "#/components/schemas/Uuid"}), "R1 DueR1TaskCandidateV1 differs from exact scoped contract")
 
     def test_internal_problem_enums_are_exact(self):
-        self.mutation(API, "enum: ['NO', FIRST_PAGE, AFTER_REAUTH, BACKOFF]", "enum: ['NO', FIRST_PAGE, BACKOFF]")
+        self.api_mutation(("components", "schemas", "InternalProblem", "properties", "retryPolicy", "enum"), lambda node: node.remove("AFTER_REAUTH"), "R1 InternalProblem differs from exact frozen schema")
 
     def test_internal_problem_type_and_exact_properties_are_required(self):
-        self.mutation(API, "InternalProblem:\n      type: object", "InternalProblem:\n      type: string")
-        self.mutation(API, "correlationId: { $ref: '#/components/schemas/Uuid' }", "correlationId: { $ref: '#/components/schemas/Uuid' }\n        leakedTenant: { type: string }")
+        self.api_mutation(("components", "schemas", "InternalProblem"), lambda node: node.update(type="string"), "R1 InternalProblem differs from exact frozen schema")
+        self.api_mutation(("components", "schemas", "InternalProblem", "properties"), lambda node: node.update(leakedTenant={"type": "string"}), "R1 InternalProblem differs from exact frozen schema")
 
     def test_internal_problem_scalar_schemas_are_exact(self):
-        self.mutation(API, "type: { type: string, format: uri }", "type: { type: string }")
-        self.mutation(API, "title: { type: string }", "title: { type: integer }")
-        self.mutation(API, "status: { type: integer, enum: [400, 401, 403, 404, 409, 422, 429, 500, 503] }", "status: { type: string, enum: [400, 401, 403, 404, 409, 422, 429, 500, 503] }")
+        for field, change in (("type", lambda node: node.pop("format")), ("title", lambda node: node.update(type="integer")), ("status", lambda node: node.update(type="string"))):
+            with self.subTest(field=field):
+                self.api_mutation(("components", "schemas", "InternalProblem", "properties", field), change, "R1 InternalProblem differs from exact frozen schema")
 
     def test_internal_problem_correlation_ref_is_exact(self):
-        self.mutation(API, "correlationId: { $ref: '#/components/schemas/Uuid' }", "correlationId: { type: string }")
+        self.api_mutation(("components", "schemas", "InternalProblem", "properties"), lambda node: node.update(correlationId={"type": "string"}), "R1 InternalProblem differs from exact frozen schema")
 
     def test_internal_operation_response_refs_are_exact(self):
-        self.mutation(API, "'409': { $ref: '#/components/responses/InternalConflictProblem' }", "'409': { $ref: '#/components/responses/InternalBadRequestProblem' }")
+        self.api_mutation(("paths", "/internal/v1/projections/r1/consume", "post", "responses"), lambda node: node.update({"409": {"$ref": "#/components/responses/InternalBadRequestProblem"}}), "R1 internal operation response set differs: consumeR1Projection")
 
     def test_due_operation_parameter_refs_are_exact(self):
-        self.mutation(API, "- $ref: '#/components/parameters/DueCursorQuery'", "- $ref: '#/components/parameters/DueLimitQuery'")
+        self.api_mutation(("paths", "/internal/v1/tasks/due", "get", "parameters", 2), lambda node: node.update({"$ref": "#/components/parameters/DueLimitQuery"}), "R1 listDueR1Tasks parameter/body contract differs")
 
     def test_consume_operation_body_ref_is_exact(self):
-        self.mutation(API, "schema: { $ref: '#/components/schemas/ConsumeR1ProjectionV1' }", "schema: { $ref: '#/components/schemas/DueR1TaskPageV1' }")
+        self.api_mutation(("paths", "/internal/v1/projections/r1/consume", "post", "requestBody", "content", "application/json", "schema"), lambda node: node.update({"$ref": "#/components/schemas/DueR1TaskPageV1"}), "R1 consumeR1Projection request contract differs")
 
     def test_internal_operation_error_allowlist_is_scoped(self):
-        self.mutation(API, "x-error-codes: [VALIDATION_FAILED, UNAUTHENTICATED, NOT_AUTHORIZED, NOT_FOUND, STALE_OUTBOX_CLAIM, PROJECTION_EVENT_INVALID, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE]", "x-error-codes: [VALIDATION_FAILED, UNAUTHENTICATED, NOT_AUTHORIZED, NOT_FOUND, RATE_LIMITED, INTERNAL_ERROR, SERVICE_UNAVAILABLE]")
+        self.api_mutation(("paths", "/internal/v1/projections/r1/consume", "post", "x-error-codes"), lambda node: node.remove("STALE_OUTBOX_CLAIM"), "R1 internal operation error allowlist differs: consumeR1Projection")
 
     def test_duplicate_yaml_keys_are_rejected(self):
         self.mutation(API, "DueLimitQuery:\n", "DueLimitQuery:\n      name: shadow\n")

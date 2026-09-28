@@ -1,0 +1,18 @@
+{
+  "ledgerMaster.css": {
+    "source": "apps/workbench/src/features/opportunities/ledgerMaster.css",
+    "sha256": "d471c9664426736cf7200aee1df44ec21c2920b441f3c228778bd95b25c7cd77"
+  },
+  "workbenchControls.css": {
+    "source": "apps/workbench/src/styles/workbenchControls.css",
+    "sha256": "438ebfc63712e6df25491144071ca0563af4e74eb1a77e0e6cbf5c62ca9130d3"
+  },
+  "contractControls.css": {
+    "source": "apps/workbench/src/features/contracts/contractControls.css",
+    "sha256": "86e8531d69e5fb8e0e3186c959aa282dcfedd529b4861d90cdc7adca4717061c"
+  },
+  "workbench.css": {
+    "source": "apps/workbench/src/styles/workbench.css",
+    "sha256": "604351c18af358cdb6ce830b73a1a50274b95579331e731b8eb243f5af9a7c49"
+  }
+}

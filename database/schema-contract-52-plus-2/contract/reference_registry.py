@@ -178,3 +178,82 @@ TYPED_REFERENCE_ALLOWED_TARGETS = {
         "transfer.transfer_snapshot",
     ),
 }
+
+# V900 named schema successor slots.
+APPLICATION_FACT_TYPES += ("opportunity.owner_exception", "opportunity.owner_exception_disposition", "opportunity.responsibility_handoff")
+TYPED_REFERENCE_ALLOWED_TARGETS.update({
+ "responsibility.task_occurrence.responsibility_basis": ("opportunity.opportunity", "opportunity.responsibility_handoff"),
+ "responsibility.task_occurrence.cancellation_fact": ("opportunity.responsibility_handoff",),
+})
+
+# Formal observation/disposition commands publish these facts through existing exact slots.
+for _slot in ("audit.audit_entry.subject", "execution.command_receipt.result_fact", "execution.domain_event.source_fact"):
+    TYPED_REFERENCE_ALLOWED_TARGETS[_slot] += ("opportunity.owner_exception", "opportunity.owner_exception_disposition", "opportunity.responsibility_handoff")
+
+# V910 explicit terminal fact; existing cancellation/receipt/event slots gain only this named target.
+APPLICATION_FACT_TYPES += ("opportunity.closure",)
+for _slot in ("identity.object_access_grant.object_subject", "responsibility.task_occurrence.cancellation_fact", "audit.audit_entry.subject", "execution.command_receipt.result_fact", "execution.domain_event.source_fact"):
+    TYPED_REFERENCE_ALLOWED_TARGETS[_slot] += ("opportunity.closure",)
+
+# V920 exact customer requirements and Party history; never a task cancellation basis.
+_T05_FACTS = ("party.profile_version", "opportunity.customer_requirement_draft", "opportunity.customer_requirement_confirmation", "opportunity.customer_requirement_participant", "opportunity.customer_requirement_draft_party")
+APPLICATION_FACT_TYPES += _T05_FACTS
+for _slot in ("identity.object_access_grant.object_subject", "audit.audit_entry.subject", "execution.command_receipt.result_fact", "execution.domain_event.source_fact"):
+    TYPED_REFERENCE_ALLOWED_TARGETS[_slot] += _T05_FACTS
+
+# V930 material receipts expose immutable supplementary facts, never mutable upload selectors.
+_T06_FACTS = ('evidence.material_upload_basis', 'evidence.material_upload_check', 'opportunity.material_version')
+APPLICATION_FACT_TYPES += _T06_FACTS
+for _slot in ('identity.object_access_grant.object_subject', 'audit.audit_entry.subject', 'execution.command_receipt.result_fact', 'execution.domain_event.source_fact'):
+    TYPED_REFERENCE_ALLOWED_TARGETS[_slot] += _T06_FACTS
+
+# V940 exact protected quote sources.
+_T07_FACTS = ("opportunity.quote_draft", "opportunity.quote_package_basis")
+APPLICATION_FACT_TYPES += _T07_FACTS
+for _slot in ("identity.object_access_grant.object_subject", "audit.audit_entry.subject", "execution.command_receipt.result_fact", "execution.domain_event.source_fact"):
+    TYPED_REFERENCE_ALLOWED_TARGETS[_slot] += _T07_FACTS
+
+# V950 named runtime facts; manual delivery is distinct from provider delivery.
+_T07_RUNTIME_FACTS = tuple('opportunity.' + name for name in (
+    'quote_approval_policy', 'quote_approval_policy_signer', 'quote_approval_request',
+    'quote_approval_member', 'quote_approval_decision', 'quote_manual_delivery',
+    'quote_response_basis', 'contract_preparation_source', 'quote_workflow'))
+APPLICATION_FACT_TYPES += _T07_RUNTIME_FACTS
+for _slot in ('identity.object_access_grant.object_subject', 'audit.audit_entry.subject',
+              'execution.command_receipt.result_fact', 'execution.domain_event.source_fact'):
+    TYPED_REFERENCE_ALLOWED_TARGETS[_slot] += _T07_RUNTIME_FACTS
+TYPED_REFERENCE_ALLOWED_TARGETS['opportunity.quote_issue.delivery_fact'] += ('opportunity.quote_manual_delivery',)
+TYPED_REFERENCE_ALLOWED_TARGETS['responsibility.task_occurrence.completion_fact'] += (
+    'opportunity.quote_approval_request', 'opportunity.quote_approval_decision')
+
+# V970 structural direct preparation facts; command slots are not activated yet.
+APPLICATION_FACT_TYPES += ("contract.preparation_request", "contract.preparation_decision")
+
+# V980 named contract preparation facts. Runtime activation still requires capability/version gate.
+_T08_FACTS=tuple('contract.'+name for name in ('approval_policy','approval_policy_member','preparation_workflow','revision_approval_request','preparation_draft','template_version','clause_version','revision_clause','revision_review_request','revision_review_decision','revision_review_binding','revision_approval_requirement','revision_approval_decision','signature_readiness'))
+APPLICATION_FACT_TYPES+=_T08_FACTS
+for _slot in ('identity.object_access_grant.object_subject','audit.audit_entry.subject','execution.command_receipt.result_fact','execution.domain_event.source_fact'):
+    TYPED_REFERENCE_ALLOWED_TARGETS[_slot]+=(*_T08_FACTS,'contract.preparation_request','contract.preparation_decision')
+TYPED_REFERENCE_ALLOWED_TARGETS['responsibility.task_occurrence.completion_fact']+=('contract.preparation_request','contract.preparation_decision','contract.revision_review_request','contract.revision_review_decision','contract.revision_approval_request','contract.revision_approval_decision','contract.signature_readiness')
+
+# V990 manual signing facts retain exact audit/receipt/task references.
+_T09_FACTS=tuple('contract.'+name for name in ('signature_arrangement','signature_draft','signature_submission','signature_verification','signature_archive','signature_revision_return','signature_workflow','signature_handoff'))
+APPLICATION_FACT_TYPES+=_T09_FACTS
+for _slot in ('identity.object_access_grant.object_subject','audit.audit_entry.subject','execution.command_receipt.result_fact','execution.domain_event.source_fact'):
+    TYPED_REFERENCE_ALLOWED_TARGETS[_slot]+=_T09_FACTS
+TYPED_REFERENCE_ALLOWED_TARGETS['responsibility.task_occurrence.completion_fact']+=tuple(f for f in _T09_FACTS if f not in ('contract.signature_draft','contract.signature_workflow'))
+
+# Approved-template signing identity metadata is immutable, never a task completion.
+APPLICATION_FACT_TYPES+=('contract.template_signing_party',)
+for _slot in ('identity.object_access_grant.object_subject','audit.audit_entry.subject','execution.command_receipt.result_fact','execution.domain_event.source_fact'):
+    TYPED_REFERENCE_ALLOWED_TARGETS[_slot]+=('contract.template_signing_party',)
+
+# V1050 exact pending transfer facts; they do not imply intake or case creation.
+_TRANSFER_PENDING_FACTS=('transfer.workflow','transfer.submission','transfer.review','transfer.review_return_item','transfer.intake','transfer.classification')
+APPLICATION_FACT_TYPES+=_TRANSFER_PENDING_FACTS
+for _slot in ('identity.object_access_grant.object_subject','audit.audit_entry.subject','execution.command_receipt.result_fact','execution.domain_event.source_fact'):
+    TYPED_REFERENCE_ALLOWED_TARGETS[_slot]+=_TRANSFER_PENDING_FACTS
+TYPED_REFERENCE_ALLOWED_TARGETS['responsibility.task_occurrence.completion_fact']+=('transfer.submission','transfer.review','transfer.intake','transfer.classification')
+
+TYPED_REFERENCE_ALLOWED_TARGETS['conflict.conflict_review.trigger_fact']+=('transfer.submission',)
+TYPED_REFERENCE_ALLOWED_TARGETS['conflict.conflict_review_party.source_item']+=('opportunity.customer_requirement_participant',)

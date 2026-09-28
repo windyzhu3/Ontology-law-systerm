@@ -31,7 +31,14 @@ public class SessionContextController implements SessionApi {
                             if(authorities.select(connection,actor,target,target.id(),"IDENTITY_ADMIN",code)!=null){admin=true;break;}
                         }
                     }
-                    return new IdentitySelfReadRuntime.EntryRights(workbench,admin);
+                    boolean exceptions=false;
+                    if(actor.onBehalfAppointmentId()==null){var exceptionRights=OpportunityOwnerExceptionAuthorityReader.databaseBacked();var now=io.github.windyzhu3.ontologylaw.execution.R1ServiceReadRuntime.databaseTime(connection);exceptions=exceptionRights.hasAuthority(connection,actor,"OPPORTUNITY_OWNER_EXCEPTION_READ",now)||exceptionRights.hasAuthority(connection,actor,"OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ",now);}
+                    boolean ledger=actor.principalKind()==PrincipalKind.HUMAN&&actor.onBehalfAppointmentId()==null&&OpportunityLedgerAuthorityReader.databaseBacked().hasAuthority(connection,actor,io.github.windyzhu3.ontologylaw.execution.R1ServiceReadRuntime.databaseTime(connection));
+                    var named=OpportunityOwnerExceptionAuthorityReader.databaseBacked();var now=io.github.windyzhu3.ontologylaw.execution.R1ServiceReadRuntime.databaseTime(connection);
+                    boolean management=actor.principalKind()==PrincipalKind.HUMAN&&actor.onBehalfAppointmentId()==null&&(named.hasAuthority(connection,actor,"PAYMENT_LEDGER_READ",now)||named.hasAuthority(connection,actor,"TRANSFER_LEDGER_READ",now));
+                    var views=new ArrayList<String>();if(actor.onBehalfAppointmentId()==null){for(var entry:Map.of("contracts","CONTRACT_READ","payments","PAYMENT_LEDGER_READ","transfer","TRANSFER_LEDGER_READ").entrySet())if(named.hasAuthority(connection,actor,entry.getValue(),now))views.add(entry.getKey());}views.sort(String::compareTo);
+                    boolean overview=false;if(actor.principalKind()==PrincipalKind.HUMAN&&actor.onBehalfAppointmentId()==null)for(var code:List.of("LEAD_MANAGEMENT_READ","OPPORTUNITY_LEDGER_READ","SALES_OPPORTUNITY_OWNER","CONTRACT_READ","TRANSFER_LEDGER_READ","TEAM_TASK_READ"))if(named.hasAuthority(connection,actor,code,now)){overview=true;break;}
+                    return new IdentitySelfReadRuntime.EntryRights(workbench,admin,exceptions,ledger,management,List.copyOf(views),actor.principalKind()==PrincipalKind.HUMAN&&actor.onBehalfAppointmentId()==null&&named.hasAuthority(connection,actor,"TEAM_TASK_READ",now),actor.principalKind()==PrincipalKind.HUMAN&&actor.onBehalfAppointmentId()==null&&named.hasAuthority(connection,actor,"LEAD_MANAGEMENT_READ",now),overview);
                 });
             }catch(HumanIdentityReader.Failure refused){throw new R1HttpFailure(refused.code());}
             catch(java.sql.SQLException unavailable){throw new R1HttpFailure("SERVICE_UNAVAILABLE");}

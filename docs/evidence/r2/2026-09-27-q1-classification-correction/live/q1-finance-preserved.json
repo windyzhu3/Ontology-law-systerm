@@ -1,0 +1,16 @@
+{
+  "case": "C49",
+  "tasks": [
+    {
+      "taskId": "01a0e26c-814c-7109-a6d3-95e4024d1a6b",
+      "businessPurpose": {
+        "code": "CHECK_CONTRACT_RECEIPT",
+        "label": "核对本笔到账"
+      },
+      "priority": "NORMAL",
+      "timeHint": "在处理时限内",
+      "subjectFactRef": "B9lpZpyysIzfTu9yqv7oqx552q46tIxb4SbbeXBSjfs",
+      "subjectTitle": "页面验收-C49-Q1转案与分类纠正整链验收"
+    }
+  ]
+}

@@ -1,0 +1,194 @@
+{
+  "checks": [
+    {
+      "scene": "check",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "heading": "核对合同执行条件"
+    },
+    {
+      "scene": "check",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "heading": "核对合同执行条件"
+    },
+    {
+      "scene": "check",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "heading": "核对合同执行条件"
+    },
+    {
+      "scene": "prepay",
+      "width": 1440,
+      "overflow": false,
+      "primary": 0,
+      "heading": "等待约定首款到账"
+    },
+    {
+      "scene": "prepay",
+      "width": 390,
+      "overflow": false,
+      "primary": 0,
+      "heading": "等待约定首款到账"
+    },
+    {
+      "scene": "prepay",
+      "width": 360,
+      "overflow": false,
+      "primary": 0,
+      "heading": "等待约定首款到账"
+    },
+    {
+      "scene": "payment",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "heading": "核对本笔到账"
+    },
+    {
+      "scene": "payment",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "heading": "核对本笔到账"
+    },
+    {
+      "scene": "payment",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "heading": "核对本笔到账"
+    },
+    {
+      "scene": "partial",
+      "width": 1440,
+      "overflow": false,
+      "primary": 0,
+      "heading": "等待剩余款项到账"
+    },
+    {
+      "scene": "partial",
+      "width": 390,
+      "overflow": false,
+      "primary": 0,
+      "heading": "等待剩余款项到账"
+    },
+    {
+      "scene": "partial",
+      "width": 360,
+      "overflow": false,
+      "primary": 0,
+      "heading": "等待剩余款项到账"
+    },
+    {
+      "scene": "mismatch",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "heading": "补齐收款核对依据"
+    },
+    {
+      "scene": "mismatch",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "heading": "补齐收款核对依据"
+    },
+    {
+      "scene": "mismatch",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "heading": "补齐收款核对依据"
+    },
+    {
+      "scene": "ready",
+      "width": 1440,
+      "overflow": false,
+      "primary": 0,
+      "heading": "合同已具备转案条件"
+    },
+    {
+      "scene": "ready",
+      "width": 390,
+      "overflow": false,
+      "primary": 0,
+      "heading": "合同已具备转案条件"
+    },
+    {
+      "scene": "ready",
+      "width": 360,
+      "overflow": false,
+      "primary": 0,
+      "heading": "合同已具备转案条件"
+    },
+    {
+      "scene": "unassigned",
+      "width": 1440,
+      "overflow": false,
+      "primary": 0,
+      "heading": "收款责任安排待处理"
+    },
+    {
+      "scene": "unassigned",
+      "width": 390,
+      "overflow": false,
+      "primary": 0,
+      "heading": "收款责任安排待处理"
+    },
+    {
+      "scene": "unassigned",
+      "width": 360,
+      "overflow": false,
+      "primary": 0,
+      "heading": "收款责任安排待处理"
+    },
+    {
+      "scene": "revoked",
+      "width": 1440,
+      "overflow": false,
+      "primary": 0,
+      "heading": "当前事项不可办理"
+    },
+    {
+      "scene": "revoked",
+      "width": 390,
+      "overflow": false,
+      "primary": 0,
+      "heading": "当前事项不可办理"
+    },
+    {
+      "scene": "revoked",
+      "width": 360,
+      "overflow": false,
+      "primary": 0,
+      "heading": "当前事项不可办理"
+    },
+    {
+      "scene": "unknown",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "heading": "核对原提交结果"
+    },
+    {
+      "scene": "unknown",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "heading": "核对原提交结果"
+    },
+    {
+      "scene": "unknown",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "heading": "核对原提交结果"
+    }
+  ],
+  "errors": []
+}

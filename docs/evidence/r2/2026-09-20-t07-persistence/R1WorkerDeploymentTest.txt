@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: io.github.windyzhu3.ontologylaw.worker.R1WorkerDeploymentTest
+-------------------------------------------------------------------------------
+Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.265 s -- in io.github.windyzhu3.ontologylaw.worker.R1WorkerDeploymentTest

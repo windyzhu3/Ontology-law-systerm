@@ -32,9 +32,20 @@ function adapter(): OidcAdapter {
   };
 }
 beforeEach(() => sessionStorage.clear());
+it('rejects overview rights in delegated sessions and accepts the direct optional hint',async()=>{
+ for(const represented of [false,true]){const data={...context,canReadBusinessOverview:true,selectedOnBehalfAppointmentId:represented?delegated:null};const c=new SessionController(adapter(),new RecoveryStore(sessionStorage),async()=>jsonResponse(data));await c.initialize();expect(c.getSnapshot().status==='READY').toBe(!represented);}
+});
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+it('accepts the independent lead entry only in an own selected session',async()=>{
+ const ownContext={...context,canEnterWorkbench:false,canReadLeadManagement:true};
+ const controller=new SessionController(adapter(),new RecoveryStore(sessionStorage),async()=>jsonResponse(ownContext));await controller.initialize();
+ expect(controller.getSnapshot().status).toBe('READY');expect(controller.getSnapshot().context?.canReadLeadManagement).toBe(true);
+ const delegatedContext={...ownContext,selectedOnBehalfAppointmentId:delegated};
+ const represented=new SessionController(adapter(),new RecoveryStore(sessionStorage),async()=>jsonResponse(delegatedContext));await represented.initialize();expect(represented.getSnapshot().status).not.toBe('READY');
 });
 
 it("invokes the default browser fetch without using the controller as its receiver", async () => {

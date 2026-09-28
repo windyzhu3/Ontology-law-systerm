@@ -19,7 +19,7 @@ ROLE_PLACEHOLDERS = {
     "${audit_append_role}": "law_audit_append",
 }
 PLPGSQL_FUNCTION = re.compile(
-    r"CREATE FUNCTION\s+[^\n]+.*?LANGUAGE plpgsql.*?AS\s+(\$[a-z_]*\$).*?\1;",
+    r"CREATE (?:OR REPLACE )?FUNCTION\s+[^\n]+.*?LANGUAGE plpgsql.*?AS\s+(\$[a-z_]*\$).*?\1;",
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -33,8 +33,8 @@ def normalized_sql(path: Path) -> str:
 
 def main() -> int:
     migrations = sorted(MIGRATIONS.glob("*.sql"))
-    if len(migrations) != 21:
-        print(f"expected 21 migrations, found {len(migrations)}", file=sys.stderr)
+    if len(migrations) != 34:
+        print(f"expected 34 migrations, found {len(migrations)}", file=sys.stderr)
         return 1
 
     failures: list[str] = []

@@ -20,6 +20,8 @@ public interface LeadIngressService {
     Lead capture(Connection c,UUID tenant,Map<String,Object> normalized,byte[] sourceKey,Instant now)throws SQLException;
     Duplicate duplicate(Connection c,UUID tenant,Lead lead,Instant cutoff)throws SQLException;
     Assignment assignment(Connection c,UUID tenant,UUID id)throws SQLException;
+    /** Metadata only; any historical assignment/contact prevents legacy ACK restoration. */
+    boolean hasAssignmentOrContactHistory(Connection c,UUID tenant,UUID lead)throws SQLException;
     boolean hasOpenAssignment(Connection c,UUID tenant,UUID lead)throws SQLException;
     Assignment assign(Connection c,UUID tenant,Lead lead,UUID owner,String reason,Instant now)throws SQLException;
     Lead update(Connection c,UUID tenant,Lead lead,String disposition,UUID linkedParty,Map<String,Object> ingress,UUID actor,UUID newAssignment,Instant now)throws SQLException;

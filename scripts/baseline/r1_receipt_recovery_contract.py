@@ -148,6 +148,10 @@ CONSUMER_PROFILES = {
 }
 # ADR-0015 exact transport successor; ADR-0013's registry itself remains historical and immutable.
 OPENAPI_FROZEN_HASH = '99630d256ba9609268bdbfd4c4744fb2f6bcc0c9ec3055695b26da9a08a9ac3e'
+try:
+    from scripts.baseline.r2_task_selection_contract import r1_transport_projection
+except ModuleNotFoundError:
+    from r2_task_selection_contract import r1_transport_projection
 OPENAPI_DESCRIPTION = (
     'ADR-0013 / R1-HTTP-V1.3: only the identical original trusted Actor and on-behalf pair may recover a public command receipt. '
     'R1_RECEIPT_RECOVERY_METADATA_LOOKUP_V1 obtains bounded metadata inside Audit Owner; current Owner authorization is recomputed without rerunning terminal command eligibility. '
@@ -174,7 +178,7 @@ def _validate_transport(source: str) -> tuple[str, ...]:
     """
     findings: list[str] = []
     try:
-        document = yaml.load(source, Loader=_StrictSafeLoader)
+        document = r1_transport_projection(yaml.load(source, Loader=_StrictSafeLoader))
         operation = document['paths'][RECEIPT_PATH]['get']
         if operation.pop('description', None) != OPENAPI_DESCRIPTION:
             findings.append('R1 receipt recovery OpenAPI must describe the exact authorization, audit, cache and legacy semantics')

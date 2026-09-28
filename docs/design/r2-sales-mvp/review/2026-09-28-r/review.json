@@ -1,0 +1,113 @@
+{
+  "status": "LOCAL_PROTOTYPE_CHECKED_NOT_APPROVED",
+  "sharedStyles": "4 identical",
+  "results": [
+    {
+      "scene": "payments",
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "scene": "payments",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "scene": "payments",
+      "width": 360,
+      "overflow": false
+    },
+    {
+      "scene": "transfer",
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "scene": "transfer",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "scene": "transfer",
+      "width": 360,
+      "overflow": false
+    },
+    {
+      "scene": "readonly",
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "scene": "readonly",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "scene": "readonly",
+      "width": 360,
+      "overflow": false
+    },
+    {
+      "scene": "empty",
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "scene": "empty",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "scene": "empty",
+      "width": 360,
+      "overflow": false
+    },
+    {
+      "scene": "loading",
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "scene": "loading",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "scene": "loading",
+      "width": 360,
+      "overflow": false
+    },
+    {
+      "scene": "error",
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "scene": "error",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "scene": "error",
+      "width": 360,
+      "overflow": false
+    },
+    {
+      "scene": "revoked",
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "scene": "revoked",
+      "width": 390,
+      "overflow": false
+    },
+    {
+      "scene": "revoked",
+      "width": 360,
+      "overflow": false
+    }
+  ],
+  "searchClearSwitchRetry": true,
+  "pageErrors": []
+}

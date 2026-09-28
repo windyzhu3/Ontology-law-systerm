@@ -11,8 +11,14 @@ public final class LeadCommands {
     private final AuthorizationIdentityReader identity=AuthorizationIdentityReader.databaseBacked();private final R1AuthorityReader authorities=R1AuthorityReader.databaseBacked();
     private final AuthorizationService authorization=AuthorizationService.databaseBacked();private final AssignmentPolicy assignmentPolicy=new AssignmentPolicy();
     public LeadCommands(R1SourcePolicyRegistry sources,LeadProtection protection) {this.sources=Objects.requireNonNull(sources);this.protection=Objects.requireNonNull(protection);this.leads=LeadIngressService.databaseBacked(protection);}
-    public List<CommandHandler> handlers(){var result=new ArrayList<CommandHandler>(List.of(new Handler(CommandEnvelope.Type.CAPTURE_LEAD),new Handler(CommandEnvelope.Type.RESOLVE_DUPLICATE_LEAD),new Handler(CommandEnvelope.Type.COMPLETE_LEAD_INGRESS),new Handler(CommandEnvelope.Type.ASSIGN_LEAD),new Handler(CommandEnvelope.Type.RECORD_ROUTING_DISPOSITION),new Handler(CommandEnvelope.Type.ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST)));result.addAll(new ContactCommands(sources,protection).handlers());result.addAll(new WaitLifecycleService(leads::lock).handlers());return List.copyOf(result);}
-    public static Map<String,Object> candidate(CommandEnvelope.Type type,Map<String,Object> values){try{return LeadInputs.candidate(type,values);}catch(IllegalArgumentException ex){throw new CommandHandler.Rejected("VALIDATION_FAILED");}}
+    public List<CommandHandler> handlers(){var result=new ArrayList<CommandHandler>(List.of(new SourceRequestRepairCommand(sources,protection),new Handler(CommandEnvelope.Type.RECORD_SOURCE_REQUEST_CONTINUATION),new Handler(CommandEnvelope.Type.CAPTURE_LEAD),new Handler(CommandEnvelope.Type.RESOLVE_DUPLICATE_LEAD),new Handler(CommandEnvelope.Type.COMPLETE_LEAD_INGRESS),new Handler(CommandEnvelope.Type.ASSIGN_LEAD),new Handler(CommandEnvelope.Type.RECORD_ROUTING_DISPOSITION),new Handler(CommandEnvelope.Type.ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST)));result.addAll(new ContactCommands(sources,protection).handlers());result.addAll(new WaitLifecycleService(leads::lock,this::sourceRecovery).handlers());return List.copyOf(result);}
+    public static Map<String,Object> candidate(CommandEnvelope.Type type,Map<String,Object> values){try{return LeadInputs.candidate(type,values);}catch(IllegalArgumentException|DateTimeException ex){throw new CommandHandler.Rejected("VALIDATION_FAILED");}}
+    private void sourceRecovery(Connection c,UUID tenant,TaskFactory.Task task)throws SQLException{
+        var lead=leads.header(c,tenant,task.lead().id());
+        require(lead!=null&&lead.selector().equals(task.lead())&&lead.assignment()==null&&!leads.hasOpenAssignment(c,tenant,task.lead().id())&&tasks.causalSourceRequest(c,tenant,task)!=null,"VALIDATION_FAILED");
+        try{require(assignmentPolicy.sourceRequestOwner(c,tenant,task,policy(lead.source())).equals(task.owner()),"NOT_AUTHORIZED");}
+        catch(CommandHandler.Rejected unavailable){throw new CommandHandler.Rejected("NOT_AUTHORIZED");}
+    }
     private static void require(boolean ok,String code){if(!ok)throw new CommandHandler.Rejected(code);}
     private static UUID represented(Actor actor){return actor.onBehalfAppointmentId()==null?actor.appointmentId():actor.onBehalfAppointmentId();}
     private R1SourcePolicyRegistry.SourcePolicy policy(String source){var p=sources.find(source);require(p!=null,"VALIDATION_FAILED");return p;}
@@ -63,7 +69,7 @@ public final class LeadCommands {
             check(c,ctx.authorization(),task.selector(),false);check(c,ctx.authorization(),lead.selector(),false);require(task.owner().equals(represented(e.actor())),"NOT_AUTHORIZED");
             var value=values(e);drafts.validate(c,e.actor().tenantId(),task,confirmation(e),value);
             if(type==CommandEnvelope.Type.COMPLETE_LEAD_INGRESS){require(lead.missingContact()&&lead.ingressEmpty(),"INGRESS_COMPLETION_ALREADY_RECORDED");CommandHandler.nextRevision(lead.selector().revision());}
-            if(type==CommandEnvelope.Type.ASSIGN_LEAD){CommandHandler.nextRevision(lead.selector().revision());require(lead.assignment()==null&&!leads.hasOpenAssignment(c,e.actor().tenantId(),lead.selector().id()),"STALE_SUBJECT");require(assignmentPolicy.sales(c,e.actor().tenantId(),lead.selector(),policy(lead.source())).stream().anyMatch(a->a.appointmentId().equals(LeadInputs.uuid(value,"ownerAppointmentId"))),"STALE_SUBJECT");}
+            if(type==CommandEnvelope.Type.ASSIGN_LEAD||type==CommandEnvelope.Type.RECORD_SOURCE_REQUEST_CONTINUATION&&"ASSIGN_SELECTED".equals(value.get("decisionCode"))){CommandHandler.nextRevision(lead.selector().revision());require(lead.assignment()==null&&!leads.hasOpenAssignment(c,e.actor().tenantId(),lead.selector().id()),"STALE_SUBJECT");require(assignmentPolicy.sales(c,e.actor().tenantId(),lead.selector(),policy(lead.source())).stream().anyMatch(a->a.appointmentId().equals(LeadInputs.uuid(value,"ownerAppointmentId"))),"STALE_SUBJECT");}
             if(type==CommandEnvelope.Type.RESOLVE_DUPLICATE_LEAD){CommandHandler.nextRevision(lead.selector().revision());var duplicate=leads.duplicate(c,e.actor().tenantId(),lead,task.createdAt());require(duplicate!=null&&duplicate.lead().equals(new Subject("lead.lead",LeadInputs.uuid(value,"candidateLeadId"),LeadInputs.revision(value,"candidateLeadRevision"),null))&&duplicate.party().equals(new Subject("party.party",LeadInputs.uuid(value,"partyId"),LeadInputs.revision(value,"partyRevision"),null)),"STALE_SUBJECT");}
             if(type==CommandEnvelope.Type.ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST){var causal=tasks.causalStop(c,e.actor().tenantId(),task);require(causal!=null&&causal.equals(new Subject("responsibility.decision_record",LeadInputs.uuid(value,"causalDecisionId"),null,(String)value.get("causalDecisionHash"))),"STALE_SUBJECT");}
         }
@@ -84,7 +90,14 @@ public final class LeadCommands {
                         if(decision.equals("SCHEDULE_ROUTING_REVIEW"))plan=new Plan(TaskFactory.Type.RESOLVE_LEAD_ROUTING_GAP,supervisor,false,true);
                         else {var candidates=assignmentPolicy.sales(c,tenant,lead.selector(),source);plan=candidates.isEmpty()?new Plan(TaskFactory.Type.RESOLVE_LEAD_ROUTING_GAP,supervisor,false,false):new Plan(TaskFactory.Type.CONTACT_LEAD,candidates.getFirst().appointmentId(),true,false);assignmentReason="ROUTING_RETRY";}}
                 }
-                case ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST -> {contract="SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED";decision=contract;event=SourceIntakeStopRequestAcknowledgedV1;}
+                case ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST -> {contract="SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED";decision=contract;event=SourceIntakeStopRequestAcknowledgedV1;plan=new Plan(TaskFactory.Type.RESOLVE_SOURCE_REQUEST,assignmentPolicy.sourceRequestOwner(c,tenant,task,source),false,false);}
+                case RECORD_SOURCE_REQUEST_CONTINUATION -> {
+                    contract="SOURCE_REQUEST_CONTINUATION";decision=(String)value.get("decisionCode");event=SourceRequestContinuationRecordedV1;
+                    require(tasks.causalSourceRequest(c,tenant,task)!=null&&lead.assignment()==null&&!leads.hasOpenAssignment(c,tenant,lead.selector().id()),"STALE_SUBJECT");
+                    UUID supervisor=assignmentPolicy.sourceRequestOwner(c,tenant,task,source);require(supervisor.equals(task.owner()),"STALE_SUBJECT");
+                    if(decision.equals("ASSIGN_SELECTED")){plan=new Plan(TaskFactory.Type.CONTACT_LEAD,LeadInputs.uuid(value,"ownerAppointmentId"),true,false);assignmentReason="SOURCE_REQUEST_CONTINUATION";}
+                    else if(decision.equals("SCHEDULE_REVIEW")){require(OffsetDateTime.parse((String)value.get("reviewAt")).toInstant().isAfter(now),"VALIDATION_FAILED");plan=new Plan(TaskFactory.Type.RESOLVE_SOURCE_REQUEST,supervisor,false,true);}
+                }
                 default -> throw new IllegalStateException("Unregistered handler");
             }
             boolean mutate=disposition!=null||ingress!=null||plan!=null&&plan.assignment();if(mutate)CommandHandler.nextRevision(lead.selector().revision());
@@ -92,11 +105,19 @@ public final class LeadCommands {
             UUID assignment=null;if(plan!=null&&plan.assignment()){var a=leads.assign(c,tenant,lead,plan.owner(),assignmentReason,now);assignment=a.selector().id();if(type==CommandEnvelope.Type.ASSIGN_LEAD)fact=a.selector();}
             if(contract!=null){var digest=new TreeMap<String,Object>();digest.put("tenantId",tenant.toString());digest.put("subject",Map.of("type",task.lead().type(),"id",task.lead().id().toString(),"revision",task.lead().revision()));digest.put("authoritySlot",task.type().slot);digest.put("decisionCode",decision);digest.put("rationaleSummary",value.get("rationaleSummary"));
                 if(type==CommandEnvelope.Type.RESOLVE_DUPLICATE_LEAD){for(String k:List.of("candidateLeadId","candidateLeadRevision","partyId","partyRevision"))digest.put(k,value.get(k));digest.put("newRevision",CommandHandler.nextRevision(lead.selector().revision()));var changed=new TreeMap<String,Object>();changed.put("disposition_code",disposition);if(linked!=null){changed.put("parsed_party_id",linked.toString());changed.put("party_resolution_code","RESOLVED");}digest.put("newValues",changed);}
+                if(type==CommandEnvelope.Type.RECORD_SOURCE_REQUEST_CONTINUATION){var causal=tasks.causalSourceRequest(c,tenant,task);digest.put("causalDecisionId",causal.id().toString());digest.put("causalDecisionHash",causal.hash());if(value.containsKey("ownerAppointmentId"))digest.put("ownerAppointmentId",value.get("ownerAppointmentId"));if(value.containsKey("reviewAt"))digest.put("reviewAt",value.get("reviewAt"));}
                 if(type==CommandEnvelope.Type.ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST){digest.put("causalDecisionId",value.get("causalDecisionId"));digest.put("causalDecisionHash",value.get("causalDecisionHash"));}
                 fact=tasks.decision(c,tenant,task,actor,contract,decision,(String)value.get("rationaleSummary"),digest,now);}
             if(mutate)lead=leads.update(c,tenant,lead,disposition,linked,ingress,actor,assignment,now);if(type==CommandEnvelope.Type.COMPLETE_LEAD_INGRESS)fact=lead.selector();
             tasks.complete(c,tenant,task,fact,now);
-            if(plan!=null){var successor=tasks.create(c,tenant,plan.type(),plan.owner(),lead.selector(),ZoneId.of(source.businessTimezone()),now);if(plan.waiting())tasks.waitUntil(c,tenant,successor,actor,R1BusinessTime.nextWindow(now,ZoneId.of(source.businessTimezone())),now);}
+            if(plan!=null){
+                var zone=ZoneId.of(source.businessTimezone());
+                var successor=plan.type()==TaskFactory.Type.RESOLVE_SOURCE_REQUEST?tasks.createSourceRequestContinuation(c,tenant,plan.owner(),task,fact,zone,now):tasks.create(c,tenant,plan.type(),plan.owner(),lead.selector(),zone,now);
+                if(plan.waiting()){
+                    if(type==CommandEnvelope.Type.RECORD_SOURCE_REQUEST_CONTINUATION)tasks.waitForSourceRequestReview(c,tenant,successor,actor,OffsetDateTime.parse((String)value.get("reviewAt")).toInstant(),now,fact);
+                    else tasks.waitUntil(c,tenant,successor,actor,R1BusinessTime.nextWindow(now,zone),now);
+                }
+            }
             return Result.succeeded(fact,event);
         }
         public void validateBeforeCommit(Connection c,CommandEnvelope e,Context ctx,Result result)throws SQLException{
@@ -105,12 +126,16 @@ public final class LeadCommands {
             check(c,ctx.authorization(),lead.selector(),false);
             if(type!=CommandEnvelope.Type.CAPTURE_LEAD){var done=tasks.read(c,tenant,ctx.scope().taskId());check(c,ctx.authorization(),done.selector(),false);require(result.fact().equals(done.completion()),"STALE_TASK");}
             if(result.status()==CommandOutcome.Status.NO_CHANGE)return;
-            var active=tasks.activeForLead(c,tenant,lead.selector());require(active.size()==(type==CommandEnvelope.Type.ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST?0:1),"STALE_TASK");
+            var active=tasks.activeForLead(c,tenant,lead.selector());require(active.size()==(type==CommandEnvelope.Type.RECORD_SOURCE_REQUEST_CONTINUATION&&"END_LEAD".equals(values(e).get("decisionCode"))?0:1),"STALE_TASK");
             for(var task:active){var source=policy(lead.source());
                 if(task.type()==TaskFactory.Type.CONTACT_LEAD){var candidates=assignmentPolicy.sales(c,tenant,lead.selector(),source);var chosen=candidates.stream().filter(a->a.appointmentId().equals(task.owner())).findFirst();require(chosen.isPresent(),"STALE_SUBJECT");
-                    if(type!=CommandEnvelope.Type.ASSIGN_LEAD)require(candidates.getFirst().appointmentId().equals(task.owner()),"STALE_SUBJECT");
+                    if(type!=CommandEnvelope.Type.ASSIGN_LEAD&&type!=CommandEnvelope.Type.RECORD_SOURCE_REQUEST_CONTINUATION)require(candidates.getFirst().appointmentId().equals(task.owner()),"STALE_SUBJECT");
                     var a=leads.assignment(c,tenant,lead.assignment());require(a!=null&&a.lead().equals(lead.selector().id())&&a.owner().equals(task.owner())&&"OPEN".equals(a.state())&&a.selector().revision()==0,"STALE_SUBJECT");
-                }else require(assignmentPolicy.unique(c,tenant,lead.selector(),source,task.type()).equals(task.owner()),"STALE_SUBJECT");
+                }else if(task.type()==TaskFactory.Type.RESOLVE_SOURCE_REQUEST){
+                    var selectionBasis=type==CommandEnvelope.Type.ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST?tasks.read(c,tenant,ctx.scope().taskId()):task;
+                    require(assignmentPolicy.sourceRequestOwner(c,tenant,selectionBasis,source).equals(task.owner()),"STALE_SUBJECT");
+                }
+                else require(assignmentPolicy.unique(c,tenant,lead.selector(),source,task.type()).equals(task.owner()),"STALE_SUBJECT");
             }
         }
         private void check(Connection c,Request base,Subject subject,boolean last)throws SQLException {var check=authorization.evaluate(c,new Request(base.actor(),subject,base.scopeOrganizationId(),base.requirement()),last);require(check.allowed(),check.rejectionCode()==null?"NOT_AUTHORIZED":check.rejectionCode());}

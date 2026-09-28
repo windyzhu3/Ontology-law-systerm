@@ -283,6 +283,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/business-management/{view}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the exact current transfer responsibility and confirmed basis
+         * @description Authorized audited T08 read; minimum conflict disclosure; no-store.
+         */
+        get: operations["listBusinessManagement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/business-management/{view}/{requestId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the exact current transfer responsibility and confirmed basis
+         * @description Authorized audited T08 read; minimum conflict disclosure; no-store.
+         */
+        get: operations["getBusinessManagementDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/business-overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read five source-scoped business metrics and matching details
+         * @description R25_BUSINESS_OVERVIEW_V1: direct HUMAN only; five exact source-scoped metrics; monthly formation counts and current original-SLA overdue stock. No truncated totals.
+         */
+        get: operations["getBusinessOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/business-overview/{metric}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read five source-scoped business metrics and matching details
+         * @description R25_BUSINESS_OVERVIEW_V1: direct HUMAN only; five exact source-scoped metrics; monthly formation counts and current original-SLA overdue stock. No truncated totals.
+         */
+        get: operations["listBusinessOverviewDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/commands/{commandId}/receipt": {
         parameters: {
             query?: never;
@@ -303,6 +383,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contract-tasks/{taskId}/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Authorized audited T08 read; minimum conflict disclosure; no-store. */
+        get: operations["getContractTaskContext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contracts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Authorized audited bounded contract ledger. Scans at most 100 candidates in opportunity UUID order; returns at most limit rows. Encrypted cursor binds tenant, principal, appointment, normalized search/state and limit, expires after 600 seconds. An empty page may carry nextCursor. Search uses normalized case-insensitive customer substring and state uses exact displayed label; filters run only after authorization. No total count; no-store. */
+        get: operations["getContractLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lead-management/leads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read authorized team responsibility metadata
+         * @description Direct HUMAN lead management read with independent LEAD_MANAGEMENT_READ, exact source authorization and transactional disclosure audit. No command or capture permission is implied.
+         */
+        get: operations["listLeadManagement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lead-management/leads/{leadId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read authorized team responsibility metadata
+         * @description Direct HUMAN lead management read with independent LEAD_MANAGEMENT_READ, exact source authorization and transactional disclosure audit. No command or capture permission is implied.
+         */
+        get: operations["getLeadManagementDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/lead-management/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read authorized team responsibility metadata
+         * @description Direct HUMAN lead management read with independent LEAD_MANAGEMENT_READ, exact source authorization and transactional disclosure audit. No command or capture permission is implied.
+         */
+        get: operations["listLeadManagementSources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/leads": {
         parameters: {
             query?: never;
@@ -314,6 +488,1186 @@ export interface paths {
         put?: never;
         /** Capture one Lead from a source account */
         post: operations["captureLead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/leads/intake-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read authorized own human Lead intake source metadata
+         * @description R2_LEAD_INTAKE_SOURCES_V1: requires an active own HUMAN appointment and fresh LEAD_CAPTURE authorization for each source. Delegated and SERVICE actors are rejected. Returns metadata only; no Lead facts. All responses use Cache-Control: no-store.
+         */
+        get: operations["getLeadIntakeSources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description R2_OPPORTUNITY_LEDGER_V1: direct HUMAN only; current own SALES_OPPORTUNITY_OWNER or explicitly granted OPPORTUNITY_LEDGER_READ in organizational scope. Every exact disclosed source is authorized and audited. No mutations or task activation. Cursor is bound to actor, search and state. */
+        get: operations["listOpportunities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description R2_OPPORTUNITY_LEDGER_V1: direct HUMAN only; current own SALES_OPPORTUNITY_OWNER or explicitly granted OPPORTUNITY_LEDGER_READ in organizational scope. Every exact disclosed source is authorized and audited. No mutations or task activation. Cursor is bound to actor, search and state. */
+        get: operations["getOpportunity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/ai-candidates/{task}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate three bounded human-confirmed AI candidate kinds
+         * @description R25_AI_CANDIDATES_V1: server-selected authorized sources, audited before model input and rechecked after response; no business command. AI unavailable preserves manual workflow.
+         */
+        post: operations["generateAiCandidates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/ai-candidates/{task}/recheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recheck candidate source authority and versions
+         * @description R25_AI_CANDIDATES_V1: server-selected authorized sources, audited before model input and rechecked after response; no business command. AI unavailable preserves manual workflow.
+         */
+        post: operations["recheckAiCandidateSources"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/closure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description R2_OPPORTUNITY_CLOSURE_V1: direct HUMAN only; authorized ledger scope; exact protected closure context. READY requires current OPPORTUNITY_CLOSE on every source. No-store audited disclosure; no task creation. */
+        get: operations["getOpportunityClosure"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/commands/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description R2_OPPORTUNITY_CLOSURE_V1: direct HUMAN with current OPPORTUNITY_CLOSE on every exact source. All selectors including explicit null task/wait are mandatory. Closes only sales negotiation; rejects downstream business facts. Immutable closure, exact ordinary task cancellation, event, audit and receipt commit together. Same-key retries return the original currently authorized receipt. */
+        post: operations["closeOpportunity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Authorized audited T08 read; minimum conflict disclosure; no-store. */
+        get: operations["getContractContext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/{contractId}/versions/{versionId}/document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Exact confirmed and scanned contract bytes; checked authority and audit before response. Not signature or execution. */
+        get: operations["downloadContractVersionDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/approval-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T08 exact-version authorized command. Durable receipt recovery, no automatic re-send or signature completion. */
+        post: operations["request_contract_approval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T08 exact-version authorized command. Durable receipt recovery, no automatic re-send or signature completion. */
+        post: operations["record_contract_decision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T08 exact-version authorized command. Durable receipt recovery, no automatic re-send or signature completion. */
+        post: operations["save_contract_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/execution-verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Human verification of the exact archived approved version; receipts, execution, activation and task completion are checked atomically. Does not create a case. */
+        post: operations["verify_contract_execution_conditions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T08 exact-version authorized command. Durable receipt recovery, no automatic re-send or signature completion. */
+        post: operations["form_contract"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Read-only candidate rendering, two audited snapshots, no version or task completion; final confirmation uses the existing form command. */
+        post: operations["generateContractDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/negotiation-end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description 终止销售办理的准确事实；保留合同、签署与独立责任，不表示合同解除。 */
+        post: operations["end_contract_negotiation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/preparation-decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T08 exact-version authorized command. Durable receipt recovery, no automatic re-send or signature completion. */
+        post: operations["record_contract_preparation_decision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/preparation-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T08 exact-version authorized command. Durable receipt recovery, no automatic re-send or signature completion. */
+        post: operations["request_contract_preparation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/receipt-review-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Independent manually confirmed finance review; does not create execution or a case. */
+        post: operations["request_contract_receipt_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/receipt-reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Independent manually confirmed finance review; does not create execution or a case. */
+        post: operations["record_contract_receipt_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/receipt-supplements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Independent manually confirmed finance review; does not create execution or a case. */
+        post: operations["supplement_contract_receipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/review-decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T08 exact-version authorized command. Durable receipt recovery, no automatic re-send or signature completion. */
+        post: operations["record_contract_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/review-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T08 exact-version authorized command. Durable receipt recovery, no automatic re-send or signature completion. */
+        post: operations["request_contract_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/signature-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T09 manual signing command bound to the approved revision and exact signing workflow; durable receipt recovery. */
+        post: operations["archive_contract_signature"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/signature-arrangements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T09 manual signing command bound to the approved revision and exact signing workflow; durable receipt recovery. */
+        post: operations["confirm_contract_signature_arrangement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/signature-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T09 manual signing command bound to the approved revision and exact signing workflow; durable receipt recovery. */
+        post: operations["save_contract_signature_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/signature-revision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T09 manual signing command bound to the approved revision and exact signing workflow; durable receipt recovery. */
+        post: operations["return_contract_for_revision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/signature-submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T09 manual signing command bound to the approved revision and exact signing workflow; durable receipt recovery. */
+        post: operations["submit_contract_signature"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/signature-verification-revision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T09 manual signing command bound to the approved revision and exact signing workflow; durable receipt recovery. */
+        post: operations["return_contract_signature_for_revision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/signature-verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T09 manual signing command bound to the approved revision and exact signing workflow; durable receipt recovery. */
+        post: operations["record_contract_signature_verification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T08 exact-version authorized command. Durable receipt recovery, no automatic re-send or signature completion. */
+        post: operations["start_contract_preparation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/termination-review-decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description 终止销售办理的准确事实；保留合同、签署与独立责任，不表示合同解除。 */
+        post: operations["record_contract_termination_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/contracts/termination-review-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description 终止销售办理的准确事实；保留合同、签署与独立责任，不表示合同解除。 */
+        post: operations["request_contract_termination_review"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/customer-requirements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        get: operations["getOpportunityCustomerRequirements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/customer-requirements/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        post: operations["confirmOpportunityCustomerRequirements"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/customer-requirements/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        post: operations["saveOpportunityCustomerDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/customer-requirements/parties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        get: operations["searchOpportunityParties"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/followup-attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        get: operations["readFollowupAttempts"];
+        put?: never;
+        /** @description Records the real contact attempt and schedules one successor without manufacturing effective progress or a customer reply. */
+        post: operations["recordOpportunityFollowupAttempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/material-uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T06 single private immutable PDF/JPEG/PNG up to 20 MiB. Direct authorized human; no-store audited exact-version access. Upload is not acceptance. Existing tasks and SLA remain unchanged. */
+        post: operations["openOpportunityMaterialUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/material-uploads/{uploadSessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description T06 single private immutable PDF/JPEG/PNG up to 20 MiB. Direct authorized human; no-store audited exact-version access. Upload is not acceptance. Existing tasks and SLA remain unchanged. */
+        get: operations["getOpportunityMaterialUpload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/material-uploads/{uploadSessionId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description T06 single private immutable PDF/JPEG/PNG up to 20 MiB. Direct authorized human; no-store audited exact-version access. Upload is not acceptance. Existing tasks and SLA remain unchanged. */
+        put: operations["uploadOpportunityMaterialContent"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description T06 single private immutable PDF/JPEG/PNG up to 20 MiB. Direct authorized human; no-store audited exact-version access. Upload is not acceptance. Existing tasks and SLA remain unchanged. */
+        get: operations["getOpportunityMaterials"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/materials/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T06 single private immutable PDF/JPEG/PNG up to 20 MiB. Direct authorized human; no-store audited exact-version access. Upload is not acceptance. Existing tasks and SLA remain unchanged. */
+        post: operations["acceptOpportunityMaterial"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/materials/versions/{versionId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description T06 single private immutable PDF/JPEG/PNG up to 20 MiB. Direct authorized human; no-store audited exact-version access. Upload is not acceptance. Existing tasks and SLA remain unchanged. */
+        get: operations["downloadOpportunityMaterialContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        get: operations["getQuoteContext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/quotes/{quoteId}/document": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        get: operations["downloadQuoteDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/quotes/approval-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        post: operations["request_quote_approval"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/quotes/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        post: operations["record_quote_decision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/quotes/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        post: operations["record_quote_delivery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/quotes/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        post: operations["save_quote_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/quotes/followup-attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Records the real contact attempt and schedules one successor without manufacturing effective progress or a customer reply. */
+        post: operations["recordQuoteFollowupAttempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/quotes/form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        post: operations["form_quote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/quotes/preparation-intents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description 明确开始报价准备；原子接管普通跟进，不生成正式报价。 */
+        post: operations["startQuotePreparation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/quotes/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        post: operations["record_quote_response"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/quotes/terminations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description 明确开始报价准备；原子接管普通跟进，不生成正式报价。 */
+        post: operations["endQuoteNegotiation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/transfers/classification-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the exact current transfer responsibility and confirmed basis
+         * @description Authorized audited T08 read; minimum conflict disclosure; no-store.
+         */
+        get: operations["getMatterClassificationCorrectionContext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/transfers/classifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Human decision on the exact current transfer workflow. Acceptance creates the case; classification preserves its identity. */
+        post: operations["classifyMatter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/transfers/conflict-reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Human decision on the exact current transfer workflow. Acceptance creates the case; classification preserves its identity. */
+        post: operations["recordTransferConflictReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/transfers/intake-decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Human decision on the exact current transfer workflow. Acceptance creates the case; classification preserves its identity. */
+        post: operations["recordTransferIntake"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/transfers/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Human decision on the exact current transfer workflow. Acceptance creates the case; classification preserves its identity. */
+        post: operations["submitTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunities/{opportunityId}/transfers/supplements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Human decision on the exact current transfer workflow. Acceptance creates the case; classification preserves its identity. */
+        post: operations["resubmitTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunity-owner-exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listOpportunityOwnerExceptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunity-owner-exceptions/{exceptionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getOpportunityOwnerException"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunity-owner-exceptions/{exceptionId}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listOpportunityOwnerExceptionReceivers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunity-owner-exceptions/commands/coordinate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recordOpportunityOwnerCoordination"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunity-owner-exceptions/commands/transfer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["transferOpportunityResponsibility"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunity-owner-exceptions/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listOpportunityOwnerExceptionOperations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/opportunity-tasks/{taskId}/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description 读取当前任职的准确商机跟进上下文；只读，不交接责任。 */
+        get: operations["getOpportunityTaskContinuation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quote-tasks/{taskId}/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description T05: exact authorized customer and service requirement versions; direct HUMAN only. Protected audited no-store reads. Draft is not a business confirmation. Confirmation atomically applies staged Party changes and immutable requirements without completing, cancelling or waking any ordinary task. */
+        get: operations["getQuoteTaskContext"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -405,6 +1759,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/{taskId}/commands/record-opportunity-progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm saved opportunity progress and schedule its successor */
+        post: operations["recordOpportunityProgress"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{taskId}/commands/record-routing-disposition": {
         parameters: {
             query?: never;
@@ -416,6 +1787,23 @@ export interface paths {
         put?: never;
         /** Record the controlled routing-gap disposition */
         post: operations["recordRoutingDisposition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{taskId}/commands/record-source-request-continuation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Source request continuation: recordSourceRequestContinuation */
+        post: operations["recordSourceRequestContinuation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -473,6 +1861,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/{taskId}/opportunity-progress-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save the current opportunity progress draft */
+        put: operations["saveOpportunityProgressDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tasks/{taskId}/source-request-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Source request continuation: saveSourceRequestDraft */
+        put: operations["saveSourceRequestDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team-management/{view}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read authorized team responsibility metadata
+         * @description R25_TEAM_MANAGEMENT_V1: direct HUMAN, exact source authorization, synchronous disclosure audit, bounded reads and no-store; no business writes.
+         */
+        get: operations["listTeamManagement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/team-management/{view}/{recordId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read authorized team responsibility metadata
+         * @description R25_TEAM_MANAGEMENT_V1: direct HUMAN, exact source authorization, synchronous disclosure audit, bounded reads and no-store; no business writes.
+         */
+        get: operations["getTeamManagementDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfer-tasks/{taskId}/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the exact current transfer responsibility and confirmed basis
+         * @description Authorized audited T08 read; minimum conflict disclosure; no-store.
+         */
+        get: operations["getTransferTaskContext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfer-tasks/{taskId}/materials/{versionId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an authorized material of the exact current transfer task
+         * @description Authorized audited T08 read; minimum conflict disclosure; no-store.
+         */
+        get: operations["downloadTransferTaskMaterial"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workcards/current": {
         parameters: {
             query?: never;
@@ -484,6 +1986,118 @@ export interface paths {
         get: operations["getCurrentWorkCard"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/contract-preparation/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listContractPreparationCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/opportunity-owner-exceptions/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listOpportunityOwnerExceptionCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/opportunity-owner-exceptions/commands/observe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["observeOpportunityOwnerException"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/opportunity-tasks/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listR2OpportunityTaskCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/opportunity-tasks/commands/activate-initial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["activateInitialOpportunityTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/opportunity-tasks/commands/reconcile-contract-preparation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reconcileContractPreparation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/opportunity-tasks/commands/reopen-due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reopenDueOpportunityTask"];
         delete?: never;
         options?: never;
         head?: never;
@@ -527,6 +2141,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/sales-chain-repairs/repair-superseded-opportunity-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Explicit exact-snapshot sales chain repair; never automatically scheduled */
+        post: operations["repairSupersededOpportunityTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/sales-chain-repairs/restore-source-request-task": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Explicit exact-snapshot sales chain repair; never automatically scheduled */
+        post: operations["restoreSourceRequestTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/tasks/commands/reopen-due-contact-tasks": {
         parameters: {
             query?: never;
@@ -561,6 +2209,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/v1/tasks/commands/reopen-due-source-request-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Source request continuation: reopenDueSourceRequestTasks */
+        post: operations["reopenDueSourceRequestTasks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/internal/v1/tasks/due": {
         parameters: {
             query?: never;
@@ -582,6 +2247,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptOpportunityMaterialV1: {
+            expectedConfirmation: components["schemas"]["OpportunityCustomerNullableSelectorV1"];
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedPreviousVersion: components["schemas"]["OpportunityCustomerNullableSelectorV1"];
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            uploadSession: components["schemas"]["OpportunityCustomerSelectorV1"];
+        };
         AcknowledgeSourceIntakeStopRequestBusinessPurpose: {
             /** @enum {string} */
             code: "ACK_SOURCE_INTAKE_STOP_REQUEST";
@@ -691,6 +2363,43 @@ export interface components {
             preconditions: components["schemas"]["PreconditionTokens"];
             receipt: components["schemas"]["ActionDraftCommandReceipt"];
         };
+        ActivateInitialOpportunityTaskV1: {
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            opportunityId: components["schemas"]["Uuid"];
+        };
+        AiCandidateCitationV1: {
+            quote: string;
+            sourceId: string;
+        };
+        AiCandidateItemV1: {
+            citations: components["schemas"]["AiCandidateCitationV1"][];
+            /** @enum {string} */
+            field: "customerName" | "contactName" | "contactPhone" | "customerGoal" | "progressSummary" | "CONTRACT_BUSINESS" | "CORRESPONDENCE";
+            /** @enum {string} */
+            status: "CANDIDATE" | "MISSING" | "CONFLICT";
+            value: string | null;
+        } & (unknown & unknown & unknown);
+        AiCandidateRecheckV1: {
+            sourceToken: string;
+        };
+        AiCandidateRequestV1: Record<string, never>;
+        AiCandidateResultV1: {
+            /** Format: date-time */
+            generatedAt: string;
+            items: components["schemas"]["AiCandidateItemV1"][];
+            sources: components["schemas"]["AiCandidateSourceV1"][];
+            sourceToken: string;
+            task: components["schemas"]["AiCandidateTaskV1"];
+        } & (unknown & unknown & unknown);
+        AiCandidateSourceV1: {
+            id: string;
+            /** @enum {string} */
+            kind: "TEXT" | "PROGRESS" | "MATERIAL" | "RULE";
+            label: string;
+            text: string;
+        };
+        /** @enum {string} */
+        AiCandidateTaskV1: "FIELDS" | "SUMMARY" | "MATERIALS";
         AppointmentCommandReceiptV1: {
             commandId: components["schemas"]["Uuid"];
             completedAt: components["schemas"]["Instant"];
@@ -817,7 +2526,7 @@ export interface components {
         AuthorityGrantV1: {
             appointment: components["schemas"]["IdentityChoiceV1"];
             /** @enum {string} */
-            authorityCode: "LEAD_CAPTURE" | "LEAD_INGRESS_RESOLVE" | "LEAD_INGRESS_COMPLETE" | "LEAD_ASSIGN" | "LEAD_ROUTING_DECIDE" | "SOURCE_INTAKE_REQUEST_ACK" | "SALES_CONTACT_OWNER" | "LEAD_VALIDITY_REVIEW" | "IDENTITY_PRINCIPAL_MANAGE" | "IDENTITY_ORGANIZATION_MANAGE" | "IDENTITY_APPOINTMENT_MANAGE" | "IDENTITY_AUTHORITY_MANAGE";
+            authorityCode: "LEAD_CAPTURE" | "LEAD_INGRESS_RESOLVE" | "LEAD_INGRESS_COMPLETE" | "LEAD_ASSIGN" | "LEAD_ROUTING_DECIDE" | "SOURCE_INTAKE_REQUEST_ACK" | "SALES_CONTACT_OWNER" | "LEAD_VALIDITY_REVIEW" | "IDENTITY_PRINCIPAL_MANAGE" | "IDENTITY_ORGANIZATION_MANAGE" | "IDENTITY_APPOINTMENT_MANAGE" | "IDENTITY_AUTHORITY_MANAGE" | "SALES_OPPORTUNITY_OWNER" | "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER" | "OPPORTUNITY_OWNER_EXCEPTION_READ" | "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE" | "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ" | "OPPORTUNITY_LEDGER_READ" | "OPPORTUNITY_CLOSE" | "CUSTOMER_REQUIREMENTS_MANAGE" | "PARTY_PROFILE_MANAGE" | "MATERIALS_READ" | "MATERIALS_MANAGE" | "QUOTE_READ" | "QUOTE_PREPARE" | "QUOTE_APPROVE" | "QUOTE_SELF_AUTHORIZE" | "QUOTE_DELIVER" | "QUOTE_RESPONSE" | "PAYMENT_LEDGER_READ" | "TRANSFER_LEDGER_READ" | "CONTRACT_READ" | "CONTRACT_PREPARE" | "CONTRACT_PREPARATION_DECIDE" | "CONTRACT_REVIEW" | "CONTRACT_APPROVE" | "CONTRACT_SIGNATURE_VERIFY" | "CONTRACT_EXECUTION_VERIFY" | "CONTRACT_TERMINATION_REVIEW" | "PAYMENT_SUBMIT" | "PAYMENT_CONFIRM" | "TRANSFER_SUBMIT" | "TRANSFER_REVIEW" | "TRANSFER_ACCEPT" | "MATTER_CLASSIFY" | "MATTER_RECEIVE" | "TEAM_TASK_READ" | "LEAD_MANAGEMENT_READ";
             etag: components["schemas"]["IdentityETag"];
             id: components["schemas"]["Uuid"];
             scopeOrganization: components["schemas"]["IdentityChoiceV1"];
@@ -827,10 +2536,44 @@ export interface components {
             /** Format: date-time */
             validUntil: string | null;
         };
+        /** @enum {string} */
+        BusinessOverviewMetricKeyV1: "leads" | "opportunities" | "signedContracts" | "acceptedMatters" | "overdueTasks";
+        BusinessOverviewMetricV1: {
+            /** Format: int64 */
+            count: number | null;
+            key: components["schemas"]["BusinessOverviewMetricKeyV1"];
+            label: string;
+            /** @enum {string} */
+            status: "AVAILABLE" | "FORBIDDEN";
+        } & (unknown & unknown);
+        BusinessOverviewPageV1: {
+            /** Format: date-time */
+            asOf: string;
+            items: components["schemas"]["BusinessOverviewRowV1"][];
+            metric: components["schemas"]["BusinessOverviewMetricKeyV1"];
+            month: string;
+            nextCursor: string | null;
+        };
+        BusinessOverviewRowV1: {
+            customerLabel: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            occurredAt: string;
+            stateLabel: string;
+        };
+        BusinessOverviewSummaryV1: {
+            /** Format: date-time */
+            asOf: string;
+            metrics: components["schemas"]["BusinessOverviewMetricV1"][];
+            month: string;
+        };
         CaptureLeadV1: {
             capturedAt: components["schemas"]["Instant"];
             capturedName?: components["schemas"]["SafeText200"];
             cityCode?: components["schemas"]["Code64"];
+            contactName?: components["schemas"]["SafeText200"];
+            customerName?: components["schemas"]["SafeText200"];
             /** Format: email */
             email?: string;
             jurisdictionCode: components["schemas"]["Code64"];
@@ -848,6 +2591,14 @@ export interface components {
             mode: "ACTION_DRAFT";
             placeholder: components["schemas"]["SafeText200"];
             targetTaskId: components["schemas"]["Uuid"] | null;
+        };
+        CloseOpportunityV1: {
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedResponsibility: components["schemas"]["OwnerExceptionRevisionSelectorV1"];
+            expectedTask: components["schemas"]["OwnerExceptionRevisionSelectorV1"] | null;
+            expectedWait: components["schemas"]["OwnerExceptionDigestSelectorV1"] | null;
+            reasonCode: components["schemas"]["OpportunityCloseReasonV1"];
+            summary: string;
         };
         CloseOrganizationUnitV1: {
             /** @enum {string} */
@@ -988,6 +2739,12 @@ export interface components {
             sourceCode: components["schemas"]["LeadIngressSourceCode"];
             sourceSummary: components["schemas"]["SafeText500"];
         } & (components["schemas"]["CompleteLeadIngressPhoneOnlyValuesV1"] | components["schemas"]["CompleteLeadIngressEmailOnlyValuesV1"] | components["schemas"]["CompleteLeadIngressPhoneAndEmailValuesV1"]);
+        ConfirmOpportunityCustomerRequirementsV1: {
+            expectedConfirmation: components["schemas"]["OpportunityCustomerNullableSelectorV1"];
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"];
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+        };
         ConnectedValidRecordContactResultV1: {
             /** @enum {string} */
             contactChannelCode: "PHONE" | "EMAIL";
@@ -1055,6 +2812,464 @@ export interface components {
         };
         /** @enum {string} */
         ContactResultCode: "CONNECTED_VALID" | "NOT_CONNECTED" | "SUSPECT_INVALID";
+        ContractCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["R2ContractPreparationRequestFactRefV1"] | components["schemas"]["R2ContractPreparationDecisionFactRefV1"] | components["schemas"]["R2ContractFactRefV1"] | components["schemas"]["R2ContractDraftFactRefV1"] | components["schemas"]["R2ContractRevisionFactRefV1"] | components["schemas"]["R2ContractReviewRequestFactRefV1"] | components["schemas"]["R2ContractReviewDecisionFactRefV1"] | components["schemas"]["R2ContractApprovalRequestFactRefV1"] | components["schemas"]["R2ContractApprovalDecisionFactRefV1"] | components["schemas"]["R2ContractSignatureDraftFactRefV1"] | components["schemas"]["R2ContractSignatureArrangementFactRefV1"] | components["schemas"]["R2ContractSignatureSubmissionFactRefV1"] | components["schemas"]["R2ContractSignatureVerificationFactRefV1"] | components["schemas"]["R2ContractSignatureArchiveFactRefV1"] | components["schemas"]["R2ContractSignatureRevisionReturnFactRefV1"] | components["schemas"]["ContractNegotiationDispositionFactRefV1"] | components["schemas"]["ContractExecutionVerificationFactRefV1"] | components["schemas"]["ContractPaymentRequestFactRefV1"] | components["schemas"]["ContractPaymentReviewFactRefV1"];
+        };
+        ContractCommercialV1: {
+            conditionalFee: {
+                basis: string;
+                /** Format: int64 */
+                capMinor: number;
+                rateBasisPoints: number;
+            } | null;
+            /** @constant */
+            currency: "CNY";
+            lines: {
+                /** Format: int64 */
+                amountMinor: number;
+                description: string;
+                discount: boolean;
+            }[];
+            paymentTerms: string;
+            scope: string;
+        };
+        ContractContextV1: {
+            allowedActions: ("REQUEST_CONTRACT_PREPARATION" | "RECORD_CONTRACT_PREPARATION_DECISION" | "START_CONTRACT_PREPARATION" | "SAVE_CONTRACT_DRAFT" | "FORM_CONTRACT" | "REQUEST_CONTRACT_REVIEW" | "RECORD_CONTRACT_REVIEW" | "REQUEST_CONTRACT_APPROVAL" | "RECORD_CONTRACT_DECISION" | "SAVE_CONTRACT_SIGNATURE_DRAFT" | "CONFIRM_CONTRACT_SIGNATURE_ARRANGEMENT" | "SUBMIT_CONTRACT_SIGNATURE" | "RECORD_CONTRACT_SIGNATURE_VERIFICATION" | "ARCHIVE_CONTRACT_SIGNATURE" | "RETURN_CONTRACT_FOR_REVISION" | "RETURN_CONTRACT_SIGNATURE_FOR_REVISION" | "END_CONTRACT_NEGOTIATION" | "REQUEST_CONTRACT_TERMINATION_REVIEW" | "RECORD_CONTRACT_TERMINATION_REVIEW" | "VERIFY_CONTRACT_EXECUTION_CONDITIONS")[];
+            approvals: {
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+                slot: string;
+                status: string;
+            }[];
+            blockers: {
+                code: string;
+                message: string;
+            }[];
+            contract: {
+                currentRevision: {
+                    hash: string;
+                    id: components["schemas"]["Uuid"];
+                } | null;
+                document: components["schemas"]["ContractDraftContentV1"];
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+                source: {
+                    /** @constant */
+                    kind: "ACCEPTED_QUOTE";
+                    selector: {
+                        hash: string;
+                        id: components["schemas"]["Uuid"];
+                    };
+                } | {
+                    /** @constant */
+                    kind: "DIRECT_AUTHORIZATION";
+                    selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+                };
+                /** @enum {string} */
+                stage: "DIRECT_REQUEST" | "DIRECT_REVIEW" | "DIRECT_RETURNED" | "PREPARE" | "RETURNED" | "SUBMIT_REVIEW" | "AWAIT_REVIEW" | "REVIEW_SUPPLEMENT" | "REVIEW_BLOCKED" | "SUBMIT_APPROVAL" | "AWAIT_APPROVAL" | "READY_FOR_SIGNATURE" | "AWAITING_NEXT_STAGE" | "OWNER_EXCEPTION";
+                /** Format: int64 */
+                version: number;
+            } | null;
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            customerName: string;
+            documents?: {
+                bodySha256: string;
+                id: components["schemas"]["Uuid"];
+                label: string;
+            }[];
+            draft: {
+                document: components["schemas"]["ContractDraftContentV1"];
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+            } | null;
+            execution?: components["schemas"]["ContractExecutionContextV1"] | null;
+            history: {
+                id: components["schemas"]["Uuid"];
+                label: string;
+                occurredAt: components["schemas"]["Instant"];
+                summary: string;
+            }[];
+            opportunity: components["schemas"]["OpportunityCustomerSelectorV1"];
+            partySnapshotDigest?: string | null;
+            payments?: components["schemas"]["ContractPaymentContextV1"][];
+            preparation?: {
+                commercial: components["schemas"]["ContractCommercialV1"];
+                reason: string;
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+            } | null;
+            readonly: boolean;
+            receiptBoundary: {
+                source: string;
+                state: string;
+            } | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            review: {
+                scopeHash: string;
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+                status: string;
+                summary: string;
+            } | null;
+            reviewPreview?: {
+                candidateCount: number;
+                permittedOutcomes: ("CLEAR" | "NEED_INFO" | "BLOCKED")[];
+                scopeComplete: boolean;
+            };
+            signature?: components["schemas"]["ContractSignatureContextV1"] | null;
+            signatureHistory?: ({
+                actorAppointmentId?: string;
+                actorLabel: string;
+                authorityMaterialVersionId?: string;
+                id: string;
+                label: string;
+                materialVersionId?: string;
+                occurredAt: string;
+                reason?: string;
+                summary: string;
+            } & {
+                [key: string]: unknown;
+            })[];
+            templates?: {
+                clauseVersionIds: components["schemas"]["Uuid"][];
+                id: components["schemas"]["Uuid"];
+                label: string;
+            }[];
+            termination?: components["schemas"]["ContractTerminationContextV1"] | null;
+            transfer?: {
+                canCorrectClassification?: boolean;
+                canHandle: boolean;
+                /** @enum {string} */
+                stage: "PREPARE" | "SUPPLEMENT" | "REVIEW_TRANSFER" | "INTAKE" | "CLASSIFY" | "COMPLETE" | "OWNER_EXCEPTION";
+                task: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            };
+            workflow: {
+                dueAt?: components["schemas"]["Instant"] | null;
+                message?: string | null;
+                ownerAppointmentId: components["schemas"]["Uuid"] | null;
+                ownerLabel?: string;
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+                /** @enum {string} */
+                stage: "DIRECT_REQUEST" | "DIRECT_REVIEW" | "DIRECT_RETURNED" | "PREPARE" | "RETURNED" | "SUBMIT_REVIEW" | "AWAIT_REVIEW" | "REVIEW_SUPPLEMENT" | "REVIEW_BLOCKED" | "SUBMIT_APPROVAL" | "AWAIT_APPROVAL" | "READY_FOR_SIGNATURE" | "AWAITING_NEXT_STAGE" | "OWNER_EXCEPTION";
+                task: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            } | null;
+        };
+        ContractDraftContentV1: {
+            commercial: components["schemas"]["ContractCommercialV1"];
+            document?: {
+                bodySha256: string;
+                clauseVersionIds: components["schemas"]["Uuid"][];
+                evidenceVersionId: components["schemas"]["Uuid"];
+                generationProof?: string;
+                humanConfirmed?: boolean;
+                templateVersionId: components["schemas"]["Uuid"];
+            };
+            expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            paymentGate?: {
+                receiptRequiredBeforeTransfer: boolean;
+                requiredMinor: number | null;
+            };
+            signing?: {
+                partySnapshotDigest: string;
+                requirements: string;
+            };
+        };
+        ContractExecutionContextV1: {
+            handoff: components["schemas"]["OpportunityCustomerSelectorV1"];
+            workflow: {
+                dueAt: components["schemas"]["Instant"] | null;
+                message: string;
+                ownerAppointmentId: components["schemas"]["Uuid"] | null;
+                ownerLabel: string;
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                /** @enum {string} */
+                stage: "CHECK_CONDITIONS" | "WAIT_RECEIPT" | "READY_TRANSFER" | "OWNER_EXCEPTION";
+                task: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            };
+        };
+        ContractExecutionVerificationFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_EXECUTION_VERIFICATION";
+            revision: components["schemas"]["Revision"];
+        };
+        ContractExecutionWorkflowFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_EXECUTION_WORKFLOW";
+            /** @constant */
+            revision: 0;
+        };
+        ContractGeneratedDocumentV1: {
+            bodySha256: string;
+            expiresAt: components["schemas"]["Instant"];
+            generationProof: string;
+            pdfBase64: string;
+            previewText: string;
+        };
+        ContractGenerationRequestV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                commercial: components["schemas"]["ContractCommercialV1"];
+                document: {
+                    bodySha256: string;
+                    clauseVersionIds: components["schemas"]["Uuid"][];
+                    evidenceVersionId: string;
+                    templateVersionId: components["schemas"]["Uuid"];
+                };
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                paymentGate: {
+                    receiptRequiredBeforeTransfer: boolean;
+                    requiredMinor: number | null;
+                };
+                signing: {
+                    partySnapshotDigest: string;
+                    requirements: string;
+                };
+            };
+        };
+        ContractLedgerPageV1: {
+            items: {
+                canHandle: boolean;
+                customerLabel: string;
+                dueAt?: components["schemas"]["Instant"];
+                id: components["schemas"]["Uuid"];
+                opportunityId: components["schemas"]["Uuid"];
+                ownerLabel: string;
+                stateLabel: string;
+                versionLabel: string;
+            }[];
+            nextCursor: string | null;
+        };
+        ContractNegotiationDispositionFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_NEGOTIATION_DISPOSITION";
+            revision: components["schemas"]["Revision"];
+        };
+        ContractPaymentContextV1: {
+            accountLabel: string | null;
+            allowedActions: ("REQUEST_CONTRACT_RECEIPT_REVIEW" | "RECORD_CONTRACT_RECEIPT_REVIEW" | "SUPPLEMENT_CONTRACT_RECEIPT")[];
+            /** Format: int64 */
+            confirmedMinor?: number;
+            dueAt: components["schemas"]["Instant"];
+            explanation: string | null;
+            ownerAppointmentId: components["schemas"]["Uuid"] | null;
+            ownerLabel: string;
+            remainingMinor?: number | null;
+            request: components["schemas"]["OpportunityCustomerSelectorV1"];
+            requiredMinor?: number | null;
+            selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+            /** @enum {string} */
+            stage: "CHECK_RECEIPT" | "SUPPLEMENT_RECEIPT" | "COMPLETE" | "OWNER_EXCEPTION";
+            targetStage: string;
+            task: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            taskIds: components["schemas"]["Uuid"][];
+        };
+        ContractPaymentRequestFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_PAYMENT_REQUEST";
+            /** @constant */
+            revision: 0;
+        };
+        ContractPaymentReviewFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_PAYMENT_REVIEW";
+            /** @constant */
+            revision: 0;
+        };
+        ContractPaymentWorkflowFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_PAYMENT_WORKFLOW";
+            /** @constant */
+            revision: 0;
+        };
+        ContractPreparationCandidatePageV1: {
+            candidates: components["schemas"]["ContractPreparationCandidateV1"][];
+            nextCursor: string | null;
+        };
+        ContractPreparationCandidateV1: {
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedWorkflow: {
+                id: components["schemas"]["Uuid"];
+                /** @constant */
+                revision: 0;
+            } | null;
+            idempotencyKey: components["schemas"]["Uuid"];
+            /** @constant */
+            kind: "CONTRACT_PREPARATION";
+            opportunityId: components["schemas"]["Uuid"];
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            source: {
+                id: components["schemas"]["Uuid"];
+                /** @constant */
+                revision: 0;
+            };
+            /** @enum {string} */
+            sourceKind: "ACCEPTED_QUOTE" | "AUTHORITY_RETURN" | "SIGNATURE_READINESS" | "SIGNATURE_AUTHORITY_RETURN" | "TERMINATION_REVIEW" | "EXECUTION_HANDOFF" | "PAYMENT_HANDOFF" | "PAYMENT_RECOVERY" | "TRANSFER_HANDOFF" | "TRANSFER_RECOVERY";
+        };
+        ContractPreparationReconcileReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED" | "NO_CHANGE";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["ContractPreparationWorkflowFactRefV1"] | components["schemas"]["R2ContractSignatureWorkflowFactRefV1"] | components["schemas"]["ContractExecutionWorkflowFactRefV1"] | components["schemas"]["ContractPaymentWorkflowFactRefV1"] | components["schemas"]["ContractTerminationReviewAssignmentFactRefV1"] | components["schemas"]["TransferWorkflowFactRefV1"];
+        };
+        ContractPreparationWorkflowFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_PREPARATION_WORKFLOW";
+            /** @constant */
+            revision: 0;
+        };
+        ContractProblemV1: {
+            /** @enum {string} */
+            code: "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_INVALID" | "UNAUTHENTICATED" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "NOT_FOUND" | "COMMAND_PAYLOAD_CONFLICT" | "STALE_SUBJECT" | "STALE_DRAFT" | "OPPORTUNITY_CLOSED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "STALE_TASK" | "STALE_EVIDENCE" | "CUSTOMER_CONFIRMATION_REQUIRED" | "CONTRACT_PREPARATION_SOURCE_REQUIRED" | "CONTRACT_RESPONSIBILITY_REQUIRED" | "CONTRACT_REVIEW_SCOPE_REQUIRED" | "CONTRACT_REVIEW_NOT_CLEAR" | "CONTRACT_REVIEW_SCOPE_COMPLETE" | "CONTRACT_REVIEW_FINDING_REQUIRED" | "CONTRACT_REVIEW_WAIVER_UNAVAILABLE" | "CONTRACT_CONFLICT_DECISION_REQUIRED" | "COMMERCIAL_AUTHORIZATION_REQUIRED" | "CONTRACT_APPROVAL_POLICY_CHANGED" | "CONTRACT_APPROVAL_POLICY_REQUIRED" | "CONTRACT_REVIEW_REQUIRED" | "CONTRACT_SOURCE_AMBIGUOUS" | "CONTRACT_VERSION_BASIS_CHANGED" | "CONTRACT_HANDLING_PAUSED" | "PAYMENT_ALREADY_RECORDED" | "PAYMENT_ACCOUNT_NOT_CONFIGURED";
+            detail: components["schemas"]["SafeText500"];
+            fieldErrors?: components["schemas"]["FieldError"][];
+            /** Format: uri-reference */
+            instance: string;
+            receiptRef?: components["schemas"]["ReceiptRef"];
+            /** @enum {string} */
+            retryPolicy: "NEW_KEY_AFTER_ADMIN_FIX" | "NEW_KEY_AFTER_REFRESH" | "NO" | "SAME_KEY_AFTER_BACKOFF" | "SAME_KEY_AFTER_FIX" | "SAME_KEY_AFTER_REAUTH";
+            status: number;
+            title: components["schemas"]["SafeText200"];
+            /** Format: uri */
+            type: string;
+        } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
+        ContractSignatureContextV1: {
+            allowedActions?: ("SAVE_CONTRACT_SIGNATURE_DRAFT" | "CONFIRM_CONTRACT_SIGNATURE_ARRANGEMENT" | "SUBMIT_CONTRACT_SIGNATURE" | "RECORD_CONTRACT_SIGNATURE_VERIFICATION" | "ARCHIVE_CONTRACT_SIGNATURE" | "RETURN_CONTRACT_FOR_REVISION" | "RETURN_CONTRACT_SIGNATURE_FOR_REVISION")[];
+            arrangements: components["schemas"]["ContractSignatureSlotV1"][];
+            draft: {
+                [key: string]: unknown;
+            } | null;
+            draftSelector?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            handoff: {
+                message: string;
+                state: string;
+            } | null;
+            historyEntries?: ({
+                actorAppointmentId?: string;
+                actorLabel: string;
+                authorityMaterialVersionId?: string;
+                id: string;
+                label: string;
+                materialVersionId?: string;
+                occurredAt: string;
+                reason?: string;
+                summary: string;
+            } & {
+                [key: string]: unknown;
+            })[];
+            parties: {
+                id: components["schemas"]["Uuid"];
+                label: string;
+                participationId?: components["schemas"]["Uuid"];
+                templateSigningPartyId?: components["schemas"]["Uuid"];
+            }[];
+            submissions: components["schemas"]["ContractSignatureSubmissionV1"][];
+            workflow: {
+                dueAt?: components["schemas"]["Instant"] | null;
+                message?: string | null;
+                ownerAppointmentId: components["schemas"]["Uuid"] | null;
+                ownerLabel?: string;
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                /** @enum {string} */
+                stage: "ARRANGE" | "COLLECT" | "AWAIT_VERIFICATION" | "SUPPLEMENT" | "PARTIAL" | "ARCHIVE" | "SIGNATURE_COMPLETE" | "REVISION_REQUIRED" | "OWNER_EXCEPTION";
+                task: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            };
+        };
+        ContractSignatureSlotV1: {
+            authoritySlot: string;
+            clauseBasis: string;
+            participationId?: components["schemas"]["Uuid"];
+            partyId: components["schemas"]["Uuid"];
+            required: boolean;
+            sealRequired: boolean;
+            signatureRequired: boolean;
+            slotNumber: number;
+            templateSigningPartyId?: components["schemas"]["Uuid"];
+        };
+        ContractSignatureSubmissionV1: {
+            authorityMaterialSha256: string;
+            authorityMaterialVersionId: components["schemas"]["Uuid"];
+            decision: string | null;
+            materialSha256: string;
+            materialVersionId: components["schemas"]["Uuid"];
+            reason?: string | null;
+            selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+            signedAt: components["schemas"]["Instant"];
+            signerName: string;
+            slotNumber: number;
+        };
+        ContractTaskContextV1: {
+            context: components["schemas"]["ContractContextV1"];
+            opportunityId: components["schemas"]["Uuid"];
+        };
+        ContractTerminationContextV1: {
+            dueAt: components["schemas"]["Instant"] | null;
+            history: {
+                /** @enum {string} */
+                kind: "STOP_UNSIGNED" | "REQUEST_REVIEW" | "STOP_REVIEWED" | "CONTINUE";
+                occurredAt: components["schemas"]["Instant"];
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+                summary: string;
+            }[];
+            independentBasis: string;
+            independentState: {
+                executionRecorded: boolean;
+                paymentRecorded: boolean;
+                transferRecorded: boolean;
+            };
+            occurredAt: components["schemas"]["Instant"];
+            ownerAppointmentId: components["schemas"]["Uuid"] | null;
+            ownerLabel: string;
+            resumeAvailable?: boolean;
+            selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+            /** @enum {string} */
+            state: "STOPPED" | "REVIEW_REQUIRED" | "CONTINUED";
+            summary: string;
+            task: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+        };
+        ContractTerminationReviewAssignmentFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_TERMINATION_REVIEW_ASSIGNMENT";
+            revision: components["schemas"]["Revision"];
+        };
+        ContractVersionContentV1: {
+            commercial: components["schemas"]["ContractCommercialV1"];
+            document: {
+                bodySha256: string;
+                clauseVersionIds: components["schemas"]["Uuid"][];
+                evidenceVersionId: components["schemas"]["Uuid"];
+                generationProof?: string;
+                humanConfirmed?: boolean;
+                templateVersionId: components["schemas"]["Uuid"];
+            };
+            expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            paymentGate: {
+                receiptRequiredBeforeTransfer: boolean;
+                requiredMinor: number | null;
+            };
+            signing: {
+                partySnapshotDigest: string;
+                requirements: string;
+            };
+        };
         CreateAppointmentV1: {
             effectiveFrom: components["schemas"]["Instant"];
             /** Format: date-time */
@@ -1102,8 +3317,12 @@ export interface components {
         } & (unknown & unknown & unknown & unknown);
         CurrentWorkCardEnvelope: {
             chatComposer: components["schemas"]["ChatComposer"];
-            currentCard: components["schemas"]["CurrentCard"] | null;
+            currentCard: components["schemas"]["R2CurrentCardV1"] | null;
+            myTasks?: components["schemas"]["NextSummary"][];
             nextSummaries: components["schemas"]["NextSummary"][];
+            /** Format: uuid */
+            recommendedTaskId?: string | null;
+            selectionNotice?: components["schemas"]["SafeText500"];
             todaySummary: components["schemas"]["SafeText500"];
             waitingCount: number;
         } & unknown;
@@ -1155,6 +3374,41 @@ export interface components {
             /** @enum {string} */
             reasonCode: "ADMINISTRATIVE_ACTION" | "SECURITY_RESPONSE";
         };
+        EndContractNegotiationV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                expectedSignatureWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                expectedTermination: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                /** @description 必须由人勾选确认；命令提交时仅接受 true。 */
+                humanConfirmed: boolean;
+                summary: string;
+            };
+        };
+        EndQuoteNegotiationV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedQuote: {
+                hash: components["schemas"]["Digest32"];
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                /** @enum {string} */
+                reasonCode: "CLIENT_DECLINED" | "NEED_CANCELLED" | "OTHER";
+                summary: string;
+            };
+        };
         /** @enum {string} */
         ErrorCode: "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_INVALID" | "UNAUTHENTICATED" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "NOT_FOUND" | "COMMAND_PAYLOAD_CONFLICT" | "TASK_NOT_OPEN" | "TASK_ALREADY_COMPLETED" | "DRAFT_DIGEST_MISMATCH" | "INGRESS_COMPLETION_ALREADY_RECORDED" | "STALE_TASK" | "STALE_DRAFT" | "STALE_SUBJECT" | "SUPERVISOR_UNRESOLVED" | "SOURCE_INTAKE_OWNER_UNRESOLVED" | "DRAFT_PRECONDITION_REQUIRED" | "TASK_PRECONDITION_REQUIRED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE";
         FieldError: {
@@ -1163,6 +3417,55 @@ export interface components {
             detail: components["schemas"]["SafeText200"];
             /** Format: json-pointer */
             pointer: string;
+        };
+        FollowupAttemptContextV1: {
+            /** @enum {string|null} */
+            command: "RECORD_OPPORTUNITY_FOLLOWUP_ATTEMPT" | "RECORD_QUOTE_FOLLOWUP_ATTEMPT" | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            history: {
+                actorAppointmentId: components["schemas"]["Uuid"];
+                /** @enum {string} */
+                context: "OPPORTUNITY" | "QUOTE";
+                nextCheckAt: components["schemas"]["Instant"];
+                occurredAt: components["schemas"]["Instant"];
+                recordedAt: components["schemas"]["Instant"];
+                selector: {
+                    hash: components["schemas"]["Digest32"];
+                    id: components["schemas"]["Uuid"];
+                };
+                summary: string;
+                /** @enum {string} */
+                type: "NOT_CONNECTED" | "NO_REPLY" | "NO_EFFECTIVE_PROGRESS";
+            }[];
+            nextCheckAt: components["schemas"]["Instant"] | null;
+            opportunity: components["schemas"]["OpportunityCustomerSelectorV1"];
+            responsibilityBasis: {
+                id: components["schemas"]["Uuid"];
+                revision: components["schemas"]["Revision"];
+                /** @enum {string} */
+                type: "opportunity.opportunity" | "opportunity.responsibility_handoff";
+            };
+            task: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            /** @enum {string|null} */
+            taskState: "OPEN" | "WAITING" | null;
+            waitReceipt: {
+                hash: components["schemas"]["Digest32"];
+                id: components["schemas"]["Uuid"];
+            } | null;
+        };
+        FollowupAttemptFactRefV1: {
+            digest: components["schemas"]["Digest32"];
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "FOLLOWUP_ATTEMPT";
+        };
+        FollowupAttemptReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["FollowupAttemptFactRefV1"];
         };
         FormField: {
             /** @enum {string} */
@@ -1180,7 +3483,7 @@ export interface components {
             value: string;
         };
         /** @enum {string} */
-        GrantableAuthorityCodeV1: "LEAD_CAPTURE" | "LEAD_INGRESS_RESOLVE" | "LEAD_INGRESS_COMPLETE" | "LEAD_ASSIGN" | "LEAD_ROUTING_DECIDE" | "SOURCE_INTAKE_REQUEST_ACK" | "SALES_CONTACT_OWNER" | "LEAD_VALIDITY_REVIEW";
+        GrantableAuthorityCodeV1: "LEAD_CAPTURE" | "LEAD_INGRESS_RESOLVE" | "LEAD_INGRESS_COMPLETE" | "LEAD_ASSIGN" | "LEAD_ROUTING_DECIDE" | "SOURCE_INTAKE_REQUEST_ACK" | "SALES_CONTACT_OWNER" | "LEAD_VALIDITY_REVIEW" | "SALES_OPPORTUNITY_OWNER" | "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER" | "OPPORTUNITY_OWNER_EXCEPTION_READ" | "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE" | "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ" | "OPPORTUNITY_LEDGER_READ" | "OPPORTUNITY_CLOSE" | "CUSTOMER_REQUIREMENTS_MANAGE" | "PARTY_PROFILE_MANAGE" | "MATERIALS_READ" | "MATERIALS_MANAGE" | "QUOTE_READ" | "QUOTE_PREPARE" | "QUOTE_APPROVE" | "QUOTE_SELF_AUTHORIZE" | "QUOTE_DELIVER" | "QUOTE_RESPONSE" | "PAYMENT_LEDGER_READ" | "TRANSFER_LEDGER_READ" | "CONTRACT_READ" | "CONTRACT_PREPARE" | "CONTRACT_PREPARATION_DECIDE" | "CONTRACT_REVIEW" | "CONTRACT_APPROVE" | "CONTRACT_SIGNATURE_VERIFY" | "CONTRACT_EXECUTION_VERIFY" | "CONTRACT_TERMINATION_REVIEW" | "PAYMENT_SUBMIT" | "PAYMENT_CONFIRM" | "TRANSFER_SUBMIT" | "TRANSFER_REVIEW" | "TRANSFER_ACCEPT" | "MATTER_CLASSIFY" | "MATTER_RECEIVE" | "TEAM_TASK_READ" | "LEAD_MANAGEMENT_READ";
         IdentityAdminOptionsV1: {
             candidates: components["schemas"]["IdentityChoicePageV1"];
             grantableAuthorityCodes: components["schemas"]["GrantableAuthorityCodeV1"][] & unknown;
@@ -1316,10 +3619,147 @@ export interface components {
         };
         /** @enum {string} */
         LeadIngressSourceCode: "OWNER_CONFIRMED" | "CUSTOMER_PROVIDED";
+        LeadIntakeSourcesV1: {
+            sources: components["schemas"]["LeadIntakeSourceV1"][];
+        };
+        LeadIntakeSourceV1: {
+            displayName: components["schemas"]["SafeText200"];
+            jurisdictionCode: components["schemas"]["Code64"];
+            serviceCategoryCode: components["schemas"]["Code64"];
+            sourceAccountCode: string;
+            sourceChannelCode: components["schemas"]["Code64"];
+            urgencyCode: components["schemas"]["Code64"];
+        };
+        LeadManagementDetailV1: {
+            action: null | {
+                /** @constant */
+                kind: "task";
+                /** @constant */
+                label: "前往原工作卡";
+            };
+            /** Format: date-time */
+            capturedAt: string;
+            contactLabel: string;
+            customerLabel: string;
+            facts: string[][];
+            /** Format: uuid */
+            id: string;
+            nextAction: string;
+            /** Format: uuid */
+            opportunityId: string | null;
+            /** Format: uuid */
+            ownerId: string | null;
+            ownerLabel: string;
+            sourceLabel: string;
+            /** @enum {string} */
+            state: "INCOMPLETE" | "DUPLICATE" | "ASSIGNMENT" | "CONTACT" | "VALIDITY_REVIEW" | "SOURCE_REVIEW" | "ROUTING" | "WAITING" | "INVALID" | "CLOSED" | "OPPORTUNITY" | "NEEDS_REVIEW";
+            stateLabel: string;
+            /** Format: uuid */
+            taskId: string | null;
+        } & (unknown & unknown);
+        LeadManagementPageV1: {
+            items: components["schemas"]["LeadManagementRowV1"][];
+            nextCursor: string | null;
+        };
+        LeadManagementRowV1: {
+            /** Format: date-time */
+            capturedAt: string;
+            contactLabel: string;
+            customerLabel: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            ownerId: string | null;
+            ownerLabel: string;
+            sourceLabel: string;
+            /** @enum {string} */
+            state: "INCOMPLETE" | "DUPLICATE" | "ASSIGNMENT" | "CONTACT" | "VALIDITY_REVIEW" | "SOURCE_REVIEW" | "ROUTING" | "WAITING" | "INVALID" | "CLOSED" | "OPPORTUNITY" | "NEEDS_REVIEW";
+            stateLabel: string;
+        };
+        LeadManagementSourcesV1: {
+            items: components["schemas"]["LeadManagementSourceV1"][];
+        };
+        LeadManagementSourceV1: {
+            /** @enum {string} */
+            assignmentMode: "MANUAL" | "AUTOMATIC";
+            channel: string;
+            code: string;
+            intakeLabel: string;
+            label: string;
+            supervisorLabel: string;
+        };
+        ManagementDetailV1: {
+            canHandle: boolean;
+            customerLabel: string;
+            facts: string[][];
+            history: {
+                /** Format: uuid */
+                id: string;
+                label: string;
+            }[];
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            opportunityId: string;
+            /** Format: uuid */
+            taskId: string | null;
+        };
+        ManagementPageV1: {
+            items: components["schemas"]["ManagementRowV1"][];
+            nextCursor: string | null;
+        };
+        ManagementRowV1: {
+            basisLabel: string;
+            customerLabel: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            opportunityId: string;
+            ownerLabel: string;
+            stateLabel: string;
+        };
+        /** @enum {string} */
+        MaterialPurposeV1: "CONTRACT_BUSINESS" | "CORRESPONDENCE" | "OTHER";
+        /** @enum {string} */
+        MaterialUploadStateV1: "OPEN" | "CHECKING" | "UNKNOWN" | "SCAN_UNAVAILABLE" | "PASSED" | "REJECTED" | "ACCEPTED" | "EXPIRED";
+        MatterClassificationCorrectionContextV1: {
+            /** @enum {string} */
+            category: "GENERAL" | "ENFORCEMENT" | "OTHER";
+            customerName: string;
+            /** Format: int64 */
+            expectedOpportunityRevision: number;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"];
+            matter: {
+                /** Format: uuid */
+                id: string;
+                number: string;
+            };
+            /** Format: uuid */
+            opportunityId: string;
+            receivers: {
+                /** Format: uuid */
+                id: string;
+                label: string;
+            }[];
+            recipient: {
+                /** Format: uuid */
+                id: string;
+                label: string;
+            } | null;
+        };
+        MatterClassificationFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "MATTER_CLASSIFICATION";
+            /** @constant */
+            revision: 0;
+        };
         NextSummary: {
             businessPurpose: components["schemas"]["LabeledCode"];
             /** @enum {string} */
             priority: "URGENT" | "NORMAL";
+            subjectFactRef?: string;
+            subjectTitle?: components["schemas"]["SafeText200"];
             taskId: components["schemas"]["Uuid"];
             timeHint: components["schemas"]["SafeText200"];
         };
@@ -1354,7 +3794,353 @@ export interface components {
             resultCode: "NOT_CONNECTED";
             resultSummary?: components["schemas"]["SafeText500"];
         };
+        ObserveOpportunityOwnerExceptionV1: {
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            opportunityId: components["schemas"]["Uuid"];
+        };
         OpaqueRef: string;
+        OpenOpportunityMaterialUploadV1: {
+            expectedConfirmation: components["schemas"]["OpportunityCustomerNullableSelectorV1"];
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedPreviousVersion: components["schemas"]["OpportunityCustomerNullableSelectorV1"];
+            fileName: string;
+            note: string | null;
+            purpose: components["schemas"]["MaterialPurposeV1"];
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+        };
+        OpportunityCloseCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["OpportunityClosureFactRefV1"];
+        };
+        OpportunityCloseContextV1: {
+            closure?: components["schemas"]["OpportunityClosureDetailV1"];
+            expectedResponsibility?: components["schemas"]["OwnerExceptionRevisionSelectorV1"];
+            expectedTask?: components["schemas"]["OwnerExceptionRevisionSelectorV1"] | null;
+            expectedWait?: components["schemas"]["OwnerExceptionDigestSelectorV1"] | null;
+            opportunity: components["schemas"]["OpportunityLedgerSelectorV1"];
+            /** @enum {string} */
+            status: "READY" | "READ_ONLY" | "BLOCKED" | "CLOSED";
+        } & (unknown & unknown);
+        OpportunityCloseProblemV1: {
+            /** @enum {string} */
+            code: "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_INVALID" | "UNAUTHENTICATED" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "NOT_FOUND" | "COMMAND_PAYLOAD_CONFLICT" | "STALE_SUBJECT" | "STALE_TASK" | "OPPORTUNITY_CLOSED" | "OPPORTUNITY_HAS_DOWNSTREAM_FACTS" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE";
+            detail: components["schemas"]["SafeText500"];
+            fieldErrors?: components["schemas"]["FieldError"][];
+            /** Format: uri-reference */
+            instance: string;
+            receiptRef?: components["schemas"]["ReceiptRef"];
+            /** @enum {string} */
+            retryPolicy: "NEW_KEY_AFTER_ADMIN_FIX" | "NEW_KEY_AFTER_REFRESH" | "NO" | "SAME_KEY_AFTER_BACKOFF" | "SAME_KEY_AFTER_FIX" | "SAME_KEY_AFTER_REAUTH";
+            status: number;
+            title: components["schemas"]["SafeText200"];
+            /** Format: uri */
+            type: string;
+        } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
+        /** @enum {string} */
+        OpportunityCloseReasonV1: "CLIENT_DECLINED" | "NEED_CANCELLED" | "OTHER";
+        OpportunityClosureDetailV1: {
+            closedAt: components["schemas"]["Instant"];
+            reasonCode: components["schemas"]["OpportunityCloseReasonV1"];
+            summary?: string;
+        };
+        OpportunityClosureFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "OPPORTUNITY_CLOSURE";
+            /** @constant */
+            revision: 0;
+        };
+        OpportunityCustomerCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["OpportunityCustomerDraftFactRefV1"] | components["schemas"]["OpportunityCustomerConfirmationFactRefV1"];
+        };
+        OpportunityCustomerConfirmationFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "OPPORTUNITY_CUSTOMER_CONFIRMATION";
+            /** @constant */
+            revision: 0;
+        };
+        OpportunityCustomerContextV1: {
+            canCreateParty: boolean;
+            canMaintainSharedParty: boolean;
+            closed: boolean;
+            confirmation?: components["schemas"]["OpportunityCustomerVersionV1"];
+            currentOwnerAppointmentId: components["schemas"]["Uuid"];
+            currentOwnerLabel?: string;
+            draft?: components["schemas"]["OpportunityCustomerVersionV1"];
+            /** @description True only when the latest confirmation references the exact returned draft. Keep its selector for CAS, but begin edits from the canonical confirmation document. */
+            draftConsumed: boolean;
+            editable: boolean;
+            history: components["schemas"]["OpportunityCustomerVersionV1"][];
+            opportunity: components["schemas"]["OpportunityCustomerSelectorV1"];
+            parties: components["schemas"]["OpportunityCustomerPartyV1"][];
+            responsibilityBasis: components["schemas"]["OpportunityCustomerNullableSelectorV1"];
+            source: components["schemas"]["OpportunityCustomerSourceV1"];
+        };
+        OpportunityCustomerDocumentV1: {
+            contactName: string;
+            contactPhone: string;
+            customerGoal: string;
+            knownConstraints: string;
+            matterName: string;
+            participants: components["schemas"]["OpportunityCustomerParticipantV1"][];
+            serviceScope: string;
+            unknownOpponent: boolean;
+            /** @description Unverified opponent name only; never a canonical Party or confirmed participant. */
+            unverifiedOpponentName?: string | null;
+        };
+        OpportunityCustomerDraftFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "OPPORTUNITY_CUSTOMER_DRAFT";
+            /** @constant */
+            revision: 0;
+        };
+        OpportunityCustomerNewPartyV1: {
+            distinctIdentityConfirmed: boolean;
+            /** @enum {string} */
+            kind: "NATURAL_PERSON" | "ORGANIZATION";
+            name: string;
+        };
+        OpportunityCustomerNullableSelectorV1: {
+            id: components["schemas"]["Uuid"];
+            revision: components["schemas"]["Revision"];
+        } | null;
+        OpportunityCustomerParticipantV1: {
+            newParty: {
+                distinctIdentityConfirmed: boolean;
+                /** @enum {string} */
+                kind: "NATURAL_PERSON" | "ORGANIZATION";
+                name: string;
+            } | null;
+            party: components["schemas"]["OpportunityCustomerNullableSelectorV1"];
+            profileChange: {
+                name: string;
+                sharedProfileImpactConfirmed: boolean;
+            } | null;
+            /** @enum {string} */
+            role: "CLIENT" | "OPPONENT" | "OTHER";
+        };
+        OpportunityCustomerPartyPageV1: {
+            hasMore: boolean;
+            items: components["schemas"]["OpportunityCustomerPartyV1"][];
+        };
+        OpportunityCustomerPartyV1: {
+            /** @enum {string} */
+            kind: "NATURAL_PERSON" | "ORGANIZATION";
+            name: string;
+            selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+        };
+        OpportunityCustomerProblemV1: {
+            /** @enum {string} */
+            code: "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_INVALID" | "UNAUTHENTICATED" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "NOT_FOUND" | "COMMAND_PAYLOAD_CONFLICT" | "STALE_SUBJECT" | "STALE_DRAFT" | "OPPORTUNITY_CLOSED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE";
+            detail: components["schemas"]["SafeText500"];
+            fieldErrors?: components["schemas"]["FieldError"][];
+            /** Format: uri-reference */
+            instance: string;
+            receiptRef?: components["schemas"]["ReceiptRef"];
+            /** @enum {string} */
+            retryPolicy: "NEW_KEY_AFTER_ADMIN_FIX" | "NEW_KEY_AFTER_REFRESH" | "NO" | "SAME_KEY_AFTER_BACKOFF" | "SAME_KEY_AFTER_FIX" | "SAME_KEY_AFTER_REAUTH";
+            status: number;
+            title: components["schemas"]["SafeText200"];
+            /** Format: uri */
+            type: string;
+        } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
+        OpportunityCustomerProfileChangeV1: {
+            name: string;
+            sharedProfileImpactConfirmed: boolean;
+        };
+        OpportunityCustomerSelectorV1: {
+            id: components["schemas"]["Uuid"];
+            revision: components["schemas"]["Revision"];
+        };
+        OpportunityCustomerSourceV1: {
+            contactName?: string;
+            contactPhone?: string;
+            lead: components["schemas"]["OpportunityCustomerSelectorV1"];
+            legalNeed?: string;
+            name?: string;
+            party?: components["schemas"]["OpportunityCustomerPartyV1"];
+        };
+        OpportunityCustomerVersionV1: {
+            actorAppointmentId: components["schemas"]["Uuid"];
+            createdAt: components["schemas"]["Instant"];
+            document: components["schemas"]["OpportunityCustomerDocumentV1"];
+            /** @description Actor-scoped public reference for matching this exact immutable version to its command receipt; not the selector UUID. */
+            factRef: components["schemas"]["OpaqueRef"];
+            partySnapshots: components["schemas"]["OpportunityCustomerPartyV1"][];
+            selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+        };
+        OpportunityLedgerDetailV1: {
+            canHandle: boolean;
+            customerLabel: components["schemas"]["SafeText200"];
+            /** Format: date-time */
+            dueAt?: string;
+            lastProgress?: components["schemas"]["OpportunityLedgerProgressV1"];
+            nextActionLabel?: string;
+            opportunity: components["schemas"]["OpportunityLedgerSelectorV1"];
+            ownerLabel: components["schemas"]["SafeText200"];
+            task?: components["schemas"]["OpportunityLedgerTaskV1"];
+            /** @enum {string} */
+            taskState: "OPEN" | "WAITING" | "NONE" | "CLOSED";
+        } & unknown;
+        OpportunityLedgerItemV1: {
+            customerLabel: components["schemas"]["SafeText200"];
+            /** Format: date-time */
+            dueAt?: string;
+            nextActionLabel?: string;
+            opportunity: components["schemas"]["OpportunityLedgerSelectorV1"];
+            ownerLabel: components["schemas"]["SafeText200"];
+            /** @enum {string} */
+            taskState: "OPEN" | "WAITING" | "NONE" | "CLOSED";
+        };
+        OpportunityLedgerPageV1: {
+            items: components["schemas"]["OpportunityLedgerItemV1"][];
+            nextCursor?: string;
+        };
+        OpportunityLedgerProgressV1: {
+            /** Format: date-time */
+            occurredAt: string;
+            summary: string;
+        };
+        OpportunityLedgerSelectorV1: {
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            revision: number;
+        };
+        OpportunityLedgerTaskV1: {
+            etag: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int64 */
+            revision: number;
+        };
+        OpportunityMaterialCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["OpportunityMaterialUploadFactRefV1"] | components["schemas"]["OpportunityMaterialVersionFactRefV1"];
+        };
+        OpportunityMaterialProblemV1: {
+            /** @enum {string} */
+            code: "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_INVALID" | "UNAUTHENTICATED" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "NOT_FOUND" | "COMMAND_PAYLOAD_CONFLICT" | "STALE_SUBJECT" | "STALE_DRAFT" | "OPPORTUNITY_CLOSED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE";
+            detail: components["schemas"]["SafeText500"];
+            fieldErrors?: components["schemas"]["FieldError"][];
+            /** Format: uri-reference */
+            instance: string;
+            receiptRef?: components["schemas"]["ReceiptRef"];
+            /** @enum {string} */
+            retryPolicy: "NEW_KEY_AFTER_ADMIN_FIX" | "NEW_KEY_AFTER_REFRESH" | "NO" | "SAME_KEY_AFTER_BACKOFF" | "SAME_KEY_AFTER_FIX" | "SAME_KEY_AFTER_REAUTH";
+            status: number;
+            title: components["schemas"]["SafeText200"];
+            /** Format: uri */
+            type: string;
+        } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
+        OpportunityMaterialsContextV1: {
+            closed: boolean;
+            confirmation?: components["schemas"]["OpportunityCustomerSelectorV1"];
+            currentOwnerLabel?: string;
+            editable: boolean;
+            opportunity: components["schemas"]["OpportunityCustomerSelectorV1"];
+            pendingUploads: components["schemas"]["OpportunityMaterialUploadV1"][];
+            responsibilityBasis: components["schemas"]["OpportunityCustomerNullableSelectorV1"];
+            versions: components["schemas"]["OpportunityMaterialVersionV1"][];
+        };
+        OpportunityMaterialUploadFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "OPPORTUNITY_MATERIAL_UPLOAD";
+            /** @constant */
+            revision: 0;
+        };
+        OpportunityMaterialUploadV1: {
+            confirmation: components["schemas"]["OpportunityCustomerNullableSelectorV1"];
+            expiresAt: components["schemas"]["Instant"];
+            factRef: components["schemas"]["OpaqueRef"];
+            fileName: string;
+            /** @enum {string} */
+            mediaType?: "application/pdf" | "image/jpeg" | "image/png";
+            note: string | null;
+            previousVersion: components["schemas"]["OpportunityCustomerNullableSelectorV1"];
+            purpose: components["schemas"]["MaterialPurposeV1"];
+            resultCode?: string;
+            selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+            sizeBytes?: number;
+            state: components["schemas"]["MaterialUploadStateV1"];
+        };
+        OpportunityMaterialVersionFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "OPPORTUNITY_MATERIAL_VERSION";
+            /** @constant */
+            revision: 0;
+        };
+        OpportunityMaterialVersionV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            fileName: string;
+            itemId: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            mediaType: "application/pdf" | "image/jpeg" | "image/png";
+            note: string | null;
+            previewAllowed: boolean;
+            /** Format: uuid */
+            previousVersionId: string | null;
+            purpose: components["schemas"]["MaterialPurposeV1"];
+            receivedAt: components["schemas"]["Instant"];
+            receivedByAppointmentId: components["schemas"]["Uuid"];
+            receivedByLabel?: string;
+            selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+            sizeBytes: number;
+        };
+        OpportunityProgressCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED" | "NO_CHANGE";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["OpportunityProgressFactRefV1"];
+        };
+        OpportunityProgressDraftProjectionV1: {
+            /** @constant */
+            actionCode: "RECORD_OPPORTUNITY_PROGRESS";
+            digest: components["schemas"]["Digest32"];
+            draftId: components["schemas"]["Uuid"];
+            draftRevision: components["schemas"]["Revision"];
+            editable: boolean;
+            schemaVersion: components["schemas"]["SchemaVersionV1"];
+            updatedAt: components["schemas"]["Instant"];
+            values: components["schemas"]["OpportunityProgressValuesV1"];
+        };
+        OpportunityProgressDraftWriteResultV1: {
+            draft: components["schemas"]["OpportunityProgressDraftProjectionV1"];
+            preconditions: components["schemas"]["PreconditionTokens"];
+            receipt: components["schemas"]["ActionDraftCommandReceipt"];
+        };
+        OpportunityProgressFactRefV1: {
+            digest: components["schemas"]["Digest32"];
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "OPPORTUNITY_PROGRESS";
+        };
+        OpportunityProgressValuesV1: {
+            nextCheckAt: components["schemas"]["Instant"];
+            occurredAt: components["schemas"]["Instant"];
+            progressSummary: components["schemas"]["SafeText2000"];
+            /** @enum {string} */
+            progressTypeCode: "PHONE_CONNECTED" | "CLIENT_VISIT" | "MEETING" | "SITE_VISIT" | "WECHAT_CONNECTED";
+        };
         OrganizationUnitCommandReceiptV1: {
             commandId: components["schemas"]["Uuid"];
             completedAt: components["schemas"]["Instant"];
@@ -1382,6 +4168,106 @@ export interface components {
             parentOrganizationId: string | null;
             /** @enum {string} */
             state: "ACTIVE" | "CLOSED";
+        };
+        OwnerExceptionCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED" | "NO_CHANGE";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["OwnerExceptionFactRefV1"] | components["schemas"]["OwnerExceptionValidationFactRefV1"];
+        };
+        OwnerExceptionDetailV1: {
+            allowedActions: ("TRANSFER" | "COORDINATE")[];
+            basis: components["schemas"]["OwnerExceptionSelectorV1"];
+            currentOwnerAppointmentId: components["schemas"]["Uuid"];
+            currentOwnerLabel?: string;
+            etag: string;
+            exception: components["schemas"]["OwnerExceptionSelectorV1"];
+            firstObservedAt: components["schemas"]["Instant"];
+            frozenOwnerAppointmentId: components["schemas"]["Uuid"];
+            frozenOwnerLabel?: string;
+            lastObservedAt: components["schemas"]["Instant"];
+            opportunity: components["schemas"]["OwnerExceptionSelectorV1"];
+            opportunityLabel: string;
+            organizationLabel?: string;
+            reasonCodes: components["schemas"]["OwnerExceptionReasonV1"][];
+            resumeDueAt?: components["schemas"]["Instant"];
+            reviewDueAt?: components["schemas"]["Instant"];
+            state: components["schemas"]["OwnerExceptionStateV1"];
+            task?: components["schemas"]["OwnerExceptionSelectorV1"];
+            taskDueAt?: components["schemas"]["Instant"];
+            /** @enum {string} */
+            taskState?: "OPEN" | "WAITING" | "DONE" | "CANCELLED";
+            wait?: components["schemas"]["OwnerExceptionSelectorV1"];
+        };
+        OwnerExceptionDigestSelectorV1: {
+            hash: components["schemas"]["Digest32"];
+            id: components["schemas"]["Uuid"];
+            type: string;
+        };
+        OwnerExceptionFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "OPPORTUNITY_OWNER_EXCEPTION";
+            revision: components["schemas"]["Revision"];
+        };
+        OwnerExceptionObservationCandidateV1: {
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            idempotencyKey: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            kind: "OWNER_EXCEPTION";
+            opportunityId: components["schemas"]["Uuid"];
+        };
+        OwnerExceptionObservationPageV1: {
+            candidates: components["schemas"]["OwnerExceptionObservationCandidateV1"][];
+            /** @description Bounded technical count of scanned records whose organization or current facts could not be proven; contains no business content. */
+            diagnostics?: number;
+            nextCursor?: string;
+        };
+        OwnerExceptionOperationsPageV1: {
+            items: components["schemas"]["OwnerExceptionOperationsSummaryV1"][];
+            nextCursor?: string;
+        };
+        OwnerExceptionOperationsSummaryV1: {
+            exceptionId: components["schemas"]["Uuid"];
+            firstObservedAt: components["schemas"]["Instant"];
+            lastObservedAt: components["schemas"]["Instant"];
+            organizationLabel: string;
+            reasonCodes: components["schemas"]["OwnerExceptionReasonV1"][];
+            repairGuidance: string;
+            state: components["schemas"]["OwnerExceptionStateV1"];
+        };
+        OwnerExceptionPageV1: {
+            items: components["schemas"]["OwnerExceptionDetailV1"][];
+            nextCursor?: string;
+        };
+        /** @enum {string} */
+        OwnerExceptionReasonV1: "OWNER_INACTIVE" | "OWNER_AUTHORITY_MISSING" | "OWNER_DENIED" | "SUPERVISOR_UNRESOLVED" | "SOURCE_INCONSISTENT";
+        OwnerExceptionReceiverPageV1: {
+            etag: string;
+            exception: components["schemas"]["OwnerExceptionSelectorV1"];
+            items: components["schemas"]["OwnerExceptionReceiverV1"][];
+            nextCursor?: string;
+        };
+        OwnerExceptionReceiverV1: {
+            appointmentId: components["schemas"]["Uuid"];
+            displayName: string;
+            organizationLabel: string;
+        };
+        OwnerExceptionRevisionSelectorV1: {
+            id: components["schemas"]["Uuid"];
+            revision: components["schemas"]["Revision"];
+            type: string;
+        };
+        OwnerExceptionSelectorV1: components["schemas"]["OwnerExceptionRevisionSelectorV1"] | components["schemas"]["OwnerExceptionDigestSelectorV1"];
+        /** @enum {string} */
+        OwnerExceptionStateV1: "ACTIVE" | "COORDINATING" | "RESOLVED" | "NO_LONGER_APPLICABLE";
+        OwnerExceptionValidationFactRefV1: {
+            digest: components["schemas"]["Digest32"];
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "OPPORTUNITY_OWNER_VALIDATION";
         };
         OwnerSummary: {
             displayName: components["schemas"]["SafeText200"];
@@ -1416,6 +4302,13 @@ export interface components {
             /** @enum {string} */
             decisionCode?: "" | "SCHEDULE_ROUTING_REVIEW" | "RETRY_ASSIGNMENT_NOW" | "REQUEST_SOURCE_INTAKE_STOP";
             rationaleSummary?: components["schemas"]["DraftText500"];
+        };
+        PartialRecordSourceRequestContinuationValuesV1: {
+            /** @enum {string} */
+            decisionCode?: "" | "ASSIGN_SELECTED" | "SCHEDULE_REVIEW" | "END_LEAD";
+            ownerAppointmentId?: string;
+            rationaleSummary?: components["schemas"]["DraftText500"];
+            reviewAt?: string;
         };
         PartialResolveDuplicateLeadValuesV1: {
             candidateLeadId: components["schemas"]["Uuid"];
@@ -1465,12 +4358,1134 @@ export interface components {
             items: components["schemas"]["ProviderUserChoiceV1"][];
             nextCursor: string | null;
         };
-        PublicFactRef: components["schemas"]["IdentityPrincipalFactRefV1"] | components["schemas"]["OrganizationUnitFactRefV1"] | components["schemas"]["AppointmentFactRefV1"] | components["schemas"]["AuthorityGrantFactRefV1"] | components["schemas"]["LeadFactRef"] | components["schemas"]["ActionDraftFactRef"] | components["schemas"]["TaskOccurrenceFactRef"] | components["schemas"]["DecisionRecordFactRef"] | components["schemas"]["LeadAssignmentFactRef"] | components["schemas"]["LeadContactResultFactRef"];
+        PublicFactRef: components["schemas"]["R2ContractPreparationRequestFactRefV1"] | components["schemas"]["R2ContractPreparationDecisionFactRefV1"] | components["schemas"]["R2ContractFactRefV1"] | components["schemas"]["R2ContractDraftFactRefV1"] | components["schemas"]["R2ContractRevisionFactRefV1"] | components["schemas"]["R2ContractReviewRequestFactRefV1"] | components["schemas"]["R2ContractReviewDecisionFactRefV1"] | components["schemas"]["R2ContractApprovalRequestFactRefV1"] | components["schemas"]["R2ContractApprovalDecisionFactRefV1"] | components["schemas"]["OpportunityMaterialUploadFactRefV1"] | components["schemas"]["OpportunityMaterialVersionFactRefV1"] | components["schemas"]["OpportunityCustomerDraftFactRefV1"] | components["schemas"]["OpportunityCustomerConfirmationFactRefV1"] | components["schemas"]["OpportunityClosureFactRefV1"] | components["schemas"]["OwnerExceptionFactRefV1"] | components["schemas"]["OwnerExceptionValidationFactRefV1"] | components["schemas"]["IdentityPrincipalFactRefV1"] | components["schemas"]["OrganizationUnitFactRefV1"] | components["schemas"]["AppointmentFactRefV1"] | components["schemas"]["AuthorityGrantFactRefV1"] | components["schemas"]["LeadFactRef"] | components["schemas"]["ActionDraftFactRef"] | components["schemas"]["TaskOccurrenceFactRef"] | components["schemas"]["DecisionRecordFactRef"] | components["schemas"]["LeadAssignmentFactRef"] | components["schemas"]["LeadContactResultFactRef"] | components["schemas"]["OpportunityProgressFactRefV1"] | components["schemas"]["R2QuoteDraftFactRefV1"] | components["schemas"]["R2QuoteRevisionFactRefV1"] | components["schemas"]["R2QuoteApprovalRequestFactRefV1"] | components["schemas"]["R2QuoteApprovalDecisionFactRefV1"] | components["schemas"]["R2QuoteIssueFactRefV1"] | components["schemas"]["R2QuoteResponseFactRefV1"] | components["schemas"]["ContractPreparationWorkflowFactRefV1"] | components["schemas"]["R2ContractSignatureDraftFactRefV1"] | components["schemas"]["R2ContractSignatureArrangementFactRefV1"] | components["schemas"]["R2ContractSignatureSubmissionFactRefV1"] | components["schemas"]["R2ContractSignatureVerificationFactRefV1"] | components["schemas"]["R2ContractSignatureArchiveFactRefV1"] | components["schemas"]["R2ContractSignatureRevisionReturnFactRefV1"] | components["schemas"]["R2ContractSignatureWorkflowFactRefV1"] | components["schemas"]["ContractExecutionWorkflowFactRefV1"] | components["schemas"]["ContractPaymentWorkflowFactRefV1"] | components["schemas"]["R2ContractSignatureHandoffFactRefV1"] | components["schemas"]["R2QuotePreparationIntentFactRefV1"] | components["schemas"]["FollowupAttemptFactRefV1"] | components["schemas"]["R2QuoteTerminationFactRefV1"] | components["schemas"]["ContractNegotiationDispositionFactRefV1"] | components["schemas"]["ContractTerminationReviewAssignmentFactRefV1"] | components["schemas"]["ContractExecutionVerificationFactRefV1"] | components["schemas"]["ContractPaymentRequestFactRefV1"] | components["schemas"]["ContractPaymentReviewFactRefV1"] | components["schemas"]["TransferSubmissionFactRefV1"] | components["schemas"]["TransferConflictReviewFactRefV1"] | components["schemas"]["TransferIntakeFactRefV1"] | components["schemas"]["MatterClassificationFactRefV1"] | components["schemas"]["TransferWorkflowFactRefV1"];
         /** @enum {string} */
         PublicFactType: "LEAD" | "ACTION_DRAFT" | "TASK_OCCURRENCE" | "DECISION_RECORD" | "LEAD_ASSIGNMENT" | "LEAD_CONTACT_RESULT";
+        QuoteCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["R2QuoteDraftFactRefV1"] | components["schemas"]["R2QuoteRevisionFactRefV1"] | components["schemas"]["R2QuoteApprovalRequestFactRefV1"] | components["schemas"]["R2QuoteApprovalDecisionFactRefV1"] | components["schemas"]["R2QuoteIssueFactRefV1"] | components["schemas"]["R2QuoteResponseFactRefV1"] | components["schemas"]["R2QuotePreparationIntentFactRefV1"] | components["schemas"]["R2QuoteTerminationFactRefV1"];
+        };
+        QuoteCommercialDraftV1: {
+            conditionalFee?: {
+                basis: string;
+                /** Format: int64 */
+                capMinor: number;
+                rateBasisPoints: number;
+            } | null;
+            /** @enum {string} */
+            currency?: "CNY";
+            lines?: {
+                /** Format: int64 */
+                amountMinor: number;
+                description: string;
+                discount: boolean;
+            }[];
+            paymentTerms?: string;
+            scope?: string;
+            validUntil?: components["schemas"]["Instant"];
+        };
+        QuoteContextV1: {
+            allowedActions: ("SAVE_QUOTE_DRAFT" | "FORM_QUOTE" | "REQUEST_QUOTE_APPROVAL" | "RECORD_QUOTE_DECISION" | "RECORD_QUOTE_DELIVERY" | "RECORD_QUOTE_RESPONSE" | "START_QUOTE_PREPARATION" | "END_QUOTE_NEGOTIATION")[];
+            approvers: {
+                appointmentId: components["schemas"]["Uuid"];
+                taskId: components["schemas"]["Uuid"];
+            }[];
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            customerName: string;
+            draft: {
+                document: components["schemas"]["QuoteCommercialDraftV1"];
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+            } | null;
+            history: {
+                document: {
+                    [key: string]: unknown;
+                };
+                selector: {
+                    hash: components["schemas"]["Digest32"];
+                    id: components["schemas"]["Uuid"];
+                };
+                /** Format: int64 */
+                totalMinor: number;
+                validUntil: components["schemas"]["Instant"];
+                version: components["schemas"]["Revision"];
+            }[];
+            materials: {
+                fileName: string;
+                purpose: string;
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+            }[];
+            notice?: string;
+            opportunity: components["schemas"]["OpportunityCustomerSelectorV1"];
+            quote: {
+                document: {
+                    [key: string]: unknown;
+                };
+                selector: {
+                    hash: components["schemas"]["Digest32"];
+                    id: components["schemas"]["Uuid"];
+                };
+                /** Format: int64 */
+                totalMinor: number;
+                validUntil: components["schemas"]["Instant"];
+                version: components["schemas"]["Revision"];
+            } | null;
+            readonly: boolean;
+            recipients: {
+                name: string;
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+            }[];
+            records: ({
+                actorAppointmentId: components["schemas"]["Uuid"];
+                /** @enum {string} */
+                decision: "APPROVED" | "RETURNED";
+                /** @constant */
+                kind: "APPROVAL";
+                occurredAt: components["schemas"]["Instant"];
+                quote: {
+                    hash: components["schemas"]["Digest32"];
+                    id: components["schemas"]["Uuid"];
+                };
+                reason: string;
+                recordedAt: components["schemas"]["Instant"];
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+                /** Format: int64 */
+                version: number;
+            } | {
+                actorAppointmentId: components["schemas"]["Uuid"];
+                /** @enum {string} */
+                channel: "IN_PERSON" | "MANUAL_ELECTRONIC";
+                evidence: components["schemas"]["OpportunityCustomerSelectorV1"];
+                /** @constant */
+                kind: "DELIVERY";
+                occurredAt: components["schemas"]["Instant"];
+                quote: {
+                    hash: components["schemas"]["Digest32"];
+                    id: components["schemas"]["Uuid"];
+                };
+                recipient: string;
+                recordedAt: components["schemas"]["Instant"];
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+                /** Format: int64 */
+                version: number;
+            } | {
+                actorAppointmentId: components["schemas"]["Uuid"];
+                evidence: components["schemas"]["OpportunityCustomerSelectorV1"];
+                /** @constant */
+                kind: "RESPONSE";
+                occurredAt: components["schemas"]["Instant"];
+                quote: {
+                    hash: components["schemas"]["Digest32"];
+                    id: components["schemas"]["Uuid"];
+                };
+                recordedAt: components["schemas"]["Instant"];
+                /** @enum {string} */
+                responseKind: "ACCEPTED" | "NOT_ACCEPTED" | "REJECTED" | "AMBIGUOUS";
+                selector: {
+                    hash: components["schemas"]["Digest32"];
+                    id: components["schemas"]["Uuid"];
+                };
+                statement: string;
+                /** Format: int64 */
+                version: number;
+            })[];
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            workflow: {
+                dueAt?: components["schemas"]["Instant"];
+                message?: string;
+                nextCheckAt?: components["schemas"]["Instant"];
+                ownerAppointmentId: components["schemas"]["Uuid"];
+                ownerLabel?: string;
+                selector: components["schemas"]["OpportunityCustomerSelectorV1"];
+                /** @enum {string} */
+                stage: "PREPARE" | "SUBMIT_APPROVAL" | "AWAIT_APPROVAL" | "DELIVER" | "AWAIT_REPLY" | "FOLLOW_UP" | "CLARIFY_REPLY" | "SALES_DISPOSITION" | "ACCEPTED" | "RETURNED" | "OWNER_EXCEPTION";
+                state?: string | null;
+                task: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            } | null;
+        };
+        QuoteProblemV1: {
+            /** @enum {string} */
+            code: "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_INVALID" | "UNAUTHENTICATED" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "NOT_FOUND" | "COMMAND_PAYLOAD_CONFLICT" | "STALE_SUBJECT" | "STALE_DRAFT" | "OPPORTUNITY_CLOSED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "STALE_TASK" | "STALE_EVIDENCE" | "CUSTOMER_CONFIRMATION_REQUIRED";
+            detail: components["schemas"]["SafeText500"];
+            fieldErrors?: components["schemas"]["FieldError"][];
+            /** Format: uri-reference */
+            instance: string;
+            receiptRef?: components["schemas"]["ReceiptRef"];
+            /** @enum {string} */
+            retryPolicy: "NEW_KEY_AFTER_ADMIN_FIX" | "NEW_KEY_AFTER_REFRESH" | "NO" | "SAME_KEY_AFTER_BACKOFF" | "SAME_KEY_AFTER_FIX" | "SAME_KEY_AFTER_REAUTH";
+            status: number;
+            title: components["schemas"]["SafeText200"];
+            /** Format: uri */
+            type: string;
+        } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
+        R2ArchiveContractSignatureV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                archiveComplete: boolean;
+                expectedSignatureWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"];
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                materialSha256: string;
+                materialVersionId: components["schemas"]["Uuid"];
+                reason: string;
+            };
+        };
+        R2ClassifyMatterV1: {
+            /** Format: int64 */
+            expectedOpportunityRevision: number;
+            expectedWorkflow: {
+                id: components["schemas"]["Uuid"];
+                /** @constant */
+                revision: 0;
+            };
+            values: {
+                /** @enum {string} */
+                category: "GENERAL" | "ENFORCEMENT" | "OTHER";
+                explanation: string;
+                matterId: components["schemas"]["Uuid"];
+                recipient: components["schemas"]["Uuid"];
+            };
+        };
+        R2ConfirmContractSignatureArrangementV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                expectedSignatureWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"];
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                humanConfirmed: boolean;
+                slots: components["schemas"]["ContractSignatureSlotV1"][];
+            };
+        };
+        R2ContractApprovalDecisionFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_APPROVAL_DECISION";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractApprovalRequestFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_APPROVAL_REQUEST";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractCurrentCardV1: {
+            /**
+             * @description Purpose-only routing card. Contract drafts are available solely through ContractContextV1; this field is always null.
+             * @constant
+             */
+            actionDraft: components["schemas"]["OpportunityProgressDraftProjectionV1"] | null;
+            businessPurpose: {
+                /** @enum {string} */
+                code: "REQUEST_CONTRACT_PREPARATION" | "DECIDE_CONTRACT_PREPARATION" | "PREPARE_CONTRACT" | "SUBMIT_CONTRACT_REVIEW" | "REVIEW_CONTRACT" | "SUBMIT_CONTRACT_APPROVAL" | "APPROVE_CONTRACT" | "SUPPLEMENT_CONTRACT_REVIEW" | "ARRANGE_CONTRACT_SIGNATURE" | "COLLECT_CONTRACT_SIGNATURE" | "VERIFY_CONTRACT_SIGNATURE" | "ARCHIVE_CONTRACT_SIGNATURE" | "REVIEW_CONTRACT_TERMINATION" | "CHECK_CONTRACT_EXECUTION" | "CHECK_CONTRACT_RECEIPT" | "SUPPLEMENT_CONTRACT_RECEIPT";
+                label: components["schemas"]["SafeText200"];
+            };
+            commandForm: {
+                /** @enum {string} */
+                actionCode: "REQUEST_CONTRACT_PREPARATION" | "RECORD_CONTRACT_PREPARATION_DECISION" | "START_CONTRACT_PREPARATION" | "SAVE_CONTRACT_DRAFT" | "FORM_CONTRACT" | "REQUEST_CONTRACT_REVIEW" | "RECORD_CONTRACT_REVIEW" | "REQUEST_CONTRACT_APPROVAL" | "RECORD_CONTRACT_DECISION" | "SAVE_CONTRACT_SIGNATURE_DRAFT" | "CONFIRM_CONTRACT_SIGNATURE_ARRANGEMENT" | "SUBMIT_CONTRACT_SIGNATURE" | "RECORD_CONTRACT_SIGNATURE_VERIFICATION" | "ARCHIVE_CONTRACT_SIGNATURE" | "RETURN_CONTRACT_FOR_REVISION" | "RETURN_CONTRACT_SIGNATURE_FOR_REVISION" | "RECORD_CONTRACT_TERMINATION_REVIEW" | "VERIFY_CONTRACT_EXECUTION_CONDITIONS" | "RECORD_CONTRACT_RECEIPT_REVIEW" | "SUPPLEMENT_CONTRACT_RECEIPT";
+                fields: Record<string, never>[];
+                /** @constant */
+                schemaVersion: 1;
+                values: Record<string, never>;
+            };
+            /** @enum {string} */
+            expectedCompletionFact: "CONTRACT_PREPARATION_REQUEST" | "CONTRACT_PREPARATION_DECISION" | "CONTRACT" | "CONTRACT_DRAFT" | "CONTRACT_REVISION" | "CONTRACT_REVIEW_REQUEST" | "CONTRACT_REVIEW_DECISION" | "CONTRACT_APPROVAL_REQUEST" | "CONTRACT_APPROVAL_DECISION" | "CONTRACT_SIGNATURE_DRAFT" | "CONTRACT_SIGNATURE_ARRANGEMENT" | "CONTRACT_SIGNATURE_SUBMISSION" | "CONTRACT_SIGNATURE_VERIFICATION" | "CONTRACT_SIGNATURE_ARCHIVE" | "CONTRACT_SIGNATURE_REVISION_RETURN" | "CONTRACT_NEGOTIATION_DISPOSITION" | "CONTRACT_EXECUTION_VERIFICATION" | "CONTRACT_PAYMENT_REVIEW";
+            owner: components["schemas"]["OwnerSummary"];
+            preconditions: components["schemas"]["PreconditionTokens"];
+            primaryCommand: {
+                /** @enum {string} */
+                code: "REQUEST_CONTRACT_PREPARATION" | "RECORD_CONTRACT_PREPARATION_DECISION" | "START_CONTRACT_PREPARATION" | "SAVE_CONTRACT_DRAFT" | "FORM_CONTRACT" | "REQUEST_CONTRACT_REVIEW" | "RECORD_CONTRACT_REVIEW" | "REQUEST_CONTRACT_APPROVAL" | "RECORD_CONTRACT_DECISION" | "SAVE_CONTRACT_SIGNATURE_DRAFT" | "CONFIRM_CONTRACT_SIGNATURE_ARRANGEMENT" | "SUBMIT_CONTRACT_SIGNATURE" | "RECORD_CONTRACT_SIGNATURE_VERIFICATION" | "ARCHIVE_CONTRACT_SIGNATURE" | "RETURN_CONTRACT_FOR_REVISION" | "RETURN_CONTRACT_SIGNATURE_FOR_REVISION" | "RECORD_CONTRACT_TERMINATION_REVIEW" | "VERIFY_CONTRACT_EXECUTION_CONDITIONS" | "RECORD_CONTRACT_RECEIPT_REVIEW" | "SUPPLEMENT_CONTRACT_RECEIPT";
+                enabled: boolean;
+                label: components["schemas"]["SafeText200"];
+            };
+            sla: components["schemas"]["SlaSummary"];
+            subject: components["schemas"]["R2OpportunitySubjectV1"];
+            taskId: components["schemas"]["Uuid"];
+            taskRevision: components["schemas"]["Revision"];
+            /** @enum {string} */
+            taskType: "REQUEST_CONTRACT_PREPARATION" | "DECIDE_CONTRACT_PREPARATION" | "PREPARE_CONTRACT" | "SUBMIT_CONTRACT_REVIEW" | "REVIEW_CONTRACT" | "SUBMIT_CONTRACT_APPROVAL" | "APPROVE_CONTRACT" | "SUPPLEMENT_CONTRACT_REVIEW" | "ARRANGE_CONTRACT_SIGNATURE" | "COLLECT_CONTRACT_SIGNATURE" | "VERIFY_CONTRACT_SIGNATURE" | "ARCHIVE_CONTRACT_SIGNATURE" | "REVIEW_CONTRACT_TERMINATION" | "CHECK_CONTRACT_EXECUTION" | "CHECK_CONTRACT_RECEIPT" | "SUPPLEMENT_CONTRACT_RECEIPT";
+            /** @enum {string} */
+            versionStatus: "CURRENT" | "REFRESH_RECOMMENDED";
+        };
+        R2ContractDraftFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_DRAFT";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractPreparationDecisionFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_PREPARATION_DECISION";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractPreparationRequestFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_PREPARATION_REQUEST";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractReviewDecisionFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_REVIEW_DECISION";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractReviewRequestFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_REVIEW_REQUEST";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractRevisionFactRefV1: {
+            digest: components["schemas"]["Digest32"];
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_REVISION";
+        };
+        R2ContractSignatureArchiveFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_SIGNATURE_ARCHIVE";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractSignatureArrangementFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_SIGNATURE_ARRANGEMENT";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractSignatureDraftFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_SIGNATURE_DRAFT";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractSignatureHandoffFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_SIGNATURE_HANDOFF";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractSignatureRevisionReturnFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_SIGNATURE_REVISION_RETURN";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractSignatureSubmissionFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_SIGNATURE_SUBMISSION";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractSignatureVerificationFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_SIGNATURE_VERIFICATION";
+            revision: components["schemas"]["Revision"];
+        };
+        R2ContractSignatureWorkflowFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "CONTRACT_SIGNATURE_WORKFLOW";
+            revision: components["schemas"]["Revision"];
+        };
+        R2CurrentCardV1: components["schemas"]["ResolveLeadDuplicateCurrentCard"] | components["schemas"]["CompleteLeadIngressCurrentCard"] | components["schemas"]["AssignLeadCurrentCard"] | components["schemas"]["ResolveLeadRoutingGapCurrentCard"] | components["schemas"]["AcknowledgeSourceIntakeStopRequestCurrentCard"] | components["schemas"]["ContactLeadCurrentCard"] | components["schemas"]["ReviewLeadValidityCurrentCard"] | components["schemas"]["R2OpportunityCurrentCardV1"] | components["schemas"]["R2QuoteCurrentCardV1"] | components["schemas"]["R2ContractCurrentCardV1"] | components["schemas"]["R2SourceRequestCurrentCardV1"] | components["schemas"]["R2TransferCurrentCardV1"];
+        R2DueOpportunityTaskCandidateV1: {
+            dueCutoff: components["schemas"]["Instant"];
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedTaskRevision: components["schemas"]["Revision"];
+            /** Format: uuid */
+            idempotencyKey: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "DUE";
+            opportunityId: components["schemas"]["Uuid"];
+            progressHash: components["schemas"]["Digest32"];
+            progressId: components["schemas"]["Uuid"];
+            taskId: components["schemas"]["Uuid"];
+            waitReceiptHash: components["schemas"]["Digest32"];
+            waitReceiptId: components["schemas"]["Uuid"];
+        };
+        R2FormContractV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: components["schemas"]["ContractVersionContentV1"];
+        };
+        R2FormQuoteV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedQuote: {
+                hash: components["schemas"]["Digest32"];
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: components["schemas"]["QuoteCommercialDraftV1"];
+        };
+        R2InitialOpportunityTaskCandidateV1: {
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            /** Format: uuid */
+            idempotencyKey: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "INITIAL";
+            opportunityId: components["schemas"]["Uuid"];
+        };
+        R2OpportunityCurrentCardV1: {
+            actionDraft: components["schemas"]["OpportunityProgressDraftProjectionV1"] | null;
+            businessPurpose: {
+                /** @enum {string} */
+                code: "PROGRESS_OPPORTUNITY";
+                label: components["schemas"]["SafeText200"];
+            };
+            commandForm: components["schemas"]["R2OpportunityFormV1"];
+            /** @enum {string} */
+            expectedCompletionFact: "OPPORTUNITY_PROGRESS";
+            owner: components["schemas"]["OwnerSummary"];
+            preconditions: components["schemas"]["PreconditionTokens"];
+            primaryCommand: {
+                /** @enum {string} */
+                code: "RECORD_OPPORTUNITY_PROGRESS";
+                enabled: boolean;
+                label: components["schemas"]["SafeText200"];
+            };
+            sla: components["schemas"]["SlaSummary"];
+            subject: components["schemas"]["R2OpportunitySubjectV1"];
+            taskId: components["schemas"]["Uuid"];
+            taskRevision: components["schemas"]["Revision"];
+            /** @enum {string} */
+            taskType: "PROGRESS_OPPORTUNITY";
+            /** @enum {string} */
+            versionStatus: "CURRENT" | "REFRESH_RECOMMENDED";
+        };
+        R2OpportunityFormV1: {
+            /** @enum {string} */
+            actionCode: "RECORD_OPPORTUNITY_PROGRESS";
+            fields: components["schemas"]["FormField"][];
+            /** @enum {integer} */
+            schemaVersion: 1;
+            values: Record<string, never> | components["schemas"]["OpportunityProgressValuesV1"];
+        };
+        R2OpportunitySubjectV1: {
+            subjectRef: components["schemas"]["OpaqueRef"];
+            subjectRevision: components["schemas"]["Revision"];
+            /** @enum {string} */
+            subjectType: "OPPORTUNITY";
+            subtitle?: string;
+            title: components["schemas"]["SafeText200"];
+        };
+        R2OpportunityTaskCandidateV1: components["schemas"]["R2InitialOpportunityTaskCandidateV1"] | components["schemas"]["R2DueOpportunityTaskCandidateV1"];
+        /** @enum {string} */
+        R2OpportunityTaskKindV1: "INITIAL" | "DUE";
+        R2OpportunityTaskPageV1: {
+            candidates: components["schemas"]["R2OpportunityTaskCandidateV1"][];
+            nextCursor?: string;
+        };
+        R2OpportunityTaskProblemV1: {
+            /** @enum {string} */
+            code: "VALIDATION_FAILED" | "UNAUTHENTICATED" | "NOT_AUTHORIZED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_INVALID" | "COMMAND_PAYLOAD_CONFLICT" | "NOT_FOUND" | "STALE_TASK" | "STALE_SUBJECT" | "STALE_PROGRESS" | "OPPORTUNITY_OPENING_SOURCE_INVALID" | "OPPORTUNITY_NOT_FOUND" | "STALE_OPPORTUNITY" | "OPPORTUNITY_CLOSED";
+            detail: components["schemas"]["SafeText500"];
+            fieldErrors?: components["schemas"]["FieldError"][];
+            /** Format: uri-reference */
+            instance: string;
+            /** @enum {string} */
+            retryPolicy: "NEW_KEY_AFTER_ADMIN_FIX" | "NEW_KEY_AFTER_REFRESH" | "NO" | "SAME_KEY_AFTER_BACKOFF" | "SAME_KEY_AFTER_FIX" | "SAME_KEY_AFTER_REAUTH";
+            status: number;
+            title: components["schemas"]["SafeText200"];
+            /** Format: uri */
+            type: string;
+        } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
+        R2QuoteApprovalDecisionFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "QUOTE_APPROVAL_DECISION";
+            /** @constant */
+            revision: 0;
+        };
+        R2QuoteApprovalRequestFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "QUOTE_APPROVAL_REQUEST";
+            /** @constant */
+            revision: 0;
+        };
+        R2QuoteCurrentCardV1: {
+            actionDraft: components["schemas"]["OpportunityProgressDraftProjectionV1"] | null;
+            businessPurpose: {
+                /** @enum {string} */
+                code: "PREPARE_QUOTE" | "SUBMIT_QUOTE_APPROVAL" | "APPROVE_QUOTE" | "DELIVER_QUOTE" | "RECORD_QUOTE_REPLY" | "RESOLVE_QUOTE_AUTHORITY";
+                label: components["schemas"]["SafeText200"];
+            };
+            commandForm: {
+                /** @enum {string} */
+                actionCode: "SAVE_QUOTE_DRAFT" | "FORM_QUOTE" | "REQUEST_QUOTE_APPROVAL" | "RECORD_QUOTE_DECISION" | "RECORD_QUOTE_DELIVERY" | "RECORD_QUOTE_RESPONSE";
+                fields: Record<string, never>[];
+                /** @constant */
+                schemaVersion: 1;
+                values: Record<string, never>;
+            };
+            /** @enum {string} */
+            expectedCompletionFact: "QUOTE_DRAFT" | "QUOTE_REVISION" | "QUOTE_APPROVAL_REQUEST" | "QUOTE_APPROVAL_DECISION" | "QUOTE_ISSUE" | "QUOTE_RESPONSE";
+            owner: components["schemas"]["OwnerSummary"];
+            preconditions: components["schemas"]["PreconditionTokens"];
+            primaryCommand: {
+                /** @enum {string} */
+                code: "SAVE_QUOTE_DRAFT" | "FORM_QUOTE" | "REQUEST_QUOTE_APPROVAL" | "RECORD_QUOTE_DECISION" | "RECORD_QUOTE_DELIVERY" | "RECORD_QUOTE_RESPONSE";
+                enabled: boolean;
+                label: components["schemas"]["SafeText200"];
+            };
+            sla: components["schemas"]["SlaSummary"];
+            subject: components["schemas"]["R2OpportunitySubjectV1"];
+            taskId: components["schemas"]["Uuid"];
+            taskRevision: components["schemas"]["Revision"];
+            /** @enum {string} */
+            taskType: "PREPARE_QUOTE" | "SUBMIT_QUOTE_APPROVAL" | "APPROVE_QUOTE" | "DELIVER_QUOTE" | "RECORD_QUOTE_REPLY" | "RESOLVE_QUOTE_AUTHORITY";
+            /** @enum {string} */
+            versionStatus: "CURRENT" | "REFRESH_RECOMMENDED";
+        };
+        R2QuoteDraftFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "QUOTE_DRAFT";
+            /** @constant */
+            revision: 0;
+        };
+        R2QuoteIssueFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "QUOTE_ISSUE";
+            /** @constant */
+            revision: 0;
+        };
+        R2QuotePreparationIntentFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "QUOTE_PREPARATION_INTENT";
+            /** @constant */
+            revision: 0;
+        };
+        R2QuoteResponseFactRefV1: {
+            digest: components["schemas"]["Digest32"];
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "QUOTE_RESPONSE";
+        };
+        R2QuoteRevisionFactRefV1: {
+            digest: components["schemas"]["Digest32"];
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "QUOTE_REVISION";
+        };
+        R2QuoteTerminationFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "QUOTE_TERMINATION";
+            /** @constant */
+            revision: 0;
+        };
+        R2RecordContractDecisionV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                /** @enum {string} */
+                decision: "APPROVED" | "RETURNED";
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                reason: string;
+                validUntil?: components["schemas"]["Instant"] | null;
+            };
+        };
+        R2RecordContractPreparationDecisionV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                /** @enum {string} */
+                decision: "APPROVED" | "RETURNED";
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                reason: string;
+                validUntil?: components["schemas"]["Instant"] | null;
+            };
+        };
+        R2RecordContractReceiptReviewV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                /** Format: int64 */
+                amountMinor: number;
+                /** @description Must be true; revalidated by the finance Owner. */
+                attributionChecked: boolean;
+                /** @constant */
+                currency: "CNY";
+                /** @constant */
+                decision: "CONFIRM";
+                expectedPaymentWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"];
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                explanation: string;
+                materialSha256: string;
+                materialVersionId: components["schemas"]["Uuid"];
+                receivedAt: components["schemas"]["Instant"];
+                transactionReference: string;
+            } | {
+                /** @constant */
+                decision: "RETURN";
+                expectedPaymentWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"];
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                explanation: string;
+            };
+        };
+        R2RecordContractReviewV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                /** @enum {string} */
+                decision: "CLEAR" | "NEED_INFO" | "BLOCKED";
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                reason: string;
+            };
+        };
+        R2RecordContractSignatureVerificationV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                arrangementComplete?: boolean;
+                authorityVerified?: boolean;
+                contentCorresponds?: boolean;
+                /** @enum {string} */
+                decision: "VERIFIED" | "NEED_INFO" | "ARRANGEMENT_CORRECTION" | "REVISION_REQUIRED";
+                expectedSignatureWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"];
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                materialComplete?: boolean;
+                reason: string;
+                sealVerified?: boolean;
+                signatureVerified?: boolean;
+            };
+        };
+        R2RecordQuoteDecisionV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedQuote: {
+                hash: components["schemas"]["Digest32"];
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                /** @enum {string} */
+                decision: "APPROVED" | "RETURNED";
+                reason: string;
+            };
+        };
+        R2RecordQuoteDeliveryV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedQuote: {
+                hash: components["schemas"]["Digest32"];
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                channel: string;
+                evidence: components["schemas"]["OpportunityCustomerSelectorV1"];
+                occurredAt: components["schemas"]["Instant"];
+                recipient: string;
+                recipientParticipation: components["schemas"]["OpportunityCustomerSelectorV1"];
+            };
+        };
+        R2RecordQuoteResponseV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedQuote: {
+                hash: components["schemas"]["Digest32"];
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                evidence: components["schemas"]["OpportunityCustomerSelectorV1"];
+                /** @enum {string} */
+                kind: "ACCEPTED" | "NOT_ACCEPTED" | "REJECTED" | "AMBIGUOUS";
+                nextCheckAt: components["schemas"]["Instant"] | null;
+                occurredAt: components["schemas"]["Instant"];
+                statement: string;
+            };
+        };
+        R2RecordTransferConflictReviewV1: {
+            /** Format: int64 */
+            expectedOpportunityRevision: number;
+            expectedWorkflow: {
+                id: components["schemas"]["Uuid"];
+                /** @constant */
+                revision: 0;
+            };
+            values: {
+                explanation: string;
+                /** @enum {string} */
+                outcome: "CLEAR" | "NEED_INFO" | "BLOCKED";
+                scopeChecked: boolean;
+            };
+        };
+        R2RecordTransferIntakeV1: {
+            /** Format: int64 */
+            expectedOpportunityRevision: number;
+            expectedWorkflow: {
+                id: components["schemas"]["Uuid"];
+                /** @constant */
+                revision: 0;
+            };
+            values: {
+                acceptanceChecked: boolean;
+                /** @enum {string} */
+                decision: "ACCEPT" | "RETURN";
+                explanation: string;
+                /** @enum {string|null} */
+                requirement: null | "CLIENT_IDENTITY" | "SIGNATURE_ARCHIVE" | "HANDOVER_EXPLANATION" | "OTHER_MATERIAL";
+            };
+        };
+        R2RequestContractApprovalV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            };
+        };
+        R2RequestContractPreparationV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                commercial: components["schemas"]["ContractCommercialV1"];
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                reason: string;
+            };
+        };
+        R2RequestContractReceiptReviewV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                expectedPaymentWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"];
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                explanation: string;
+                materialSha256: string;
+                materialVersionId: components["schemas"]["Uuid"];
+            };
+        };
+        R2RequestContractReviewV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                reason?: string;
+            };
+        };
+        R2RequestQuoteApprovalV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedQuote: {
+                hash: components["schemas"]["Digest32"];
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: Record<string, never>;
+        };
+        R2ResubmitTransferV1: {
+            /** Format: int64 */
+            expectedOpportunityRevision: number;
+            expectedWorkflow: {
+                id: components["schemas"]["Uuid"];
+                /** @constant */
+                revision: 0;
+            };
+            values: {
+                clientIdentity: components["schemas"]["TransferMaterialV1"];
+                consistencyChecked: boolean;
+                corrections: components["schemas"]["TransferCorrectionV1"][];
+                explanation: string;
+                signatureArchive: components["schemas"]["TransferMaterialV1"];
+            };
+        };
+        R2ReturnContractForRevisionV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                expectedSignatureWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                reason: string;
+            };
+        };
+        R2ReturnContractSignatureForRevisionV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                expectedSignatureWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                reason: string;
+            };
+        };
+        R2SalesRepairRevisionSelectorV1: {
+            id: components["schemas"]["Uuid"];
+            revision: components["schemas"]["Revision"];
+            /** @enum {string} */
+            type: "opportunity.opportunity" | "opportunity.responsibility_handoff" | "responsibility.task_occurrence" | "responsibility.action_draft" | "contract.contract" | "contract.preparation_workflow" | "contract.preparation_request";
+        };
+        R2SaveContractDraftV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: components["schemas"]["ContractDraftContentV1"];
+        };
+        R2SaveContractSignatureDraftV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                authorityMaterialSha256?: string;
+                authorityMaterialVersionId?: string;
+                expectedSignatureDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                expectedSignatureWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"];
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                materialSha256?: string;
+                materialVersionId?: string;
+                reason?: string;
+                signedAt?: string;
+                signerName?: string;
+                slotNumber?: number;
+                slots?: {
+                    authoritySlot?: string;
+                    clauseBasis?: string;
+                    participationId?: components["schemas"]["Uuid"];
+                    partyId?: components["schemas"]["Uuid"];
+                    required?: boolean;
+                    sealRequired?: boolean;
+                    signatureRequired?: boolean;
+                    slotNumber?: number;
+                    templateSigningPartyId?: components["schemas"]["Uuid"];
+                }[];
+            };
+        };
+        R2SaveQuoteDraftV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedQuote: {
+                hash: components["schemas"]["Digest32"];
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: components["schemas"]["QuoteCommercialDraftV1"];
+        };
+        R2SourceRequestCurrentCardV1: {
+            actionDraft: components["schemas"]["RecordSourceRequestContinuationDraftProjection"] | null;
+            businessPurpose: components["schemas"]["ResolveSourceRequestBusinessPurpose"];
+            commandForm: components["schemas"]["RecordSourceRequestContinuationCommandForm"];
+            /** @constant */
+            expectedCompletionFact: components["schemas"]["Code64"];
+            owner: components["schemas"]["OwnerSummary"];
+            preconditions: components["schemas"]["PreconditionTokens"];
+            primaryCommand: components["schemas"]["RecordSourceRequestContinuationPrimaryCommand"];
+            sla: components["schemas"]["SlaSummary"];
+            subject: components["schemas"]["SubjectSummary"];
+            taskId: components["schemas"]["Uuid"];
+            taskRevision: components["schemas"]["Revision"];
+            /** @enum {string} */
+            taskType: "RESOLVE_SOURCE_REQUEST";
+            /** @enum {string} */
+            versionStatus: "CURRENT" | "REFRESH_RECOMMENDED";
+        };
+        R2StartContractPreparationV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            };
+        };
+        R2SubmitContractSignatureV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                authorityMaterialSha256: string;
+                authorityMaterialVersionId: components["schemas"]["Uuid"];
+                expectedSignatureWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"];
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                materialSha256: string;
+                materialVersionId: components["schemas"]["Uuid"];
+                signedAt: components["schemas"]["Instant"];
+                signerName: string;
+                slotNumber: number;
+            };
+        };
+        R2SubmitTransferV1: {
+            /** Format: int64 */
+            expectedOpportunityRevision: number;
+            expectedWorkflow: {
+                id: components["schemas"]["Uuid"];
+                /** @constant */
+                revision: 0;
+            };
+            values: {
+                clientIdentity: components["schemas"]["TransferMaterialV1"];
+                consistencyChecked: boolean;
+                corrections: components["schemas"]["TransferCorrectionV1"][];
+                explanation: string;
+                signatureArchive: components["schemas"]["TransferMaterialV1"];
+            };
+        };
+        R2SupplementContractReceiptV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                expectedPaymentWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"];
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                explanation: string;
+                materialSha256: string;
+                materialVersionId: components["schemas"]["Uuid"];
+            };
+        };
+        R2TransferCurrentCardV1: {
+            /**
+             * @description Purpose-only routing card; transfer form data is disclosed separately.
+             * @constant
+             */
+            actionDraft: components["schemas"]["OpportunityProgressDraftProjectionV1"] | null;
+            businessPurpose: {
+                /** @enum {string} */
+                code: "PREPARE_TRANSFER" | "REVIEW_TRANSFER" | "ACCEPT_TRANSFER" | "SUPPLEMENT_TRANSFER" | "CLASSIFY_MATTER";
+                label: components["schemas"]["SafeText200"];
+            };
+            commandForm: {
+                /** @enum {string} */
+                actionCode: "SUBMIT_TRANSFER" | "RESUBMIT_TRANSFER" | "RECORD_TRANSFER_CONFLICT_REVIEW" | "RECORD_TRANSFER_INTAKE" | "CLASSIFY_MATTER";
+                fields: Record<string, never>[];
+                /** @constant */
+                schemaVersion: 1;
+                values: Record<string, never>;
+            };
+            /** @enum {string} */
+            expectedCompletionFact: "TRANSFER_SUBMISSION" | "TRANSFER_CONFLICT_REVIEW" | "TRANSFER_INTAKE" | "MATTER_CLASSIFICATION";
+            owner: components["schemas"]["OwnerSummary"];
+            preconditions: components["schemas"]["PreconditionTokens"];
+            primaryCommand: {
+                /** @enum {string} */
+                code: "SUBMIT_TRANSFER" | "RESUBMIT_TRANSFER" | "RECORD_TRANSFER_CONFLICT_REVIEW" | "RECORD_TRANSFER_INTAKE" | "CLASSIFY_MATTER";
+                enabled: boolean;
+                label: components["schemas"]["SafeText200"];
+            };
+            sla: components["schemas"]["SlaSummary"];
+            subject: components["schemas"]["R2OpportunitySubjectV1"];
+            taskId: components["schemas"]["Uuid"];
+            taskRevision: components["schemas"]["Revision"];
+            /** @enum {string} */
+            taskType: "PREPARE_TRANSFER" | "REVIEW_TRANSFER" | "ACCEPT_TRANSFER" | "SUPPLEMENT_TRANSFER" | "CLASSIFY_MATTER";
+            /** @enum {string} */
+            versionStatus: "CURRENT" | "REFRESH_RECOMMENDED";
+        };
+        R2VerifyContractExecutionConditionsV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                approvedConditionsChecked: boolean;
+                archiveAndConditionsComplete: boolean;
+                expectedExecutionWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"];
+                expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            };
+        };
         ReceiptRef: {
             commandId: components["schemas"]["Uuid"];
             href: string;
+        };
+        ReconcileContractPreparationV1: {
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedWorkflow: {
+                id: components["schemas"]["Uuid"];
+                /** @constant */
+                revision: 0;
+            } | null;
+            opportunityId: components["schemas"]["Uuid"];
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            source: {
+                id: components["schemas"]["Uuid"];
+                /** @constant */
+                revision: 0;
+            };
+            /** @enum {string} */
+            sourceKind: "ACCEPTED_QUOTE" | "AUTHORITY_RETURN" | "SIGNATURE_READINESS" | "SIGNATURE_AUTHORITY_RETURN" | "TERMINATION_REVIEW" | "EXECUTION_HANDOFF" | "PAYMENT_HANDOFF" | "PAYMENT_RECOVERY" | "TRANSFER_HANDOFF" | "TRANSFER_RECOVERY";
         };
         RecordContactResultCommandForm: {
             /**
@@ -1534,6 +5549,71 @@ export interface components {
             resultCode: components["schemas"]["ContactResultCode"];
             resultSummary?: components["schemas"]["SafeText500"];
         } & unknown) & (components["schemas"]["ConnectedValidRecordContactResultValuesV1"] | components["schemas"]["NotConnectedRecordContactResultValuesV1"] | components["schemas"]["SuspectInvalidRecordContactResultValuesV1"]);
+        RecordContractTerminationReviewV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                /** @enum {string} */
+                decision: "STOP" | "CONTINUE";
+                expectedIndependentBasis: string;
+                expectedSignatureWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                expectedTermination: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                /** @description 必须由人勾选确认；命令提交时仅接受 true。 */
+                humanConfirmed: boolean;
+                summary: string;
+            };
+        };
+        RecordFollowupAttemptV1: {
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: {
+                id: components["schemas"]["Uuid"];
+                revision: components["schemas"]["Revision"];
+                /** @enum {string} */
+                type: "opportunity.opportunity" | "opportunity.responsibility_handoff";
+            };
+            task: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                nextCheckAt: components["schemas"]["Instant"];
+                occurredAt: components["schemas"]["Instant"];
+                summary: string;
+                /** @enum {string} */
+                type: "NOT_CONNECTED" | "NO_REPLY" | "NO_EFFECTIVE_PROGRESS";
+            };
+            waitReceipt: {
+                hash: components["schemas"]["Digest32"];
+                id: components["schemas"]["Uuid"];
+            } | null;
+        };
+        RecordOpportunityOwnerCoordinationV1: {
+            exceptionId: components["schemas"]["Uuid"];
+            expectedBasis: components["schemas"]["OwnerExceptionSelectorV1"];
+            expectedExceptionRevision: components["schemas"]["Revision"];
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedTask: components["schemas"]["OwnerExceptionSelectorV1"] | null;
+            expectedWait: components["schemas"]["OwnerExceptionSelectorV1"] | null;
+            opportunityId: components["schemas"]["Uuid"];
+            reason: string;
+            reviewDueAt: components["schemas"]["Instant"];
+        };
+        RecordOpportunityProgressV1: {
+            draftDigest: components["schemas"]["Digest32"];
+            draftId: components["schemas"]["Uuid"];
+            expectedDraftRevision: components["schemas"]["Revision"];
+            nextCheckAt: components["schemas"]["Instant"];
+            occurredAt: components["schemas"]["Instant"];
+            progressSummary: components["schemas"]["SafeText2000"];
+            /** @enum {string} */
+            progressTypeCode: "PHONE_CONNECTED" | "CLIENT_VISIT" | "MEETING" | "SITE_VISIT" | "WECHAT_CONNECTED";
+        };
         RecordRoutingDispositionCommandForm: {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -1586,8 +5666,49 @@ export interface components {
             decisionCode: "SCHEDULE_ROUTING_REVIEW" | "RETRY_ASSIGNMENT_NOW" | "REQUEST_SOURCE_INTAKE_STOP";
             rationaleSummary: components["schemas"]["SafeText500"];
         };
+        RecordSourceRequestContinuationCommandForm: {
+            /** @constant */
+            actionCode: "RECORD_SOURCE_REQUEST_CONTINUATION";
+            fields: components["schemas"]["SourceRequestFormFieldV1"][];
+            schemaVersion: components["schemas"]["SchemaVersionV1"];
+            values: components["schemas"]["PartialRecordSourceRequestContinuationValuesV1"];
+        };
+        RecordSourceRequestContinuationDraftProjection: {
+            /** @constant */
+            actionCode: "RECORD_SOURCE_REQUEST_CONTINUATION";
+            digest: components["schemas"]["Digest32"];
+            draftId: components["schemas"]["Uuid"];
+            draftRevision: components["schemas"]["Revision"];
+            editable: boolean;
+            schemaVersion: components["schemas"]["SchemaVersionV1"];
+            updatedAt: components["schemas"]["Instant"];
+            values: components["schemas"]["RecordSourceRequestContinuationValuesV1"];
+        };
+        RecordSourceRequestContinuationPrimaryCommand: {
+            /** @enum {string} */
+            code: "RECORD_SOURCE_REQUEST_CONTINUATION";
+            enabled: boolean;
+            label: components["schemas"]["SafeText200"];
+        };
+        RecordSourceRequestContinuationV1: {
+            /** @enum {string} */
+            decisionCode: "ASSIGN_SELECTED" | "SCHEDULE_REVIEW" | "END_LEAD";
+            draftDigest: components["schemas"]["Digest32"];
+            draftId: components["schemas"]["Uuid"];
+            expectedDraftRevision: components["schemas"]["Revision"];
+            ownerAppointmentId?: components["schemas"]["Uuid"];
+            rationaleSummary: components["schemas"]["SafeText500"];
+            reviewAt?: components["schemas"]["Instant"];
+        };
+        RecordSourceRequestContinuationValuesV1: {
+            /** @enum {string} */
+            decisionCode: "ASSIGN_SELECTED" | "SCHEDULE_REVIEW" | "END_LEAD";
+            ownerAppointmentId?: components["schemas"]["Uuid"];
+            rationaleSummary: components["schemas"]["SafeText500"];
+            reviewAt?: components["schemas"]["Instant"];
+        };
         /** @enum {string} */
-        RecoveryTypeV1: "CONTACT_TASK" | "ROUTING_REVIEW_TASK";
+        RecoveryTypeV1: "CONTACT_TASK" | "ROUTING_REVIEW_TASK" | "SOURCE_REQUEST_REVIEW_TASK";
         RejectedCommandReceipt: {
             commandId: components["schemas"]["Uuid"];
             completedAt: components["schemas"]["Instant"];
@@ -1609,12 +5730,58 @@ export interface components {
             waitReceiptHash: components["schemas"]["Digest32"];
             waitReceiptId: components["schemas"]["Uuid"];
         };
+        ReopenDueOpportunityTaskV1: {
+            dueCutoff: components["schemas"]["Instant"];
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedTaskRevision: components["schemas"]["Revision"];
+            opportunityId: components["schemas"]["Uuid"];
+            progressHash: components["schemas"]["Digest32"];
+            progressId: components["schemas"]["Uuid"];
+            taskId: components["schemas"]["Uuid"];
+            waitReceiptHash: components["schemas"]["Digest32"];
+            waitReceiptId: components["schemas"]["Uuid"];
+        };
         ReopenDueRoutingReviewTaskV1: {
             dueCutoff: components["schemas"]["Instant"];
             expectedTaskRevision: components["schemas"]["Revision"];
             taskId: components["schemas"]["Uuid"];
             waitReceiptHash: components["schemas"]["Digest32"];
             waitReceiptId: components["schemas"]["Uuid"];
+        };
+        ReopenDueSourceRequestTaskV1: {
+            dueCutoff: components["schemas"]["Instant"];
+            expectedTaskRevision: components["schemas"]["Revision"];
+            taskId: components["schemas"]["Uuid"];
+            waitReceiptHash: components["schemas"]["Digest32"];
+            waitReceiptId: components["schemas"]["Uuid"];
+        };
+        RepairSupersededOpportunityTaskV1: {
+            basis: components["schemas"]["R2SalesRepairRevisionSelectorV1"];
+            draft: components["schemas"]["R2SalesRepairRevisionSelectorV1"] | null;
+            opportunity: components["schemas"]["R2SalesRepairRevisionSelectorV1"];
+            ownerAppointmentId: components["schemas"]["Uuid"];
+            /** @description Exact distinct selectors; duplicate selectors are rejected before execution. */
+            takeoverFacts: components["schemas"]["R2SalesRepairRevisionSelectorV1"][];
+            task: components["schemas"]["R2SalesRepairRevisionSelectorV1"];
+        };
+        RequestContractTerminationReviewV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedContract: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedVersion: {
+                hash: string;
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: {
+                expectedSignatureWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                expectedTermination: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+                /** @description 必须由人勾选确认；命令提交时仅接受 true。 */
+                humanConfirmed: boolean;
+                summary: string;
+            };
         };
         ResolveDuplicateLeadCommandForm: {
             /**
@@ -1728,9 +5895,24 @@ export interface components {
             /** @enum {string} */
             versionStatus: "CURRENT" | "REFRESH_RECOMMENDED";
         };
+        ResolveSourceRequestBusinessPurpose: {
+            /** @enum {string} */
+            code: "RESOLVE_SOURCE_REQUEST";
+            label: components["schemas"]["SafeText200"];
+        };
         ResourceETag: string;
         /** @enum {string} */
         ResourceKind: "WORKBENCH" | "TASK" | "DRAFT" | "SUBJECT";
+        RestoreSourceRequestTaskV1: {
+            ackDecisionHash: components["schemas"]["Digest32"];
+            ackDecisionId: components["schemas"]["Uuid"];
+            ackTaskId: components["schemas"]["Uuid"];
+            expectedAckOwnerAppointmentId: components["schemas"]["Uuid"];
+            expectedAckTaskRevision: components["schemas"]["Revision"];
+            expectedLeadRevision: components["schemas"]["Revision"];
+            leadId: components["schemas"]["Uuid"];
+            supervisorAppointmentId: components["schemas"]["Uuid"];
+        };
         ResumeAppointmentV1: {
             /** @enum {string} */
             reasonCode: "ADMINISTRATIVE_ACTION" | "SECURITY_RESPONSE";
@@ -1840,14 +6022,47 @@ export interface components {
             schemaVersion: components["schemas"]["SchemaVersionV1"];
             values: components["schemas"]["ResolveDuplicateLeadValuesV1"] | components["schemas"]["CompleteLeadIngressValuesV1"] | components["schemas"]["AssignLeadValuesV1"] | components["schemas"]["RecordRoutingDispositionValuesV1"] | components["schemas"]["AcknowledgeSourceIntakeStopRequestValuesV1"] | components["schemas"]["RecordContactResultValuesV1"] | components["schemas"]["ReviewLeadValidityValuesV1"];
         } & (components["schemas"]["ResolveDuplicateLeadDraftBinding"] | components["schemas"]["CompleteLeadIngressDraftBinding"] | components["schemas"]["AssignLeadDraftBinding"] | components["schemas"]["RecordRoutingDispositionDraftBinding"] | components["schemas"]["AcknowledgeSourceIntakeStopRequestDraftBinding"] | components["schemas"]["RecordContactResultDraftBinding"] | components["schemas"]["ReviewLeadValidityDraftBinding"]);
+        SaveOpportunityCustomerDraftV1: {
+            document: components["schemas"]["OpportunityCustomerDocumentV1"];
+            expectedConfirmation: components["schemas"]["OpportunityCustomerNullableSelectorV1"];
+            expectedDraft: components["schemas"]["OpportunityCustomerNullableSelectorV1"];
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+        };
+        SaveOpportunityProgressDraftV1: {
+            /** @constant */
+            actionCode: "RECORD_OPPORTUNITY_PROGRESS";
+            schemaVersion: components["schemas"]["SchemaVersionV1"];
+            values: components["schemas"]["OpportunityProgressValuesV1"];
+        };
+        SaveSourceRequestDraftV1: {
+            /** @constant */
+            actionCode: "RECORD_SOURCE_REQUEST_CONTINUATION";
+            schemaVersion: components["schemas"]["SchemaVersionV1"];
+            values: components["schemas"]["RecordSourceRequestContinuationValuesV1"];
+        };
         /** @enum {integer} */
         SchemaVersionV1: 1;
         /** @description Nine required fields. Selected IDs must match exactly one corresponding candidate; choices are UUID sorted and deduplicated. Cross-array membership, current qualification, bounded query overflow and fresh entry permission checks are explicit runtime obligations under Identity V1.1; generated types do not guarantee them. */
         SessionContextV1: {
             actorScopeKey: string | null;
             appointmentChoices: components["schemas"]["IdentityChoiceV1"][];
+            /** @description Current direct HUMAN view entry hints; every data request rechecks exact scope. */
+            businessManagementViews?: ("contracts" | "payments" | "transfer")[];
             canEnterIdentityAdmin: boolean;
             canEnterWorkbench: boolean;
+            /** @description Current selected HUMAN appointment has a named exception READ or OPERATIONS_READ entry grant. Each request independently rechecks object scope. */
+            canManageOwnerExceptions?: boolean;
+            /** @description Direct HUMAN management entry hint; each read rechecks exact scope. */
+            canReadBusinessManagement?: boolean;
+            /** @description Direct HUMAN overview entry hint; each metric retains its own exact read authority and source audit. */
+            canReadBusinessOverview?: boolean;
+            /** @description Direct HUMAN lead management entry hint; each exact source is freshly authorized and audited. */
+            canReadLeadManagement?: boolean;
+            /** @description Current direct HUMAN appointment has SALES_OPPORTUNITY_OWNER or an explicit OPPORTUNITY_LEDGER_READ grant. Entry hint only; each read rechecks exact object and organization scope. */
+            canReadOpportunityLedger?: boolean;
+            /** @description Direct HUMAN team metadata entry hint; never confers another owner command authority. */
+            canReadTeamTasks?: boolean;
             delegatedAppointmentChoices: components["schemas"]["IdentityChoiceV1"][];
             displayName: components["schemas"]["SafeText200"];
             /** Format: uuid */
@@ -1863,6 +6078,33 @@ export interface components {
             /** @enum {string} */
             status: "ON_TRACK" | "DUE_SOON" | "OVERDUE";
             timeHint: components["schemas"]["SafeText200"];
+        };
+        SourceRequestDraftWriteResultV1: {
+            draft: components["schemas"]["RecordSourceRequestContinuationDraftProjection"];
+            preconditions: components["schemas"]["PreconditionTokens"];
+            receipt: components["schemas"]["ActionDraftCommandReceipt"];
+        };
+        SourceRequestFormFieldV1: {
+            /** @enum {string} */
+            control: "TEXT" | "TEXTAREA" | "SELECT" | "EMAIL" | "TEL";
+            label: components["schemas"]["SafeText200"];
+            /** @enum {string} */
+            name: "decisionCode" | "ownerAppointmentId" | "reviewAt" | "rationaleSummary";
+            options: components["schemas"]["FormOption"][];
+            readOnly: boolean;
+            required: boolean;
+        } & unknown;
+        StartQuotePreparationV1: {
+            customerConfirmation: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedDraft: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedQuote: {
+                hash: components["schemas"]["Digest32"];
+                id: components["schemas"]["Uuid"];
+            } | null;
+            expectedWorkflow: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
+            responsibilityBasis: components["schemas"]["OpportunityCustomerSelectorV1"];
+            values: Record<string, never>;
         };
         SubjectETag: string;
         SubjectSummary: {
@@ -1937,12 +6179,186 @@ export interface components {
         };
         /** @enum {string} */
         TaskType: "RESOLVE_LEAD_DUPLICATE" | "COMPLETE_LEAD_INGRESS" | "ASSIGN_LEAD" | "RESOLVE_LEAD_ROUTING_GAP" | "ACK_SOURCE_INTAKE_STOP_REQUEST" | "CONTACT_LEAD" | "REVIEW_LEAD_VALIDITY";
+        TeamDetailV1: {
+            action: null | {
+                /** @enum {string} */
+                kind: "task" | "exception";
+                /** @enum {string} */
+                label: "前往办理" | "查看原异常处置";
+            };
+            customerLabel: string;
+            /** Format: uuid */
+            exceptionId: string | null;
+            facts: string[][];
+            history: {
+                /** Format: uuid */
+                id: string;
+                label: string;
+            }[];
+            /** Format: uuid */
+            id: string;
+            nextAction: string;
+            /** Format: uuid */
+            taskId: string | null;
+        } & (unknown & unknown & unknown);
+        TeamPageV1: {
+            items: components["schemas"]["TeamRowV1"][];
+            nextCursor: string | null;
+        };
+        TeamRowV1: {
+            customerLabel: string;
+            /** Format: uuid */
+            id: string;
+            ownerLabel: string;
+            purposeLabel: string;
+            stateLabel: string;
+            timeLabel: string;
+        };
         TechnicalIdentifier: string;
         /**
          * @description Post-slot business rejection codes that may be persisted in a terminal REJECTED CommandReceipt. Pre-slot, payload-conflict, rate-limit, and technical failures never create a new receipt.
          * @enum {string}
          */
-        TerminalRejectionCode: "NOT_FOUND" | "IDENTITY_BINDING_CONFLICT" | "IDENTITY_STATE_CONFLICT" | "IDENTITY_SELF_LOCKOUT" | "IDENTITY_LAST_ADMIN" | "IDENTITY_ORGANIZATION_DEPENDENCY" | "IDENTITY_RESPONSIBILITY_DEPENDENCY" | "STALE_IDENTITY" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "TASK_NOT_OPEN" | "TASK_ALREADY_COMPLETED" | "DRAFT_DIGEST_MISMATCH" | "INGRESS_COMPLETION_ALREADY_RECORDED" | "STALE_TASK" | "STALE_DRAFT" | "STALE_SUBJECT" | "SUPERVISOR_UNRESOLVED" | "SOURCE_INTAKE_OWNER_UNRESOLVED";
+        TerminalRejectionCode: "NOT_FOUND" | "IDENTITY_BINDING_CONFLICT" | "IDENTITY_STATE_CONFLICT" | "IDENTITY_SELF_LOCKOUT" | "IDENTITY_LAST_ADMIN" | "IDENTITY_ORGANIZATION_DEPENDENCY" | "IDENTITY_RESPONSIBILITY_DEPENDENCY" | "STALE_IDENTITY" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "TASK_NOT_OPEN" | "TASK_ALREADY_COMPLETED" | "DRAFT_DIGEST_MISMATCH" | "INGRESS_COMPLETION_ALREADY_RECORDED" | "STALE_TASK" | "STALE_DRAFT" | "STALE_SUBJECT" | "SUPERVISOR_UNRESOLVED" | "SOURCE_INTAKE_OWNER_UNRESOLVED" | "OPPORTUNITY_CLOSED" | "OPPORTUNITY_HAS_DOWNSTREAM_FACTS" | "VALIDATION_FAILED" | "STALE_EVIDENCE" | "CUSTOMER_CONFIRMATION_REQUIRED" | "CONTRACT_HANDLING_PAUSED" | "CONTRACT_PREPARATION_SOURCE_REQUIRED" | "CONTRACT_RESPONSIBILITY_REQUIRED" | "CONTRACT_REVIEW_SCOPE_REQUIRED" | "CONTRACT_REVIEW_NOT_CLEAR" | "CONTRACT_REVIEW_SCOPE_COMPLETE" | "CONTRACT_REVIEW_FINDING_REQUIRED" | "CONTRACT_REVIEW_WAIVER_UNAVAILABLE" | "CONTRACT_CONFLICT_DECISION_REQUIRED" | "COMMERCIAL_AUTHORIZATION_REQUIRED" | "CONTRACT_APPROVAL_POLICY_CHANGED" | "CONTRACT_APPROVAL_POLICY_REQUIRED" | "CONTRACT_REVIEW_REQUIRED" | "CONTRACT_SOURCE_AMBIGUOUS" | "CONTRACT_VERSION_BASIS_CHANGED" | "RECIPIENT_UNAVAILABLE" | "STALE_CUSTOMER_BASIS" | "STALE_REVIEW" | "STALE_TRANSFER_PARTY" | "STALE_TRANSFER_REVIEW_BASIS" | "TRANSFER_REVIEW_OUTCOME_UNAVAILABLE";
+        TransferCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["TransferSubmissionFactRefV1"] | components["schemas"]["TransferConflictReviewFactRefV1"] | components["schemas"]["TransferIntakeFactRefV1"] | components["schemas"]["MatterClassificationFactRefV1"];
+        };
+        TransferConflictReviewFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "TRANSFER_CONFLICT_REVIEW";
+            /** @constant */
+            revision: 0;
+        };
+        TransferCorrectionV1: {
+            material?: components["schemas"]["TransferMaterialV1"];
+            response: string;
+            returnItemId: components["schemas"]["Uuid"];
+        };
+        TransferIntakeFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "TRANSFER_INTAKE";
+            /** @constant */
+            revision: 0;
+        };
+        TransferMaterialV1: {
+            sha256: string;
+            versionId: components["schemas"]["Uuid"];
+        };
+        TransferOpportunityResponsibilityV1: {
+            exceptionId: components["schemas"]["Uuid"];
+            expectedBasis: components["schemas"]["OwnerExceptionSelectorV1"];
+            expectedExceptionRevision: components["schemas"]["Revision"];
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedTask: components["schemas"]["OwnerExceptionSelectorV1"] | null;
+            expectedWait: components["schemas"]["OwnerExceptionSelectorV1"] | null;
+            opportunityId: components["schemas"]["Uuid"];
+            reason: string;
+            receiverAppointmentId: components["schemas"]["Uuid"];
+        };
+        TransferProblemV1: {
+            /** @enum {string} */
+            code: "VALIDATION_FAILED" | "IDEMPOTENCY_KEY_REQUIRED" | "IDEMPOTENCY_KEY_INVALID" | "UNAUTHENTICATED" | "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "NOT_FOUND" | "COMMAND_PAYLOAD_CONFLICT" | "STALE_SUBJECT" | "STALE_TASK" | "STALE_EVIDENCE" | "CUSTOMER_CONFIRMATION_REQUIRED" | "OPPORTUNITY_CLOSED" | "RATE_LIMITED" | "INTERNAL_ERROR" | "SERVICE_UNAVAILABLE" | "RECIPIENT_UNAVAILABLE" | "STALE_CUSTOMER_BASIS" | "STALE_REVIEW" | "STALE_TRANSFER_PARTY" | "STALE_TRANSFER_REVIEW_BASIS" | "TRANSFER_REVIEW_OUTCOME_UNAVAILABLE";
+            detail: components["schemas"]["SafeText500"];
+            fieldErrors?: components["schemas"]["FieldError"][];
+            /** Format: uri-reference */
+            instance: string;
+            receiptRef?: components["schemas"]["ReceiptRef"];
+            /** @enum {string} */
+            retryPolicy: "NEW_KEY_AFTER_ADMIN_FIX" | "NEW_KEY_AFTER_REFRESH" | "NO" | "SAME_KEY_AFTER_BACKOFF" | "SAME_KEY_AFTER_FIX" | "SAME_KEY_AFTER_REAUTH";
+            status: number;
+            title: components["schemas"]["SafeText200"];
+            /** Format: uri */
+            type: string;
+        } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
+        TransferSubmissionFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "TRANSFER_SUBMISSION";
+            /** @constant */
+            revision: 0;
+        };
+        TransferTaskContextV1: {
+            /** @enum {string} */
+            allowedAction: "SUBMIT_TRANSFER" | "RESUBMIT_TRANSFER" | "RECORD_TRANSFER_CONFLICT_REVIEW" | "RECORD_TRANSFER_INTAKE" | "CLASSIFY_MATTER";
+            contract: {
+                id: components["schemas"]["Uuid"];
+                paymentTerms: string;
+                receiptRequiredBeforeTransfer: boolean;
+                scope: string;
+                signingRequirements: string;
+                version: components["schemas"]["Revision"];
+            };
+            customerName: string;
+            /** Format: date-time */
+            dueAt: string;
+            expectedOpportunityRevision: components["schemas"]["Revision"];
+            expectedWorkflow: {
+                id: components["schemas"]["Uuid"];
+                /** @constant */
+                revision: 0;
+            };
+            intake: {
+                /** @enum {string} */
+                decision: "ACCEPT" | "RETURN";
+                explanation: string;
+            } | null;
+            materials: {
+                fileName: string;
+                id: components["schemas"]["Uuid"];
+                sha256: string;
+            }[];
+            matter: {
+                id: components["schemas"]["Uuid"];
+                number: string;
+            } | null;
+            opportunityId: components["schemas"]["Uuid"];
+            receivers: {
+                id: components["schemas"]["Uuid"];
+                label: string;
+            }[];
+            returnItems: {
+                id: components["schemas"]["Uuid"];
+                label: string;
+                reason: string;
+                /** @enum {string} */
+                requirement: "CLIENT_IDENTITY" | "SIGNATURE_ARCHIVE" | "HANDOVER_EXPLANATION" | "OTHER_MATERIAL" | "RESOLVE_CONFLICT" | "COMPLETE_SUBJECT_EVIDENCE";
+                requiresMaterial: boolean;
+            }[];
+            review: {
+                explanation: string;
+                /** @enum {string} */
+                outcome: "CLEAR" | "NEED_INFO" | "BLOCKED";
+            } | null;
+            reviewPreview: {
+                candidateCount: number;
+                permittedOutcomes: ("CLEAR" | "NEED_INFO" | "BLOCKED")[];
+                scopeComplete: boolean;
+            } | null;
+            /** @enum {string} */
+            stage: "PREPARE" | "SUPPLEMENT" | "REVIEW_TRANSFER" | "INTAKE" | "CLASSIFY";
+            submission: {
+                clientIdentity: components["schemas"]["TransferMaterialV1"];
+                consistencyChecked: boolean;
+                corrections: components["schemas"]["TransferCorrectionV1"][];
+                explanation: string;
+                signatureArchive: components["schemas"]["TransferMaterialV1"];
+            } | null;
+            taskId: components["schemas"]["Uuid"];
+        };
+        TransferWorkflowFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "TRANSFER_WORKFLOW";
+            /** @constant */
+            revision: 0;
+        };
         /** Format: uuid */
         Uuid: string;
         WorkbenchETag: string;
@@ -2302,6 +6718,8 @@ export interface components {
         /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
         OnBehalfAppointmentSelection: components["schemas"]["Uuid"];
         RecoveryTypeQuery: components["schemas"]["RecoveryTypeV1"];
+        /** @description R2_MY_TASK_SELECTION_V1 selects an authorized OPEN owned task without changing recommendation or task facts. */
+        SelectedTaskId: string;
         TaskIdPath: components["schemas"]["Uuid"];
         TaskIfMatch: components["schemas"]["TaskETag"];
         WorkbenchIfNoneMatch: components["schemas"]["WorkbenchETag"];
@@ -3171,6 +7589,488 @@ export interface operations {
             503: components["responses"]["Identity503Problem"];
         };
     };
+    listBusinessManagement: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                search?: string;
+                state?: "CHECK_RECEIPT" | "SUPPLEMENT_RECEIPT" | "COMPLETE" | "OWNER_EXCEPTION" | "PREPARE" | "REVIEW_TRANSFER" | "INTAKE" | "SUPPLEMENT" | "CLASSIFY";
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                view: "payments" | "transfer";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagementPageV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    getBusinessManagementDetail: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                requestId: string;
+                view: "payments" | "transfer";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagementDetailV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    getBusinessOverview: {
+        parameters: {
+            query?: {
+                month?: string;
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessOverviewSummaryV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    listBusinessOverviewDetails: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                month?: string;
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                metric: components["schemas"]["BusinessOverviewMetricKeyV1"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessOverviewPageV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Overview unavailable or denied; clear previous totals and details. Candidate budget overflow returns 503, never partial totals. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
     getCommandReceipt: {
         parameters: {
             query?: never;
@@ -3203,6 +8103,602 @@ export interface operations {
             429: components["responses"]["RateLimitedProblem"];
             500: components["responses"]["InternalProblem"];
             503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    getContractTaskContext: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractTaskContextV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    getContractLedger: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                search?: string;
+                state?: string;
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractLedgerPageV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    listLeadManagement: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                owner?: string;
+                search?: string;
+                source?: string;
+                state?: "INCOMPLETE" | "DUPLICATE" | "ASSIGNMENT" | "CONTACT" | "VALIDITY_REVIEW" | "SOURCE_REVIEW" | "ROUTING" | "WAITING" | "INVALID" | "CLOSED" | "OPPORTUNITY" | "NEEDS_REVIEW";
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadManagementPageV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    getLeadManagementDetail: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                leadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadManagementDetailV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    listLeadManagementSources: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadManagementSourcesV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
         };
     };
     captureLead: {
@@ -3242,6 +8738,7698 @@ export interface operations {
             429: components["responses"]["RateLimitedProblem"];
             500: components["responses"]["InternalProblem"];
             503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    getLeadIntakeSources: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized configured intake sources. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadIntakeSourcesV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    listOpportunities: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                search?: string;
+                state?: "OPEN" | "WAITING" | "NONE" | "CLOSED";
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityLedgerPageV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    getOpportunity: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityLedgerDetailV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    generateAiCandidates: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+                task: components["schemas"]["AiCandidateTaskV1"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCandidateRequestV1"];
+            };
+        };
+        responses: {
+            /** @description Committed candidate response; no business fact created. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCandidateResultV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    recheckAiCandidateSources: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+                task: components["schemas"]["AiCandidateTaskV1"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCandidateRecheckV1"];
+            };
+        };
+        responses: {
+            /** @description Current source authorization and fingerprint rechecked; browser may fill its draft. */
+            204: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Candidate unavailable or denied; preserve manual input. Source changes require regeneration. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    getOpportunityClosure: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityCloseContextV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+        };
+    };
+    closeOpportunity: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseOpportunityV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityCloseCommandReceiptV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+            /** @description Closed closure-command problem; exact body preconditions, no header ETag. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCloseProblemV1"];
+                };
+            };
+        };
+    };
+    getContractContext: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractContextV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    downloadContractVersionDocument: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                contractId: components["schemas"]["Uuid"];
+                opportunityId: string;
+                versionId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    request_contract_approval: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RequestContractApprovalV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    record_contract_decision: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RecordContractDecisionV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    save_contract_draft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2SaveContractDraftV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    verify_contract_execution_conditions: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2VerifyContractExecutionConditionsV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    form_contract: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2FormContractV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    generateContractDocument: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContractGenerationRequestV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractGeneratedDocumentV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    end_contract_negotiation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndContractNegotiationV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    record_contract_preparation_decision: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RecordContractPreparationDecisionV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    request_contract_preparation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RequestContractPreparationV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    request_contract_receipt_review: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RequestContractReceiptReviewV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    record_contract_receipt_review: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RecordContractReceiptReviewV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    supplement_contract_receipt: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2SupplementContractReceiptV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    record_contract_review: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RecordContractReviewV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    request_contract_review: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RequestContractReviewV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    archive_contract_signature: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2ArchiveContractSignatureV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    confirm_contract_signature_arrangement: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2ConfirmContractSignatureArrangementV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    save_contract_signature_draft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2SaveContractSignatureDraftV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    return_contract_for_revision: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2ReturnContractForRevisionV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    submit_contract_signature: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2SubmitContractSignatureV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    return_contract_signature_for_revision: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2ReturnContractSignatureForRevisionV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    record_contract_signature_verification: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RecordContractSignatureVerificationV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    start_contract_preparation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2StartContractPreparationV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    record_contract_termination_review: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordContractTerminationReviewV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    request_contract_termination_review: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestContractTerminationReviewV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    getOpportunityCustomerRequirements: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityCustomerContextV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+        };
+    };
+    confirmOpportunityCustomerRequirements: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmOpportunityCustomerRequirementsV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityCustomerCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+        };
+    };
+    saveOpportunityCustomerDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveOpportunityCustomerDraftV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityCustomerCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+        };
+    };
+    searchOpportunityParties: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityCustomerPartyPageV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityCustomerProblemV1"];
+                };
+            };
+        };
+    };
+    readFollowupAttempts: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowupAttemptContextV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    recordOpportunityFollowupAttempt: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordFollowupAttemptV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowupAttemptReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    openOpportunityMaterialUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenOpportunityMaterialUploadV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityMaterialCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+        };
+    };
+    getOpportunityMaterialUpload: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+                uploadSessionId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityMaterialUploadV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+        };
+    };
+    uploadOpportunityMaterialContent: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+                uploadSessionId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityMaterialUploadV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+        };
+    };
+    getOpportunityMaterials: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityMaterialsContextV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+        };
+    };
+    acceptOpportunityMaterial: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptOpportunityMaterialV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityMaterialCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+        };
+    };
+    downloadOpportunityMaterialContent: {
+        parameters: {
+            query?: {
+                disposition?: "inline" | "attachment";
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+                versionId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exact authorized file bytes. PDF always attachment; only validated images may be previewed. No object keys or URLs. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    "Content-Disposition"?: string;
+                    "X-Content-Type-Options"?: "nosniff";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["OpportunityMaterialProblemV1"];
+                };
+            };
+        };
+    };
+    getQuoteContext: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteContextV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    downloadQuoteDocument: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+                quoteId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    request_quote_approval: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RequestQuoteApprovalV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    record_quote_decision: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RecordQuoteDecisionV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    record_quote_delivery: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RecordQuoteDeliveryV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    save_quote_draft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2SaveQuoteDraftV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    recordQuoteFollowupAttempt: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordFollowupAttemptV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowupAttemptReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    form_quote: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2FormQuoteV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    startQuotePreparation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartQuotePreparationV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    record_quote_response: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RecordQuoteResponseV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    endQuoteNegotiation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndQuoteNegotiationV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+        };
+    };
+    getMatterClassificationCorrectionContext: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatterClassificationCorrectionContextV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    classifyMatter: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2ClassifyMatterV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+        };
+    };
+    recordTransferConflictReview: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RecordTransferConflictReviewV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+        };
+    };
+    recordTransferIntake: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2RecordTransferIntakeV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+        };
+    };
+    submitTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2SubmitTransferV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+        };
+    };
+    resubmitTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                opportunityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["R2ResubmitTransferV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferCommandReceiptV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["TransferProblemV1"];
+                };
+            };
+        };
+    };
+    listOpportunityOwnerExceptions: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerExceptionPageV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    getOpportunityOwnerException: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                exceptionId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerExceptionDetailV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    listOpportunityOwnerExceptionReceivers: {
+        parameters: {
+            query: {
+                cursor?: string;
+                expectedRevision: components["schemas"]["Revision"];
+                limit?: number;
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                exceptionId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerExceptionReceiverPageV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    recordOpportunityOwnerCoordination: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordOpportunityOwnerCoordinationV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerExceptionCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            404: components["responses"]["NotFoundProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    transferOpportunityResponsibility: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferOpportunityResponsibilityV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerExceptionCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            404: components["responses"]["NotFoundProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    listOpportunityOwnerExceptionOperations: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerExceptionOperationsPageV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    getOpportunityTaskContinuation: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityLedgerDetailV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    getQuoteTaskContext: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        context: components["schemas"]["QuoteContextV1"];
+                        opportunityId: components["schemas"]["Uuid"];
+                    };
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["QuoteProblemV1"];
+                };
+            };
         };
     };
     getSessionContext: {
@@ -3306,6 +16494,7 @@ export interface operations {
             404: components["responses"]["NotFoundProblem"];
             409: components["responses"]["ConflictProblem"];
             412: components["responses"]["PreconditionFailedProblem"];
+            422: components["responses"]["UnprocessableProblem"];
             428: components["responses"]["PreconditionRequiredProblem"];
             429: components["responses"]["RateLimitedProblem"];
             500: components["responses"]["InternalProblem"];
@@ -3419,6 +16608,51 @@ export interface operations {
             503: components["responses"]["UnavailableProblem"];
         };
     };
+    recordOpportunityProgress: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["TaskIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                taskId: components["parameters"]["TaskIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordOpportunityProgressV1"];
+            };
+        };
+        responses: {
+            /** @description The Task command completed with a Lead Contact Result digest fact. */
+            200: {
+                headers: {
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityProgressCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            404: components["responses"]["NotFoundProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            422: components["responses"]["UnprocessableProblem"];
+            428: components["responses"]["PreconditionRequiredProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
     recordRoutingDisposition: {
         parameters: {
             query?: never;
@@ -3438,6 +16672,42 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RecordRoutingDispositionV1"];
+            };
+        };
+        responses: {
+            200: components["responses"]["DecisionRecordCommandSucceeded"];
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            404: components["responses"]["NotFoundProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            422: components["responses"]["UnprocessableProblem"];
+            428: components["responses"]["PreconditionRequiredProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    recordSourceRequestContinuation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["TaskIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                taskId: components["parameters"]["TaskIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordSourceRequestContinuationV1"];
             };
         };
         responses: {
@@ -3583,9 +16853,605 @@ export interface operations {
             503: components["responses"]["UnavailableProblem"];
         };
     };
-    getCurrentWorkCard: {
+    saveOpportunityProgressDraft: {
         parameters: {
             query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match"?: components["parameters"]["DraftIfMatch"];
+                "If-None-Match"?: components["parameters"]["DraftCreateIfNoneMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                taskId: components["parameters"]["TaskIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveOpportunityProgressDraftV1"];
+            };
+        };
+        responses: {
+            /** @description Existing Draft updated. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["DraftETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityProgressDraftWriteResultV1"];
+                };
+            };
+            /** @description Draft created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["DraftETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpportunityProgressDraftWriteResultV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            404: components["responses"]["NotFoundProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            428: components["responses"]["PreconditionRequiredProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    saveSourceRequestDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match"?: components["parameters"]["DraftIfMatch"];
+                "If-None-Match"?: components["parameters"]["DraftCreateIfNoneMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                taskId: components["parameters"]["TaskIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveSourceRequestDraftV1"];
+            };
+        };
+        responses: {
+            /** @description Existing Draft updated. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["DraftETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceRequestDraftWriteResultV1"];
+                };
+            };
+            /** @description Draft created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["DraftETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceRequestDraftWriteResultV1"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["PublicUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            404: components["responses"]["NotFoundProblem"];
+            409: components["responses"]["ConflictProblem"];
+            412: components["responses"]["PreconditionFailedProblem"];
+            428: components["responses"]["PreconditionRequiredProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    listTeamManagement: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                search?: string;
+                state?: "OPEN" | "OVERDUE" | "WAIT_FUTURE" | "WAIT_CONDITION" | "WAIT_DUE" | "DONE" | "CANCELLED" | "OWNER_INVALID" | "OWNER_EXCEPTION" | "COORDINATING" | "CONTINUATION_GAP";
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                view: "tasks" | "waiting" | "exceptions" | "history";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamPageV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    getTeamManagementDetail: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                recordId: string;
+                view: "tasks" | "waiting" | "exceptions" | "history";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamDetailV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Team read rejected or unavailable; clear stale details and reread the original responsibility. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    getTransferTaskContext: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferTaskContextV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    downloadTransferTaskMaterial: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. Only original11 business operations and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                taskId: string;
+                versionId: components["schemas"]["Uuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            400: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            401: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            403: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            404: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            409: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            412: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            429: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            500: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+            /** @description Customer requirements problem; refresh exact body selectors after version conflict. */
+            503: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ContractProblemV1"];
+                };
+            };
+        };
+    };
+    getCurrentWorkCard: {
+        parameters: {
+            query?: {
+                /** @description R2_MY_TASK_SELECTION_V1 selects an authorized OPEN owned task without changing recommendation or task facts. */
+                taskId?: components["parameters"]["SelectedTaskId"];
+            };
             header?: {
                 "If-None-Match"?: components["parameters"]["WorkbenchIfNoneMatch"];
                 /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
@@ -3623,6 +17489,704 @@ export interface operations {
             429: components["responses"]["RateLimitedProblem"];
             500: components["responses"]["InternalProblem"];
             503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    listContractPreparationCandidates: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized bounded discovery. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractPreparationCandidatePageV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+        };
+    };
+    listOpportunityOwnerExceptionCandidates: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerExceptionObservationPageV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+        };
+    };
+    observeOpportunityOwnerException: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObserveOpportunityOwnerExceptionV1"];
+            };
+        };
+        responses: {
+            /** @description Authorized committed response. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerExceptionCommandReceiptV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed SERVICE problem; no human receipt or bearer challenge. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+        };
+    };
+    listR2OpportunityTaskCandidates: {
+        parameters: {
+            query: {
+                cursor?: string;
+                kind: components["schemas"]["R2OpportunityTaskKindV1"];
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized bounded discovery. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["R2OpportunityTaskPageV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+        };
+    };
+    activateInitialOpportunityTask: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivateInitialOpportunityTaskV1"];
+            };
+        };
+        responses: {
+            /** @description Committed command receipt or authorized same-key replay. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOccurrenceCommandReceipt"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+        };
+    };
+    reconcileContractPreparation: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconcileContractPreparationV1"];
+            };
+        };
+        responses: {
+            /** @description Committed command receipt or authorized same-key replay. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractPreparationReconcileReceiptV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+        };
+    };
+    reopenDueOpportunityTask: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenDueOpportunityTaskV1"];
+            };
+        };
+        responses: {
+            /** @description Committed command receipt or authorized same-key replay. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOccurrenceCommandReceipt"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            412: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
+            /** @description Closed R2 maintenance problem; no human receipt endpoint is disclosed. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["R2OpportunityTaskProblemV1"];
+                };
+            };
         };
     };
     consumeR1Projection: {
@@ -3735,6 +18299,72 @@ export interface operations {
             };
         };
     };
+    repairSupersededOpportunityTask: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RepairSupersededOpportunityTaskV1"];
+            };
+        };
+        responses: {
+            /** @description Immutable repair receipt. Repeat this same command with the original key after an unknown result. No public receipt endpoint. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOccurrenceCommandReceipt"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["InternalUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            409: components["responses"]["ConflictProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    restoreSourceRequestTask: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreSourceRequestTaskV1"];
+            };
+        };
+        responses: {
+            /** @description Immutable repair receipt. Repeat this same command with the original key after an unknown result. No public receipt endpoint. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOccurrenceCommandReceipt"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["InternalUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            409: components["responses"]["ConflictProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
     reopenDueContactTasks: {
         parameters: {
             query?: never;
@@ -3782,6 +18412,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ReopenDueRoutingReviewTaskV1"];
+            };
+        };
+        responses: {
+            /** @description The exact waiting routing-review Task is reopened or was already reopened by the same selector. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["TaskETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskOccurrenceCommandReceipt"];
+                };
+            };
+            400: components["responses"]["BadRequestProblem"];
+            401: components["responses"]["InternalUnauthorizedProblem"];
+            403: components["responses"]["ForbiddenProblem"];
+            409: components["responses"]["ConflictProblem"];
+            429: components["responses"]["RateLimitedProblem"];
+            500: components["responses"]["InternalProblem"];
+            503: components["responses"]["UnavailableProblem"];
+        };
+    };
+    reopenDueSourceRequestTasks: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReopenDueSourceRequestTaskV1"];
             };
         };
         responses: {

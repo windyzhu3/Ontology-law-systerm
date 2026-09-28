@@ -27,6 +27,14 @@ public final class R1ProjectionConsumer {
     private void route(Connection c,Actor actor,R1ProjectionClaimReader.Notification event,Instant now)throws SQLException{
         var facts=R1EventReaders.databaseBacked();var responsibility=EventResponsibilityReader.databaseBacked();var source=event.source();var tenant=actor.tenantId();
         switch(event.type()){
+            case SourceRequestTaskRestoredV1 -> {
+                var task=require(facts.task(c,tenant,source.id()));mutable(source,task.selector());
+                if(!"RESOLVE_SOURCE_REQUEST".equals(task.purpose())||!"RECORD_SOURCE_REQUEST_CONTINUATION".equals(task.primaryCommand())||!Long.valueOf(0).equals(source.revision()))throw invalid();
+                var reader=io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.databaseBacked();
+                var current=require(reader.read(c,tenant,source.id()));var causal=require(reader.causalSourceRequest(c,tenant,current));
+                authorize(c,actor,owner(c,actor,task.owner(),now),List.of(source,task.selector(),lead(c,facts,tenant,task),causal));
+            }
+
             case LeadCapturedV1,LeadIngressCompletedV1 -> {
                 var lead=require(facts.leadAnchor(c,tenant,source.id()));mutable(source,lead.selector());
                 if(event.type()==CommandHandler.Event.LeadCapturedV1){
@@ -38,10 +46,10 @@ public final class R1ProjectionConsumer {
                 if(task.draft()==null||!task.draft().selector().id().equals(draft.selector().id())||!draft.action().equals(task.primaryCommand())||draft.version()!=1)throw invalid();
                 authorize(c,actor,owner(c,actor,task.owner(),now),List.of(task.selector(),lead));
             }
-            case ContactTaskReopenedV1,RoutingReviewTaskReopenedV1 -> {
-                var task=require(facts.task(c,tenant,source.id()));mutable(source,task.selector());r1(task);boolean contact=event.type()==CommandHandler.Event.ContactTaskReopenedV1;
-                if(!task.purpose().equals(contact?"CONTACT_LEAD":"RESOLVE_LEAD_ROUTING_GAP"))throw invalid();
-                var wait=require(facts.latestWait(c,tenant,source.id()));if(wait.version()!=1||!wait.profile().equals(contact?"CONTACT_RETRY_V1":"R1_ROUTING_REVIEW_WAIT_V1")||wait.taskRevision()>task.selector().revision()||"WAITING".equals(task.state())&&wait.taskRevision()!=task.selector().revision())throw invalid();
+            case ContactTaskReopenedV1,RoutingReviewTaskReopenedV1,SourceRequestReviewReopenedV1 -> {
+                var task=require(facts.task(c,tenant,source.id()));mutable(source,task.selector());r1(task);boolean contact=event.type()==CommandHandler.Event.ContactTaskReopenedV1;boolean sourceReview=event.type()==CommandHandler.Event.SourceRequestReviewReopenedV1;
+                if(!task.purpose().equals(sourceReview?"RESOLVE_SOURCE_REQUEST":contact?"CONTACT_LEAD":"RESOLVE_LEAD_ROUTING_GAP"))throw invalid();
+                var wait=require(facts.latestWait(c,tenant,source.id()));if(wait.version()!=1||!wait.profile().equals(sourceReview?"R2_SOURCE_REQUEST_REVIEW_WAIT_V1":contact?"CONTACT_RETRY_V1":"R1_ROUTING_REVIEW_WAIT_V1")||wait.taskRevision()>task.selector().revision()||"WAITING".equals(task.state())&&wait.taskRevision()!=task.selector().revision())throw invalid();
                 authorize(c,actor,owner(c,actor,task.owner(),now),List.of(task.selector(),lead(c,facts,tenant,task)));
             }
             case LeadAssignedV1 -> {
@@ -50,7 +58,7 @@ public final class R1ProjectionConsumer {
                 // Assignment identity is retained lineage; later current-assignment changes do not rewrite this event.
                 authorize(c,actor,owner(c,actor,assignment.owner(),now),List.of(assignment.selector(),lead.selector()));
             }
-            case LeadDuplicateResolutionRecordedV1,LeadRoutingDispositionRecordedV1,SourceIntakeStopRequestedV1,SourceIntakeStopRequestAcknowledgedV1,LeadValidityReviewedV1 -> {
+            case SourceRequestContinuationRecordedV1,LeadDuplicateResolutionRecordedV1,LeadRoutingDispositionRecordedV1,SourceIntakeStopRequestedV1,SourceIntakeStopRequestAcknowledgedV1,LeadValidityReviewedV1 -> {
                 var decision=require(facts.decision(c,tenant,source.id()));if(!source.equals(decision.selector())||decision.version()!=1)throw invalid();var task=require(facts.task(c,tenant,decision.taskId()));r1(task);
                 if(!"DONE".equals(task.state())||!source.equals(task.completion()))throw invalid();var lead=lead(c,facts,tenant,task);
                 if(!"lead.lead".equals(decision.subject().type())||!lead.id().equals(decision.subject().id()))throw invalid();
@@ -58,6 +66,7 @@ public final class R1ProjectionConsumer {
                     case LeadDuplicateResolutionRecordedV1 -> task.purpose().equals("RESOLVE_LEAD_DUPLICATE")&&decision.contract().equals("LEAD_DUPLICATE_RESOLUTION")&&Set.of("KEEP_SEPARATE","LINK_EXISTING_PARTY").contains(decision.code());
                     case LeadRoutingDispositionRecordedV1 -> task.purpose().equals("RESOLVE_LEAD_ROUTING_GAP")&&decision.contract().equals("LEAD_ROUTING_DISPOSITION")&&Set.of("SCHEDULE_ROUTING_REVIEW","RETRY_ASSIGNMENT_NOW").contains(decision.code());
                     case SourceIntakeStopRequestedV1 -> task.purpose().equals("RESOLVE_LEAD_ROUTING_GAP")&&decision.contract().equals("LEAD_ROUTING_DISPOSITION")&&decision.code().equals("REQUEST_SOURCE_INTAKE_STOP");
+                    case SourceRequestContinuationRecordedV1 -> task.purpose().equals("RESOLVE_SOURCE_REQUEST")&&decision.contract().equals("SOURCE_REQUEST_CONTINUATION")&&Set.of("ASSIGN_SELECTED","SCHEDULE_REVIEW","END_LEAD").contains(decision.code());
                     case SourceIntakeStopRequestAcknowledgedV1 -> task.purpose().equals("ACK_SOURCE_INTAKE_STOP_REQUEST")&&decision.contract().equals("SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED")&&decision.code().equals("SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED");
                     case LeadValidityReviewedV1 -> task.purpose().equals("REVIEW_LEAD_VALIDITY")&&decision.contract().equals("LEAD_VALIDITY_REVIEW")&&Set.of("CONFIRM_INVALID","CLOSE_UNREACHED","REOPEN_CONTACT").contains(decision.code());
                     default -> false;

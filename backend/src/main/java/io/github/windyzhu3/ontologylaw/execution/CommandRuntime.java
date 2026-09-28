@@ -11,6 +11,7 @@ import static io.github.windyzhu3.ontologylaw.execution.internal.persistence.Cap
 public final class CommandRuntime {
     private final Map<CommandEnvelope.Type,CommandHandler> handlers;
     private final R1CommandPolicy policy;
+    private final AuthorizationService authorization;
     private final AuditAppender audit;
     private final R1EventFacts eventFacts;
     public CommandRuntime(Collection<CommandHandler> handlers,AuthorizationService authorization,String executionNodeCode) {this(handlers,authorization,AuditAppender.databaseBacked(executionNodeCode));}
@@ -29,7 +30,7 @@ public final class CommandRuntime {
             var type=Objects.requireNonNull(handler.type());
             if(registry.put(type,handler)!=null)throw new IllegalArgumentException("Duplicate static handler");
         }
-        this.handlers=Map.copyOf(registry);this.policy=new R1CommandPolicy(authorization,facts);this.audit=Objects.requireNonNull(audit);this.eventFacts=eventFacts;
+        this.handlers=Map.copyOf(registry);this.authorization=Objects.requireNonNull(authorization);this.policy=new R1CommandPolicy(authorization,facts);this.audit=Objects.requireNonNull(audit);this.eventFacts=eventFacts;
     }
     /** Caller owns a fresh connection. Commit acknowledgement loss has unknown durability; retry the same key. */
     public CommandResult execute(Connection connection,CommandEnvelope envelope) throws SQLException {
@@ -49,6 +50,12 @@ public final class CommandRuntime {
             AuthorizationSnapshot initial=policy.authorize(c,envelope,context,false);
             if(!initial.allowed())throw new CommandHandler.Rejected(initial.rejectionCode());
             R1BusinessFence.databaseBacked().exclusive(c,envelope.actor().tenantId());
+            // Owner observation writes business/audit facts, never identity. Reuse raw
+            // identity rows under their shared lock instead of rereading them hundreds
+            // of times while the tenant business fence blocks foreground queries.
+            // Every authorization decision still evaluates the current database time.
+            try(AuthorizationService.ReadScope identityRead=envelope.type()==CommandEnvelope.Type.OBSERVE_OPPORTUNITY_OWNER_EXCEPTION
+                    ?authorization.lockedReadScope(c,envelope.actor().tenantId()):()->{}) {
             // The fence may have waited while identity or source facts changed. No roots or writes yet.
             var afterFence=policy.authorize(c,envelope,context,false);
             if(!afterFence.allowed())throw new CommandHandler.Rejected(afterFence.rejectionCode());
@@ -61,14 +68,22 @@ public final class CommandRuntime {
                 if(!current.allowed())throw new CommandHandler.Rejected(current.rejectionCode());
                 return projection.project(c,existing);
             }
-            var recovery=envelope.type().recovery()?null:CommandRecoveryMetadata.freeze(envelope,context);
-            UUID slot=store.occupy(envelope,context.scope(),payload);Savepoint business=c.setSavepoint();
+            var recovery=envelope.type().internalMaintenance()?null:CommandRecoveryMetadata.freeze(envelope,context);
+            UUID slot=store.occupy(envelope,context.scope(),payload);
+            AuditAppender.OwnerValidationEntry observationEvidence=null;
+            if(envelope.type()==CommandEnvelope.Type.OBSERVE_OPPORTUNITY_OWNER_EXCEPTION){
+                if(!(handler instanceof OpportunityOwnerObservationCommand observation))throw new CommandHandler.Rejected("VALIDATION_FAILED");
+                setLocalRole(c,Capability.QUERY);var authorized=policy.authorize(c,envelope,context,true);if(!authorized.allowed())throw new CommandHandler.Rejected(authorized.rejectionCode());
+                observationEvidence=observation.prepareObservation(c,envelope,context,authorized);
+                setLocalRole(c,Capability.AUDIT);audit.append(c,observationEvidence);setLocalRole(c,Capability.COMMAND);
+            }
+            Savepoint business=c.setSavepoint();
             CommandHandler.Result result=null;String rejection=null;AuthorizationSnapshot terminal=null;
             try {
                 setLocalRole(c,Capability.QUERY);
                 terminal=policy.authorize(c,envelope,context,false);if(!terminal.allowed())throw new CommandHandler.Rejected(terminal.rejectionCode());
                 var eventPolicy=new R1EventPolicy(eventFacts);eventPolicy.beforeWork(c,envelope,context);
-                setLocalRole(c,Capability.COMMAND);handler.validateBeforeWork(c,envelope,context);result=handler.execute(c,envelope,context);
+                setLocalRole(c,Capability.COMMAND);handler.validateBeforeWork(c,envelope,context);result=envelope.type()==CommandEnvelope.Type.OBSERVE_OPPORTUNITY_OWNER_EXCEPTION?((OpportunityOwnerObservationCommand)handler).executeObserved(c,envelope,context,observationEvidence):handler.execute(c,envelope,context);
                 if(result.status()==CommandOutcome.Status.NO_CHANGE)c.rollback(business);
                 setLocalRole(c,Capability.QUERY);
                 // Capture denials on newly written exact selectors before rollback restores old
@@ -98,6 +113,7 @@ public final class CommandRuntime {
             audit.append(c,new AuditAppender.Entry(auditId,envelope.commandId(),envelope.type().name(),envelope.correlationId(),status.name(),terminal,summary,CanonicalJson.digest(summary),recovery==null?1:2));
             setLocalRole(c,Capability.QUERY);
             return projection.project(c,receipt);
+            }
         });
     }
 }

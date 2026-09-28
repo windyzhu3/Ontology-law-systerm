@@ -26,14 +26,15 @@ public final class JooqCurrentLeadReader implements CurrentLeadReader {
         // Explicit original columns are essential: SELECT * still includes five forbidden V850 columns.
         var r=db(c).select(l.REVISION,l.SOURCE_CHANNEL_CODE,l.SOURCE_ACCOUNT_CODE,l.CAPTURED_AT,l.CAPTURED_NAME_CIPHERTEXT,
                 l.CAPTURED_PHONE_CIPHERTEXT,l.CAPTURED_EMAIL_CIPHERTEXT,l.LEGAL_NEED_SUMMARY_CIPHERTEXT,l.CITY_CODE,
-                l.SERVICE_CATEGORY_CODE,l.JURISDICTION_CODE,l.URGENCY_CODE,l.PARSED_PARTY_ID,l.PARTY_RESOLUTION_CODE,l.DISPOSITION_CODE,l.CURRENT_ASSIGNMENT_ID)
+                l.SERVICE_CATEGORY_CODE,l.JURISDICTION_CODE,l.URGENCY_CODE,l.PARSED_PARTY_ID,l.PARTY_RESOLUTION_CODE,l.DISPOSITION_CODE,l.CURRENT_ASSIGNMENT_ID,l.CUSTOMER_NAME_CIPHERTEXT,l.CONTACT_NAME_CIPHERTEXT)
                 .from(l).where(l.TENANT_ID.eq(tenant)).and(l.LEAD_ID.eq(id)).fetchOne();
         if(r==null)return null;
         return new Lead(new Subject("lead.lead",id,r.get(l.REVISION),null),r.get(l.SOURCE_CHANNEL_CODE),r.get(l.SOURCE_ACCOUNT_CODE),r.get(l.CAPTURED_AT).toInstant(),
                 protection.decrypt(tenant,CAPTURED_NAME,r.get(l.CAPTURED_NAME_CIPHERTEXT)),protection.decrypt(tenant,CAPTURED_PHONE,r.get(l.CAPTURED_PHONE_CIPHERTEXT)),
                 protection.decrypt(tenant,CAPTURED_EMAIL,r.get(l.CAPTURED_EMAIL_CIPHERTEXT)),protection.decrypt(tenant,LEGAL_NEED_SUMMARY,r.get(l.LEGAL_NEED_SUMMARY_CIPHERTEXT)),
                 r.get(l.CITY_CODE),r.get(l.SERVICE_CATEGORY_CODE),r.get(l.JURISDICTION_CODE),r.get(l.URGENCY_CODE),r.get(l.PARSED_PARTY_ID),
-                r.get(l.PARTY_RESOLUTION_CODE),r.get(l.DISPOSITION_CODE),r.get(l.CURRENT_ASSIGNMENT_ID));
+                r.get(l.PARTY_RESOLUTION_CODE),r.get(l.DISPOSITION_CODE),r.get(l.CURRENT_ASSIGNMENT_ID),protection.decrypt(tenant,CUSTOMER_NAME,r.get(l.CUSTOMER_NAME_CIPHERTEXT)),
+                protection.decrypt(tenant,CONTACT_NAME,r.get(l.CONTACT_NAME_CIPHERTEXT)));
     }
     public EffectiveContact effectiveContact(Connection c,UUID tenant,UUID id) {
         var l=LEAD_;

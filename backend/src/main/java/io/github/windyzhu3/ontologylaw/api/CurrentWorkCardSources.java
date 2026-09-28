@@ -7,6 +7,8 @@ import io.github.windyzhu3.ontologylaw.responsibility.*;
 import io.github.windyzhu3.ontologylaw.execution.*;
 import io.github.windyzhu3.ontologylaw.evidence.EvidenceReferenceReader;
 import io.github.windyzhu3.ontologylaw.query.CurrentWorkCardQuery;
+import io.github.windyzhu3.ontologylaw.query.OpportunityWorkCardQuery;
+import io.github.windyzhu3.ontologylaw.opportunity.*;
 import java.sql.*;
 import java.time.Instant;
 import java.util.*;
@@ -21,8 +23,20 @@ final class CurrentWorkCardSources {
     private final ActionDraftService drafts=ActionDraftService.databaseBacked();
     private final CurrentLeadReader leads;
     private final R1SourcePolicyRegistry policies;
-    CurrentWorkCardSources(AuthorizationService auth,LeadProtection protection,R1SourcePolicyRegistry policies) {this.auth=auth;this.leads=CurrentLeadReader.databaseBacked(protection);this.policies=policies;}
-    SensitiveReadRuntime.Prepared read(Connection c,Actor actor,Instant now)throws SQLException {
+    private final OpportunityCommandReader opportunities;
+    private final EventOpportunityReader opportunityOrigins=EventOpportunityReader.databaseBacked();
+    private record OpportunityPath(OpportunityCommandReader.Header header,OpportunityResponsibilityReader.Responsibility responsibility,
+            EventOpportunityReader.Opportunity origin,Subject lead,UUID scope) {}
+    private record Candidate(CurrentWorkCardQuery.CardData leadCard,OpportunityWorkCardQuery.Data opportunityCard) {
+        CurrentTaskReader.Task task(){return leadCard!=null?leadCard.task():opportunityCard.task();}
+        CurrentLeadReader.Lead lead(){return leadCard!=null?leadCard.lead():opportunityCard.lead();}
+    }
+    CurrentWorkCardSources(AuthorizationService auth,LeadProtection protection,R1SourcePolicyRegistry policies) {this(auth,protection,policies,null);}
+    CurrentWorkCardSources(AuthorizationService auth,LeadProtection protection,R1SourcePolicyRegistry policies,OpportunityProgressProtection opportunityProtection) {
+        this.auth=auth;this.leads=CurrentLeadReader.databaseBacked(protection);this.policies=policies;
+        this.opportunities=opportunityProtection==null?null:OpportunityCommandReader.databaseBacked(opportunityProtection);
+    }
+    SensitiveReadRuntime.Prepared read(Connection c,Actor actor,Instant now,UUID selectedTaskId)throws SQLException {
         UUID ownerId=actor.onBehalfAppointmentId()==null?actor.appointmentId():actor.onBehalfAppointmentId();
         var registration=identities.registration(c,actor.tenantId(),actor.appointmentId());
         var owner=owners.read(c,actor.tenantId(),ownerId);
@@ -30,15 +44,25 @@ final class CurrentWorkCardSources {
             ||!owner.principal().selector().id().equals(actor.onBehalfPrincipalId()==null?actor.principalId():actor.onBehalfPrincipalId()))throw denied();
         var dependencies=new ArrayList<AuthorizationSnapshot>();boolean workbench=false;
         for(var type:TaskFactory.Type.values()) {
+            if(type.subjectType().equals("opportunity.opportunity")&&(opportunities==null||actor.onBehalfAppointmentId()!=null))continue;
             var snapshot=authorized(c,actor,owner.organization().selector(),owner.organization().selector().id(),type);
             if(snapshot!=null){workbench=true;dependencies.add(snapshot);}
         }
-        if(!workbench)throw denied();
         var all=CurrentWorkCardQuery.ordered(tasks.ownedTasks(c,actor.tenantId(),ownerId),now);
         var visible=new ArrayList<CurrentTaskReader.Task>();var bindings=new LinkedHashMap<Subject,DisclosurePlan.Entry>();
+        var opportunityPaths=new HashMap<UUID,OpportunityPath>();
         int waiting=0;
         for(var task:all) {
             if(!Set.of("OPEN","WAITING").contains(task.state()))continue;
+            if(task.type().subjectType().equals("opportunity.opportunity")) {
+                var opportunityBindings=new LinkedHashMap<Subject,DisclosurePlan.Entry>();
+                var path=opportunityPath(c,actor,task,owner,opportunityBindings);if(path==null)continue;
+                opportunityPaths.put(task.selector().id(),path);
+                workbench=true;
+                opportunityBindings.values().forEach(e->dependencies.add(e.authorization()));bindings.putAll(opportunityBindings);
+                if("WAITING".equals(task.state()))waiting++;else visible.add(task);
+                continue;
+            }
             var taskAuth=authorized(c,actor,task.selector(),owner.organization().selector().id(),task.type());
             var leadAuth=authorized(c,actor,task.lead(),owner.organization().selector().id(),task.type());
             if(taskAuth==null||leadAuth==null)continue;
@@ -49,22 +73,88 @@ final class CurrentWorkCardSources {
             bindings.put(task.selector(),new DisclosurePlan.Entry(task.selector(),task.selector(),taskAuth));
             if("WAITING".equals(task.state()))waiting++;else visible.add(task);
         }
-        CurrentWorkCardQuery.CardData data=null;var chosenBindings=new LinkedHashMap<Subject,DisclosurePlan.Entry>();
+        if(!workbench)throw denied();
+        Candidate data=null,recommendedData=null;UUID recommended=null;
+        var chosenBindings=new LinkedHashMap<Subject,DisclosurePlan.Entry>();
+        var recommendedBindings=new LinkedHashMap<Subject,DisclosurePlan.Entry>();
+        var eligible=new ArrayList<CurrentTaskReader.Task>();
+        var summarySubjects=new LinkedHashMap<UUID,io.github.windyzhu3.ontologylaw.lead.CurrentLeadReader.Lead>();
+        var summaryReferences=new LinkedHashMap<UUID,Subject>();
         for(var task:visible) {
             var candidateBindings=new LinkedHashMap<Subject,DisclosurePlan.Entry>();
-            data=card(c,actor,task,owner,candidateBindings,dependencies);
-            if(data!=null){chosenBindings.putAll(candidateBindings);break;}
+            var candidate=candidate(c,actor,task,owner,candidateBindings,dependencies,opportunityPaths.get(task.selector().id()));
+            if(candidate==null)continue;
+            eligible.add(task);
+            summarySubjects.put(task.selector().id(),candidate.lead());
+            if(candidate.opportunityCard()!=null)summaryReferences.put(task.selector().id(),candidate.opportunityCard().opportunity().selector());
+            bindings.putAll(candidateBindings);
+            if(recommended==null){recommended=task.selector().id();recommendedData=candidate;recommendedBindings.putAll(candidateBindings);}
+            if(selectedTaskId!=null&&selectedTaskId.equals(task.selector().id())){data=candidate;chosenBindings.putAll(candidateBindings);}
         }
+        boolean unavailable=selectedTaskId!=null&&data==null;
+        if(data==null){data=recommendedData;chosenBindings.putAll(recommendedBindings);}
         UUID chosen=data==null?null:data.task().selector().id();
-        var next=visible.stream().filter(t->!t.selector().id().equals(chosen)).limit(2).toList();
-        var projection=new CurrentWorkCardQuery().project(actor,now,data,next,waiting);
+        var next=eligible.stream().filter(t->!t.selector().id().equals(chosen)).limit(2).toList();
+        var query=new CurrentWorkCardQuery((a,s)->io.github.windyzhu3.ontologylaw.execution.PublicFactReferences.reference(a,s.type(),s.id()));
+        var projection=data!=null&&data.opportunityCard()!=null
+            ?query.projectOpportunity(actor,now,data.opportunityCard(),next,waiting,eligible,recommended,summarySubjects,summaryReferences)
+            :query.project(actor,now,data==null?null:data.leadCard(),next,waiting,eligible,recommended,summarySubjects,summaryReferences);
+        var body=new LinkedHashMap<String,Object>(projection.envelope().values());
+        if(unavailable)body.put("selectionNotice","所选事项已不可处理，已返回当前可处理事项。请从我的待办重新选择。");
         var entries=new ArrayList<DisclosurePlan.Entry>();
         for(var source:projection.sources()) {
             var entry=chosenBindings.get(source);if(entry==null)entry=bindings.get(source);
             if(entry==null)throw new IllegalArgumentException("Missing actual source authorization");entries.add(entry);
         }
         for(var entry:chosenBindings.values())if(entry.disclosedSource().type().startsWith("evidence."))entries.add(entry);
-        return new SensitiveReadRuntime.Prepared(projection.envelope().values(),new DisclosurePlan(entries,dependencies));
+        return new SensitiveReadRuntime.Prepared(body,new DisclosurePlan(entries,dependencies));
+    }
+    private Candidate candidate(Connection c,Actor actor,CurrentTaskReader.Task task,WorkcardOwnerReader.Owner owner,
+            Map<Subject,DisclosurePlan.Entry> entries,List<AuthorizationSnapshot> dependencies,OpportunityPath path)throws SQLException {
+        if(!task.type().subjectType().equals("opportunity.opportunity")) {
+            var legacy=card(c,actor,task,owner,entries,dependencies);return legacy==null?null:new Candidate(legacy,null);
+        }
+        if(path==null)return null;
+        var opportunity=path.header();var origin=path.origin();UUID scope=path.scope();
+        // Business facts are stable under the tenant fence; authorization time is evaluated afresh.
+        if(!bind(c,actor,path.responsibility().basis(),path.responsibility().basis(),scope,task.type(),entries)
+            ||!bind(c,actor,task.selector(),task.selector(),scope,task.type(),entries)
+            ||!bind(c,actor,opportunity.selector(),opportunity.selector(),scope,task.type(),entries)
+            ||!bind(c,actor,path.lead(),path.lead(),scope,task.type(),entries))return null;
+        var lead=leads.read(c,actor.tenantId(),origin.leadId());
+        if(lead==null||!entries.containsKey(lead.selector()))return null;
+        if(!bindOwner(c,actor,owner,task.selector(),scope,task.type(),entries))return null;
+        var draft=task.type().isContract()||task.type().isTransfer()?null:drafts.read(c,actor.tenantId(),task.selector().id());
+        if(draft!=null) {
+            if(!draft.taskId().equals(task.selector().id())||!task.type().command.equals(draft.actionCode())||!task.type().schema.equals(draft.schemaCode())||draft.schemaVersion()!=1
+                ||!Set.of("DRAFT","CONFIRMED").contains(draft.state()))throw new IllegalArgumentException("Invalid Opportunity Draft schema");
+            var validated=R2OpportunityCommands.candidate(draft.values());
+            if(!validated.equals(draft.values())||!Base64.getUrlEncoder().withoutPadding().encodeToString(CanonicalJson.digest(CanonicalJson.encode(validated))).equals(draft.digest()))throw new IllegalArgumentException("Invalid Opportunity Draft payload");
+            // Check the Draft itself as well as its current Task, including object-specific DENY.
+            if(!bind(c,actor,draft.selector(),draft.selector(),scope,task.type(),entries))return null;
+        }
+        return new Candidate(null,new OpportunityWorkCardQuery.Data(task,opportunity,lead,owner,draft,path.responsibility()));
+    }
+    private OpportunityPath opportunityPath(Connection c,Actor actor,CurrentTaskReader.Task task,WorkcardOwnerReader.Owner owner,Map<Subject,DisclosurePlan.Entry> entries)throws SQLException {
+        if(opportunities==null||actor.onBehalfAppointmentId()!=null||!actor.appointmentId().equals(task.owner()))return null;
+        var opportunity=opportunities.header(c,actor.tenantId(),task.subject().id());
+        if(opportunity==null||opportunity.closed()&&!Set.of("CHECK_CONTRACT_RECEIPT","SUPPLEMENT_CONTRACT_RECEIPT").contains(task.type().name())||!opportunity.selector().equals(task.subject()))return null;
+        var effective=io.github.windyzhu3.ontologylaw.opportunity.OpportunityResponsibilityReader.databaseBacked().current(c,actor.tenantId(),opportunity.selector());
+        if((!task.type().independentDecisionOwner()&&!effective.appointmentId().equals(task.owner()))||!effective.basis().equals(task.responsibilityBasis()))return null;
+        UUID scope=OpportunityOwnerExceptionAuthorityReader.databaseBacked().historicalOrganization(c,actor.tenantId(),opportunity.owner());if(scope==null)return null;
+        if(task.type().isTransfer()){
+            var transfer=io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowReader.databaseBacked().forTask(c,actor.tenantId(),task.selector().id());
+            if(transfer==null||!transfer.opportunity().equals(opportunity.selector())||!actor.appointmentId().equals(transfer.owner()))return null;
+            scope=Set.of("PREPARE","SUPPLEMENT").contains(transfer.stage())?transfer.fromOrganization():transfer.toOrganization();
+            if(!bind(c,actor,transfer.workflow(),transfer.workflow(),scope,task.type(),entries)||!bind(c,actor,transfer.request(),transfer.request(),scope,task.type(),entries))return null;
+        }
+        if(!bind(c,actor,effective.basis(),effective.basis(),scope,task.type(),entries))return null;
+        if(!bind(c,actor,task.selector(),task.selector(),scope,task.type(),entries)||!bind(c,actor,opportunity.selector(),opportunity.selector(),scope,task.type(),entries))return null;
+        var origin=opportunityOrigins.byId(c,actor.tenantId(),opportunity.selector().id());
+        if(origin==null||!origin.selector().equals(opportunity.selector())||!origin.owner().equals(opportunity.owner()))return null;
+        var lead=leads.selector(c,actor.tenantId(),origin.leadId());
+        if(lead==null||!bind(c,actor,lead,lead,scope,task.type(),entries))return null;
+        return new OpportunityPath(opportunity,effective,origin,lead,scope);
     }
     private CurrentWorkCardQuery.CardData card(Connection c,Actor actor,CurrentTaskReader.Task task,WorkcardOwnerReader.Owner owner,
             Map<Subject,DisclosurePlan.Entry> entries,List<AuthorizationSnapshot> dependencies)throws SQLException {
@@ -84,7 +174,7 @@ final class CurrentWorkCardSources {
                 party=leads.namedParty(c,tenant,duplicate.party().id());
                 if(party==null||!"ACTIVE".equals(party.status())||!party.selector().equals(duplicate.party()))return null;
             }
-            case ASSIGN_LEAD -> {
+            case ASSIGN_LEAD,RESOLVE_SOURCE_REQUEST -> {
                 var policy=policies.find(lead.sourceAccount());if(policy==null)throw new IllegalArgumentException("Unknown source policy");
                 // Each candidate is a complete policy-selected sales path; Actor separately authorizes every returned label.
                 for(var candidate:new AssignmentPolicy().sales(c,tenant,lead.selector(),policy)) {
@@ -95,7 +185,8 @@ final class CurrentWorkCardSources {
                         options.add(candidateOwner);entries.putAll(candidateEntries);dependencies.add(authorized);
                     }
                 }
-                if(options.isEmpty())return null;
+                if(options.isEmpty()&&task.type()==TaskFactory.Type.ASSIGN_LEAD)return null;
+                if(task.type()==TaskFactory.Type.RESOLVE_SOURCE_REQUEST){decision=tasks.causalSourceRequest(c,tenant,task);if(decision==null||!bind(c,actor,decision.selector(),decision.selector(),scope,task.type(),entries))return null;}
             }
             case ACK_SOURCE_INTAKE_STOP_REQUEST -> {
                 decision=tasks.causalStop(c,tenant,task);
@@ -151,9 +242,11 @@ final class CurrentWorkCardSources {
         entries.putIfAbsent(source,new DisclosurePlan.Entry(source,anchor,snapshot));return true;
     }
     private AuthorizationSnapshot authorized(Connection c,Actor actor,Subject subject,UUID scope,TaskFactory.Type type)throws SQLException {
-        var request=authorities.select(c,actor,subject,scope,type.slot,type.authority);if(request==null)return null;
+        var result=authorities.authorize(c,actor,subject,scope,type.slot,type.authority);if(result==null)return null;
+        var request=result.request();
+        if(type.subjectType().equals("opportunity.opportunity")&&request.requirement().path()!=Path.DIRECT)return null;
         if(request.requirement().path()!=Path.DIRECT&&request.requirement().path()!=Path.DELEGATED)return null;
-        var result=auth.evaluate(c,request,false);return result.allowed()?result:null;
+        return result.allowed()?result:null;
     }
     private static SensitiveReadRuntime.Failure denied(){return new SensitiveReadRuntime.Failure(403,"NOT_AUTHORIZED");}
 }

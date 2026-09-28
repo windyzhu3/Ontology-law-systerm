@@ -115,7 +115,9 @@ INGRESS_COMPLETION_SLOT_EXPRESSION = (
 class FrozenDomainSemanticsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        from contract.schema_contract import SCHEMAS
+        from contract.schema_contract import BASE_SCHEMAS
+        from contract.evolutions import V850_LEAD_INGRESS_COMPLETION
+        SCHEMAS = V850_LEAD_INGRESS_COMPLETION.apply(BASE_SCHEMAS)
         cls.tables = {
             f"{schema.name}.{table.name}": table
             for schema in SCHEMAS
@@ -189,10 +191,17 @@ class FrozenDomainSemanticsTest(unittest.TestCase):
         self.assertEqual("OPEN", task.initial_state)
 
     def test_complete_migration_set_matches_current_baseline_contract_hashes(self):
-        self.assert_frozen_migration_contract(
-            CONTRACT_ROOT,
-            REPOSITORY_ROOT / "docs/baseline/CURRENT-MVP-BASELINE.md",
-        )
+        from contract import schema_contract
+        from contract.render import generate_all
+        evolutions = schema_contract.EVOLUTIONS[:2]
+        frozen = evolutions[0].apply(schema_contract.BASE_SCHEMAS)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(schema_contract, "EVOLUTIONS", evolutions), patch.object(schema_contract, "SCHEMAS", frozen), patch.object(schema_contract, "CONTRACT_VERSION", "52-plus-2-v1.2"):
+                generate_all(root / "generated")
+            self.assert_frozen_migration_contract(root, REPOSITORY_ROOT / "docs/baseline/CURRENT-MVP-BASELINE.md")
+            for name, digest in EXPECTED_V1_2_MIGRATION_SHA256.items():
+                self.assertEqual(digest, hashlib.sha256((CONTRACT_ROOT / "generated/db/migration" / name).read_bytes()).hexdigest())
 
     def test_v850_is_only_append_and_v1_migrations_keep_exact_sha256(self):
         from contract.render import generate_all
@@ -202,7 +211,7 @@ class FrozenDomainSemanticsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             # Exercise the historical V850 stage with its unchanged literal expectations.
-            with patch.object(schema_contract, "EVOLUTIONS", (V850_LEAD_INGRESS_COMPLETION,)), patch.object(schema_contract, "CONTRACT_VERSION", "52-plus-2-v1.1"):
+            with patch.object(schema_contract, "SCHEMAS", V850_LEAD_INGRESS_COMPLETION.apply(schema_contract.BASE_SCHEMAS)), patch.object(schema_contract, "EVOLUTIONS", (V850_LEAD_INGRESS_COMPLETION,)), patch.object(schema_contract, "CONTRACT_VERSION", "52-plus-2-v1.1"):
                 generate_all(root)
             migration_root = root / "db/migration"
             migrations = tuple(path.name for path in sorted(migration_root.glob("*.sql")))

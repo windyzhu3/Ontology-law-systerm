@@ -1,0 +1,56 @@
+[
+  {
+    "width": 1440,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "确认并形成合同版本",
+        "height": 54
+      },
+      {
+        "text": "下载生成正文",
+        "height": 44
+      },
+      {
+        "text": "返回修改内容",
+        "height": 44
+      }
+    ]
+  },
+  {
+    "width": 390,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "确认并形成合同版本",
+        "height": 54
+      },
+      {
+        "text": "下载生成正文",
+        "height": 44
+      },
+      {
+        "text": "返回修改内容",
+        "height": 44
+      }
+    ]
+  },
+  {
+    "width": 360,
+    "overflow": false,
+    "buttons": [
+      {
+        "text": "确认并形成合同版本",
+        "height": 54
+      },
+      {
+        "text": "下载生成正文",
+        "height": 44
+      },
+      {
+        "text": "返回修改内容",
+        "height": 44
+      }
+    ]
+  }
+]

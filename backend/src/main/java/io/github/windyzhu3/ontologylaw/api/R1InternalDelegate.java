@@ -25,6 +25,17 @@ public class R1InternalDelegate implements InternalTaskCommandsApi {
     public ResponseEntity<DueR1TaskPageV1> listDueR1Tasks(RecoveryTypeV1 type,Integer limit,String cursor){var result=service().due(actor(),type,limit,cursor);if(result.errorCode()!=null)throw new R1HttpFailure(result.errorCode());return ResponseEntity.ok().header("Cache-Control","no-store").body(result.page());}
     public ResponseEntity<TaskOccurrenceCommandReceipt> reopenDueContactTasks(UUID key,ReopenDueContactTaskV1 body){return recover(CommandEnvelope.Type.REOPEN_DUE_CONTACT_TASKS,key,body);}
     public ResponseEntity<TaskOccurrenceCommandReceipt> reopenDueRoutingReviewTasks(UUID key,ReopenDueRoutingReviewTaskV1 body){return recover(CommandEnvelope.Type.REOPEN_DUE_ROUTING_REVIEW_TASKS,key,body);}
+    public ResponseEntity<TaskOccurrenceCommandReceipt> reopenDueSourceRequestTasks(UUID key,ReopenDueSourceRequestTaskV1 body){return recover(CommandEnvelope.Type.REOPEN_DUE_SOURCE_REQUEST_TASKS,key,body);}
+    public ResponseEntity<TaskOccurrenceCommandReceipt> restoreSourceRequestTask(UUID key,RestoreSourceRequestTaskV1 body){return repair(CommandEnvelope.Type.RESTORE_SOURCE_REQUEST_TASK,key,body);}
+    public ResponseEntity<TaskOccurrenceCommandReceipt> repairSupersededOpportunityTask(UUID key,RepairSupersededOpportunityTaskV1 body){return repair(CommandEnvelope.Type.REPAIR_SUPERSEDED_OPPORTUNITY_TASK,key,body);}
+    private ResponseEntity<TaskOccurrenceCommandReceipt> repair(CommandEnvelope.Type type,UUID key,Object body){
+        var payload=new java.util.TreeMap<String,Object>((java.util.Map<String,Object>)R1WireModels.payload(body));
+        // Original-byte validation requires this field; preserve its explicit null after the R1 optional-field codec.
+        if(type==CommandEnvelope.Type.REPAIR_SUPERSEDED_OPPORTUNITY_TASK)payload.putIfAbsent("draft",null);
+        var result=service().command(new CommandEnvelope(type,key,UUID.randomUUID(),actor(),payload));
+        if(result.errorCode()!=null)throw new R1HttpFailure(result.errorCode());
+        return ResponseEntity.ok().header("Cache-Control","no-store").body(R1WireModels.model(result.body(),TaskOccurrenceCommandReceipt.class));
+    }
     private ResponseEntity<TaskOccurrenceCommandReceipt> recover(CommandEnvelope.Type type,UUID key,Object body){
         var result=service().command(new CommandEnvelope(type,key,UUID.randomUUID(),actor(),R1WireModels.payload(body)));if(result.errorCode()!=null)throw new R1HttpFailure(result.errorCode(),result.receiptRef());
         return ResponseEntity.ok().header("Cache-Control","no-store").header("ETag",result.etag()).header("Location","/api/v1/commands/"+key+"/receipt").body(R1WireModels.model(result.body(),TaskOccurrenceCommandReceipt.class));

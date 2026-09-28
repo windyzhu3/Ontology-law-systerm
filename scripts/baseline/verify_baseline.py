@@ -2812,7 +2812,7 @@ def verify_visual_asset_counts(root: Path, findings: list[str]) -> None:
         findings.append(f"Unexpected identity admin visual PNG: {path.as_posix()}")
 
 
-def _verify_repository_result_unchecked(root: Path) -> VerificationResult:
+def _verify_repository_result_unchecked(root: Path, *, allow_r2_schema: bool = False) -> VerificationResult:
     structural_findings: list[str] = []
     missing_controlled_paths: set[Path] = set()
 
@@ -2830,7 +2830,7 @@ def _verify_repository_result_unchecked(root: Path) -> VerificationResult:
     verify_r1_contracts(root, structural_findings)
     structural_findings.extend(validate_r1_command_contract(root))
     if (root / "docs/adr/ADR-0008-r1-business-closure-alignment.md").is_file():
-        structural_findings.extend(validate_r1_business_closure_contract(root))
+        structural_findings.extend(validate_r1_business_closure_contract(root, allow_r2_schema=allow_r2_schema))
     structural_findings.extend(validate_r1_contact_evidence_contract(root))
     structural_findings.extend(validate_r1_projection_readiness_contract(root))
     structural_findings.extend(validate_r1_receipt_recovery_contract(root))
@@ -2862,9 +2862,9 @@ def _verify_repository_result_unchecked(root: Path) -> VerificationResult:
     return VerificationResult(tuple(ordered_findings))
 
 
-def _verify_repository_result(root: Path) -> VerificationResult:
+def _verify_repository_result(root: Path, *, allow_r2_schema: bool = False) -> VerificationResult:
     try:
-        return _verify_repository_result_unchecked(root)
+        return _verify_repository_result_unchecked(root, allow_r2_schema=allow_r2_schema)
     except InvalidUtf8GovernedFile as error:
         message = (
             "Invalid UTF-8 in governed file: "
@@ -2879,17 +2879,54 @@ def verify_repository(root: Path) -> list[str]:
     return _verify_repository_result(root).messages()
 
 
+def verify_r2_development_admission(root: Path) -> list[str]:
+    """Validate the named development exception, never release acceptance."""
+    plan = Path("docs/superpowers/plans/2026-09-13-r2-complete-sales-mvp-plan.md")
+    scope_id = "R2-COMPLETE-SALES-MVP-2026-09-13"
+    required = {
+        CANONICAL_BASELINE: (
+            f"Baseline ID: {CANONICAL_BASELINE_ID}",
+            "R2 development profile: R2_DEVELOPMENT_ADMISSION_V1",
+            f"R2 development plan: {plan.as_posix()}",
+            f"R2 scope ID: {scope_id}",
+            "R1 acceptance: PAUSED; R2 release acceptance: NOT_GRANTED",
+        ),
+        plan: (
+            f"R2-Scope-ID: {scope_id}",
+            "R2-Scope: APPROVED",
+            "R1-Acceptance: PAUSED",
+        ),
+    }
+    findings = []
+    for path, markers in required.items():
+        try:
+            content = read_text(root, path) or ""
+        except InvalidUtf8GovernedFile:
+            content = ""
+        for marker in markers:
+            key, expected = marker.split(":", 1)
+            values = re.findall(rf"(?m)^{re.escape(key)}:[ \t]*(.*)$", content)
+            if values != [expected.strip()]:
+                findings.append(f"R2 development admission unmet: {path.as_posix()} requires {marker}")
+    return findings
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify the canonical MVP baseline")
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--strict-r2",
         action="store_true",
         help="treat R2 readiness blockers as fatal",
     )
+    mode.add_argument(
+        "--r2-development", action="store_true",
+        help="check named R2 development admission; does not grant R1 or R2 acceptance",
+    )
     parser.add_argument("root", nargs="?", type=Path, default=Path.cwd())
     args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     root = args.root.resolve()
-    result = _verify_repository_result(root)
+    result = _verify_repository_result(root, allow_r2_schema=args.r2_development)
     readiness_blockers = result.in_category(FindingCategory.R2_READINESS)
     structural_findings = result.in_category(FindingCategory.STRUCTURAL)
 
@@ -2902,6 +2939,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if structural_findings:
         return 1
+    if args.r2_development:
+        development_findings = verify_r2_development_admission(root)
+        for finding in development_findings:
+            print(finding)
+        if development_findings:
+            return 1
+        print("R2 development admission: PASS; R1 acceptance: PAUSED; R2 release acceptance: NOT_GRANTED")
     if readiness_blockers:
         count = len(readiness_blockers)
         noun = "blocker" if count == 1 else "blockers"

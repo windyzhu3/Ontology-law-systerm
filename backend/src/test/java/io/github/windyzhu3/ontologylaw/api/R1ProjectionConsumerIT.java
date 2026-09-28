@@ -12,7 +12,7 @@ import java.util.*;
 import java.time.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class R1ProjectionConsumerIT extends ContactFlowFixture {
     @Test void cross_tenant_mixed_event_expired_and_wrong_owner_claims_are_read_only_rejections()throws Exception{
@@ -112,7 +112,13 @@ class R1ProjectionConsumerIT extends ContactFlowFixture {
         var result=new ArrayList<String>();try(var c=database.adminConnection()){for(String table:List.of("lead.lead","lead.lead_assignment","lead.lead_contact_result","opportunity.opportunity","responsibility.task_occurrence","responsibility.action_draft","responsibility.decision_record","responsibility.wait_receipt","execution.command_execution_slot","execution.command_receipt","execution.domain_event","execution.domain_event_outbox","audit.audit_entry_classified_v"))
             try(var statement=c.prepareStatement("select coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text),'[]'::jsonb)::text from "+table+" t where tenant_id=?")){statement.setObject(1,seed.tenant());try(var rows=statement.executeQuery()){rows.next();result.add(HexFormat.of().formatHex(CanonicalJson.digest(rows.getString(1))));}}}return result;
     }
-    @ParameterizedTest @EnumSource(CommandHandler.Event.class)
+    static java.util.stream.Stream<CommandHandler.Event> r1ProjectionEvents() {
+        var events=Arrays.stream(CommandHandler.Event.values())
+                .filter(event->event.queueOwners().contains(CommandHandler.QueueOwner.R1_PROJECTION)).toList();
+        assertEquals(14,events.size(),"Frozen R1 projection event inventory");
+        return events.stream();
+    }
+    @ParameterizedTest @MethodSource("r1ProjectionEvents")
     void all_fourteen_routes_read_real_current_facts_with_zero_business_delta(CommandHandler.Event event)throws Exception {
         setup(event);var actor=service("R1_PROJECTION_CONSUME");var claim=claim(event);var before=snapshots();
         assertEquals(204,consume(actor,dto(claim)).status(),event.name());assertEquals(before,snapshots());

@@ -1,0 +1,4 @@
+import {it,expect} from 'vitest';
+import {parseEnvelope} from './contract';
+import {opportunityEnvelope} from '../../test/opportunityFixtures';
+it('accepts quote routing card and rejects command mismatch or generic editable form',()=>{const base=opportunityEnvelope(),c={...base.currentCard,taskType:'APPROVE_QUOTE',businessPurpose:{code:'APPROVE_QUOTE',label:'报价审批'},primaryCommand:{code:'RECORD_QUOTE_DECISION',label:'记录报价决定',enabled:true},expectedCompletionFact:'QUOTE_APPROVAL_DECISION',commandForm:{actionCode:'RECORD_QUOTE_DECISION',schemaVersion:1,values:{},fields:[]}};expect(parseEnvelope({...base,currentCard:c}).currentCard?.taskType).toBe('APPROVE_QUOTE');expect(()=>parseEnvelope({...base,currentCard:{...c,primaryCommand:{...c.primaryCommand,code:'FORM_QUOTE'}}})).toThrow();expect(()=>parseEnvelope({...base,currentCard:{...c,commandForm:{...c.commandForm,values:{decision:'APPROVED'}}}})).toThrow();});

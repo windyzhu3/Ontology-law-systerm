@@ -1,0 +1,48 @@
+{
+  "status": "APPROVED",
+  "common": "Create one polished high-fidelity Chinese desktop application screenshot, 1487x1058, as a narrow revision of attached approved screenshot. Preserve brand 律所工作助手, exact header, warm white #f8f7f7, white surfaces, graphite #2c2c34, emerald #007d52, mint #f1f6f4, 1px #dfe0e4 borders, 6px radius, barely visible shadow, Microsoft YaHei style Chinese typography. Simple practical law firm application. No illustrations, dashboards, gradients, new logo, ornamental cards, notifications or microphone. Legible exact Chinese labels. Only ONE filled emerald primary command per screen. Other actions quiet text/outline. Sample data fictional. This is a review draft, not a redesign. ",
+  "screens": [
+    {
+      "id": "R2-HF-01",
+      "ref": "docs/design/sales-mvp-workcards/frozen/02-opportunity-progress.png",
+      "text": "Workbench My Tasks: preserve centered single split workcard and topbar 陈晓 · 销售一组. Above workcard show expanded compact 我的待办 list with 3 rows: 系统推荐｜联系王某｜今天 15:00; 当前查看｜华启智能制造 · 商机跟进｜今天 17:00; 核对明川公司签署材料｜明天 10:00. Each row has subtle 查看 action, current selected mint. Exactly one full card below titled 记录商机进展; left owner 陈晓, 下一行动 需求访谈, 截止 今天17:00; right editable 跟进记录 and inline AI 跟进摘要 · 待人工确认 with 编辑 / 忽略 text links and unchecked 我已核对 checkbox, 下一行动 and 下次跟进时间 fields. Main 记录商机进展. Footer 记录成功后生成下一项责任. No multiple full cards, no chat messages. Compact bottom neutral notice 未保存内容在切换前需要确认；结果确认中暂不可切换.",
+      "correction": "Remove notification bell. Change 下次跟进时间 date to 2026-09-15 10:00. Add source line 来源：本次跟进记录 inside AI summary panel. Keep everything else identical.",
+      "finalSource": "C:/Users/Jacob/.codex/generated_images/01a09b27-8035-74c2-bb75-a412e406d1f6/exec-196b98ae-feaf-4889-b651-7ecd6b6cf739.png"
+    },
+    {
+      "id": "R2-HF-02",
+      "ref": "docs/design/identity-admin-mvp/revisions/2026-09-09-contract-alignment/ADM-01-review.png",
+      "text": "Lead creation management screen. Same admin shell, sidebar links 线索与客户 selected, 商机与报价, 合同与收款, 转案与案件, 团队待办; bottom 返回工作台. Title 新增线索, subtitle 先录入联系信息和需求，业务分类在案件形成后完成. Main single clean panel left form 来源 (客户转介绍), 联系人 (王女士), 手机号, 客户名称 (华启智能制造有限公司), 需求描述 textarea. Right inline helper 从材料提取字段 with paste text field and outline 提取候选, then AI 候选 · 待人工确认 showing 联系人 王女士 / 客户名称 华启智能制造有限公司; text 编辑 / 忽略; checkbox 我已逐项核对候选内容. Bottom one filled 保存线索; quiet 返回列表 and 批量导入 text. No case category, opportunitycategory or case number. AI candidates not silently applied. Footer 保存后进入分配与联系流程.",
+      "correction": "Header change to 陈晓 · 销售一组 / 业务管理 and 陈 avatar. Remove red required stars from 联系人、手机号、客户名称; add required star to 需求描述, keep 来源 required. Change phone to placeholder 请输入手机号. AI candidates must not already populate unconfirmed fields: clear 联系人 and 客户名称 left input values to placeholder 待填写, keep candidate values on right. Add 来源：粘贴材料 inside candidatepanel. Keep layout and all other design.",
+      "finalSource": "C:/Users/Jacob/.codex/generated_images/01a09b27-8035-74c2-bb75-a412e406d1f6/exec-63c418f3-1100-42a6-ae90-c332babc1cf0.png"
+    },
+    {
+      "id": "R2-HF-03",
+      "ref": "docs/design/identity-admin-mvp/revisions/2026-09-09-contract-alignment/ADM-01-review.png",
+      "text": "Lead bulk import preview screen, same admin shell business nav 线索与客户 selected, 商机与报价, 合同与收款, 转案与案件, 团队待办. Title 导入线索; small stepper 选择文件 — 核对预览 — 查看结果 with 核对预览 active. Filename 九月线索.xlsx. Compact mapping row 文件列 客户→客户名称, 联系人→联系人, 联系电话→手机号, 咨询内容→需求描述, 来源编号→来源记录号. Central table 4 rows with source row numbers, 客户名称, 联系人, 手机号, 需求描述, 检查结果. 2 valid rows and 2 invalid: 第4行 缺少需求描述, 第5行 来源记录号重复; orange gentle row markers. No actual real phone numbers use 138****0001. Clear status 可导入2条 · 需修正2条. Plain notice 仅提交检查通过的行；错误行保留供修正；不会覆盖已有记录. Bottom single filled 确认导入2条 and quiet 更换文件. Side panel 当前行问题 / 补齐需求描述后重新核对. Do not show charts or setupworkflow.",
+      "correction": "Header change to 陈晓 · 销售一组 / 业务管理 and 陈 avatar. Remove bottom duplicate 更换文件 button, keep upper filename 更换文件 text. Preserve exact remaining screenshot.",
+      "finalSource": "C:/Users/Jacob/.codex/generated_images/01a09b27-8035-74c2-bb75-a412e406d1f6/exec-747edde4-d5dd-405a-b585-379849d37ed2.png"
+    },
+    {
+      "id": "R2-HF-04",
+      "ref": "docs/design/identity-admin-mvp/revisions/2026-09-09-contract-alignment/ADM-01-review.png",
+      "text": "Bulk lead import result with unresolved receipt. Same admin shell business links. Title 导入结果. Status banner 1条已录入 · 1条结果待确认 · 2条未提交. Neutral amber note 有一条提交结果尚未确认，已暂停后续提交，请勿重复导入. Table source rows 客户, 录入结果, 当前责任, 负责人, 下一步. Row2 华启 已录入 联系客户 陈晓 今天15:00联系; Row3 明川 结果待确认 — — 核对本次结果; Row4 远航 未提交 — — 等待恢复; Row5 启明 需修正 — — 补齐需求. Right detail panel 明川公司 / 正在核对本次录入 / 不会再次创建相同线索 / 本次进度已保留. One green command 核对提交结果, quiet 返回线索列表. Avoid claiming success for unknownresult or batchcomplete, no retry-all. Same calm design.",
+      "correction": "Replace ENTIRE sidebar identity labels with 业务管理 header and these five items: 线索与客户 (selected), 商机与报价, 合同与收款, 转案与案件, 团队待办. Add bottom 返回工作台. Remove 身份与组织 / 身份主体 / 组织架构 / 任职管理 / 直接授权. Change summary third item to 1条未提交 · 1条需修正. Keep remaining layout unchanged.",
+      "finalSource": "C:/Users/Jacob/.codex/generated_images/01a09b27-8035-74c2-bb75-a412e406d1f6/exec-f2bd3303-1507-4f94-ada9-fd7e16d387cc.png"
+    },
+    {
+      "id": "R2-HF-05",
+      "ref": "docs/design/identity-admin-mvp/revisions/2026-09-09-contract-alignment/ADM-01-review.png",
+      "text": "Business lead/customer ledger management. Preserve same admin list + right detail layout. Sidebar 线索与客户 active, 商机与报价, 合同与收款, 转案与案件, 团队待办. Title 线索与客户 subtitle 仅显示你有权查看的业务. Top right one filled 新增线索; adjacent quiet 导入. Compact search input 搜索客户或联系人 and small 我的负责 / 全部可见 selector. Table columns 客户/联系人, 当前阶段, 负责人, 下一行动, 截止时间. 3 rows 华启智能制造/王女士 商机跟进 陈晓 需求访谈 今天17:00; 明川公司/李先生 待联系 周宁 首次联系 今天15:00; 远航科技/赵女士 待补齐 陈晓 补充联系方式 明天10:00. Selected first row mint. Right detail 华启智能制造 / 当前责任 记录商机进展 / 负责人 陈晓 / 下一行动 需求访谈 / 截止 今天17:00, quiet outline 前往处理, collapsible 联系信息 / 跟进记录 / 关联材料. No edit stage button; transitions only via workcard. Footer 本页3项 上一页 下一页; no totalclaimed, no complex stats.",
+      "correction": "",
+      "finalSource": "C:/Users/Jacob/.codex/generated_images/01a09b27-8035-74c2-bb75-a412e406d1f6/exec-236f354c-c14d-4e41-a84e-003ea146f8bb.png"
+    },
+    {
+      "id": "R2-HF-06",
+      "ref": "docs/design/sales-mvp-workcards/frozen/02-opportunity-progress.png",
+      "text": "Workbench transfer correction workcard in same centered split layout. Top-right 周宁 · 销售一组. Small top line 我的待办 3项 · 查看. One card title 补齐转案材料, customer 华启智能制造有限公司, owner 周宁, due 明天12:00. Left known facts 合同 已核验签署 / 收款条件 不要求首款到账后转案 / 当前状态 案管退回补正 / 退回原因 缺少客户主体证明. Explicit quiet note 案管审核接收后生成案件，再进行业务分类. Right header 核对本次补正材料, uploaded file 营业执照.pdf / 已上传，待核对. Mint AI 材料缺项提示 · 待人工确认 panel: 对照转案清单，主体证明已提供；授权委托材料仍需人工核对. Small source 依据：转案材料清单与已上传文件. Checkbox 我已核对材料及缺项提示; optional textarea 补正说明. One main 提交补正, secondary 忽略AI提示 text. Footer 上传文件不等于核验通过；提交后交由案管审核. No autogenerated case or classification beforeaccept, noAIapproval.",
+      "correction": "Header change to 周宁 · 销售一组 / 客户顾问 with 周 avatar so matches owner. Label mint panel AI 材料缺项提示 · 待人工确认. Keep everything else same.",
+      "finalSource": "C:/Users/Jacob/.codex/generated_images/01a09b27-8035-74c2-bb75-a412e406d1f6/exec-72e7dd79-3ff4-4b63-8272-09c9e9c9749d.png"
+    }
+  ]
+}

@@ -45,6 +45,10 @@ public abstract class R1ProductionFixture extends R1HttpFixture {
         String binding="ols.worker.bindings[0].";worker.putAll(Map.of(binding+"tenant-id",actor.tenantId().toString(),binding+"principal-id",actor.principalId().toString(),binding+"appointment-id",actor.appointmentId().toString(),binding+"credential-alias",client.alias(),binding+"certificate-sha256",tls.sha256(client),binding+"key-store-path",client.path().toString(),binding+"key-store-password",new String(tls.password),binding+"trust-store-path",clientTrust.path().toString(),binding+"trust-store-password",new String(tls.password)));
         return new Deployment(api,worker,tls,client,clientTrust,actor);
     }
-    private void database(Map<String,Object> properties,String prefix,boolean api){properties.putAll(Map.of(prefix+".url",database.jdbcUrl(),prefix+".username",api?"law_api_login":"law_worker_login",prefix+".password",api?database.apiPassword():database.workerPassword(),prefix+".schema-version","52-plus-2-v1.2",prefix+".release-digest","11".repeat(32),prefix+".manifest-hash","22".repeat(32)));}
+    protected String generatedSchemaVersion()throws java.io.IOException {
+        var manifest=repositoryRoot().resolve("database/schema-contract-52-plus-2/generated/schema-contract-manifest.json");
+        return tools.jackson.databind.json.JsonMapper.builder().build().readTree(Files.readString(manifest)).path("contractVersion").asText();
+    }
+    private void database(Map<String,Object> properties,String prefix,boolean api)throws java.io.IOException {properties.putAll(Map.of(prefix+".url",database.jdbcUrl(),prefix+".username",api?"law_api_login":"law_worker_login",prefix+".password",api?database.apiPassword():database.workerPassword(),prefix+".schema-version",generatedSchemaVersion(),prefix+".release-digest","11".repeat(32),prefix+".manifest-hash","22".repeat(32)));}
     static String encoded(int fill){byte[] value=new byte[32];Arrays.fill(value,(byte)fill);return Base64.getEncoder().encodeToString(value);}
 }

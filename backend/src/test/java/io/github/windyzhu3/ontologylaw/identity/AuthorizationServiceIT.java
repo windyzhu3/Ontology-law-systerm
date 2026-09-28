@@ -138,6 +138,54 @@ public class AuthorizationServiceIT extends PostgresIntegrationTest {
             });
         }
     }
+    @Test void locked_fact_reuse_still_observes_expiration() throws Exception {
+        Seed s=seed();UUID timed=UUID.randomUUID();
+        try(var c=database.apiConnection()) {
+            inTransaction(c,Capability.COMMAND,x->{
+                sql(x,"insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,valid_until,state,created_at) values (?,?,?,?,?,'LEAD_INGRESS_COMPLETE',clock_timestamp()-interval '1 day',clock_timestamp()+interval '1 second','ACTIVE',clock_timestamp())",s.tenant,timed,s.appointment,s.appointment,s.org);return null;
+            });
+            var request=new AuthorizationService.Request(s.request().actor(),s.request().subject(),s.org,new AuthorizationService.Requirement("LEAD_INGRESS_COMPLETE","SOURCE_INTAKE_OWNER",AuthorizationService.Path.DIRECT,timed));
+            inTransaction(c,Capability.QUERY,x->{
+                try(var scope=service.lockedReadScope(x,s.tenant)){
+                var start=service.evaluate(x,request,false);assertTrue(start.allowed());
+                try(var p=x.prepareStatement("select pg_sleep(1.1)")){p.execute();}
+                var end=service.evaluate(x,request,true);assertFalse(end.allowed());assertTrue(end.checkedAt().isAfter(start.checkedAt()));return null;}
+            });
+        }
+    }
+    @Test void large_denial_catalog_falls_back_without_losing_exact_hash_denials()throws Exception {
+        Seed s=seed();String hash=Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32]);
+        var subject=new AuthorizationService.Subject("contract.contract_revision",s.subject,null,hash);
+        var request=new AuthorizationService.Request(s.request().actor(),subject,s.org,s.request().requirement());
+        try(var c=database.apiConnection()) {
+            inTransaction(c,Capability.COMMAND,x->{
+                sql(x,"insert into identity.object_access_grant(tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,access_code,effect_code,valid_from,state,created_at,object_subject_type,object_subject_id,object_subject_revision) select ?,gen_random_uuid(),?,?,'LEAD_INGRESS_COMPLETE','DENY',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp(),'lead.lead',gen_random_uuid(),0 from generate_series(1,257)",s.tenant,s.principal,s.appointment);
+                sql(x,"insert into identity.object_access_grant(tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,access_code,effect_code,valid_from,state,created_at,object_subject_type,object_subject_id,object_subject_hash) values(?,'ffffffff-ffff-ffff-ffff-ffffffffffff',?,?,'LEAD_INGRESS_COMPLETE','DENY',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp(),?,?,?)",s.tenant,s.principal,s.appointment,subject.type(),subject.id(),new byte[32]);return null;
+            });
+            inTransaction(c,Capability.QUERY,x->{try(var scope=service.lockedReadScope(x,s.tenant)) {
+                assertFalse(service.evaluate(x,request,true).allowed());
+                byte[] other=new byte[32];other[0]=1;
+                var next=new AuthorizationService.Subject(subject.type(),subject.id(),null,Base64.getUrlEncoder().withoutPadding().encodeToString(other));
+                assertTrue(service.evaluate(x,new AuthorizationService.Request(request.actor(),next,s.org,request.requirement()),true).allowed());
+                assertTrue(service.evaluate(x,s.request(),true).allowed());
+            }return null;});
+        }
+    }
+    @Test void locked_denial_rows_become_effective_at_their_database_time()throws Exception {
+        Seed s=seed();
+        try(var c=database.apiConnection()) {
+            inTransaction(c,Capability.COMMAND,x->{
+                sql(x,"insert into identity.object_access_grant(tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,access_code,effect_code,valid_from,state,created_at,object_subject_type,object_subject_id,object_subject_revision) values(?,?,?,?,'LEAD_INGRESS_COMPLETE','DENY',clock_timestamp()+interval '1 second','ACTIVE',clock_timestamp(),?,?,?)",s.tenant,UUID.randomUUID(),s.principal,s.appointment,s.request().subject().type(),s.request().subject().id(),s.request().subject().revision());return null;
+            });
+            inTransaction(c,Capability.QUERY,x->{
+                try(var scope=service.lockedReadScope(x,s.tenant)) {
+                    assertTrue(service.evaluate(x,s.request(),false).allowed());
+                    try(var p=x.prepareStatement("select pg_sleep(1.1)")){p.execute();}
+                    assertFalse(service.evaluate(x,s.request(),false).allowed());
+                }return null;
+            });
+        }
+    }
     @Test void current_organization_reparenting_and_cycles_fail_closed()throws Exception {
         Seed s=seed();UUID child=UUID.randomUUID(),otherRoot=UUID.randomUUID();
         try(var c=database.apiConnection()) {

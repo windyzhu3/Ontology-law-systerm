@@ -1,0 +1,104 @@
+{
+  "checks": [
+    {
+      "scene": "prepare",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "controls": [
+        44,
+        44
+      ]
+    },
+    {
+      "scene": "review",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "controls": [
+        44,
+        44
+      ]
+    },
+    {
+      "scene": "arrangementReturned",
+      "width": 1440,
+      "overflow": false,
+      "primary": 1,
+      "controls": [
+        44,
+        44
+      ]
+    },
+    {
+      "scene": "prepare",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "controls": [
+        44,
+        44
+      ]
+    },
+    {
+      "scene": "review",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "controls": [
+        44,
+        44
+      ]
+    },
+    {
+      "scene": "arrangementReturned",
+      "width": 390,
+      "overflow": false,
+      "primary": 1,
+      "controls": [
+        44,
+        44
+      ]
+    },
+    {
+      "scene": "prepare",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "controls": [
+        44,
+        44
+      ]
+    },
+    {
+      "scene": "review",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "controls": [
+        44,
+        44
+      ]
+    },
+    {
+      "scene": "arrangementReturned",
+      "width": 360,
+      "overflow": false,
+      "primary": 1,
+      "controls": [
+        44,
+        44
+      ]
+    }
+  ],
+  "interactions": [
+    "explicit arrangement confirmation required",
+    "missing basis or duplicate party blocked without losing entered data",
+    "confirmed arrangement continues to materials",
+    "verifier must compare arrangement to approved content",
+    "correction routes to sales without changing the verifier role"
+  ],
+  "errors": [],
+  "resources": [],
+  "styleByteMatch": true
+}

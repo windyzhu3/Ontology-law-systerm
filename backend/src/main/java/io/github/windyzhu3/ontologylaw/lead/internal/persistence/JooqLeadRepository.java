@@ -22,6 +22,9 @@ public final class JooqLeadRepository implements LeadIngressService {
         r.get(l.PARSED_PARTY_ID),r.get(l.PARTY_RESOLUTION_CODE),r.get(l.DISPOSITION_CODE),r.get(l.CURRENT_ASSIGNMENT_ID),r.get(l.CAPTURED_PHONE_HMAC),r.get(l.INGRESS_COMPLETION_PHONE_HMAC),r.get(l.CAPTURED_EMAIL_HMAC),r.get(l.INGRESS_COMPLETION_EMAIL_HMAC),
         r.get(l.INGRESS_COMPLETION_PHONE_CIPHERTEXT)==null&&r.get(l.INGRESS_COMPLETION_PHONE_HMAC)==null&&r.get(l.INGRESS_COMPLETION_EMAIL_CIPHERTEXT)==null&&r.get(l.INGRESS_COMPLETION_EMAIL_HMAC)==null&&r.get(l.INGRESS_COMPLETION_SOURCE_CODE)==null&&r.get(l.INGRESS_COMPLETION_SOURCE_SUMMARY_CIPHERTEXT)==null&&r.get(l.INGRESS_COMPLETED_BY_APPOINTMENT_ID)==null&&r.get(l.INGRESS_COMPLETED_AT)==null&&r.get(l.INGRESS_COMPLETION_DIGEST)==null);}
     public Lead read(Connection c,UUID tenant,UUID id){var l=LEAD_;return lead(db(c).selectFrom(l).where(l.TENANT_ID.eq(tenant)).and(l.LEAD_ID.eq(id)).fetchOne());}
+    public boolean hasAssignmentOrContactHistory(Connection c,UUID tenant,UUID lead)throws SQLException {
+        return db(c).fetchOne("select exists(select 1 from lead.lead_assignment where tenant_id=? and lead_id=?) or exists(select 1 from lead.lead_contact_result where tenant_id=? and lead_id=?)",tenant,lead,tenant,lead).get(0,Boolean.class);
+    }
     public Header header(Connection c,UUID tenant,UUID id){var l=LEAD_;var r=db(c).select(l.REVISION,l.SOURCE_ACCOUNT_CODE,l.CURRENT_ASSIGNMENT_ID).from(l).where(l.TENANT_ID.eq(tenant)).and(l.LEAD_ID.eq(id)).fetchOne();return r==null?null:new Header(new Subject("lead.lead",id,r.value1(),null),r.value2(),r.value3());}
     public Lead natural(Connection c,UUID tenant,String account,byte[] key){var l=LEAD_;return lead(db(c).selectFrom(l).where(l.TENANT_ID.eq(tenant)).and(l.SOURCE_ACCOUNT_CODE.eq(account)).and(l.SOURCE_RECORD_KEY_DIGEST.eq(key)).fetchOne());}
     public void lock(Connection c,UUID tenant,UUID id){var l=LEAD_;db(c).select(l.LEAD_ID).from(l).where(l.TENANT_ID.eq(tenant)).and(l.LEAD_ID.eq(id)).forUpdate().fetch();}
@@ -31,8 +34,10 @@ public final class JooqLeadRepository implements LeadIngressService {
     public Lead capture(Connection c,UUID tenant,Map<String,Object> p,byte[] sourceKey,Instant now){
         var l=LEAD_;UUID id=id(c);var digest=new TreeMap<String,Object>();
         for(String key:List.of("sourceChannelCode","sourceAccountCode","capturedName","phone","email","cityCode","serviceCategoryCode","jurisdictionCode","urgencyCode","legalNeedSummary"))digest.put(key,p.get(key));
+        for(String key:List.of("customerName","contactName"))if(p.containsKey(key))digest.put(key,p.get(key));
         Instant captured=Instant.parse((String)p.get("capturedAt"));digest.put("capturedAt",timestamp(captured));digest.put("sourceRecordKeyDigest",base64(sourceKey));
         db(c).insertInto(l).set(l.TENANT_ID,tenant).set(l.LEAD_ID,id).set(l.SOURCE_CHANNEL_CODE,(String)p.get("sourceChannelCode")).set(l.SOURCE_ACCOUNT_CODE,(String)p.get("sourceAccountCode")).set(l.SOURCE_RECORD_KEY_DIGEST,sourceKey).set(l.CAPTURED_AT,time(captured))
+          .set(l.CUSTOMER_NAME_CIPHERTEXT,encrypt(tenant,CUSTOMER_NAME,p,"customerName")).set(l.CONTACT_NAME_CIPHERTEXT,encrypt(tenant,CONTACT_NAME,p,"contactName"))
           .set(l.CAPTURED_NAME_CIPHERTEXT,encrypt(tenant,CAPTURED_NAME,p,"capturedName")).set(l.CAPTURED_PHONE_CIPHERTEXT,encrypt(tenant,CAPTURED_PHONE,p,"phone")).set(l.CAPTURED_PHONE_HMAC,hmac(tenant,LEAD_PHONE_EXACT,p,"phone"))
           .set(l.CAPTURED_EMAIL_CIPHERTEXT,encrypt(tenant,CAPTURED_EMAIL,p,"email")).set(l.CAPTURED_EMAIL_HMAC,hmac(tenant,LEAD_EMAIL_EXACT,p,"email")).set(l.CITY_CODE,(String)p.get("cityCode"))
           .set(l.SERVICE_CATEGORY_CODE,(String)p.get("serviceCategoryCode")).set(l.JURISDICTION_CODE,(String)p.get("jurisdictionCode")).set(l.URGENCY_CODE,(String)p.get("urgencyCode"))
@@ -46,7 +51,7 @@ public final class JooqLeadRepository implements LeadIngressService {
     public Assignment assignment(Connection c,UUID tenant,UUID id){var a=LEAD_ASSIGNMENT;var r=db(c).selectFrom(a).where(a.TENANT_ID.eq(tenant)).and(a.LEAD_ASSIGNMENT_ID.eq(id)).fetchOne();return r==null?null:new Assignment(new Subject("lead.lead_assignment",id,r.get(a.REVISION),null),r.get(a.LEAD_ID),r.get(a.OWNER_APPOINTMENT_ID),r.get(a.ASSIGNMENT_STATUS_CODE),r.get(a.CREATED_AT).toInstant());}
     public boolean hasOpenAssignment(Connection c,UUID tenant,UUID lead){var a=LEAD_ASSIGNMENT;return db(c).fetchExists(DSL.selectOne().from(a).where(a.TENANT_ID.eq(tenant)).and(a.LEAD_ID.eq(lead)).and(a.ASSIGNMENT_STATUS_CODE.eq("OPEN")));}
     public Assignment assign(Connection c,UUID tenant,Lead lead,UUID owner,String reason,Instant now){
-        if(!Set.of("MANUAL_SELECTION","SOURCE_POLICY_AUTOMATIC","ROUTING_RETRY").contains(reason))throw new IllegalArgumentException("Invalid assignment reason");
+        if(!Set.of("MANUAL_SELECTION","SOURCE_POLICY_AUTOMATIC","ROUTING_RETRY","SOURCE_REQUEST_CONTINUATION").contains(reason))throw new IllegalArgumentException("Invalid assignment reason");
         if(lead.assignment()!=null||hasOpenAssignment(c,tenant,lead.selector().id()))throw new CommandHandler.Rejected("STALE_SUBJECT");
         var a=LEAD_ASSIGNMENT;UUID id=id(c);db(c).insertInto(a).set(a.TENANT_ID,tenant).set(a.LEAD_ASSIGNMENT_ID,id).set(a.LEAD_ID,lead.selector().id()).set(a.ASSIGNMENT_NO,1L).set(a.OWNER_APPOINTMENT_ID,owner).set(a.ASSIGNMENT_REASON_CODE,reason)
             .set(a.ASSIGNED_AT,time(now)).set(a.ASSIGNMENT_STATUS_CODE,"OPEN").set(a.REVISION,0L).set(a.CREATED_AT,time(now)).execute();return assignment(c,tenant,id);

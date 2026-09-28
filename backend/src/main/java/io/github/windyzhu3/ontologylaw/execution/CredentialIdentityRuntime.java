@@ -10,7 +10,9 @@ import static io.github.windyzhu3.ontologylaw.execution.internal.persistence.Cap
 public final class CredentialIdentityRuntime {
     public HumanIdentityReader.VerifiedHumanIdentity human(Connection connection,UUID tenant,String provider,byte[] hmac)throws SQLException {
         return inTransaction(connection,Capability.QUERY,c->{
-            R1BusinessFence.databaseBacked().shared(c,tenant);AuthorizationService.databaseBacked().lockForEvaluation(c,tenant);
+            // Credential mapping reads identity tables only. The identity shared lock
+            // serializes revocation; unrelated business commands must not delay login.
+            AuthorizationService.databaseBacked().lockForEvaluation(c,tenant);
             var reader=HumanIdentityReader.databaseBacked();var identity=reader.unique(c,tenant,provider,hmac);reader.self(c,identity);return identity;
         });
     }
@@ -19,7 +21,7 @@ public final class CredentialIdentityRuntime {
     }
     public Actor selectHuman(Connection connection,HumanIdentityReader.VerifiedHumanIdentity identity,UUID selector,UUID behalf)throws SQLException {
         return inTransaction(connection,Capability.QUERY,c->{
-            R1BusinessFence.databaseBacked().shared(c,identity.tenantId());AuthorizationService.databaseBacked().lockForEvaluation(c,identity.tenantId());
+            AuthorizationService.databaseBacked().lockForEvaluation(c,identity.tenantId());
             var reader=HumanIdentityReader.databaseBacked();var self=reader.self(c,identity);var actor=self.select(selector);
             if(actor==null)throw new HumanIdentityReader.Failure("NOT_AUTHORIZED");
             return reader.selectDelegated(self,actor,behalf,behalf==null?List.of():reader.delegated(c,identity,actor.appointmentId()));

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IdentityField } from "./IdentityFormFields";
 import type { IdentityCommand } from "./useIdentityCommand";
 
-function IdentityDialog({ title, children, onCancel, locked, returnFocus }: { title: string; children: ReactNode; onCancel: () => void; locked: boolean; returnFocus: HTMLElement | null }) {
+export function IdentityDialog({ title, children, onCancel, locked, returnFocus }: { title: string; children: ReactNode; onCancel: () => void; locked: boolean; returnFocus: HTMLElement | null }) {
   const dialog = useRef<HTMLDivElement>(null);
   const cancel = useRef(onCancel); cancel.current = onCancel;
   const blocked = useRef(locked); blocked.current = locked;

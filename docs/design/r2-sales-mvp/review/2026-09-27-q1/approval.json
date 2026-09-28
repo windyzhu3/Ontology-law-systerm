@@ -1,0 +1,16 @@
+{
+  "status": "CONFIRMED",
+  "confirmedOn": "2026-09-27",
+  "userDecision": "确认，继续",
+  "scope": "Classification correction entry, current values, reason and same matter history under Q1",
+  "files": {
+    "app.html": "85854f3ef65ff32dfc268c0a1ac1eb40a08374fce650aa8ab64666cbc3c0e73f",
+    "contractControls.css": "86e8531d69e5fb8e0e3186c959aa282dcfedd529b4861d90cdc7adca4717061c",
+    "index.html": "effbc71236fcc26ccf285e232993405627684ea242e5d869745585bba1c6289b",
+    "ledgerMaster.css": "7ab59db1efa9ec39404ca189125bc9af820382ad7ab5b0e68c885a0447e65851",
+    "scenes.js": "dad87e1c7c1cd73b6be6e6b73d1d6f6416347ce2b053807b7c21ab8bc13ff5d9",
+    "transfer.js": "847c8cf46660759e6ffcb16ef4963311baed851f523b233f6424245b0d4628dc",
+    "workbench.css": "604351c18af358cdb6ce830b73a1a50274b95579331e731b8eb243f5af9a7c49",
+    "workbenchControls.css": "438ebfc63712e6df25491144071ca0563af4e74eb1a77e0e6cbf5c62ca9130d3"
+  }
+}

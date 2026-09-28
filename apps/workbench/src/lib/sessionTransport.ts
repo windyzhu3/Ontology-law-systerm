@@ -17,6 +17,14 @@ export interface WorkbenchSession {
   getValidAccessToken(): Promise<string>;
   isCurrent(): boolean;
   invalidate(status: number): void;
+  readonly canEnterWorkbench?: boolean;
+  readonly canReadOpportunityLedger?: boolean;
+  readonly canReadBusinessManagement?: boolean;
+  readonly canReadTeamTasks?: boolean;
+  readonly canReadBusinessOverview?: boolean;
+  readonly canReadLeadManagement?: boolean;
+  readonly canManageOwnerExceptions?: boolean;
+  readonly businessManagementViews?: readonly ('contracts'|'payments'|'transfer')[];
   readonly displayName?: string;
 }
 
@@ -154,6 +162,7 @@ export function matchesReceipt(
     publicCommandFacts[marker.commandType as keyof typeof publicCommandFacts];
   if (value.outcome !== "REJECTED") {
     if (value.resultFact.factType !== fact) return false;
+    if (marker.commandType === "CLOSE_OPPORTUNITY" && (value.outcome !== "SUCCEEDED" || !("revision" in value.resultFact) || value.resultFact.revision !== 0)) return false;
     const identity = [
       "IDENTITY_PRINCIPAL",
       "ORGANIZATION_UNIT",
@@ -171,5 +180,6 @@ export function matchesReceipt(
       return false;
     return true;
   }
+  if (value.rejectionCode === "VALIDATION_FAILED" && !["RECORD_OPPORTUNITY_FOLLOWUP_ATTEMPT","RECORD_QUOTE_FOLLOWUP_ATTEMPT", "END_CONTRACT_NEGOTIATION", "REQUEST_CONTRACT_TERMINATION_REVIEW", "RECORD_CONTRACT_TERMINATION_REVIEW", "SAVE_CONTRACT_SIGNATURE_DRAFT", "CONFIRM_CONTRACT_SIGNATURE_ARRANGEMENT", "SUBMIT_CONTRACT_SIGNATURE", "RECORD_CONTRACT_SIGNATURE_VERIFICATION", "ARCHIVE_CONTRACT_SIGNATURE", "REQUEST_CONTRACT_RECEIPT_REVIEW", "RECORD_CONTRACT_RECEIPT_REVIEW", "SUPPLEMENT_CONTRACT_RECEIPT", "VERIFY_CONTRACT_EXECUTION_CONDITIONS", "RETURN_CONTRACT_FOR_REVISION", "RETURN_CONTRACT_SIGNATURE_FOR_REVISION", "REQUEST_CONTRACT_PREPARATION", "RECORD_CONTRACT_PREPARATION_DECISION", "START_CONTRACT_PREPARATION", "SAVE_CONTRACT_DRAFT", "FORM_CONTRACT", "REQUEST_CONTRACT_REVIEW", "RECORD_CONTRACT_REVIEW", "REQUEST_CONTRACT_APPROVAL", "RECORD_CONTRACT_DECISION", "END_QUOTE_NEGOTIATION", "START_QUOTE_PREPARATION", "SAVE_QUOTE_DRAFT", "FORM_QUOTE", "REQUEST_QUOTE_APPROVAL", "RECORD_QUOTE_DECISION", "RECORD_QUOTE_DELIVERY", "RECORD_QUOTE_RESPONSE", "SAVE_OPPORTUNITY_CUSTOMER_DRAFT", "CONFIRM_OPPORTUNITY_CUSTOMER_REQUIREMENTS", "OPEN_OPPORTUNITY_MATERIAL_UPLOAD", "ACCEPT_OPPORTUNITY_MATERIAL"].includes(marker.commandType)) return false;
   return allowedCommandError(marker.commandType, value.rejectionCode);
 }

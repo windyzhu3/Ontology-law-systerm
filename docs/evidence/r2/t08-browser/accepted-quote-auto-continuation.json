@@ -1,0 +1,24 @@
+{
+  "recordedAt": "2026-09-21T11:28:28.737553+00:00",
+  "case": "C30",
+  "opportunityId": "01a0bf20-bab5-7f4d-a908-74a44aa1a480",
+  "stage": "PREPARE",
+  "actions": [
+    "START_CONTRACT_PREPARATION"
+  ],
+  "checkpoint": {
+    "kind": "CONTRACT_PREPARATION",
+    "index": 0,
+    "failures": 0,
+    "lastStatus": 200,
+    "acknowledged": 1,
+    "rejected": 0,
+    "blocked": false,
+    "active": false,
+    "uncertain": false,
+    "probe": false,
+    "retryAt": "-1000000000-01-01T00:00:00Z",
+    "status": "READY"
+  },
+  "method": "Real worker consumed existing accepted quote after original retry deadline; no checkpoint reset or manual recovery command."
+}

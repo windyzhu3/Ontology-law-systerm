@@ -10,26 +10,51 @@ import org.jooq.impl.DSL;
 import static io.github.windyzhu3.ontologylaw.identity.internal.persistence.jooq.Tables.*;
 
 public final class JooqR1AuthorityReader implements R1AuthorityReader {
+    private record GrantCandidates(Actor actor,String code,Path path) {}
     private final AuthorizationService authorization=AuthorizationService.databaseBacked();
     private static DSLContext db(Connection c) {return DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false));}
     public Request select(Connection c,Actor actor,Subject subject,UUID organization,String slot,String code) throws SQLException {
-        var d=db(c);List<UUID> ids;Path path;
-        if(actor.onBehalfAppointmentId()!=null) {
-            path=Path.DELEGATED;var g=DELEGATION_GRANT;
-            ids=d.select(g.DELEGATION_GRANT_ID).from(g).where(g.TENANT_ID.eq(actor.tenantId()))
-                    .and(g.DELEGATE_APPOINTMENT_ID.eq(actor.appointmentId())).and(g.DELEGATOR_APPOINTMENT_ID.eq(actor.onBehalfAppointmentId()))
-                    .orderBy(g.DELEGATION_GRANT_ID).fetch(g.DELEGATION_GRANT_ID);
-        } else {
-            path=actor.principalKind()==PrincipalKind.SERVICE?Path.SYSTEM:Path.DIRECT;var g=AUTHORITY_GRANT;
-            ids=d.select(g.AUTHORITY_GRANT_ID).from(g).where(g.TENANT_ID.eq(actor.tenantId()))
-                    .and(g.GRANTEE_APPOINTMENT_ID.eq(actor.appointmentId())).and(g.AUTHORITY_CODE.eq(code))
-                    .orderBy(g.AUTHORITY_GRANT_ID).fetch(g.AUTHORITY_GRANT_ID);
-        }
+        var result=choose(c,actor,subject,organization,slot,code,false);
+        return result==null?null:result.request();
+    }
+    public AuthorizationSnapshot authorize(Connection c,Actor actor,Subject subject,UUID organization,String slot,String code)throws SQLException {
+        return choose(c,actor,subject,organization,slot,code,true);
+    }
+    private AuthorizationSnapshot choose(Connection c,Actor actor,Subject subject,UUID organization,String slot,String code,boolean finalCheck)throws SQLException {
+        Path path=actor.onBehalfAppointmentId()!=null?Path.DELEGATED:actor.principalKind()==PrincipalKind.SERVICE?Path.SYSTEM:Path.DIRECT;
+        var ids=grantIds(c,actor,code,path);
         for(UUID id:ids) {
             var request=new Request(actor,subject,organization,new Requirement(code,slot,path,id));
-            if(authorization.evaluate(c,request,false).allowed())return request;
+            var snapshot=authorization.evaluate(c,request,finalCheck);
+            if(snapshot.allowed())return snapshot;
         }
         return null;
+    }
+    private List<UUID> grantIds(Connection c,Actor actor,String code,Path path) {
+        var d=db(c);
+        if(path==Path.DELEGATED){var g=DELEGATION_GRANT;return JooqAuthorizationService.lockedFacts(c,actor.tenantId(),new GrantCandidates(actor,code,path),()->d.select(g.DELEGATION_GRANT_ID).from(g).where(g.TENANT_ID.eq(actor.tenantId())).and(g.DELEGATE_APPOINTMENT_ID.eq(actor.appointmentId())).and(g.DELEGATOR_APPOINTMENT_ID.eq(actor.onBehalfAppointmentId())).orderBy(g.DELEGATION_GRANT_ID).fetch(g.DELEGATION_GRANT_ID));}
+        var g=AUTHORITY_GRANT;return JooqAuthorizationService.lockedFacts(c,actor.tenantId(),new GrantCandidates(actor,code,path),()->d.select(g.AUTHORITY_GRANT_ID).from(g).where(g.TENANT_ID.eq(actor.tenantId())).and(g.GRANTEE_APPOINTMENT_ID.eq(actor.appointmentId())).and(g.AUTHORITY_CODE.eq(code)).orderBy(g.AUTHORITY_GRANT_ID).fetch(g.AUTHORITY_GRANT_ID));
+    }
+    public List<AuthorizationSnapshot> authorizeAll(Connection c,Actor actor,List<Subject> subjects,UUID organization,String slot,String code)throws SQLException {
+        if(!JooqAuthorizationService.lockedReadActive(c,actor.tenantId()))return R1AuthorityReader.super.authorizeAll(c,actor,subjects,organization,slot,code);
+        Path path=actor.onBehalfAppointmentId()!=null?Path.DELEGATED:actor.principalKind()==PrincipalKind.SERVICE?Path.SYSTEM:Path.DIRECT;
+        var found=new HashMap<Subject,AuthorizationSnapshot>();
+        for(UUID id:grantIds(c,actor,code,path)){
+            var requests=subjects.stream().distinct().filter(subject->!found.containsKey(subject)).map(subject->new Request(actor,subject,organization,new Requirement(code,slot,path,id))).toList();
+            var evaluated=authorization.evaluateAll(c,requests,true);
+            boolean oneCompletePath=found.isEmpty()&&evaluated.stream().allMatch(AuthorizationSnapshot::allowed);
+            for(var snapshot:evaluated)if(snapshot.allowed())found.put(snapshot.request().subject(),snapshot);
+            // This whole selection was evaluated at one database time, with the
+            // batch's end-time boundary check already complete. A second identical
+            // evaluation adds no distinct winning path to verify. A new call still
+            // obtains fresh time; selections assembled across paths use the check below.
+            if(oneCompletePath)return subjects.stream().map(found::get).toList();
+            if(found.size()==new HashSet<>(subjects).size())break;
+        }
+        if(subjects.stream().anyMatch(subject->!found.containsKey(subject)))return List.of();
+        // Earlier winning paths can expire while other paths are being selected.
+        var result=authorization.evaluateAll(c,subjects.stream().map(subject->found.get(subject).request()).toList(),true);
+        return result.stream().allMatch(AuthorizationSnapshot::allowed)?result:List.of();
     }
     public List<Candidate> candidates(Connection c,UUID tenant,Subject subject,UUID organization,String slot,String code) throws SQLException {
         var a=APPOINTMENT;var p=PRINCIPAL;var result=new ArrayList<Candidate>();

@@ -1,0 +1,133 @@
+{
+  "C21": {
+    "label": "报价草稿待形成",
+    "opportunityId": "01a0bf17-61c6-7a16-bd78-2e8085e38575",
+    "stage": null,
+    "actions": [
+      "SAVE_QUOTE_DRAFT",
+      "FORM_QUOTE"
+    ],
+    "historyCount": 0,
+    "recordCount": 0
+  },
+  "C22": {
+    "label": "报价待提交审批",
+    "opportunityId": "01a0bf18-207e-74a9-9ad8-089ef40aba9f",
+    "stage": "SUBMIT_APPROVAL",
+    "actions": [
+      "REQUEST_QUOTE_APPROVAL"
+    ],
+    "historyCount": 1,
+    "recordCount": 0,
+    "ledger": {
+      "taskState": "OPEN",
+      "nextActionLabel": "提交报价审批",
+      "dueAt": "2026-09-21T05:00:00Z",
+      "canHandle": true
+    }
+  },
+  "C23": {
+    "label": "报价审批待处理",
+    "opportunityId": "01a0bf18-d5b2-717f-bd59-891451939cde",
+    "stage": "AWAIT_APPROVAL",
+    "actions": [
+      "RECORD_QUOTE_DECISION"
+    ],
+    "historyCount": 1,
+    "recordCount": 0
+  },
+  "C24": {
+    "label": "报价退回待修订",
+    "opportunityId": "01a0bf1b-12d8-7b9e-90af-3f0d52fb7464",
+    "stage": "RETURNED",
+    "actions": [
+      "SAVE_QUOTE_DRAFT",
+      "FORM_QUOTE"
+    ],
+    "historyCount": 1,
+    "recordCount": 1
+  },
+  "C25": {
+    "label": "报价待交付",
+    "opportunityId": "01a0bf1b-e30f-7003-aef8-84fc5c352111",
+    "stage": "DELIVER",
+    "actions": [
+      "RECORD_QUOTE_DELIVERY"
+    ],
+    "historyCount": 1,
+    "recordCount": 1
+  },
+  "C26": {
+    "label": "报价客户回复待录入",
+    "opportunityId": "01a0bf1c-85af-78d5-b729-7920bdd7e64c",
+    "stage": "AWAIT_REPLY",
+    "actions": [
+      "RECORD_QUOTE_RESPONSE"
+    ],
+    "historyCount": 1,
+    "recordCount": 2
+  },
+  "C27": {
+    "label": "报价未接受待跟进",
+    "opportunityId": "01a0bf1d-48dc-74c7-ad41-c13ed715a330",
+    "stage": "FOLLOW_UP",
+    "actions": [
+      "RECORD_QUOTE_RESPONSE"
+    ],
+    "historyCount": 1,
+    "recordCount": 3,
+    "ledger": {
+      "taskState": "WAITING",
+      "nextActionLabel": "跟进客户报价回复",
+      "dueAt": "2026-09-22T15:01:12.348469Z",
+      "canHandle": false
+    }
+  },
+  "C28": {
+    "label": "报价含糊回复待澄清",
+    "opportunityId": "01a0bf1e-95d0-71f8-ac55-101fb542da50",
+    "stage": "CLARIFY_REPLY",
+    "actions": [
+      "RECORD_QUOTE_RESPONSE"
+    ],
+    "historyCount": 1,
+    "recordCount": 3,
+    "ledger": {
+      "taskState": "WAITING",
+      "nextActionLabel": "澄清客户报价回复",
+      "dueAt": "2026-09-22T15:01:41.621577Z",
+      "canHandle": false
+    }
+  },
+  "C29": {
+    "label": "报价拒绝待销售处置",
+    "opportunityId": "01a0bf20-3175-7cc2-90aa-be08942249d7",
+    "stage": "SALES_DISPOSITION",
+    "actions": [
+      "SAVE_QUOTE_DRAFT",
+      "FORM_QUOTE"
+    ],
+    "historyCount": 1,
+    "recordCount": 3,
+    "ledger": {
+      "taskState": "OPEN",
+      "nextActionLabel": "决定后续洽谈安排",
+      "dueAt": "2026-09-22T15:02:48.706927Z",
+      "canHandle": true
+    }
+  },
+  "C30": {
+    "label": "报价已接受待合同准备",
+    "opportunityId": "01a0bf20-bab5-7f4d-a908-74a44aa1a480",
+    "stage": "ACCEPTED",
+    "actions": [],
+    "historyCount": 1,
+    "recordCount": 3,
+    "ledger": {
+      "taskState": "NONE",
+      "nextActionLabel": "报价已接受，待衔接合同准备",
+      "dueAt": null,
+      "canHandle": false
+    }
+  }
+}

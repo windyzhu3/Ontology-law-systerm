@@ -1,0 +1,306 @@
+[
+  {
+    "scene": "initial",
+    "viewport": 1487,
+    "headings": [
+      "团队待办",
+      "海宁公司"
+    ],
+    "primary": 1,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "open",
+    "viewport": 1487,
+    "headings": [
+      "团队待办",
+      "嘉衡公司"
+    ],
+    "primary": 1,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "due",
+    "viewport": 1487,
+    "headings": [
+      "团队待办",
+      "远辰公司"
+    ],
+    "primary": 1,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "future",
+    "viewport": 1487,
+    "headings": [
+      "团队待办",
+      "明川公司"
+    ],
+    "primary": 1,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "none",
+    "viewport": 1487,
+    "headings": [
+      "团队待办",
+      "嘉衡公司"
+    ],
+    "primary": 1,
+    "scrollWidth": 1472,
+    "width": 1472
+  },
+  {
+    "scene": "changed",
+    "viewport": 1487,
+    "headings": [
+      "团队待办",
+      "海宁公司"
+    ],
+    "primary": 1,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "revoked",
+    "viewport": 1487,
+    "headings": [
+      "团队待办",
+      "海宁公司"
+    ],
+    "primary": 0,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "hidden",
+    "viewport": 1487,
+    "headings": [
+      "团队待办"
+    ],
+    "primary": 0,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "operations",
+    "viewport": 1487,
+    "headings": [
+      "团队待办",
+      "异常 001"
+    ],
+    "primary": 0,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "resolved",
+    "viewport": 1487,
+    "headings": [
+      "团队待办",
+      "海宁公司"
+    ],
+    "primary": 0,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "waiting",
+    "viewport": 1487,
+    "headings": [
+      "约定客户回访",
+      "明川公司"
+    ],
+    "primary": 0,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "readonly",
+    "viewport": 1487,
+    "headings": [
+      "团队待办",
+      "海宁公司"
+    ],
+    "primary": 0,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "empty",
+    "viewport": 1487,
+    "headings": [
+      "团队待办",
+      "当前授权范围内没有待处置异常"
+    ],
+    "primary": 0,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "failed",
+    "viewport": 1487,
+    "headings": [
+      "团队待办"
+    ],
+    "primary": 0,
+    "scrollWidth": 1487,
+    "width": 1487
+  },
+  {
+    "scene": "initial",
+    "viewport": 360,
+    "headings": [
+      "团队待办",
+      "海宁公司"
+    ],
+    "primary": 1,
+    "scrollWidth": 345,
+    "width": 345
+  },
+  {
+    "scene": "open",
+    "viewport": 360,
+    "headings": [
+      "团队待办",
+      "嘉衡公司"
+    ],
+    "primary": 1,
+    "scrollWidth": 345,
+    "width": 345
+  },
+  {
+    "scene": "due",
+    "viewport": 360,
+    "headings": [
+      "团队待办",
+      "远辰公司"
+    ],
+    "primary": 1,
+    "scrollWidth": 345,
+    "width": 345
+  },
+  {
+    "scene": "future",
+    "viewport": 360,
+    "headings": [
+      "团队待办",
+      "明川公司"
+    ],
+    "primary": 1,
+    "scrollWidth": 345,
+    "width": 345
+  },
+  {
+    "scene": "none",
+    "viewport": 360,
+    "headings": [
+      "团队待办",
+      "嘉衡公司"
+    ],
+    "primary": 1,
+    "scrollWidth": 345,
+    "width": 345
+  },
+  {
+    "scene": "changed",
+    "viewport": 360,
+    "headings": [
+      "团队待办",
+      "海宁公司"
+    ],
+    "primary": 1,
+    "scrollWidth": 360,
+    "width": 360
+  },
+  {
+    "scene": "revoked",
+    "viewport": 360,
+    "headings": [
+      "团队待办",
+      "海宁公司"
+    ],
+    "primary": 0,
+    "scrollWidth": 360,
+    "width": 360
+  },
+  {
+    "scene": "hidden",
+    "viewport": 360,
+    "headings": [
+      "团队待办"
+    ],
+    "primary": 0,
+    "scrollWidth": 360,
+    "width": 360
+  },
+  {
+    "scene": "operations",
+    "viewport": 360,
+    "headings": [
+      "团队待办",
+      "异常 001"
+    ],
+    "primary": 0,
+    "scrollWidth": 360,
+    "width": 360
+  },
+  {
+    "scene": "resolved",
+    "viewport": 360,
+    "headings": [
+      "团队待办",
+      "海宁公司"
+    ],
+    "primary": 0,
+    "scrollWidth": 360,
+    "width": 360
+  },
+  {
+    "scene": "waiting",
+    "viewport": 360,
+    "headings": [
+      "约定客户回访",
+      "明川公司"
+    ],
+    "primary": 0,
+    "scrollWidth": 360,
+    "width": 360
+  },
+  {
+    "scene": "readonly",
+    "viewport": 360,
+    "headings": [
+      "团队待办",
+      "海宁公司"
+    ],
+    "primary": 0,
+    "scrollWidth": 345,
+    "width": 345
+  },
+  {
+    "scene": "empty",
+    "viewport": 360,
+    "headings": [
+      "团队待办",
+      "当前授权范围内没有待处置异常"
+    ],
+    "primary": 0,
+    "scrollWidth": 360,
+    "width": 360
+  },
+  {
+    "scene": "failed",
+    "viewport": 360,
+    "headings": [
+      "团队待办"
+    ],
+    "primary": 0,
+    "scrollWidth": 360,
+    "width": 360
+  }
+]

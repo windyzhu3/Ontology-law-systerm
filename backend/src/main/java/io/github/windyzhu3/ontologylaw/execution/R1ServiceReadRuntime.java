@@ -23,8 +23,9 @@ public final class R1ServiceReadRuntime {
         try {
             return inTransaction(connection,Capability.QUERY,c->{
                 R1BusinessFence.databaseBacked().shared(c,actor.tenantId());
-                AuthorizationService.databaseBacked().lockForEvaluation(c,actor.tenantId());
-                return work.read(c,SensitiveReadClock.now(c));
+                try(var identityRead=AuthorizationService.databaseBacked().lockedReadScope(c,actor.tenantId())) {
+                    return work.read(c,SensitiveReadClock.now(c));
+                }
             });
         } catch(Failure safe){throw safe;}
         catch(SQLException|RuntimeException failure){throw new Failure(503,"SERVICE_UNAVAILABLE");}

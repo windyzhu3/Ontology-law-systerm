@@ -1,0 +1,16 @@
+{
+  "status": "CONFIRMED",
+  "scope": "P1 receipt evidence, configured account display and correction validation only",
+  "basedOn": "2026-09-26-p",
+  "files": {
+    "app.html": "1a0fb847979687500e68c43306cfb1b64451a31769d22a1919f17f711da2fe5f",
+    "execution.js": "c62c1b55ecc80c45a65bc1ca81191dcbf05db6f28cc8e6efe7a227b1925ee296",
+    "scenes.js": "b6b2e920c39b8941d8820e53b21181056865f54299de6a4ea92db9de1639b1d9",
+    "workbench.css": "604351c18af358cdb6ce830b73a1a50274b95579331e731b8eb243f5af9a7c49",
+    "ledgerMaster.css": "7ab59db1efa9ec39404ca189125bc9af820382ad7ab5b0e68c885a0447e65851",
+    "workbenchControls.css": "438ebfc63712e6df25491144071ca0563af4e74eb1a77e0e6cbf5c62ca9130d3",
+    "contractControls.css": "86e8531d69e5fb8e0e3186c959aa282dcfedd529b4861d90cdc7adca4717061c"
+  },
+  "confirmedOn": "2026-09-27",
+  "userDecision": "确认，按 P1 继续实施"
+}

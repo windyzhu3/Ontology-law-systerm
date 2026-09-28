@@ -20,6 +20,10 @@ public class R1ApiDelegate implements CommandReceiptsApi,LeadsApi,TaskCommandsAp
     public R1ApiDelegate(ObjectProvider<R1ApiServices> services){this.services=services;}
     private R1ApiServices service(){var value=services.getIfAvailable();if(value==null)throw new R1HttpFailure("SERVICE_UNAVAILABLE");return value;}
     private Actor actor(){return (Actor)SecurityContextHolder.getContext().getAuthentication().getPrincipal();}
+    public ResponseEntity<LeadIntakeSourcesV1> getLeadIntakeSources(UUID xAppointmentId,UUID xOnBehalfAppointmentId) {
+        return ResponseEntity.ok().header("Cache-Control","no-store")
+                .body(R1WireModels.model(service().intakeSources(actor()),LeadIntakeSourcesV1.class));
+    }
     public ResponseEntity<CommandReceipt> getCommandReceipt(UUID commandId,UUID xAppointmentId,UUID xOnBehalfAppointmentId){
         var service=services.getIfAvailable();if(service==null)throw new R1HttpFailure("SERVICE_UNAVAILABLE");
         var actor=(Actor)SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -30,8 +34,8 @@ public class R1ApiDelegate implements CommandReceiptsApi,LeadsApi,TaskCommandsAp
     public ResponseEntity<LeadCommandReceipt> captureLead(UUID key,CaptureLeadV1 body,UUID xAppointmentId,UUID xOnBehalfAppointmentId){
         return command(new CommandEnvelope(CommandEnvelope.Type.CAPTURE_LEAD,key,UUID.randomUUID(),actor(),R1WireModels.payload(body)),LeadCommandReceipt.class);
     }
-    public ResponseEntity<CurrentWorkCardEnvelope> getCurrentWorkCard(String ifNoneMatch,UUID xAppointmentId,UUID xOnBehalfAppointmentId){
-        requireHuman();var value=service().card(actor(),UUID.randomUUID(),ifNoneMatch);if(value.errorCode()!=null)throw new R1HttpFailure(value.errorCode());
+    public ResponseEntity<CurrentWorkCardEnvelope> getCurrentWorkCard(String ifNoneMatch,UUID xAppointmentId,UUID xOnBehalfAppointmentId,UUID taskId){
+        requireHuman();var value=service().card(actor(),UUID.randomUUID(),ifNoneMatch,taskId);if(value.errorCode()!=null)throw new R1HttpFailure(value.errorCode());
         var response=ResponseEntity.status(value.status()).header("Cache-Control",value.cacheControl()).header("Vary",value.vary()).header("ETag",value.etag());
         return value.status()==304?response.build():response.body(R1WireModels.model(value.body(),CurrentWorkCardEnvelope.class));
     }
@@ -42,6 +46,10 @@ public class R1ApiDelegate implements CommandReceiptsApi,LeadsApi,TaskCommandsAp
     public ResponseEntity<LeadAssignmentCommandReceipt> assignLead(UUID task,UUID key,String match,AssignLeadV1 body,UUID xAppointmentId,UUID xOnBehalfAppointmentId){return primary(CommandEnvelope.Type.ASSIGN_LEAD,task,key,match,body,LeadAssignmentCommandReceipt.class);}
     public ResponseEntity<LeadCommandReceipt> completeLeadIngress(UUID task,UUID key,String match,CompleteLeadIngressV1 body,UUID xAppointmentId,UUID xOnBehalfAppointmentId){return primary(CommandEnvelope.Type.COMPLETE_LEAD_INGRESS,task,key,match,body,LeadCommandReceipt.class);}
     public ResponseEntity<LeadContactResultCommandReceipt> recordContactResult(UUID task,UUID key,String match,RecordContactResultV1 body,UUID xAppointmentId,UUID xOnBehalfAppointmentId){return primary(CommandEnvelope.Type.RECORD_CONTACT_RESULT,task,key,match,body,LeadContactResultCommandReceipt.class);}
+    public ResponseEntity<SourceRequestDraftWriteResultV1> saveSourceRequestDraft(UUID task,UUID key,SaveSourceRequestDraftV1 body,String match,String none,UUID appointment,UUID onBehalf){
+        requireHuman();return command(new CommandEnvelope(CommandEnvelope.Type.SAVE_ACTION_DRAFT,key,UUID.randomUUID(),actor(),R1WireModels.payload(body),null,new CommandEnvelope.DraftPrecondition(task,match,none)),SourceRequestDraftWriteResultV1.class);
+    }
+    public ResponseEntity<DecisionRecordCommandReceipt> recordSourceRequestContinuation(UUID task,UUID key,String match,RecordSourceRequestContinuationV1 body,UUID appointment,UUID onBehalf){return primary(CommandEnvelope.Type.RECORD_SOURCE_REQUEST_CONTINUATION,task,key,match,body,DecisionRecordCommandReceipt.class);}
     public ResponseEntity<DecisionRecordCommandReceipt> recordRoutingDisposition(UUID task,UUID key,String match,RecordRoutingDispositionV1 body,UUID xAppointmentId,UUID xOnBehalfAppointmentId){return primary(CommandEnvelope.Type.RECORD_ROUTING_DISPOSITION,task,key,match,body,DecisionRecordCommandReceipt.class);}
     public ResponseEntity<DecisionRecordCommandReceipt> resolveDuplicateLead(UUID task,UUID key,String match,ResolveDuplicateLeadV1 body,UUID xAppointmentId,UUID xOnBehalfAppointmentId){return primary(CommandEnvelope.Type.RESOLVE_DUPLICATE_LEAD,task,key,match,body,DecisionRecordCommandReceipt.class);}
     public ResponseEntity<DecisionRecordCommandReceipt> reviewLeadValidity(UUID task,UUID key,String match,ReviewLeadValidityV1 body,UUID xAppointmentId,UUID xOnBehalfAppointmentId){return primary(CommandEnvelope.Type.REVIEW_LEAD_VALIDITY,task,key,match,body,DecisionRecordCommandReceipt.class);}

@@ -87,3 +87,18 @@ it("does not treat a Problem from another command's error registry as proof", ()
     ),
   ).toBe(false);
 });
+it('uses close-specific body selector stale proof without accepting other command errors',()=>{
+ const close={...marker,commandType:'CLOSE_OPPORTUNITY'}, {fieldErrors,...base}=validation;
+ expect(provenWriteOutcome({...base,status:412,code:'STALE_SUBJECT',retryPolicy:'NEW_KEY_AFTER_REFRESH'},412,close)).toBe(true);
+ expect(provenWriteOutcome({...base,status:409,code:'OPPORTUNITY_HAS_DOWNSTREAM_FACTS',retryPolicy:'NO'},409,close)).toBe(true);
+ expect(provenWriteOutcome({...base,status:409,code:'TASK_ALREADY_COMPLETED',retryPolicy:'NO'},409,close)).toBe(false);
+});
+
+it.each(['END_CONTRACT_NEGOTIATION','REQUEST_CONTRACT_TERMINATION_REVIEW','RECORD_CONTRACT_TERMINATION_REVIEW','SUBMIT_CONTRACT_SIGNATURE'])('%s recognizes an exact paused or stale contract outcome', commandType=>{
+ const {fieldErrors,...base}=validation;
+ const paused={...base,status:409,code:'CONTRACT_HANDLING_PAUSED',retryPolicy:'NEW_KEY_AFTER_REFRESH'};
+ expect(provenWriteOutcome(paused,409,{...marker,commandType})).toBe(true);
+ expect(provenWriteOutcome({...paused,retryPolicy:'NO'},409,{...marker,commandType})).toBe(false);
+ expect(provenWriteOutcome({...base,status:412,code:'STALE_SUBJECT',retryPolicy:'NEW_KEY_AFTER_REFRESH'},412,{...marker,commandType})).toBe(true);
+ expect(provenWriteOutcome(paused,409,marker)).toBe(false);
+});

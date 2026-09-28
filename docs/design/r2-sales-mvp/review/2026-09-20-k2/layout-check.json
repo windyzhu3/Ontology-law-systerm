@@ -1,0 +1,293 @@
+{
+  "desktop": [
+    {
+      "w": 1280,
+      "sc": "entry",
+      "body": true,
+      "cards": 0,
+      "primary": 0,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "prepare",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "draft",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "created",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "submit",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "pending",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "approval",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "returned",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "authorized",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "delivery",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "issued",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "response",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "accepted",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "deferred",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "rejected",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "ambiguous",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "revise",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "history",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "missing",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "expired",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "unassigned",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "stale",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "unknown",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "readonly",
+      "body": true,
+      "cards": 1,
+      "primary": 0,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "closed",
+      "body": true,
+      "cards": 1,
+      "primary": 0,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "revoked",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "failed",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "loading",
+      "body": true,
+      "cards": 1,
+      "primary": 0,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "handoff",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "waiting",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "withinAuthority",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    },
+    {
+      "w": 1280,
+      "sc": "partialApproval",
+      "body": true,
+      "cards": 1,
+      "primary": 1,
+      "scroll": 1265,
+      "width": 1265
+    }
+  ],
+  "note": "浏览器画幅覆盖未改变目标标签实际宽度；390/360批次不作为移动端通过证据。手机通过审阅框架另行检查。"
+}

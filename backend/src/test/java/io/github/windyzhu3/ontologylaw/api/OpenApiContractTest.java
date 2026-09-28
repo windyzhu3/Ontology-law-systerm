@@ -247,7 +247,7 @@ public class OpenApiContractTest {
     }
 
     @Test
-    void freezesExactlySixteenNamedOperations() {
+    void freezesNamedR1AndRegisteredR2Operations() {
         Map<OperationKey, String> actual = new LinkedHashMap<>();
         JsonNode paths = document.path("paths");
         paths.fields().forEachRemaining(pathEntry -> pathEntry.getValue().fields().forEachRemaining(methodEntry -> {
@@ -263,12 +263,137 @@ public class OpenApiContractTest {
             assertTrue(previous == null, () -> "Duplicate operation at " + method + " " + path);
         }));
 
-        assertEquals(REQUIRED_OPERATIONS, actual, "The R1 HTTP surface must remain closed and exact");
+        var registered = new LinkedHashMap<>(REQUIRED_OPERATIONS);
+        registered.put(new OperationKey("PUT", "/api/v1/tasks/{taskId}/opportunity-progress-draft"), "saveOpportunityProgressDraft");
+        registered.put(new OperationKey("POST", "/api/v1/tasks/{taskId}/commands/record-opportunity-progress"), "recordOpportunityProgress");
+        registered.put(new OperationKey("GET", "/internal/v1/opportunity-tasks/candidates"), "listR2OpportunityTaskCandidates");
+        registered.put(new OperationKey("POST", "/internal/v1/opportunity-tasks/commands/activate-initial"), "activateInitialOpportunityTask");
+        registered.put(new OperationKey("POST", "/internal/v1/opportunity-tasks/commands/reopen-due"), "reopenDueOpportunityTask");
+        // Named T01 successor; the original REQUIRED_OPERATIONS remains frozen.
+        registered.put(new OperationKey("GET", "/api/v1/opportunity-owner-exceptions"), "listOpportunityOwnerExceptions");
+        registered.put(new OperationKey("GET", "/api/v1/opportunity-owner-exceptions/operations"), "listOpportunityOwnerExceptionOperations");
+        registered.put(new OperationKey("GET", "/api/v1/opportunity-owner-exceptions/{exceptionId}"), "getOpportunityOwnerException");
+        registered.put(new OperationKey("GET", "/api/v1/opportunity-owner-exceptions/{exceptionId}/candidates"), "listOpportunityOwnerExceptionReceivers");
+        registered.put(new OperationKey("POST", "/api/v1/opportunity-owner-exceptions/commands/transfer"), "transferOpportunityResponsibility");
+        registered.put(new OperationKey("POST", "/api/v1/opportunity-owner-exceptions/commands/coordinate"), "recordOpportunityOwnerCoordination");
+        registered.put(new OperationKey("GET", "/internal/v1/opportunity-owner-exceptions/candidates"), "listOpportunityOwnerExceptionCandidates");
+        registered.put(new OperationKey("POST", "/internal/v1/opportunity-owner-exceptions/commands/observe"), "observeOpportunityOwnerException");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities"), "listOpportunities");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}"), "getOpportunity");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}/closure"), "getOpportunityClosure");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/commands/close"), "closeOpportunity");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}/customer-requirements"), "getOpportunityCustomerRequirements");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}/customer-requirements/parties"), "searchOpportunityParties");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/customer-requirements/draft"), "saveOpportunityCustomerDraft");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/customer-requirements/confirm"), "confirmOpportunityCustomerRequirements");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}/materials"), "getOpportunityMaterials");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/material-uploads"), "openOpportunityMaterialUpload");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/materials/accept"), "acceptOpportunityMaterial");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}/material-uploads/{uploadSessionId}"), "getOpportunityMaterialUpload");
+        registered.put(new OperationKey("PUT", "/api/v1/opportunities/{opportunityId}/material-uploads/{uploadSessionId}/content"), "uploadOpportunityMaterialContent");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}/materials/versions/{versionId}/content"), "downloadOpportunityMaterialContent");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}/quotes"), "getQuoteContext");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/quotes/draft"), "save_quote_draft");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/quotes/form"), "form_quote");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/quotes/approval-requests"), "request_quote_approval");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/quotes/decisions"), "record_quote_decision");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/quotes/deliveries"), "record_quote_delivery");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/quotes/responses"), "record_quote_response");
+        registered.put(new OperationKey("GET", "/api/v1/quote-tasks/{taskId}/context"), "getQuoteTaskContext");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}/quotes/{quoteId}/document"), "downloadQuoteDocument");
+        // Named T08/T09 contracts and the approved signature successor.
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/generate"), "generateContractDocument");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/signature-draft"), "save_contract_signature_draft");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/signature-arrangements"), "confirm_contract_signature_arrangement");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/signature-submissions"), "submit_contract_signature");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/signature-verifications"), "record_contract_signature_verification");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/signature-archive"), "archive_contract_signature");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/signature-revision"), "return_contract_for_revision");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/signature-verification-revision"), "return_contract_signature_for_revision");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/preparation-requests"), "request_contract_preparation");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/preparation-decisions"), "record_contract_preparation_decision");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/start"), "start_contract_preparation");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/draft"), "save_contract_draft");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/form"), "form_contract");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/review-requests"), "request_contract_review");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/review-decisions"), "record_contract_review");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/approval-requests"), "request_contract_approval");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/decisions"), "record_contract_decision");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}/contracts"), "getContractContext");
+        registered.put(new OperationKey("GET", "/api/v1/contract-tasks/{taskId}/context"), "getContractTaskContext");
+        registered.put(new OperationKey("GET", "/api/v1/contracts"), "getContractLedger");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}/contracts/{contractId}/versions/{versionId}/document"), "downloadContractVersionDocument");
+        registered.put(new OperationKey("GET", "/internal/v1/contract-preparation/candidates"), "listContractPreparationCandidates");
+        registered.put(new OperationKey("POST", "/internal/v1/opportunity-tasks/commands/reconcile-contract-preparation"), "reconcileContractPreparation");
+        // Approved F/M and R2.5 successors retain a closed operation inventory.
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/ai-candidates/{task}"), "generateAiCandidates");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/ai-candidates/{task}/recheck"), "recheckAiCandidateSources");
+        registered.put(new OperationKey("GET", "/api/v1/business-overview"), "getBusinessOverview");
+        registered.put(new OperationKey("GET", "/api/v1/business-overview/{metric}"), "listBusinessOverviewDetails");
+        registered.put(new OperationKey("GET", "/api/v1/lead-management/leads"), "listLeadManagement");
+        registered.put(new OperationKey("GET", "/api/v1/lead-management/leads/{leadId}"), "getLeadManagementDetail");
+        registered.put(new OperationKey("GET", "/api/v1/lead-management/sources"), "listLeadManagementSources");
+        registered.put(new OperationKey("GET", "/api/v1/team-management/{view}"), "listTeamManagement");
+        registered.put(new OperationKey("GET", "/api/v1/team-management/{view}/{recordId}"), "getTeamManagementDetail");
+        registered.put(new OperationKey("GET", "/api/v1/business-management/{view}"), "listBusinessManagement");
+        registered.put(new OperationKey("GET", "/api/v1/business-management/{view}/{requestId}"), "getBusinessManagementDetail");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}/transfers/classification-context"), "getMatterClassificationCorrectionContext");
+        registered.put(new OperationKey("GET", "/api/v1/transfer-tasks/{taskId}/materials/{versionId}/content"), "downloadTransferTaskMaterial");
+        registered.put(new OperationKey("GET", "/api/v1/transfer-tasks/{taskId}/context"), "getTransferTaskContext");
+        registered.put(new OperationKey("POST", "/internal/v1/sales-chain-repairs/restore-source-request-task"), "restoreSourceRequestTask");
+        registered.put(new OperationKey("POST", "/internal/v1/sales-chain-repairs/repair-superseded-opportunity-task"), "repairSupersededOpportunityTask");
+        registered.put(new OperationKey("PUT", "/api/v1/tasks/{taskId}/source-request-draft"), "saveSourceRequestDraft");
+        registered.put(new OperationKey("POST", "/api/v1/tasks/{taskId}/commands/record-source-request-continuation"), "recordSourceRequestContinuation");
+        registered.put(new OperationKey("POST", "/internal/v1/tasks/commands/reopen-due-source-request-tasks"), "reopenDueSourceRequestTasks");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/negotiation-end"), "end_contract_negotiation");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/termination-review-requests"), "request_contract_termination_review");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/termination-review-decisions"), "record_contract_termination_review");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/quotes/terminations"), "endQuoteNegotiation");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/followup-attempts"), "recordOpportunityFollowupAttempt");
+        registered.put(new OperationKey("GET", "/api/v1/opportunities/{opportunityId}/followup-attempts"), "readFollowupAttempts");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/quotes/followup-attempts"), "recordQuoteFollowupAttempt");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/quotes/preparation-intents"), "startQuotePreparation");
+        registered.put(new OperationKey("GET", "/api/v1/opportunity-tasks/{taskId}/context"), "getOpportunityTaskContinuation");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/receipt-review-requests"), "request_contract_receipt_review");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/receipt-reviews"), "record_contract_receipt_review");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/receipt-supplements"), "supplement_contract_receipt");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/contracts/execution-verifications"), "verify_contract_execution_conditions");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/transfers/submissions"), "submitTransfer");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/transfers/supplements"), "resubmitTransfer");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/transfers/conflict-reviews"), "recordTransferConflictReview");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/transfers/intake-decisions"), "recordTransferIntake");
+        registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/transfers/classifications"), "classifyMatter");
+        assertEquals(registered, actual, "R1 plus registered R2 and R2.5 operations must remain closed and exact");
         assertEquals(
-                33,
+                129,
                 paths.size(),
                 "Four Identity collection paths share GET and POST; all operation pairs stay exact"
         );
+    }
+
+    @Test
+    void closureIsAnExactOneTimeBodyPreconditionAndDisclosureContract() {
+        var body=new LinkedHashMap<String,Object>();body.put("expectedOpportunityRevision",0);body.put("expectedResponsibility",Map.of("type","opportunity.opportunity","id",UUID.randomUUID().toString(),"revision",0));body.put("expectedTask",null);body.put("expectedWait",null);body.put("reasonCode","CLIENT_DECLINED");body.put("summary","Client declined");
+        assertSchemaAccepts(body,schema("CloseOpportunityV1"),"explicit absent task and wait");body.remove("expectedWait");assertSchemaRejects(body,schema("CloseOpportunityV1"),"missing null observation");body.put("expectedWait",null);body.put("reasonCode","WON");assertSchemaRejects(body,schema("CloseOpportunityV1"),"success is not closure");
+        var context=new LinkedHashMap<String,Object>();context.put("opportunity",Map.of("id",UUID.randomUUID().toString(),"revision",0));context.put("status","READY");context.put("expectedResponsibility",body.get("expectedResponsibility"));context.put("expectedTask",null);context.put("expectedWait",null);assertSchemaAccepts(context,schema("OpportunityCloseContextV1"),"ready exact selectors");context.put("status","READ_ONLY");assertSchemaRejects(context,schema("OpportunityCloseContextV1"),"read-only cannot expose action selectors");
+        var fact=new LinkedHashMap<String,Object>();fact.put("factType","OPPORTUNITY_CLOSURE");fact.put("factRef","opaque-closure-reference-123456789");fact.put("revision",0);assertSchemaAccepts(fact,schema("OpportunityClosureFactRefV1"),"immutable closure reference");fact.put("revision",1);assertSchemaRejects(fact,schema("OpportunityClosureFactRefV1"),"closure cannot be revised");
+    }
+
+    @Test
+    void ledgerHandlingSelectorIsPresentOnlyForAnOpenHandleableTask() {
+        var item=new LinkedHashMap<String,Object>();
+        item.put("opportunity",Map.of("id",UUID.randomUUID().toString(),"revision",0));
+        item.put("customerLabel","Customer");item.put("ownerLabel","Owner");item.put("taskState","WAITING");item.put("canHandle",false);
+        assertSchemaAccepts(item,schema("OpportunityLedgerDetailV1"),"waiting read-only detail");
+        item.put("task",Map.of("id",UUID.randomUUID().toString(),"revision",0,"etag","quoted-task-tag"));
+        assertSchemaRejects(item,schema("OpportunityLedgerDetailV1"),"read-only detail cannot disclose handling selector");
+        item.put("canHandle",true);
+        assertSchemaRejects(item,schema("OpportunityLedgerDetailV1"),"waiting cannot be handleable");
+        item.put("taskState","OPEN");
+        assertSchemaAccepts(item,schema("OpportunityLedgerDetailV1"),"handleable current task");
+        item.remove("task");assertSchemaRejects(item,schema("OpportunityLedgerDetailV1"),"handleable requires current selector");
+        item.put("canHandle",false);item.put("customerPhone","unreviewed");
+        assertSchemaRejects(item,schema("OpportunityLedgerDetailV1"),"closed projection excludes extra customer data");
     }
 
     @Test
@@ -536,7 +661,7 @@ public class OpenApiContractTest {
         assertEquals(100L, limit.path("schema").path("maximum").asLong());
         assertEquals(50L, limit.path("schema").path("default").asLong());
         JsonNode recoveryType = document.path("components").path("schemas").path("RecoveryTypeV1");
-        assertEquals(Set.of("CONTACT_TASK", "ROUTING_REVIEW_TASK"), stringSet(recoveryType.path("enum")));
+        assertEquals(Set.of("CONTACT_TASK", "ROUTING_REVIEW_TASK", "SOURCE_REQUEST_REVIEW_TASK"), stringSet(recoveryType.path("enum")));
         JsonNode consume = document.path("components").path("schemas").path("ConsumeR1ProjectionV1");
         assertFalse(consume.path("additionalProperties").asBoolean());
         assertEquals(Set.of("domainEventOutboxId", "domainEventId", "expectedOutboxRevision",
@@ -575,8 +700,8 @@ public class OpenApiContractTest {
                 .getMethod("checkR1ProjectionReadiness");
         assertEquals(0, method.getParameterCount());
         assertEquals("org.springframework.http.ResponseEntity<java.lang.Void>", method.getGenericReturnType().getTypeName());
-        assertEquals(37, REQUIRED_OPERATIONS.size());
-        assertEquals(32L, REQUIRED_OPERATIONS.keySet().stream().filter(key -> key.path().startsWith("/api/")).count());
+        assertEquals(38, REQUIRED_OPERATIONS.size());
+        assertEquals(33L, REQUIRED_OPERATIONS.keySet().stream().filter(key -> key.path().startsWith("/api/")).count());
         assertEquals(5L, REQUIRED_OPERATIONS.keySet().stream().filter(key -> key.path().startsWith("/internal/")).count());
         OperationKey key = operationKey("checkR1ProjectionReadiness");
         assertEquals(new OperationKey("GET", "/internal/v1/projections/r1/readiness"), key);
@@ -1098,7 +1223,16 @@ public class OpenApiContractTest {
                         "SUPERVISOR_UNRESOLVED", "SOURCE_INTAKE_OWNER_UNRESOLVED",
                         "NOT_FOUND", "IDENTITY_BINDING_CONFLICT", "IDENTITY_STATE_CONFLICT",
                         "IDENTITY_SELF_LOCKOUT", "IDENTITY_LAST_ADMIN", "IDENTITY_ORGANIZATION_DEPENDENCY",
-                        "IDENTITY_RESPONSIBILITY_DEPENDENCY", "STALE_IDENTITY"
+                        "IDENTITY_RESPONSIBILITY_DEPENDENCY", "STALE_IDENTITY",
+                        "OPPORTUNITY_CLOSED", "OPPORTUNITY_HAS_DOWNSTREAM_FACTS", "VALIDATION_FAILED",
+                        "STALE_EVIDENCE", "CUSTOMER_CONFIRMATION_REQUIRED",
+                        "CONTRACT_HANDLING_PAUSED", "CONTRACT_PREPARATION_SOURCE_REQUIRED", "CONTRACT_RESPONSIBILITY_REQUIRED",
+                        "CONTRACT_REVIEW_SCOPE_REQUIRED", "CONTRACT_REVIEW_NOT_CLEAR", "CONTRACT_REVIEW_SCOPE_COMPLETE",
+                        "CONTRACT_REVIEW_FINDING_REQUIRED", "CONTRACT_REVIEW_WAIVER_UNAVAILABLE", "CONTRACT_CONFLICT_DECISION_REQUIRED",
+                        "COMMERCIAL_AUTHORIZATION_REQUIRED", "CONTRACT_APPROVAL_POLICY_CHANGED", "CONTRACT_APPROVAL_POLICY_REQUIRED",
+                        "CONTRACT_REVIEW_REQUIRED", "CONTRACT_SOURCE_AMBIGUOUS", "CONTRACT_VERSION_BASIS_CHANGED",
+                        "RECIPIENT_UNAVAILABLE", "STALE_CUSTOMER_BASIS", "STALE_REVIEW",
+                        "STALE_TRANSFER_PARTY", "STALE_TRANSFER_REVIEW_BASIS", "TRANSFER_REVIEW_OUTCOME_UNAVAILABLE"
                 ),
                 stringSet(schema("TerminalRejectionCode").path("enum")),
                 "Terminal rejection codes must exclude pre-slot, conflict, rate-limit, and technical failures"
@@ -1107,11 +1241,130 @@ public class OpenApiContractTest {
         Set<String> publicFactRefs = new HashSet<>(Set.of(schemaRef("IdentityPrincipalFactRefV1"),
                 schemaRef("OrganizationUnitFactRefV1"), schemaRef("AppointmentFactRefV1"), schemaRef("AuthorityGrantFactRefV1")));
         contracts.values().forEach(contract -> publicFactRefs.add(schemaRef(contract.factSchema())));
+        publicFactRefs.add(schemaRef("OpportunityProgressFactRefV1"));
+        publicFactRefs.add(schemaRef("OpportunityClosureFactRefV1"));
+        publicFactRefs.add(schemaRef("OpportunityMaterialUploadFactRefV1"));
+        publicFactRefs.add(schemaRef("OpportunityMaterialVersionFactRefV1"));
+        publicFactRefs.add(schemaRef("OpportunityCustomerDraftFactRefV1"));
+        publicFactRefs.add(schemaRef("OpportunityCustomerConfirmationFactRefV1"));
+        publicFactRefs.add(schemaRef("OwnerExceptionFactRefV1"));
+        publicFactRefs.add(schemaRef("OwnerExceptionValidationFactRefV1"));
+        publicFactRefs.add(schemaRef("R2QuoteDraftFactRefV1"));
+        publicFactRefs.add(schemaRef("R2QuoteRevisionFactRefV1"));
+        publicFactRefs.add(schemaRef("R2QuoteApprovalRequestFactRefV1"));
+        publicFactRefs.add(schemaRef("R2QuoteApprovalDecisionFactRefV1"));
+        publicFactRefs.add(schemaRef("R2QuoteIssueFactRefV1"));
+        publicFactRefs.add(schemaRef("R2QuoteResponseFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractPreparationRequestFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractPreparationDecisionFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractDraftFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractRevisionFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractReviewRequestFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractReviewDecisionFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractApprovalRequestFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractApprovalDecisionFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractSignatureDraftFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractSignatureArrangementFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractSignatureSubmissionFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractSignatureVerificationFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractSignatureArchiveFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractSignatureRevisionReturnFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractSignatureWorkflowFactRefV1"));
+        publicFactRefs.add(schemaRef("R2ContractSignatureHandoffFactRefV1"));
+        publicFactRefs.add(schemaRef("ContractPreparationWorkflowFactRefV1"));
+        publicFactRefs.add(schemaRef("ContractExecutionWorkflowFactRefV1"));
+        publicFactRefs.add(schemaRef("ContractPaymentWorkflowFactRefV1"));
+        publicFactRefs.add(schemaRef("R2QuotePreparationIntentFactRefV1"));
+        publicFactRefs.add(schemaRef("FollowupAttemptFactRefV1"));
+        publicFactRefs.add(schemaRef("R2QuoteTerminationFactRefV1"));
+        publicFactRefs.add(schemaRef("ContractNegotiationDispositionFactRefV1"));
+        publicFactRefs.add(schemaRef("ContractTerminationReviewAssignmentFactRefV1"));
+        publicFactRefs.add(schemaRef("ContractExecutionVerificationFactRefV1"));
+        publicFactRefs.add(schemaRef("ContractPaymentRequestFactRefV1"));
+        publicFactRefs.add(schemaRef("ContractPaymentReviewFactRefV1"));
+        publicFactRefs.add(schemaRef("TransferSubmissionFactRefV1"));
+        publicFactRefs.add(schemaRef("TransferConflictReviewFactRefV1"));
+        publicFactRefs.add(schemaRef("TransferIntakeFactRefV1"));
+        publicFactRefs.add(schemaRef("MatterClassificationFactRefV1"));
+        publicFactRefs.add(schemaRef("TransferWorkflowFactRefV1"));
+
         assertExactOneOfRefs(
                 schema("PublicFactRef"),
                 Set.copyOf(publicFactRefs),
                 "PublicFactRef"
         );
+    }
+
+    @Test
+    void t07QuoteFactsKeepImmutableSelectorsAndNullableContextExact() {
+        Map<String, String> facts = Map.of(
+                "R2QuoteDraftFactRefV1", "QUOTE_DRAFT",
+                "R2QuoteRevisionFactRefV1", "QUOTE_REVISION",
+                "R2QuoteApprovalRequestFactRefV1", "QUOTE_APPROVAL_REQUEST",
+                "R2QuoteApprovalDecisionFactRefV1", "QUOTE_APPROVAL_DECISION",
+                "R2QuoteIssueFactRefV1", "QUOTE_ISSUE",
+                "R2QuoteResponseFactRefV1", "QUOTE_RESPONSE",
+                "R2QuotePreparationIntentFactRefV1", "QUOTE_PREPARATION_INTENT",
+                "R2QuoteTerminationFactRefV1", "QUOTE_TERMINATION");
+        Set<String> refs = new HashSet<>();
+        facts.forEach((name, type) -> {
+            refs.add(schemaRef(name));
+            boolean hashed = Set.of("QUOTE_REVISION", "QUOTE_RESPONSE").contains(type);
+            String version = hashed ? "digest" : "revision";
+            JsonNode fact = schema(name);
+            Set<String> fields = Set.of("factType", "factRef", version);
+            assertClosedObjectShape(fact, fields, fields, name);
+            assertSchemaAcceptsOnlyLiteral(fact.path("properties").path("factType"), type);
+            assertPropertyRef(fact, "factRef", "OpaqueRef", name);
+            if (hashed) assertPropertyRef(fact, version, "Digest32", name);
+            else {
+                assertEquals(0L, fact.path("properties").path(version).path("const").asLong());
+                assertSchemaAccepts(0, fact.path("properties").path(version), name + " initial immutable revision");
+                assertSchemaRejects(1, fact.path("properties").path(version), name + " cannot mutate immutable revision");
+            }
+        });
+        JsonNode receipt = schema("QuoteCommandReceiptV1");
+        Set<String> receiptFields = Set.of("commandId", "receiptId", "outcome", "completedAt", "resultFact");
+        assertClosedObjectShape(receipt, receiptFields, receiptFields, "T07 exact successful receipt");
+        assertSchemaAcceptsOnlyLiteral(receipt.path("properties").path("outcome"), "SUCCEEDED");
+        assertExactOneOfRefs(receipt.path("properties").path("resultFact"), refs, "T07 quote result facts");
+        for (String name : List.of("R2SaveQuoteDraftV1", "R2FormQuoteV1", "R2RequestQuoteApprovalV1",
+                "R2RecordQuoteDecisionV1", "R2RecordQuoteDeliveryV1", "R2RecordQuoteResponseV1")) {
+            JsonNode command = schema(name);
+            Set<String> fields = Set.of("expectedOpportunityRevision", "responsibilityBasis", "customerConfirmation",
+                    "expectedDraft", "expectedQuote", "expectedWorkflow", "values");
+            assertClosedObjectShape(command, fields, fields, name);
+            for (String field : List.of("customerConfirmation", "expectedDraft", "expectedWorkflow"))
+                assertNullableOneOfRef(command.path("properties").path(field), schemaRef("OpportunityCustomerSelectorV1"), name + "/" + field);
+            JsonNode quote = command.path("properties").path("expectedQuote");
+            assertEquals(2, quote.path("oneOf").size());
+            assertEquals("null", quote.path("oneOf").get(1).path("type").asText());
+            assertClosedObjectShape(quote.path("oneOf").get(0), Set.of("id", "hash"), Set.of("id", "hash"), name + " exact quote hash");
+        }
+        JsonNode context = schema("QuoteContextV1");
+        Set<String> required = Set.of("opportunity", "responsibilityBasis", "customerConfirmation", "draft", "quote",
+                "workflow", "allowedActions", "history", "materials", "approvers", "customerName", "readonly", "recipients", "records");
+        Set<String> properties = new HashSet<>(required);
+        properties.add("notice");
+        assertClosedObjectShape(context, properties, required, "T07 exact context");
+        JsonNode workflow = context.path("properties").path("workflow").path("oneOf");
+        assertEquals(2, workflow.size());
+        assertEquals("null", workflow.get(1).path("type").asText());
+        assertEquals(Set.of("string", "null"), stringSet(workflow.get(0).path("properties").path("state").path("type")));
+        assertNullableOneOfRef(workflow.get(0).path("properties").path("task"), schemaRef("OpportunityCustomerSelectorV1"), "T07 optional current task");
+        assertClosedObjectShape(context.path("properties").path("history").path("items"),
+                Set.of("selector", "version", "document", "totalMinor", "validUntil"),
+                Set.of("selector", "version", "document", "totalMinor", "validUntil"), "T07 immutable version history");
+        JsonNode records = context.path("properties").path("records").path("items").path("oneOf");
+        assertEquals(3, records.size());
+        Set<String> kinds = new HashSet<>();
+        for (JsonNode record : records) {
+            kinds.add(record.path("properties").path("kind").path("const").asText());
+            assertFalse(record.path("additionalProperties").asBoolean());
+            assertEquals("int64", record.path("properties").path("version").path("format").asText());
+        }
+        assertEquals(Set.of("APPROVAL", "DELIVERY", "RESPONSE"), kinds);
     }
 
     @Test
@@ -1143,10 +1396,18 @@ public class OpenApiContractTest {
         assertEquals("AUTHENTICATED_IDENTITY", self.path("x-tenant-source").asText());
         assertEquals("R1_AUTHENTICATED_IDENTITY_V1", self.path("x-authentication-profile").asText());
         assertEquals(Set.of("displayName", "state", "appointmentChoices", "selectedAppointmentId", "actorScopeKey",
-                "canEnterWorkbench", "canEnterIdentityAdmin", "delegatedAppointmentChoices", "selectedOnBehalfAppointmentId"), fieldNames(schema("SessionContextV1").path("properties")));
+                "canEnterWorkbench", "canEnterIdentityAdmin", "delegatedAppointmentChoices", "selectedOnBehalfAppointmentId", "canManageOwnerExceptions", "canReadOpportunityLedger",
+                "canReadLeadManagement", "canReadBusinessOverview", "canReadBusinessManagement",
+                "businessManagementViews", "canReadTeamTasks"), fieldNames(schema("SessionContextV1").path("properties")));
         assertEquals(Set.of("string", "null"), stringSet(schema("SessionContextV1").path("properties").path("selectedAppointmentId").path("type")));
         assertEquals(Set.of("LEAD_CAPTURE", "LEAD_INGRESS_RESOLVE", "LEAD_INGRESS_COMPLETE", "LEAD_ASSIGN",
-                "LEAD_ROUTING_DECIDE", "SOURCE_INTAKE_REQUEST_ACK", "SALES_CONTACT_OWNER", "LEAD_VALIDITY_REVIEW"),
+                "LEAD_ROUTING_DECIDE", "SOURCE_INTAKE_REQUEST_ACK", "SALES_CONTACT_OWNER", "LEAD_VALIDITY_REVIEW",
+                "SALES_OPPORTUNITY_OWNER", "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER", "OPPORTUNITY_OWNER_EXCEPTION_READ", "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE", "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ", "OPPORTUNITY_LEDGER_READ", "OPPORTUNITY_CLOSE", "CUSTOMER_REQUIREMENTS_MANAGE", "PARTY_PROFILE_MANAGE", "MATERIALS_READ", "MATERIALS_MANAGE",
+                "QUOTE_READ", "QUOTE_PREPARE", "QUOTE_APPROVE", "QUOTE_SELF_AUTHORIZE", "QUOTE_DELIVER", "QUOTE_RESPONSE", "CONTRACT_READ", "CONTRACT_PREPARE", "CONTRACT_PREPARATION_DECIDE", "CONTRACT_REVIEW", "CONTRACT_APPROVE", "CONTRACT_SIGNATURE_VERIFY",
+                "PAYMENT_LEDGER_READ", "TRANSFER_LEDGER_READ", "CONTRACT_EXECUTION_VERIFY",
+                "CONTRACT_TERMINATION_REVIEW", "PAYMENT_SUBMIT", "PAYMENT_CONFIRM", "TRANSFER_SUBMIT",
+                "TRANSFER_REVIEW", "TRANSFER_ACCEPT", "MATTER_CLASSIFY", "MATTER_RECEIVE",
+                "TEAM_TASK_READ", "LEAD_MANAGEMENT_READ"),
                 stringSet(schema("GrantableAuthorityCodeV1").path("enum")));
         assertEquals(20L, document.at("/components/parameters/IdentityLimit/schema/default").asLong());
         assertEquals(50L, document.at("/components/parameters/IdentityLimit/schema/maximum").asLong());
@@ -1157,11 +1418,15 @@ public class OpenApiContractTest {
         noAppointment.put("appointmentChoices", List.of());
         noAppointment.put("selectedAppointmentId", null);
         noAppointment.put("actorScopeKey", null);
+        noAppointment.put("canManageOwnerExceptions", false);
         noAppointment.put("canEnterWorkbench", false);
         noAppointment.put("canEnterIdentityAdmin", false);
         noAppointment.put("delegatedAppointmentChoices", List.of());
         noAppointment.put("selectedOnBehalfAppointmentId", null);
         assertSchemaAccepts(noAppointment, schema("SessionContextV1"), "authenticated own Principal without Appointment");
+        noAppointment.put("canManageOwnerExceptions", true);
+        assertSchemaRejects(noAppointment, schema("SessionContextV1"), "unselected identity cannot enter exception management");
+        noAppointment.put("canManageOwnerExceptions", false);
         noAppointment.put("delegatedAppointmentChoices", List.of(Map.of("id", "01993dfe-a521-7001-8000-000000000002", "label", "Safe appointment")));
         assertSchemaRejects(noAppointment, schema("SessionContextV1"), "unselected own identity cannot disclose delegated choices");
         noAppointment.put("delegatedAppointmentChoices", List.of());
@@ -1208,6 +1473,7 @@ public class OpenApiContractTest {
     private static Map<OperationKey, String> requiredOperations() {
         Map<OperationKey, String> operations = new LinkedHashMap<>();
         operations.put(new OperationKey("POST", "/api/v1/leads"), "captureLead");
+        operations.put(new OperationKey("GET", "/api/v1/leads/intake-sources"), "getLeadIntakeSources");
         operations.put(new OperationKey("GET", "/api/v1/workcards/current"), "getCurrentWorkCard");
         operations.put(new OperationKey("PUT", "/api/v1/tasks/{taskId}/draft"), "saveActionDraft");
         operations.put(new OperationKey("POST", "/api/v1/tasks/{taskId}/commands/resolve-duplicate-lead"), "resolveDuplicateLead");
@@ -1254,9 +1520,13 @@ public class OpenApiContractTest {
                 parameters("IdempotencyKey", "AppointmentSelection", "OnBehalfAppointmentSelection"),
                 success("201", null, "LeadCommandReceipt", headers("Location", "ReceiptLocation"))
         ));
+        contracts.put("getLeadIntakeSources", operationContract(
+                null, parameters("AppointmentSelection", "OnBehalfAppointmentSelection"),
+                success("200", null, "LeadIntakeSourcesV1", headers("Cache-Control", "IdentityNoStore"))
+        ));
         contracts.put("getCurrentWorkCard", operationContract(
                 null,
-                parameters("WorkbenchIfNoneMatch", "AppointmentSelection", "OnBehalfAppointmentSelection"),
+                parameters("WorkbenchIfNoneMatch", "AppointmentSelection", "OnBehalfAppointmentSelection", "SelectedTaskId"),
                 success("200", null, "CurrentWorkCardEnvelope", headers("ETag", "WorkbenchETagHeader")),
                 success("304", null, null, headers("ETag", "WorkbenchETagHeader"))
         ));
@@ -1465,13 +1735,14 @@ public class OpenApiContractTest {
     private static Map<String, Set<String>> requiredErrorCodes() {
         Map<String, Set<String>> errors = new LinkedHashMap<>();
         errors.put("captureLead", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,COMMAND_PAYLOAD_CONFLICT,SUPERVISOR_UNRESOLVED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
+        errors.put("getLeadIntakeSources", errors("VALIDATION_FAILED,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,SERVICE_UNAVAILABLE"));
         errors.put("getCurrentWorkCard", errors("VALIDATION_FAILED,UNAUTHENTICATED,NOT_AUTHORIZED,NOT_FOUND,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("saveActionDraft", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,DRAFT_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("resolveDuplicateLead", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,STALE_SUBJECT,SUPERVISOR_UNRESOLVED,TASK_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("completeLeadIngress", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,INGRESS_COMPLETION_ALREADY_RECORDED,STALE_TASK,STALE_DRAFT,STALE_SUBJECT,SUPERVISOR_UNRESOLVED,TASK_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("assignLead", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,STALE_SUBJECT,TASK_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("recordRoutingDisposition", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,STALE_SUBJECT,SOURCE_INTAKE_OWNER_UNRESOLVED,TASK_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
-        errors.put("acknowledgeSourceIntakeStopRequest", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,STALE_SUBJECT,TASK_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
+        errors.put("acknowledgeSourceIntakeStopRequest", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,STALE_SUBJECT,SUPERVISOR_UNRESOLVED,TASK_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("recordContactResult", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,STALE_SUBJECT,SUPERVISOR_UNRESOLVED,TASK_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("reviewLeadValidity", errors("VALIDATION_FAILED,IDEMPOTENCY_KEY_REQUIRED,IDEMPOTENCY_KEY_INVALID,UNAUTHENTICATED,NOT_AUTHORIZED,APPOINTMENT_INACTIVE,NOT_FOUND,COMMAND_PAYLOAD_CONFLICT,TASK_NOT_OPEN,TASK_ALREADY_COMPLETED,DRAFT_DIGEST_MISMATCH,STALE_TASK,STALE_DRAFT,STALE_SUBJECT,TASK_PRECONDITION_REQUIRED,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));
         errors.put("getCommandReceipt", errors("VALIDATION_FAILED,UNAUTHENTICATED,NOT_AUTHORIZED,NOT_FOUND,RATE_LIMITED,INTERNAL_ERROR,SERVICE_UNAVAILABLE"));

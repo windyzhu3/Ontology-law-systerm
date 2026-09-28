@@ -4,13 +4,20 @@
 package io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq;
 
 
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.Closure;
 import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.Opportunity;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.OpportunityProgress;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.OwnerException;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.OwnerExceptionDisposition;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.ResponsibilityHandoff;
 
+import org.jooq.ForeignKey;
 import org.jooq.Record;
 import org.jooq.TableField;
 import org.jooq.UniqueKey;
 import org.jooq.impl.DSL;
 import org.jooq.impl.Internal;
+import org.jooq.impl.QOM.ForeignKeyRule;
 
 
 /**
@@ -24,6 +31,29 @@ public class Keys {
     // UNIQUE and PRIMARY KEY definitions
     // -------------------------------------------------------------------------
 
+    public static final UniqueKey<Record> PK_CLOSURE = Internal.createUniqueKey(Closure.CLOSURE, DSL.name("pk_closure"), new TableField[] { Closure.CLOSURE.TENANT_ID, Closure.CLOSURE.CLOSURE_ID }, true);
+    public static final UniqueKey<Record> UQ_CLOSURE__OPPORTUNITY = Internal.createUniqueKey(Closure.CLOSURE, DSL.name("uq_closure__opportunity"), new TableField[] { Closure.CLOSURE.TENANT_ID, Closure.CLOSURE.OPPORTUNITY_ID }, true);
     public static final UniqueKey<Record> PK_OPPORTUNITY = Internal.createUniqueKey(Opportunity.OPPORTUNITY_, DSL.name("pk_opportunity"), new TableField[] { Opportunity.OPPORTUNITY_.TENANT_ID, Opportunity.OPPORTUNITY_.OPPORTUNITY_ID }, true);
     public static final UniqueKey<Record> UQ_OPPORTUNITY__SOURCE_CONTACT_RESULT = Internal.createUniqueKey(Opportunity.OPPORTUNITY_, DSL.name("uq_opportunity__source_contact_result"), new TableField[] { Opportunity.OPPORTUNITY_.TENANT_ID, Opportunity.OPPORTUNITY_.SOURCE_CONTACT_RESULT_ID }, true);
+    public static final UniqueKey<Record> PK_OPPORTUNITY_PROGRESS = Internal.createUniqueKey(OpportunityProgress.OPPORTUNITY_PROGRESS, DSL.name("pk_opportunity_progress"), new TableField[] { OpportunityProgress.OPPORTUNITY_PROGRESS.TENANT_ID, OpportunityProgress.OPPORTUNITY_PROGRESS.OPPORTUNITY_PROGRESS_ID }, true);
+    public static final UniqueKey<Record> UQ_OPPORTUNITY_PROGRESS__OPPORTUNITY_NO = Internal.createUniqueKey(OpportunityProgress.OPPORTUNITY_PROGRESS, DSL.name("uq_opportunity_progress__opportunity_no"), new TableField[] { OpportunityProgress.OPPORTUNITY_PROGRESS.TENANT_ID, OpportunityProgress.OPPORTUNITY_PROGRESS.OPPORTUNITY_ID, OpportunityProgress.OPPORTUNITY_PROGRESS.PROGRESS_NO }, true);
+    public static final UniqueKey<Record> PK_OWNER_EXCEPTION = Internal.createUniqueKey(OwnerException.OWNER_EXCEPTION, DSL.name("pk_owner_exception"), new TableField[] { OwnerException.OWNER_EXCEPTION.TENANT_ID, OwnerException.OWNER_EXCEPTION.OWNER_EXCEPTION_ID, OwnerException.OWNER_EXCEPTION.REVISION }, true);
+    public static final UniqueKey<Record> PK_OWNER_EXCEPTION_DISPOSITION = Internal.createUniqueKey(OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION, DSL.name("pk_owner_exception_disposition"), new TableField[] { OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION.TENANT_ID, OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION.OWNER_EXCEPTION_DISPOSITION_ID }, true);
+    public static final UniqueKey<Record> PK_RESPONSIBILITY_HANDOFF = Internal.createUniqueKey(ResponsibilityHandoff.RESPONSIBILITY_HANDOFF, DSL.name("pk_responsibility_handoff"), new TableField[] { ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.TENANT_ID, ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.RESPONSIBILITY_HANDOFF_ID }, true);
+    public static final UniqueKey<Record> UQ_RESPONSIBILITY_HANDOFF__DECISION = Internal.createUniqueKey(ResponsibilityHandoff.RESPONSIBILITY_HANDOFF, DSL.name("uq_responsibility_handoff__decision"), new TableField[] { ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.TENANT_ID, ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.OWNER_EXCEPTION_DISPOSITION_ID }, true);
+    public static final UniqueKey<Record> UQ_RESPONSIBILITY_HANDOFF__NEW_TASK = Internal.createUniqueKey(ResponsibilityHandoff.RESPONSIBILITY_HANDOFF, DSL.name("uq_responsibility_handoff__new_task"), new TableField[] { ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.TENANT_ID, ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.NEW_TASK_OCCURRENCE_ID }, true);
+    public static final UniqueKey<Record> UQ_RESPONSIBILITY_HANDOFF__PRIOR = Internal.createUniqueKey(ResponsibilityHandoff.RESPONSIBILITY_HANDOFF, DSL.name("uq_responsibility_handoff__prior"), new TableField[] { ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.TENANT_ID, ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.OPPORTUNITY_ID, ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.PRIOR_BASIS_TYPE, ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.PRIOR_BASIS_ID, ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.PRIOR_BASIS_REVISION }, true);
+
+    // -------------------------------------------------------------------------
+    // FOREIGN KEY definitions
+    // -------------------------------------------------------------------------
+
+    public static final ForeignKey<Record, Record> CLOSURE__FK_CLOSURE__OPPORTUNITY_ID = Internal.createForeignKey(Closure.CLOSURE, DSL.name("fk_closure__opportunity_id"), new TableField[] { Closure.CLOSURE.TENANT_ID, Closure.CLOSURE.OPPORTUNITY_ID }, Keys.PK_OPPORTUNITY, new TableField[] { Opportunity.OPPORTUNITY_.TENANT_ID, Opportunity.OPPORTUNITY_.OPPORTUNITY_ID }, true, ForeignKeyRule.NO_ACTION, ForeignKeyRule.NO_ACTION);
+    public static final ForeignKey<Record, Record> OPPORTUNITY_PROGRESS__FK_OPPORTUNITY_PROGRESS__OPPORTUNITY = Internal.createForeignKey(OpportunityProgress.OPPORTUNITY_PROGRESS, DSL.name("fk_opportunity_progress__opportunity"), new TableField[] { OpportunityProgress.OPPORTUNITY_PROGRESS.TENANT_ID, OpportunityProgress.OPPORTUNITY_PROGRESS.OPPORTUNITY_ID }, Keys.PK_OPPORTUNITY, new TableField[] { Opportunity.OPPORTUNITY_.TENANT_ID, Opportunity.OPPORTUNITY_.OPPORTUNITY_ID }, true, ForeignKeyRule.NO_ACTION, ForeignKeyRule.NO_ACTION);
+    public static final ForeignKey<Record, Record> OWNER_EXCEPTION__FK_OWNER_EXCEPTION__LAST_DISPOSITION_ID = Internal.createForeignKey(OwnerException.OWNER_EXCEPTION, DSL.name("fk_owner_exception__last_disposition_id"), new TableField[] { OwnerException.OWNER_EXCEPTION.TENANT_ID, OwnerException.OWNER_EXCEPTION.LAST_DISPOSITION_ID }, Keys.PK_OWNER_EXCEPTION_DISPOSITION, new TableField[] { OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION.TENANT_ID, OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION.OWNER_EXCEPTION_DISPOSITION_ID }, true, ForeignKeyRule.NO_ACTION, ForeignKeyRule.NO_ACTION);
+    public static final ForeignKey<Record, Record> OWNER_EXCEPTION__FK_OWNER_EXCEPTION__OPPORTUNITY_ID = Internal.createForeignKey(OwnerException.OWNER_EXCEPTION, DSL.name("fk_owner_exception__opportunity_id"), new TableField[] { OwnerException.OWNER_EXCEPTION.TENANT_ID, OwnerException.OWNER_EXCEPTION.OPPORTUNITY_ID }, Keys.PK_OPPORTUNITY, new TableField[] { Opportunity.OPPORTUNITY_.TENANT_ID, Opportunity.OPPORTUNITY_.OPPORTUNITY_ID }, true, ForeignKeyRule.NO_ACTION, ForeignKeyRule.NO_ACTION);
+    public static final ForeignKey<Record, Record> OWNER_EXCEPTION_DISPOSITION__FK_OWNER_EXCEPTION_DISPOSITION__EXACT_EXCEPTION = Internal.createForeignKey(OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION, DSL.name("fk_owner_exception_disposition__exact_exception"), new TableField[] { OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION.TENANT_ID, OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION.OWNER_EXCEPTION_ID, OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION.OWNER_EXCEPTION_REVISION }, Keys.PK_OWNER_EXCEPTION, new TableField[] { OwnerException.OWNER_EXCEPTION.TENANT_ID, OwnerException.OWNER_EXCEPTION.OWNER_EXCEPTION_ID, OwnerException.OWNER_EXCEPTION.REVISION }, true, ForeignKeyRule.NO_ACTION, ForeignKeyRule.NO_ACTION);
+    public static final ForeignKey<Record, Record> OWNER_EXCEPTION_DISPOSITION__FK_OWNER_EXCEPTION_DISPOSITION__RESPONSIBILITY_HANDOFF_ID = Internal.createForeignKey(OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION, DSL.name("fk_owner_exception_disposition__responsibility_handoff_id"), new TableField[] { OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION.TENANT_ID, OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION.RESPONSIBILITY_HANDOFF_ID }, Keys.PK_RESPONSIBILITY_HANDOFF, new TableField[] { ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.TENANT_ID, ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.RESPONSIBILITY_HANDOFF_ID }, true, ForeignKeyRule.NO_ACTION, ForeignKeyRule.NO_ACTION);
+    public static final ForeignKey<Record, Record> RESPONSIBILITY_HANDOFF__FK_RESPONSIBILITY_HANDOFF__OPPORTUNITY_ID = Internal.createForeignKey(ResponsibilityHandoff.RESPONSIBILITY_HANDOFF, DSL.name("fk_responsibility_handoff__opportunity_id"), new TableField[] { ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.TENANT_ID, ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.OPPORTUNITY_ID }, Keys.PK_OPPORTUNITY, new TableField[] { Opportunity.OPPORTUNITY_.TENANT_ID, Opportunity.OPPORTUNITY_.OPPORTUNITY_ID }, true, ForeignKeyRule.NO_ACTION, ForeignKeyRule.NO_ACTION);
+    public static final ForeignKey<Record, Record> RESPONSIBILITY_HANDOFF__FK_RESPONSIBILITY_HANDOFF__OWNER_EXCEPTION_DISPOSITION_ID = Internal.createForeignKey(ResponsibilityHandoff.RESPONSIBILITY_HANDOFF, DSL.name("fk_responsibility_handoff__owner_exception_disposition_id"), new TableField[] { ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.TENANT_ID, ResponsibilityHandoff.RESPONSIBILITY_HANDOFF.OWNER_EXCEPTION_DISPOSITION_ID }, Keys.PK_OWNER_EXCEPTION_DISPOSITION, new TableField[] { OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION.TENANT_ID, OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION.OWNER_EXCEPTION_DISPOSITION_ID }, true, ForeignKeyRule.NO_ACTION, ForeignKeyRule.NO_ACTION);
 }

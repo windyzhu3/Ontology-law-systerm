@@ -1,0 +1,122 @@
+{
+  "account": "task9-local-contact",
+  "caseResults": {
+    "C30": {
+      "ledger": {
+        "taskState": "NONE",
+        "canHandle": false,
+        "nextActionLabel": "报价已接受，待衔接合同准备",
+        "taskPresent": false
+      },
+      "closure": {
+        "httpError": "412"
+      },
+      "quotes": {
+        "readonly": false,
+        "allowedActions": []
+      }
+    },
+    "C32": {
+      "ledger": {
+        "taskState": "OPEN",
+        "canHandle": false,
+        "nextActionLabel": "联系客户并记录进展",
+        "taskPresent": false
+      },
+      "closure": {
+        "httpError": "412"
+      },
+      "quotes": {
+        "readonly": false,
+        "allowedActions": [
+          "SAVE_QUOTE_DRAFT",
+          "FORM_QUOTE"
+        ]
+      }
+    },
+    "C39": {
+      "ledger": {
+        "taskState": "OPEN",
+        "canHandle": false,
+        "nextActionLabel": "联系客户并记录进展",
+        "taskPresent": false
+      },
+      "closure": {
+        "httpError": "412"
+      },
+      "quotes": {
+        "readonly": false,
+        "allowedActions": [
+          "SAVE_QUOTE_DRAFT",
+          "FORM_QUOTE"
+        ]
+      }
+    },
+    "C45": {
+      "ledger": {
+        "taskState": "OPEN",
+        "canHandle": true,
+        "nextActionLabel": "联系客户并记录进展",
+        "taskPresent": true
+      },
+      "closure": {
+        "status": "BLOCKED"
+      },
+      "quotes": {
+        "readonly": false,
+        "allowedActions": [
+          "SAVE_QUOTE_DRAFT",
+          "FORM_QUOTE"
+        ]
+      }
+    }
+  },
+  "timingsMs": {
+    "/api/v1/opportunities/01a0bf20-bab5-7f4d-a908-74a44aa1a480": [
+      265
+    ],
+    "/api/v1/opportunities/01a0bf20-bab5-7f4d-a908-74a44aa1a480/closure": [
+      718
+    ],
+    "/api/v1/opportunities/01a0bf20-bab5-7f4d-a908-74a44aa1a480/quotes": [
+      478
+    ],
+    "/api/v1/opportunities/01a0c371-a186-768f-9814-e6229b7f7ceb": [
+      188
+    ],
+    "/api/v1/opportunities/01a0c371-a186-768f-9814-e6229b7f7ceb/closure": [
+      202
+    ],
+    "/api/v1/opportunities/01a0c371-a186-768f-9814-e6229b7f7ceb/quotes": [
+      370
+    ],
+    "/api/v1/opportunities/01a0c373-8808-7cf3-85b6-db7b1f889487": [
+      149
+    ],
+    "/api/v1/opportunities/01a0c373-8808-7cf3-85b6-db7b1f889487/closure": [
+      190
+    ],
+    "/api/v1/opportunities/01a0c373-8808-7cf3-85b6-db7b1f889487/quotes": [
+      389
+    ],
+    "/api/v1/opportunities/01a0cd92-890a-7375-a8e6-85da6eaec5ba": [
+      210
+    ],
+    "/api/v1/opportunities/01a0cd92-890a-7375-a8e6-85da6eaec5ba/closure": [
+      407
+    ],
+    "/api/v1/opportunities/01a0cd92-890a-7375-a8e6-85da6eaec5ba/quotes": [
+      414
+    ],
+    "/api/v1/opportunities?limit=20": [
+      1895,
+      1925,
+      1960
+    ],
+    "/api/v1/contracts": [
+      7419,
+      7548,
+      7322
+    ]
+  }
+}

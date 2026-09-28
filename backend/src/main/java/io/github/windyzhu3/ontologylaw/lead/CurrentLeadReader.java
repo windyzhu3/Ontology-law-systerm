@@ -11,7 +11,14 @@ import java.util.UUID;
 public interface CurrentLeadReader {
     record Lead(Subject selector,String sourceChannel,String sourceAccount,Instant capturedAt,String capturedName,
             String capturedPhone,String capturedEmail,String legalNeedSummary,String cityCode,String serviceCategoryCode,
-            String jurisdictionCode,String urgencyCode,UUID partyId,String resolution,String disposition,UUID currentAssignmentId) {}
+            String jurisdictionCode,String urgencyCode,UUID partyId,String resolution,String disposition,UUID currentAssignmentId,String customerName,String contactName) {
+        public Lead(Subject selector,String sourceChannel,String sourceAccount,Instant capturedAt,String capturedName,
+            String capturedPhone,String capturedEmail,String legalNeedSummary,String cityCode,String serviceCategoryCode,
+            String jurisdictionCode,String urgencyCode,UUID partyId,String resolution,String disposition,UUID currentAssignmentId) {
+            this(selector,sourceChannel,sourceAccount,capturedAt,capturedName,capturedPhone,capturedEmail,legalNeedSummary,
+                cityCode,serviceCategoryCode,jurisdictionCode,urgencyCode,partyId,resolution,disposition,currentAssignmentId,null,null);
+        }
+    }
     record Party(Subject selector,String canonicalName,String status) {}
     record Assignment(Subject selector,UUID leadId,UUID owner,String state,Instant assignedAt) {}
     record ContactResult(Subject selector,UUID leadId,UUID assignmentId,UUID taskId,long contactNo,String channel,

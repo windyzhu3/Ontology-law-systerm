@@ -8,6 +8,11 @@ from pathlib import Path
 
 import yaml
 
+try:
+    from scripts.baseline.r2_intake_sources_contract import intake_transport_projection
+except ModuleNotFoundError:
+    from r2_intake_sources_contract import intake_transport_projection
+
 
 class _StrictSafeLoader(yaml.SafeLoader):
     pass
@@ -71,17 +76,45 @@ def _markdown_rows(text: str, heading: str, findings: list[str]) -> list[list[st
     return rows
 
 
-def validate_ingress_query_capability(root: Path) -> list[str]:
+def validate_ingress_query_capability(root: Path, *, allow_r2_schema: bool = False) -> list[str]:
     """Bind the named permission exception to its complete reviewed generated inventory."""
     generated = root / "database/schema-contract-52-plus-2/generated"
     expected_hash = "a4beeb91ed93be455736eafa3abb829f6a94fed3a263be5996832e458b7c4b39"
     try:
         manifest = json.loads((generated / "schema-contract-manifest.json").read_text(encoding="utf-8"))
+        projected_r2 = allow_r2_schema and manifest.get("contractVersion") in ("52-plus-2-r2-v1", "52-plus-2-r2-v2", "52-plus-2-r2-v3", "52-plus-2-r2-v4", "52-plus-2-r2-v5", "52-plus-2-r2-v6", "52-plus-2-r2-v7", "52-plus-2-r2-v8", "52-plus-2-r2-v9", "52-plus-2-r2-v10", "52-plus-2-r2-v12", "52-plus-2-r2-v13", "52-plus-2-r2-v14", "52-plus-2-r2-v15", "52-plus-2-r2-v16", "52-plus-2-r2-v17", "52-plus-2-r2-v19", "52-plus-2-r2-v20")
+        if projected_r2:
+            try:
+                from scripts.baseline.r2_schema_successor_contract import historical_projection
+            except ModuleNotFoundError:
+                from r2_schema_successor_contract import historical_projection
+            manifest = historical_projection(generated, manifest)
         canonical = json.dumps({k: v for k, v in manifest.items() if k != "contractSha256"}, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
         if manifest.get("contractVersion") != "52-plus-2-v1.2" or manifest.get("contractSha256") != expected_hash or hashlib.sha256(canonical).hexdigest() != expected_hash:
             raise ValueError("wrong successor manifest")
         inventory = manifest["generatedArtifactSha256"]
         actual_paths = {"db/migration/" + path.name for path in (generated / "db/migration").glob("*.sql")}
+        if projected_r2:
+            actual_paths.remove("db/migration/V870__r2_lead_independent_names.sql")
+            actual_paths.discard("db/migration/V880__r2_opportunity_progress.sql")
+            actual_paths.discard("db/migration/V890__r2_opportunity_checkpoint.sql")
+            actual_paths.discard("db/migration/V900__r2_owner_exception.sql")
+            actual_paths.discard("db/migration/V910__r2_opportunity_closure.sql")
+            actual_paths.discard("db/migration/V920__r2_customer_requirements.sql")
+            actual_paths.discard("db/migration/V930__r2_materials.sql")
+            actual_paths.discard("db/migration/V940__r2_quotes.sql")
+            actual_paths.discard("db/migration/V950__r2_quote_runtime.sql")
+            actual_paths.discard("db/migration/V960__r2_quote_transaction.sql")
+            actual_paths.discard("db/migration/V970__r2_contract_preparation.sql")
+            actual_paths.discard("db/migration/V980__r2_contract_versions.sql")
+            actual_paths.discard("db/migration/V990__r2_manual_signature.sql")
+            actual_paths.discard("db/migration/V1000__r2_quote_preparation_intent.sql")
+            actual_paths.discard("db/migration/V1010__r2_followup_attempt.sql")
+            actual_paths.discard("db/migration/V1020__r2_quote_termination.sql")
+            actual_paths.discard("db/migration/V1030__r2_contract_negotiation.sql")
+            actual_paths.discard("db/migration/V1040__r2_execution_conditions.sql")
+            actual_paths.discard("db/migration/V1050__r2_transfer_workflow.sql")
+            actual_paths.discard("db/migration/V1060__r25_contract_responsibility_recovery.sql")
         if actual_paths != set(inventory) or len(inventory) != 21:
             raise ValueError("wrong migration inventory")
         for relative, digest in inventory.items():
@@ -92,7 +125,7 @@ def validate_ingress_query_capability(root: Path) -> list[str]:
     return []
 
 
-def validate(root: Path) -> list[str]:
+def validate(root: Path, *, allow_r2_schema: bool = False) -> list[str]:
     findings: list[str] = []
     command = _read(root, "docs/contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md", findings)
     adr = _read(root, "docs/adr/ADR-0008-r1-business-closure-alignment.md", findings)
@@ -130,7 +163,7 @@ def validate(root: Path) -> list[str]:
     ):
         _require(adr, value, "ADR decision", findings)
     _require(baseline, "Baseline ID: MVP-2026-09-08.3", "active baseline id", findings)
-    findings.extend(validate_ingress_query_capability(root))
+    findings.extend(validate_ingress_query_capability(root, allow_r2_schema=allow_r2_schema))
     try:
         document = yaml.load(api, Loader=_StrictSafeLoader)
     except yaml.YAMLError as error:
@@ -143,6 +176,12 @@ def validate(root: Path) -> list[str]:
     if not isinstance(paths, dict) or any(not isinstance(item, dict) for item in paths.values()):
         findings.append("R1 OpenAPI paths and path items must be mappings")
         return findings
+    try:
+        document = intake_transport_projection(document)
+    except (KeyError, TypeError, ValueError, AttributeError) as error:
+        findings.append(f"R2 intake source transport is invalid: {error}")
+        return findings
+    paths = document["paths"]
     operations = [operation.get("operationId") for item in paths.values() for operation in item.values() if isinstance(operation, dict)]
     if len(operations) != 37 or len(set(operations)) != 37:
         findings.append("R1 OpenAPI must expose exactly 37 unique operations")

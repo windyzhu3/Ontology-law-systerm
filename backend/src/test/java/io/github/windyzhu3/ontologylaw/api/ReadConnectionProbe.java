@@ -11,12 +11,17 @@ final class ReadConnectionProbe implements InvocationHandler {
     final Connection delegate;
     final List<String> roles=new CopyOnWriteArrayList<>();
     final AtomicInteger inserts=new AtomicInteger();
+    final AtomicInteger auditRows=new AtomicInteger();
+    final AtomicInteger isolationReads=new AtomicInteger();
+    final List<String> statements=new CopyOnWriteArrayList<>();
+    final java.util.concurrent.atomic.LongAdder sqlNanos=new java.util.concurrent.atomic.LongAdder();
     final CountDownLatch auditReached=new CountDownLatch(1),auditContinue=new CountDownLatch(1),commitReached=new CountDownLatch(1),commitContinue=new CountDownLatch(1);
     int pauseAuditAt=0;boolean pauseCommit=false,loseCommitAck=false;
     String commitAckSqlState="08006";
     ReadConnectionProbe(Connection delegate){this.delegate=delegate;}
     Connection connection(){return (Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},this);}
     public Object invoke(Object proxy,Method method,Object[] args)throws Throwable {
+        if(method.getName().equals("getTransactionIsolation"))isolationReads.incrementAndGet();
         if(method.getName().equals("commit")) {
             commitReached.countDown();if(pauseCommit)await(commitContinue);
             Object result=call(delegate,method,args);if(loseCommitAck)throw new SQLException("Synthetic commit acknowledgement unavailable",commitAckSqlState);return result;
@@ -25,15 +30,21 @@ final class ReadConnectionProbe implements InvocationHandler {
         if(result instanceof Statement statement) {
             String prepared=args!=null&&args.length>0&&args[0] instanceof String s?s:null;
             Class<?> type=result instanceof PreparedStatement?PreparedStatement.class:Statement.class;
+            var bindings=new AtomicInteger();
             return Proxy.newProxyInstance(type.getClassLoader(),new Class<?>[]{type},(p,m,a)->{
                 String sql=prepared!=null?prepared:a!=null&&a.length>0&&a[0] instanceof String s?s:"";
+                if(m.getName().equals("addBatch"))bindings.incrementAndGet();
+                if(m.getName().equals("clearBatch"))bindings.set(0);
                 if(m.getName().startsWith("execute")) {
+                    statements.add(sql);
                     if(sql.startsWith("SET LOCAL ROLE "))roles.add(sql.substring(15));
                     if(sql.toLowerCase(Locale.ROOT).startsWith("insert into \"audit\".\"audit_entry\"")) {
+                        auditRows.addAndGet(m.getName().contains("Batch")?bindings.getAndSet(0):1);
                         int n=inserts.incrementAndGet();if(n==pauseAuditAt){auditReached.countDown();await(auditContinue);}
                     }
                 }
-                return call(statement,m,a);
+                long start=System.nanoTime();
+                try{return call(statement,m,a);}finally{if(m.getName().startsWith("execute"))sqlNanos.add(System.nanoTime()-start);}
             });
         }
         return result;

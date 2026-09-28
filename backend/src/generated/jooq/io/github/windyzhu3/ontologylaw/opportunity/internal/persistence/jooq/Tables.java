@@ -4,7 +4,12 @@
 package io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq;
 
 
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.Closure;
 import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.Opportunity;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.OpportunityProgress;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.OwnerException;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.OwnerExceptionDisposition;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.ResponsibilityHandoff;
 
 
 /**
@@ -14,8 +19,34 @@ import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tab
 public class Tables {
 
     /**
+     * Fact Owner：OpportunityRuntime；不可变商机终结事实；无待办也保留明确依据；说明加密且仅授权后解密。
+     */
+    public static final Closure CLOSURE = Closure.CLOSURE;
+
+    /**
      * Fact
      * Owner：OpportunityRuntime；Opportunity锚点：一行代表从一个Lead及其唯一Assignment路径形成的一项准确法律需求和Owner；只保存当前报价指针及一次终结槽，不保存通用Stage或Status。
      */
     public static final Opportunity OPPORTUNITY_ = Opportunity.OPPORTUNITY_;
+
+    /**
+     * Fact Owner：OpportunityRuntime；Opportunity进展事实：一行代表一项法律需求的一次已发生进展，Fact
+     * Owner为OpportunityRuntime并按序追加；机会Owner只是责任Actor，不可覆盖且不代表可变的当前机会阶段。
+     */
+    public static final OpportunityProgress OPPORTUNITY_PROGRESS = OpportunityProgress.OPPORTUNITY_PROGRESS;
+
+    /**
+     * Fact Owner：OpportunityRuntime；负责人异常版本：每次观察保留准确历史版本。
+     */
+    public static final OwnerException OWNER_EXCEPTION = OwnerException.OWNER_EXCEPTION;
+
+    /**
+     * Fact Owner：OpportunityRuntime；负责人异常处置：不可变人工决定。
+     */
+    public static final OwnerExceptionDisposition OWNER_EXCEPTION_DISPOSITION = OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION;
+
+    /**
+     * Fact Owner：OpportunityRuntime；商机责任交接：不可变唯一责任链。
+     */
+    public static final ResponsibilityHandoff RESPONSIBILITY_HANDOFF = ResponsibilityHandoff.RESPONSIBILITY_HANDOFF;
 }

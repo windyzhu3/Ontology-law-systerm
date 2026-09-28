@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 
 import yaml
+from scripts.baseline.r2_intake_sources_contract import intake_transport_projection
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -43,6 +44,7 @@ class R1ProjectionReadinessContractTest(unittest.TestCase):
     def test_parsed_transport_has_thirty_seven_operations_and_five_mtls(self):
         """Break caught: the executable contract omits the fifth internal operation."""
         document = yaml.safe_load((ROOT / API).read_text(encoding="utf-8"))
+        document = intake_transport_projection(document)
         operations = [operation for item in document["paths"].values()
                       for method, operation in item.items()
                       if method in {"get", "post", "put", "patch", "delete", "head", "options", "trace"}]
@@ -220,8 +222,10 @@ class R1ProjectionReadinessContractTest(unittest.TestCase):
             # artifacts, so this exercises the real order of both contract gates.
             shutil.copytree(ROOT / "docs/adr", root / "docs/adr", dirs_exist_ok=True)
             shutil.copy2(ROOT / HTTP, root / HTTP)
-            generated = "database/schema-contract-52-plus-2/generated"
-            shutil.copytree(ROOT / generated, root / generated, dirs_exist_ok=True)
+            # Current authority docs require the exact frozen R1 capability schema.
+            from scripts.baseline.tests.historical_schema_fixture import historical_schema_fixture
+            with historical_schema_fixture(860) as generated:
+                shutil.copytree(generated, root / "database/schema-contract-52-plus-2/generated", dirs_exist_ok=True)
             self.assertEqual([], verify_repository(root))
             path = root / API
             original = yaml.safe_load(path.read_text(encoding="utf-8"))

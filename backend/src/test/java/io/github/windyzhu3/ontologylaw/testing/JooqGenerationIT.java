@@ -30,7 +30,7 @@ class JooqGenerationIT extends PostgresIntegrationTest {
             "party", List.of("party"),
             "evidence", List.of("evidence_submission", "evidence_binding"),
             "lead", List.of("lead", "lead_assignment", "lead_contact_result"),
-            "opportunity", List.of("opportunity")));
+            "opportunity", List.of("opportunity", "opportunity_progress", "owner_exception", "owner_exception_disposition", "responsibility_handoff", "closure")));
 
     @TempDir Path generated;
 
@@ -57,7 +57,7 @@ class JooqGenerationIT extends PostgresIntegrationTest {
         }
         Map<String, byte[]> actual = contents(generated);
         long pojos = actual.keySet().stream().filter(name -> name.contains("/tables/pojos/")).count();
-        assertEquals(23, pojos, "Only the explicit R1 tables may be generated");
+        assertEquals(28, pojos, "Only the explicit R1 and registered R2 owner tables may be generated");
         for (var file : actual.entrySet()) {
             String source = new String(file.getValue(), StandardCharsets.UTF_8);
             assertFalse(source.contains("\r"), file.getKey() + " must use platform-independent LF");

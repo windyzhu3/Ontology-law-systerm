@@ -8,10 +8,10 @@ import org.junit.jupiter.params.provider.EnumSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class R1WorkcardHttpIT extends R1HttpFixture {
-    @ParameterizedTest @EnumSource(TaskFactory.Type.class)
+    @ParameterizedTest @EnumSource(value=TaskFactory.Type.class,names={"RESOLVE_LEAD_DUPLICATE","COMPLETE_LEAD_INGRESS","ASSIGN_LEAD","RESOLVE_LEAD_ROUTING_GAP","ACK_SOURCE_INTAKE_STOP_REQUEST","CONTACT_LEAD","REVIEW_LEAD_VALIDITY"})
     void seven_current_cards_are_typed_private_projections_and_every_200_304_has_committed_audit(TaskFactory.Type type)throws Exception {
         setupFlow(type);
-        int sources=switch(type){case COMPLETE_LEAD_INGRESS,RESOLVE_LEAD_ROUTING_GAP->5;case CONTACT_LEAD,ACK_SOURCE_INTAKE_STOP_REQUEST,REVIEW_LEAD_VALIDITY->6;case RESOLVE_LEAD_DUPLICATE->7;case ASSIGN_LEAD->8;};
+        int sources=switch(type){case CLASSIFY_MATTER,ACCEPT_TRANSFER,SUPPLEMENT_TRANSFER,PREPARE_TRANSFER,REVIEW_TRANSFER,CHECK_CONTRACT_RECEIPT,SUPPLEMENT_CONTRACT_RECEIPT,CHECK_CONTRACT_EXECUTION,RESOLVE_SOURCE_REQUEST,REVIEW_CONTRACT_TERMINATION,ARRANGE_CONTRACT_SIGNATURE,COLLECT_CONTRACT_SIGNATURE,VERIFY_CONTRACT_SIGNATURE,ARCHIVE_CONTRACT_SIGNATURE,REQUEST_CONTRACT_PREPARATION,DECIDE_CONTRACT_PREPARATION,PREPARE_CONTRACT,SUBMIT_CONTRACT_REVIEW,REVIEW_CONTRACT,SUBMIT_CONTRACT_APPROVAL,APPROVE_CONTRACT,SUPPLEMENT_CONTRACT_REVIEW,PREPARE_QUOTE,SUBMIT_QUOTE_APPROVAL,APPROVE_QUOTE,DELIVER_QUOTE,RECORD_QUOTE_REPLY,RESOLVE_QUOTE_AUTHORITY,PROGRESS_OPPORTUNITY->throw new IllegalArgumentException("R1 fixture requires an activated Lead command");case COMPLETE_LEAD_INGRESS,RESOLVE_LEAD_ROUTING_GAP->5;case CONTACT_LEAD,ACK_SOURCE_INTAKE_STOP_REQUEST,REVIEW_LEAD_VALIDITY->6;case RESOLVE_LEAD_DUPLICATE->7;case ASSIGN_LEAD->8;};
         try(var http=new HttpHarness()) {
             var before=counts();var response=http.request("GET","/api/v1/workcards/current",null,Map.of());assertEquals(200,response.statusCode(),response.body());
             var body=http.body(response);var card=(Map<?,?>)body.get("currentCard");assertEquals(type.name(),card.get("taskType"));assertEquals(current.selector().id().toString(),card.get("taskId"));

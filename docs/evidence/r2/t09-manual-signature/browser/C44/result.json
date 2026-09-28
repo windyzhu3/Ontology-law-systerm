@@ -1,0 +1,61 @@
+{
+  "success": true,
+  "opportunityId": "01a0cd92-781c-7b50-85ae-1fde3e44f9ea",
+  "qa": [
+    {
+      "name": "00-initial",
+      "width": 1440,
+      "overflow": false,
+      "primary": [
+        "确认安排并准备材料"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "00-initial",
+      "width": 390,
+      "overflow": false,
+      "primary": [
+        "确认安排并准备材料"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "00-initial",
+      "width": 360,
+      "overflow": false,
+      "primary": [
+        "确认安排并准备材料"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "01-inspect",
+      "width": 1440,
+      "overflow": false,
+      "primary": [
+        "确认安排并准备材料"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "01-inspect",
+      "width": 390,
+      "overflow": false,
+      "primary": [
+        "确认安排并准备材料"
+      ],
+      "shell": 1
+    },
+    {
+      "name": "01-inspect",
+      "width": 360,
+      "overflow": false,
+      "primary": [
+        "确认安排并准备材料"
+      ],
+      "shell": 1
+    }
+  ],
+  "issues": []
+}

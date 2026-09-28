@@ -1,0 +1,15 @@
+{
+  "confirmedOn": "2026-09-26",
+  "userDecision": "确认",
+  "scope": "F10 执行条件与收款",
+  "excluded": "F11 转案接收与案件分类；R2 发布验收",
+  "files": {
+    "app.html": "1a0fb847979687500e68c43306cfb1b64451a31769d22a1919f17f711da2fe5f",
+    "execution.js": "0fd6473942c4c0f703d23ae2a70e0a1fe66486775aae4c2d0df11a7140e9d4aa",
+    "scenes.js": "d4415baa56d254236617168dc2790d19618940ee8124f478e180bae4e71c8548",
+    "workbench.css": "604351c18af358cdb6ce830b73a1a50274b95579331e731b8eb243f5af9a7c49",
+    "ledgerMaster.css": "7ab59db1efa9ec39404ca189125bc9af820382ad7ab5b0e68c885a0447e65851",
+    "workbenchControls.css": "438ebfc63712e6df25491144071ca0563af4e74eb1a77e0e6cbf5c62ca9130d3",
+    "contractControls.css": "86e8531d69e5fb8e0e3186c959aa282dcfedd529b4861d90cdc7adca4717061c"
+  }
+}

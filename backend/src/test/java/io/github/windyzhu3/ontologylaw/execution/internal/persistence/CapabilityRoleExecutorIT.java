@@ -117,9 +117,10 @@ class CapabilityRoleExecutorIT extends PostgresIntegrationTest {
         }
     }
 
-    @Test void migrations_retain_all_54_tables_owned_by_migrator_and_restricted_logins() throws Exception {
+    @Test void migrations_retain_all_59_tables_owned_by_migrator_and_restricted_logins() throws Exception {
         try (var c = database.adminConnection()) {
-            assertEquals("54", scalar(c, "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and n.nspname not in ('pg_catalog','information_schema') and n.nspname not like 'pg_toast%'"));
+            assertEquals("59", scalar(c, "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and n.nspname not in ('pg_catalog','information_schema') and n.nspname not like 'pg_toast%'"));
+            assertEquals("4", scalar(c, "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and (n.nspname||'.'||c.relname) in ('platform_meta.r2_opportunity_checkpoint','opportunity.owner_exception','opportunity.owner_exception_disposition','opportunity.responsibility_handoff')"));
             assertEquals("0", scalar(c, "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace join pg_roles r on r.oid=c.relowner where c.relkind='r' and n.nspname not in ('pg_catalog','information_schema') and n.nspname not like 'pg_toast%' and r.rolname <> 'law_schema_migrator'"));
             assertEquals("0", scalar(c, "select count(*) from pg_roles where rolname in ('law_api_login','law_worker_login') and (rolinherit or rolsuper or rolcreaterole or rolcreatedb or rolreplication or rolbypassrls)"));
         }

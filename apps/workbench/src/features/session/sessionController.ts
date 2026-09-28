@@ -386,7 +386,7 @@ function parseContext(value: unknown): SessionContext {
   if (!value || typeof value !== "object") return fail();
   const v = value as SessionContext;
   if (
-    Object.keys(v).sort().join() !==
+    Object.keys(v).filter(key => key !== "canReadBusinessOverview" && key !== "canReadLeadManagement" && key !== "canReadTeamTasks" && key !== "businessManagementViews" && key !== "canReadBusinessManagement" && key !== "canManageOwnerExceptions" && key !== "canReadOpportunityLedger").sort().join() !==
     "actorScopeKey,appointmentChoices,canEnterIdentityAdmin,canEnterWorkbench,delegatedAppointmentChoices,displayName,selectedAppointmentId,selectedOnBehalfAppointmentId,state"
   )
     return fail();
@@ -412,7 +412,14 @@ function parseContext(value: unknown): SessionContext {
     !choices(v.appointmentChoices) ||
     !choices(v.delegatedAppointmentChoices) ||
     typeof v.canEnterWorkbench !== "boolean" ||
-    typeof v.canEnterIdentityAdmin !== "boolean"
+    typeof v.canEnterIdentityAdmin !== "boolean" ||
+    (v.businessManagementViews !== undefined && (!Array.isArray(v.businessManagementViews)||v.businessManagementViews.length>3||new Set(v.businessManagementViews).size!==v.businessManagementViews.length||v.businessManagementViews.some(view=>!["contracts","payments","transfer"].includes(view)))) ||
+    (v.canReadBusinessOverview !== undefined && typeof v.canReadBusinessOverview !== "boolean") ||
+    (v.canReadLeadManagement !== undefined && typeof v.canReadLeadManagement !== "boolean") ||
+    (v.canReadTeamTasks !== undefined && typeof v.canReadTeamTasks !== "boolean") ||
+    (v.canReadBusinessManagement !== undefined && typeof v.canReadBusinessManagement !== "boolean") ||
+    (v.canReadOpportunityLedger !== undefined && typeof v.canReadOpportunityLedger !== "boolean") ||
+    (v.canManageOwnerExceptions !== undefined && typeof v.canManageOwnerExceptions !== "boolean")
   )
     return fail();
   if (v.state === "READY") {
@@ -427,7 +434,7 @@ function parseContext(value: unknown): SessionContext {
       (!v.delegatedAppointmentChoices.some(
         (c) => c.id === v.selectedOnBehalfAppointmentId,
       ) ||
-        v.canEnterIdentityAdmin)
+        v.canEnterIdentityAdmin || v.canReadBusinessOverview === true || v.canReadLeadManagement === true || v.canReadTeamTasks === true || v.canManageOwnerExceptions === true || v.canReadOpportunityLedger === true || v.canReadBusinessManagement === true || !!v.businessManagementViews?.length)
     )
       return fail();
   } else if (
@@ -435,7 +442,7 @@ function parseContext(value: unknown): SessionContext {
     v.selectedAppointmentId !== null ||
     v.actorScopeKey !== null ||
     v.canEnterWorkbench ||
-    v.canEnterIdentityAdmin ||
+    v.canEnterIdentityAdmin || v.canReadBusinessOverview === true || v.canReadLeadManagement === true || v.canReadTeamTasks === true || v.canManageOwnerExceptions === true || v.canReadOpportunityLedger === true || v.canReadBusinessManagement === true || !!v.businessManagementViews?.length ||
     v.selectedOnBehalfAppointmentId !== null ||
     v.delegatedAppointmentChoices.length ||
     (v.state === "NO_APPOINTMENT"

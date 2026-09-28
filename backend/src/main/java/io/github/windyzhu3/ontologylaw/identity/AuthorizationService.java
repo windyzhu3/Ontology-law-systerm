@@ -36,9 +36,19 @@ public interface AuthorizationService {
         public Request { Objects.requireNonNull(actor); Objects.requireNonNull(subject); Objects.requireNonNull(scopeOrganizationId); Objects.requireNonNull(requirement); }
     }
     AuthorizationSnapshot evaluate(Connection connection, Request request, boolean finalCheck) throws SQLException;
+    /** Complete independent decisions; implementations may share a locked fact read, never an allow result. */
+    default List<AuthorizationSnapshot> evaluateAll(Connection c,List<Request> requests,boolean finalCheck)throws SQLException {
+        var result=new ArrayList<AuthorizationSnapshot>();for(var request:requests)result.add(evaluate(c,request,finalCheck));return List.copyOf(result);
+    }
     /** Acquired before reading current Owner/organization facts, retained until transaction completion. */
     default void lockForEvaluation(Connection connection, UUID tenantId) throws SQLException {
         throw new SQLException("Identity shared lock support required", "0A000");
+    }
+    /** Explicit read-only scope. The identity lock is acquired before any reusable fact is read.
+     * Close before leaving the transaction; callers must not mutate identity within this scope. */
+    interface ReadScope extends AutoCloseable { void close(); }
+    default ReadScope lockedReadScope(Connection connection,UUID tenantId)throws SQLException {
+        lockForEvaluation(connection,tenantId);return ()->{};
     }
     /** All identity writers call before any mutation, and never acquire business locks afterwards. */
     void lockForMutation(Connection connection, UUID tenantId) throws SQLException;

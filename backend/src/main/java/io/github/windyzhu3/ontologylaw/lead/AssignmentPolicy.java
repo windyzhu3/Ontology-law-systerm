@@ -21,4 +21,16 @@ public final class AssignmentPolicy {
         var candidates=authority.candidates(c,tenant,lead,root(c,tenant,code,error),type.slot,type.authority);
         if(candidates.size()!=1)throw new CommandHandler.Rejected(error);return candidates.getFirst().appointmentId();
     }
+    /** Keep an established business responsibility only while its current authority remains valid. */
+    public UUID sourceRequestOwner(Connection c,UUID tenant,io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Task task,R1SourcePolicyRegistry.SourcePolicy policy)throws SQLException {
+        var tasks=io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.databaseBacked();
+        UUID incumbent;
+        if(task.type()==Type.ACK_SOURCE_INTAKE_STOP_REQUEST)incumbent=tasks.sourceRequestOriginOwner(c,tenant,task);
+        else if(task.type()==Type.RESOLVE_SOURCE_REQUEST)incumbent=task.owner();
+        else throw new IllegalArgumentException("Source request responsibility required");
+        var candidates=authority.candidates(c,tenant,task.subject(),root(c,tenant,policy.routingSupervisorRootCode(),"SUPERVISOR_UNRESOLVED"),Type.RESOLVE_SOURCE_REQUEST.slot,Type.RESOLVE_SOURCE_REQUEST.authority);
+        if(incumbent!=null&&candidates.stream().anyMatch(candidate->candidate.appointmentId().equals(incumbent)))return incumbent;
+        if(candidates.size()==1)return candidates.getFirst().appointmentId();
+        throw new CommandHandler.Rejected("SUPERVISOR_UNRESOLVED");
+    }
 }

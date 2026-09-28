@@ -7,6 +7,7 @@ import {
   matchesReceipt,
 } from "../../lib/api";
 import type { RecoveryMarker } from "../session/recoveryMarker";
+import { sameOpportunityValues } from "./opportunityProgress";
 import {
   candidate,
   etag,
@@ -63,17 +64,25 @@ export function useCurrentCard(
   session: WorkbenchSession | null | undefined,
   api: WorkbenchApi,
   options: {
+    initialTaskId?: string;
+    deferInitialRead?: boolean;
+    pauseAutomaticRead?: boolean;
     recoveryOnly?: boolean;
     readAfterRecovery?: boolean;
     canAbandonInvalidClue?: () => boolean;
   } = {},
 ) {
+  const readActivated = useRef(options.deferInitialRead !== true);
+  const automaticReadPaused=useRef(options.pauseAutomaticRead===true);
+  automaticReadPaused.current=options.pauseAutomaticRead===true;
   const recoveryOnly = options.recoveryOnly === true;
   const [state, setState] = useState<State>(initial);
   const stateRef = useRef(state);
   const identity = useRef(session);
   const generation = useRef(0);
   const alive = useRef(true);
+  const expectedSelection = useRef<{id:string;revision:number;etag:string} | null>(null);
+  const selectedTask = useRef<string | null>(options.initialTaskId ?? null);
   const wbTag = useRef<string | null>(null);
   const getController = useRef<AbortController | null>(null);
   const writeController = useRef<AbortController | null>(null);
@@ -99,6 +108,8 @@ export function useCurrentCard(
     getController.current?.abort();
     writeController.current?.abort();
     wbTag.current = null;
+    selectedTask.current = null;
+    expectedSelection.current = null;
     stateRef.current = initial;
     locked.current = false;
     denied.current = false;
@@ -120,7 +131,8 @@ export function useCurrentCard(
     update({ ...initial, error: "当前内容不可用，请重新登录或联系管理员。" });
   };
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (automatic = false) => {
+    if (!readActivated.current) return;
     if (!session || denied.current || locked.current) return;
     if (recoveryOnly && stateRef.current.recoveryBlocked) return;
     const captured = session,
@@ -131,9 +143,23 @@ export function useCurrentCard(
     const cached = stateRef.current.envelope,
       tag = wbTag.current;
     update({ loading: true });
+    let timedOut = false;
+    let abortRead: () => void = () => {};
+    const interrupted = new Promise<never>((_, reject) => {
+      abortRead = () => reject(new Error("Responsibility read interrupted"));
+      controller.signal.addEventListener("abort", abortRead, { once: true });
+    });
+    const deadline = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 25_000);
     try {
-      const r = await api.current(captured, tag, controller.signal);
+      const r = await Promise.race([
+        api.current(captured, tag, controller.signal, selectedTask.current),
+        interrupted,
+      ]);
       if (!valid(captured) || currentGeneration !== generation.current) return;
+      if (automatic && automaticReadPaused.current) {update({loading:false});return;}
       if (!etag(r.etag, "wb")) throw new Error("Invalid envelope");
       if (r.status === 304) {
         if (!cached || !tag || r.etag !== tag) throw new Error("Invalid cache");
@@ -146,8 +172,17 @@ export function useCurrentCard(
         return;
       }
       const envelope = parseEnvelope(r.data);
+      const expected = expectedSelection.current;
+      if (expected && (envelope.selectionNotice || envelope.currentCard?.taskId !== expected.id || envelope.currentCard.taskRevision !== expected.revision || envelope.currentCard.preconditions.taskETag !== expected.etag)) {
+        wbTag.current = null;
+        update({envelope:null,loading:false,readFailed:false,needsRefresh:true,error:"当前待办已变化，请返回商机台账重新查询后办理。"});
+        return;
+      }
+      expectedSelection.current = null;
       wbTag.current = r.etag;
+      if (envelope.selectionNotice) selectedTask.current = null;
       update({
+        message: envelope.selectionNotice ?? stateRef.current.message,
         envelope,
         loading: false,
         readFailed: false,
@@ -158,7 +193,7 @@ export function useCurrentCard(
       if (
         !valid(captured) ||
         currentGeneration !== generation.current ||
-        controller.signal.aborted
+        (controller.signal.aborted && !timedOut)
       )
         return;
       if (
@@ -168,17 +203,22 @@ export function useCurrentCard(
         clearPrivate();
         return;
       }
+      if (automatic && automaticReadPaused.current) {update({loading:false});return;}
       wbTag.current = null;
       update({
         envelope: null,
         loading: false,
         readFailed: true,
-        error:
-          error instanceof TransportError
+        error: timedOut
+          ? "读取当前责任超时，请点击刷新重试。"
+          : error instanceof TransportError
             ? error.message
             : "暂时无法显示工作卡，请刷新后重试。",
         needsRefresh: true,
       });
+    } finally {
+      clearTimeout(deadline);
+      controller.signal.removeEventListener("abort", abortRead);
     }
   }, [
     session?.identityEpoch,
@@ -188,13 +228,26 @@ export function useCurrentCard(
     recoveryOnly,
   ]);
 
+  const selectTask = async (taskId: string | null, expected?: {id:string;revision:number;etag:string}) => {
+    const s = stateRef.current;
+    if (locked.current || s.busy || s.pending || s.recoveryMarker || s.recoveryBlocked || (s.loading && !s.envelope)) return;
+    expectedSelection.current = expected ?? null;
+    readActivated.current = true;
+    selectedTask.current = taskId;
+    wbTag.current = null;
+    completedTask.current = null;
+    correction.current = null;
+    update({ envelope: null, message: null, error: null, needsRefresh: false });
+    await refresh();
+  };
+
   const acceptReceipt = async (
     receipt: PublicReceipt,
     original: OriginalWrite,
   ) => {
     if (correction.current?.key === original.key) correction.current = null;
     if (original.kind === "command" && receipt.outcome !== "REJECTED")
-      completedTask.current = original.taskId;
+      { completedTask.current = original.taskId; selectedTask.current = null; }
     update({
       pending: null,
       recoveryMarker: null,
@@ -214,10 +267,18 @@ export function useCurrentCard(
     if (receipt.outcome === "REJECTED") update({ needsRefresh: true });
     wbTag.current = null;
   };
-  const perform = async (original: OriginalWrite) => {
-    if (!session || locked.current || denied.current) return;
+  type PerformResult = {
+    receipt: PublicReceipt;
+    draft?: NonNullable<NonNullable<Envelope["currentCard"]>["actionDraft"]>;
+    preconditions?: NonNullable<Envelope["currentCard"]>["preconditions"];
+  };
+  const perform = async (
+    original: OriginalWrite,
+    chainOwned = false,
+  ): Promise<PerformResult | null> => {
+    if (!session || (!chainOwned && locked.current) || denied.current) return null;
     const captured = session;
-    locked.current = true;
+    if (!chainOwned) locked.current = true;
     generation.current++;
     getController.current?.abort();
     const controller = new AbortController();
@@ -235,7 +296,7 @@ export function useCurrentCard(
     let refreshAfter = false;
     try {
       const r = await api.write(captured, original, controller.signal);
-      if (!valid(captured)) return;
+      if (!valid(captured)) return null;
       const data: unknown = r.data;
       const receipt =
         original.kind === "draft" && isObject(data) ? data.receipt : data;
@@ -252,7 +313,8 @@ export function useCurrentCard(
           !validPreconditions(d.preconditions) ||
           !etag(r.etag, "draft") ||
           d.preconditions.draftETag !== r.etag ||
-          !sameValues(d.draft.values, original.body.values) ||
+          !(original.body.actionCode === "RECORD_OPPORTUNITY_PROGRESS" ? sameOpportunityValues : sameValues)(d.draft.values, original.body.values) ||
+          d.draft.editable !== true ||
           receipt.outcome === "REJECTED" ||
           receipt.resultFact.factType !== "ACTION_DRAFT" ||
           !("revision" in receipt.resultFact) ||
@@ -268,19 +330,29 @@ export function useCurrentCard(
                 ...envelope.currentCard,
                 actionDraft: d.draft,
                 preconditions: d.preconditions,
+                ...(original.body.actionCode === "RECORD_OPPORTUNITY_PROGRESS" ? {commandForm:{...envelope.currentCard.commandForm,values:d.draft.values}} : {}),
               },
             }),
           });
       } else refreshAfter = true;
       await acceptReceipt(receipt, original);
+      return {
+        receipt,
+        ...(original.kind === "draft" && isObject(data)
+          ? {
+              draft: data.draft as PerformResult["draft"],
+              preconditions: data.preconditions as PerformResult["preconditions"],
+            }
+          : {}),
+      };
     } catch (error) {
-      if (!valid(captured)) return;
+      if (!valid(captured)) return null;
       if (
         error instanceof TransportError &&
         [401, 403, 404].includes(error.status)
       ) {
         clearPrivate();
-        return;
+        return null;
       }
       if (
         error instanceof TransportError &&
@@ -303,8 +375,9 @@ export function useCurrentCard(
               ? error.message
               : ambiguous,
         });
+      return null;
     } finally {
-      if (valid(captured)) {
+      if (valid(captured) && !chainOwned) {
         locked.current = false;
         update({ busy: false });
         if (refreshAfter) await refresh();
@@ -322,11 +395,11 @@ export function useCurrentCard(
       !card.primaryCommand.enabled ||
       card.actionDraft?.editable === false
     )
-      return;
+      return false;
     try {
       const body = candidate(card, values);
       const previous = correction.current;
-      await perform({
+      const result = await perform({
         kind: "draft",
         key:
           previous?.taskId === card.taskId && previous.kind === "draft"
@@ -338,10 +411,21 @@ export function useCurrentCard(
           : { "If-None-Match": "*" },
         body,
       });
+      const currentCard = stateRef.current.envelope?.currentCard;
+      return !!(
+        result?.draft?.editable === true &&
+        result.preconditions &&
+        session &&
+        valid(session) &&
+        currentCard?.taskId === card.taskId &&
+        currentCard.primaryCommand.enabled &&
+        currentCard.actionDraft?.editable === true
+      );
     } catch (error) {
       update({
         error: error instanceof Error ? error.message : "请核对候选内容。",
       });
+      return false;
     }
   };
   const submit = async (values: Values) => {
@@ -359,7 +443,7 @@ export function useCurrentCard(
     try {
       const body = candidate(card, values),
         draft = card.actionDraft;
-      if (!draft || !sameValues(body.values, draft.values)) {
+      if (!draft || !(card.taskType === "PROGRESS_OPPORTUNITY" ? sameOpportunityValues : sameValues)(body.values, draft.values)) {
         update({ error: "请先保存当前候选，再确认处理结果。" });
         return;
       }
@@ -385,6 +469,89 @@ export function useCurrentCard(
       update({
         error: error instanceof Error ? error.message : "请核对候选内容。",
       });
+    }
+  };
+  const confirm = async (values: Values): Promise<void> => {
+    const s = stateRef.current,
+      card = s.envelope?.currentCard;
+    if (
+      !session ||
+      !card ||
+      locked.current ||
+      s.pending ||
+      s.needsRefresh ||
+      !card.primaryCommand.enabled ||
+      card.actionDraft?.editable === false
+    )
+      return;
+    let body: ReturnType<typeof candidate>;
+    try {
+      body = candidate(card, values);
+    } catch (error) {
+      update({ error: error instanceof Error ? error.message : "请核对候选内容。" });
+      return;
+    }
+    const captured = session;
+    locked.current = true;
+    update({ busy: true, error: null, message: null });
+    let shouldRefresh = false;
+    try {
+      const same = card.taskType === "PROGRESS_OPPORTUNITY" ? sameOpportunityValues : sameValues;
+      let draft = card.actionDraft;
+      let preconditions = card.preconditions;
+      if (!draft || !same(body.values, draft.values)) {
+        const previous = correction.current;
+        const saved = await perform({
+          kind: "draft",
+          key:
+            previous?.taskId === card.taskId && previous.kind === "draft"
+              ? previous.key
+              : crypto.randomUUID(),
+          taskId: card.taskId,
+          headers: card.preconditions.draftETag
+            ? { "If-Match": card.preconditions.draftETag }
+            : { "If-None-Match": "*" },
+          body,
+        }, true);
+        const currentCard = stateRef.current.envelope?.currentCard;
+        if (
+          !saved?.draft ||
+          saved.draft.editable !== true ||
+          !saved.preconditions ||
+          !valid(captured) ||
+          !same(saved.draft.values, body.values) ||
+          currentCard?.taskId !== card.taskId ||
+          !currentCard.primaryCommand.enabled ||
+          currentCard.actionDraft?.editable !== true
+        ) return;
+        draft = saved.draft;
+        preconditions = saved.preconditions;
+      }
+      if (!valid(captured) || !draft || !same(body.values, draft.values)) return;
+      const previous = correction.current;
+      const commandResult = await perform({
+        kind: "command",
+        key:
+          previous?.taskId === card.taskId && previous.kind === "command"
+            ? previous.key
+            : crypto.randomUUID(),
+        taskId: card.taskId,
+        action: body.actionCode,
+        headers: { "If-Match": preconditions.taskETag },
+        body: {
+          ...draft.values,
+          draftId: draft.draftId,
+          expectedDraftRevision: draft.draftRevision,
+          draftDigest: draft.digest,
+        },
+      }, true);
+      shouldRefresh = !!commandResult;
+    } finally {
+      if (valid(captured)) {
+        locked.current = false;
+        update({ busy: false });
+        if (shouldRefresh) await refresh();
+      }
     }
   };
   const recover = async () => {
@@ -544,6 +711,7 @@ export function useCurrentCard(
     const tick = setInterval(() => {
       if (
         document.visibilityState === "hidden" ||
+        automaticReadPaused.current ||
         denied.current ||
         locked.current ||
         stateRef.current.loading ||
@@ -563,18 +731,18 @@ export function useCurrentCard(
       ) {
         waitingAttempts++;
         update({ waitingAutoPaused: waitingAttempts === 6 });
-        void refreshRef.current();
+        void refreshRef.current(true);
       }
     }, 30_000);
     const focus = () => {
-      if (!recoveryOnly && document.visibilityState !== "hidden")
-        void refreshRef.current();
+      if (!recoveryOnly && !automaticReadPaused.current && !stateRef.current.loading && document.visibilityState !== "hidden")
+        void refreshRef.current(true);
     };
     const visibility = () => {
       if (document.visibilityState === "hidden") {
         if (!locked.current) generation.current++;
         getController.current?.abort();
-        if (recoveryOnly && !locked.current && stateRef.current.loading)
+        if (!locked.current && stateRef.current.loading)
           update({ loading: false, needsRefresh: true });
       } else focus();
     };
@@ -599,8 +767,10 @@ export function useCurrentCard(
   return {
     ...(sessionChanged ? initial : state),
     refresh,
+    selectTask,
     save,
     submit,
+    confirm,
     recover,
     replay,
     abandonRecovery,

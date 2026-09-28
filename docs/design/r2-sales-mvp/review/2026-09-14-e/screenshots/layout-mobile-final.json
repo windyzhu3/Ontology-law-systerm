@@ -1,0 +1,112 @@
+[
+  {
+    "cards": 1,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "primary": 1,
+    "scene": "progress",
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "cards": 1,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "primary": 1,
+    "scene": "contact",
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "cards": 0,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "primary": 1,
+    "scene": "import",
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "cards": 1,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "primary": 1,
+    "scene": "contract",
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "cards": 1,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "primary": 1,
+    "scene": "direct",
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "cards": 1,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "primary": 1,
+    "scene": "transfer",
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "cards": 0,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "primary": 1,
+    "scene": "ledger",
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "cards": 0,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "primary": 1,
+    "scene": "team",
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "cards": 0,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "primary": 1,
+    "scene": "coordinate",
+    "viewport": [
+      360,
+      900
+    ]
+  },
+  {
+    "cards": 0,
+    "documentWidth": 345,
+    "fixedEditors": 0,
+    "primary": 0,
+    "scene": "readonly",
+    "viewport": [
+      360,
+      900
+    ]
+  }
+]

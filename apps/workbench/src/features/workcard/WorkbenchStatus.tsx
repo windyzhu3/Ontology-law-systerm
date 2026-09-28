@@ -2,6 +2,7 @@ import type { useCurrentCard } from "./useCurrentCard";
 
 type Status = Pick<
   ReturnType<typeof useCurrentCard>,
+  | "busy"
   | "error"
   | "message"
   | "pending"
@@ -50,6 +51,7 @@ export function WorkbenchStatus({ work }: { work: Status }) {
   } else if (recorded && work.loading) {
     text = `${result}，正在刷新当前责任…`;
   }
+  if (work.busy) {text = "正在核对本次办理结果，请稍候。"; alert = false; success = false;}
   const paused = unresolved
     ? work.receiptAutoPaused
       ? "自动回执查询已暂停，可手动查询原回执。"

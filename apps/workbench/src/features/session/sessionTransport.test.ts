@@ -261,3 +261,12 @@ it("does not replay a reconstructed body after another transport loses the origi
   ).rejects.toThrow();
   expect(requests).toHaveLength(1);
 });
+
+it.each(['draft','command'] as const)('keeps source continuation %s on its named route and original-key recovery',async kind=>{
+ const requests:Request[]=[];const api=createWorkbenchApi(async r=>{requests.push(r);throw new Error('response lost');});
+ const values={decisionCode:'END_LEAD' as const,rationaleSummary:'确认结束'};
+ const input:OriginalWrite=kind==='draft'?{kind,key:taskId,taskId,headers:{'If-None-Match':'*'},body:{actionCode:'RECORD_SOURCE_REQUEST_CONTINUATION',schemaVersion:1,values}}:{kind,key:taskId,taskId,headers:{'If-Match':tags.taskETag},action:'RECORD_SOURCE_REQUEST_CONTINUATION',body:{...values,draftId:taskId,expectedDraftRevision:0,draftDigest:'a'.repeat(43)}};
+ await expect(api.write(session,input,new AbortController().signal)).rejects.toThrow();await expect(api.write(session,input,new AbortController().signal)).rejects.toThrow();
+ expect(requests).toHaveLength(2);expect(new URL(requests[0].url).pathname).toBe(`/api/v1/tasks/${taskId}/`+(kind==='draft'?'source-request-draft':'commands/record-source-request-continuation'));
+ expect(requests[0].headers.get('Idempotency-Key')).toBe(taskId);expect(await requests[0].clone().json()).toEqual(await requests[1].clone().json());
+});

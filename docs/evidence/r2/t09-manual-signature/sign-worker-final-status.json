@@ -1,0 +1,12 @@
+{
+  "kind": "CONTRACT_PREPARATION",
+  "index": 0,
+  "failures": 0,
+  "lastHttpStatus": 503,
+  "acknowledged": 6,
+  "rejected": 0,
+  "uncertain": false,
+  "retryAt": "2026-09-23T10:39:56.753724700Z",
+  "status": "READY",
+  "pendingPage": false
+}

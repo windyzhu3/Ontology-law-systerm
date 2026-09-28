@@ -211,8 +211,9 @@ describe("apiClient", () => {
     const leadWithDigest: RecoveredFact = { factType: "LEAD", factRef: "lead-ref-opaque", digest };
     // @ts-expect-error A completion fact carries exactly one revision-or-digest selector.
     const leadWithBoth: RecoveredFact = { factType: "LEAD", factRef: "lead-ref-opaque", revision: 2, digest };
-    // @ts-expect-error Pre-slot validation failures never create a terminal receipt.
-    const preSlotRejection: RecoveredReceipt = { ...recoveredRejection, rejectionCode: "VALIDATION_FAILED" };
+    const durableCustomerValidation = { ...recoveredRejection, rejectionCode: "VALIDATION_FAILED" } satisfies RecoveredReceipt;
+    // @ts-expect-error An invalid idempotency key cannot create a terminal receipt.
+    const preSlotRejection: RecoveredReceipt = { ...recoveredRejection, rejectionCode: "IDEMPOTENCY_KEY_INVALID" };
 
     void recoveredLead;
     void recoveredDecision;
@@ -220,6 +221,7 @@ describe("apiClient", () => {
     void leadWithDigest;
     void leadWithBoth;
     void preSlotRejection;
+    void durableCustomerValidation;
   });
 
   it("exposes the dedicated routing-review recovery operation", () => {

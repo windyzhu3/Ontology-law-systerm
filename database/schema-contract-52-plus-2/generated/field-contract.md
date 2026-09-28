@@ -1,4 +1,4 @@
-# 待办驱动律所系统 52＋2 完整字段合同
+# 待办驱动律所系统完整字段合同：52业务表＋3技术表
 
 本文件由静态合同机械生成。`flyway_schema_history`由Flyway管理，因此仅记录管理边界，不重复描述其版本相关物理结构。
 
@@ -436,8 +436,8 @@
 - Fact Owner：`ResponsibilityRuntime`
 - 更新策略：`CONTROLLED`
 - 主键：`(tenant_id, task_occurrence_id)`
-- 允许更新字段：`state, completed_at, cancelled_at, cancellation_reason_code, completion_fact_type, completion_fact_id, completion_fact_revision, completion_fact_hash, revision`
-- Write-once字段：`completed_at, cancelled_at, cancellation_reason_code, completion_fact_type, completion_fact_id, completion_fact_revision, completion_fact_hash`
+- 允许更新字段：`state, completed_at, cancelled_at, cancellation_reason_code, completion_fact_type, completion_fact_id, completion_fact_revision, completion_fact_hash, revision, cancellation_fact_type, cancellation_fact_id, cancellation_fact_revision, cancellation_fact_hash`
+- Write-once字段：`completed_at, cancelled_at, cancellation_reason_code, completion_fact_type, completion_fact_id, completion_fact_revision, completion_fact_hash, cancellation_fact_type, cancellation_fact_id, cancellation_fact_revision, cancellation_fact_hash`
 - 状态字段与初态：`state = OPEN`
 - 允许状态转换：`OPEN → WAITING`, `WAITING → OPEN`, `OPEN → DONE`, `WAITING → DONE`, `OPEN → CANCELLED`, `WAITING → CANCELLED`
 
@@ -466,6 +466,16 @@
 | `completion_fact_id` | `uuid` | 是 | `—` | 完成待办所产生的准确业务Fact在所属租户内的准确标识。 |
 | `completion_fact_revision` | `bigint` | 是 | `—` | 完成待办所产生的准确业务Fact的准确修订号；按哈希冻结时为空。 |
 | `completion_fact_hash` | `bytea` | 是 | `—` | 完成待办所产生的准确业务Fact的准确规范摘要；按修订冻结时为空。 |
+| `predecessor_task_occurrence_id` | `uuid` | 是 | `—` | 前序责任身份：R2商机后继跟进绑定已完成责任；初始责任与历史记录为空，创建后不可变。 |
+| `responsibility_basis_type` | `varchar(64)` | 是 | `—` | 当前有效责任依据的静态注册类型。 |
+| `responsibility_basis_id` | `uuid` | 是 | `—` | 当前有效责任依据在所属租户内的准确标识。 |
+| `responsibility_basis_revision` | `bigint` | 是 | `—` | 当前有效责任依据的准确修订号；按哈希冻结时为空。 |
+| `responsibility_basis_hash` | `bytea` | 是 | `—` | 当前有效责任依据的准确规范摘要；按修订冻结时为空。 |
+| `cancellation_fact_type` | `varchar(64)` | 是 | `—` | 交接取消依据的静态注册类型。 |
+| `cancellation_fact_id` | `uuid` | 是 | `—` | 交接取消依据在所属租户内的准确标识。 |
+| `cancellation_fact_revision` | `bigint` | 是 | `—` | 交接取消依据的准确修订号；按哈希冻结时为空。 |
+| `cancellation_fact_hash` | `bytea` | 是 | `—` | 交接取消依据的准确规范摘要；按修订冻结时为空。 |
+| `handoff_predecessor_task_occurrence_id` | `uuid` | 是 | `—` | T01同租户准确身份。 |
 
 约束：
 
@@ -478,16 +488,28 @@
 - `ck_task_occurrence__completion_fact_exact`（`CHECK`：`((completion_fact_type IS NOT NULL AND completion_fact_id IS NOT NULL AND ((completion_fact_revision IS NOT NULL AND completion_fact_revision >= 0 AND completion_fact_hash IS NULL) OR (completion_fact_revision IS NULL AND completion_fact_hash IS NOT NULL))) OR (completion_fact_type IS NULL AND completion_fact_id IS NULL AND completion_fact_revision IS NULL AND completion_fact_hash IS NULL))`）：准确引用：完成待办所产生的准确业务Fact必须完整给出类型、标识以及修订号或摘要二者之一。
 - `ck_task_occurrence__subject_hash_length`（`CHECK`：`octet_length(subject_hash) = 32`）：摘要格式：subject_hash必须保存32字节的规范二进制值。
 - `ck_task_occurrence__completion_fact_hash_length`（`CHECK`：`octet_length(completion_fact_hash) = 32`）：摘要格式：completion_fact_hash必须保存32字节的规范二进制值。
+- `uq_task_occurrence__progress_successor`（`UNIQUE`：`tenant_id, predecessor_task_occurrence_id`）：商机跟进因果幂等：同一前序责任最多生成一个后继责任。
+- `ck_task_occurrence__progress_predecessor`（`CHECK`：`predecessor_task_occurrence_id IS NULL OR (business_purpose_code IN ('PROGRESS_OPPORTUNITY','RECORD_QUOTE_REPLY') AND predecessor_task_occurrence_id <> task_occurrence_id)`）：后继关系限定为商机推进且不得自指。
+- `ck_task_occurrence__responsibility_basis_exact`（`CHECK`：`((responsibility_basis_type IS NOT NULL AND responsibility_basis_id IS NOT NULL AND ((responsibility_basis_revision IS NOT NULL AND responsibility_basis_revision >= 0 AND responsibility_basis_hash IS NULL) OR (responsibility_basis_revision IS NULL AND responsibility_basis_hash IS NOT NULL))) OR (responsibility_basis_type IS NULL AND responsibility_basis_id IS NULL AND responsibility_basis_revision IS NULL AND responsibility_basis_hash IS NULL))`）：准确引用：当前有效责任依据必须完整给出类型、标识以及修订号或摘要二者之一。
+- `ck_task_occurrence__cancellation_fact_exact`（`CHECK`：`((cancellation_fact_type IS NOT NULL AND cancellation_fact_id IS NOT NULL AND ((cancellation_fact_revision IS NOT NULL AND cancellation_fact_revision >= 0 AND cancellation_fact_hash IS NULL) OR (cancellation_fact_revision IS NULL AND cancellation_fact_hash IS NOT NULL))) OR (cancellation_fact_type IS NULL AND cancellation_fact_id IS NULL AND cancellation_fact_revision IS NULL AND cancellation_fact_hash IS NULL))`）：准确引用：交接取消依据必须完整给出类型、标识以及修订号或摘要二者之一。
+- `ck_task_occurrence__responsibility_basis_hash_length`（`CHECK`：`octet_length(responsibility_basis_hash) = 32`）：摘要格式：responsibility_basis_hash必须保存32字节的规范二进制值。
+- `ck_task_occurrence__cancellation_fact_hash_length`（`CHECK`：`octet_length(cancellation_fact_hash) = 32`）：摘要格式：cancellation_fact_hash必须保存32字节的规范二进制值。
+- `ck_task_occurrence__handoff_predecessor`（`CHECK`：`handoff_predecessor_task_occurrence_id IS NULL OR (business_purpose_code IN ('PROGRESS_OPPORTUNITY','PREPARE_QUOTE','SUBMIT_QUOTE_APPROVAL','DELIVER_QUOTE','RECORD_QUOTE_REPLY','REQUEST_CONTRACT_PREPARATION','PREPARE_CONTRACT','SUBMIT_CONTRACT_REVIEW','SUBMIT_CONTRACT_APPROVAL','SUPPLEMENT_CONTRACT_REVIEW','ARRANGE_CONTRACT_SIGNATURE','COLLECT_CONTRACT_SIGNATURE') AND handoff_predecessor_task_occurrence_id<>task_occurrence_id AND predecessor_task_occurrence_id IS NULL AND responsibility_basis_type IS NOT NULL AND responsibility_basis_type='opportunity.responsibility_handoff')`）：T01具名事实一致性。
+- `ck_task_occurrence__handoff_cancellation`（`CHECK`：`(((cancellation_fact_type IS NULL OR (state='CANCELLED' AND cancellation_fact_revision IS NOT NULL AND cancellation_fact_revision=0 AND cancellation_fact_hash IS NULL AND ((cancellation_reason_code='R2_OPPORTUNITY_HANDOFF_V1' AND cancellation_fact_type='opportunity.responsibility_handoff') OR (cancellation_reason_code='R2_OPPORTUNITY_CLOSE_V1' AND cancellation_fact_type='opportunity.closure')))) OR (state='CANCELLED' AND cancellation_reason_code='R2_FOLLOWUP_ATTEMPT_V1' AND cancellation_fact_type='opportunity.followup_attempt' AND cancellation_fact_revision IS NULL AND cancellation_fact_hash IS NOT NULL)) OR (state='CANCELLED' AND cancellation_reason_code='R2_QUOTE_TERMINATION_V1' AND cancellation_fact_type='opportunity.quote_termination' AND cancellation_fact_revision IS NOT NULL AND cancellation_fact_revision=0 AND cancellation_fact_hash IS NULL)) OR (state='CANCELLED' AND cancellation_reason_code='R2_CONTRACT_NEGOTIATION_V1' AND cancellation_fact_type='contract.negotiation_disposition' AND cancellation_fact_revision IS NOT NULL AND cancellation_fact_revision=0 AND cancellation_fact_hash IS NULL)`）：T01具名事实一致性。
 
 物理外键：
 
 - `fk_task_occurrence__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
 - `fk_task_occurrence__owner_appointment`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。任务Owner必须是同租户已存在的任职。
+- `fk_task_occurrence__progress_predecessor`：`(tenant_id, predecessor_task_occurrence_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。前序责任必须存在于同一租户。
+- `fk_task_occurrence__handoff_predecessor_task_occurrence_id`：`(tenant_id, handoff_predecessor_task_occurrence_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户身份存在性，准确版本由Owner复验。
 
 类型化准确引用：
 
 - `subject`：待办发生时冻结的准确业务Subject；由静态允许列表、同租户Resolver和提交前复验保证。
 - `completion_fact`：完成待办所产生的准确业务Fact；由静态允许列表、同租户Resolver和提交前复验保证。
+- `responsibility_basis`：当前有效责任依据；由静态允许列表、同租户Resolver和提交前复验保证。
+- `cancellation_fact`：交接取消依据；由静态允许列表、同租户Resolver和提交前复验保证。
 
 索引：
 
@@ -569,23 +591,36 @@
 | `awaited_fact_id` | `uuid` | 是 | `—` | 本次进入等待所等待的准确外部或领域Fact在所属租户内的准确标识。 |
 | `awaited_fact_revision` | `bigint` | 是 | `—` | 本次进入等待所等待的准确外部或领域Fact的准确修订号；按哈希冻结时为空。 |
 | `awaited_fact_hash` | `bytea` | 是 | `—` | 本次进入等待所等待的准确外部或领域Fact的准确规范摘要；按修订冻结时为空。 |
+| `handoff_fact_id` | `uuid` | 是 | `—` | T01同租户准确身份。 |
+| `handoff_fact_revision` | `bigint` | 是 | `—` | T01准确版本，JSON安全整数。 |
+| `inherited_wait_receipt_id` | `uuid` | 是 | `—` | T01同租户准确身份。 |
+| `inherited_wait_hash` | `bytea` | 是 | `—` | 准确原等待摘要。 |
+| `origin_progress_id` | `uuid` | 是 | `—` | T01同租户准确身份。 |
+| `origin_progress_hash` | `bytea` | 是 | `—` | 准确原进展摘要。 |
+| `original_sla_due_at` | `timestamptz(6)` | 是 | `—` | T01数据库业务时刻。 |
 
 约束：
 
 - `uq_wait_receipt__task_revision`（`UNIQUE`：`tenant_id, task_occurrence_id, task_revision`）：一个待办修订号至多对应一次进入等待回执。
 - `uq_wait_receipt__task_sequence`（`UNIQUE`：`tenant_id, task_occurrence_id, wait_sequence`）：同一待办内等待序号唯一。
-- `ck_wait_receipt__positive_task_revision`（`CHECK`：`task_revision > 0`）：等待回执绑定的待办修订号必须为正数。
+- `ck_wait_receipt__positive_task_revision`（`CHECK`：`task_revision > 0 OR (wait_contract_code IN ('R2_OPPORTUNITY_HANDOFF_WAIT_V1','R2_QUOTE_HANDOFF_WAIT_V1','R2_ATTEMPT_HANDOFF_WAIT_V1') AND task_revision=0)`）：等待回执绑定的待办修订号必须为正数。
 - `ck_wait_receipt__positive_sequence`（`CHECK`：`wait_sequence > 0`）：等待序号必须为正整数。
 - `ck_wait_receipt__contract_version`（`CHECK`：`wait_contract_version > 0`）：等待合同版本必须为正整数。
-- `ck_wait_receipt__resume_after_entry`（`CHECK`：`resume_due_at IS NULL OR resume_due_at > entered_waiting_at`）：预期恢复时间若存在必须晚于进入等待时间。
+- `ck_wait_receipt__resume_after_entry`（`CHECK`：`resume_due_at IS NULL OR resume_due_at > entered_waiting_at OR wait_contract_code IN ('R2_OPPORTUNITY_HANDOFF_WAIT_V1','R2_QUOTE_HANDOFF_WAIT_V1','R2_ATTEMPT_HANDOFF_WAIT_V1')`）：预期恢复时间若存在必须晚于进入等待时间。
 - `ck_wait_receipt__awaited_fact_exact`（`CHECK`：`((awaited_fact_type IS NOT NULL AND awaited_fact_id IS NOT NULL AND ((awaited_fact_revision IS NOT NULL AND awaited_fact_revision >= 0 AND awaited_fact_hash IS NULL) OR (awaited_fact_revision IS NULL AND awaited_fact_hash IS NOT NULL))) OR (awaited_fact_type IS NULL AND awaited_fact_id IS NULL AND awaited_fact_revision IS NULL AND awaited_fact_hash IS NULL))`）：准确引用：本次进入等待所等待的准确外部或领域Fact必须完整给出类型、标识以及修订号或摘要二者之一。
 - `ck_wait_receipt__awaited_fact_hash_length`（`CHECK`：`octet_length(awaited_fact_hash) = 32`）：摘要格式：awaited_fact_hash必须保存32字节的规范二进制值。
+- `ck_wait_receipt__inherited_wait_hash_length`（`CHECK`：`octet_length(inherited_wait_hash) = 32`）：摘要格式：inherited_wait_hash必须保存32字节的规范二进制值。
+- `ck_wait_receipt__origin_progress_hash_length`（`CHECK`：`octet_length(origin_progress_hash) = 32`）：摘要格式：origin_progress_hash必须保存32字节的规范二进制值。
+- `ck_wait_receipt__handoff_shape`（`CHECK`：`(wait_contract_code='R2_OPPORTUNITY_HANDOFF_WAIT_V1' AND wait_contract_version=1 AND handoff_fact_id IS NOT NULL AND handoff_fact_revision IS NOT NULL AND handoff_fact_revision=0 AND inherited_wait_receipt_id IS NOT NULL AND inherited_wait_hash IS NOT NULL AND origin_progress_id IS NOT NULL AND origin_progress_hash IS NOT NULL AND original_sla_due_at IS NOT NULL) OR (wait_contract_code NOT IN ('R2_OPPORTUNITY_HANDOFF_WAIT_V1','R2_QUOTE_HANDOFF_WAIT_V1','R2_ATTEMPT_HANDOFF_WAIT_V1') AND handoff_fact_id IS NULL AND handoff_fact_revision IS NULL AND inherited_wait_receipt_id IS NULL AND inherited_wait_hash IS NULL AND origin_progress_id IS NULL AND origin_progress_hash IS NULL AND original_sla_due_at IS NULL) OR (wait_contract_code='R2_QUOTE_HANDOFF_WAIT_V1' AND wait_contract_version=1 AND handoff_fact_id IS NOT NULL AND handoff_fact_revision IS NOT NULL AND handoff_fact_revision=0 AND inherited_wait_receipt_id IS NOT NULL AND inherited_wait_hash IS NOT NULL AND origin_progress_id IS NULL AND origin_progress_hash IS NULL AND original_sla_due_at IS NOT NULL AND awaited_fact_type='opportunity.quote_response' AND awaited_fact_id IS NOT NULL AND awaited_fact_revision IS NULL AND awaited_fact_hash IS NOT NULL) OR (wait_contract_code='R2_ATTEMPT_HANDOFF_WAIT_V1' AND wait_contract_version=1 AND handoff_fact_id IS NOT NULL AND handoff_fact_revision IS NOT NULL AND handoff_fact_revision=0 AND inherited_wait_receipt_id IS NOT NULL AND inherited_wait_hash IS NOT NULL AND origin_progress_id IS NULL AND origin_progress_hash IS NULL AND original_sla_due_at IS NOT NULL AND awaited_fact_type='opportunity.followup_attempt' AND awaited_fact_id IS NOT NULL AND awaited_fact_revision IS NULL AND awaited_fact_hash IS NOT NULL)`）：T01具名事实一致性。
 
 物理外键：
 
 - `fk_wait_receipt__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
 - `fk_wait_receipt__task_occurrence`：`(tenant_id, task_occurrence_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。等待回执必须属于同租户已存在的待办。
 - `fk_wait_receipt__recorded_by_appointment`：`(tenant_id, recorded_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。记录人任职必须存在于同一租户。
+- `fk_wait_receipt__handoff_fact_id`：`(tenant_id, handoff_fact_id) → opportunity.responsibility_handoff(tenant_id, responsibility_handoff_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_wait_receipt__inherited_wait_receipt_id`：`(tenant_id, inherited_wait_receipt_id) → responsibility.wait_receipt(tenant_id, wait_receipt_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_wait_receipt__origin_progress_id`：`(tenant_id, origin_progress_id) → opportunity.opportunity_progress(tenant_id, opportunity_progress_id)`。同租户身份存在性，准确版本由Owner复验。
 
 类型化准确引用：
 
@@ -646,6 +681,41 @@
 索引：
 
 - `ix_action_draft__state`：列`(tenant_id, state, last_edited_at)`；唯一=`否`；谓词=`None`。按租户、草案状态和最近编辑时间查找待处理草案。
+
+### `responsibility.contract_task_resumption`
+
+销售办理处置的不可变准确事实；不解除合同或撤销执行。
+
+- Fact Owner：`ResponsibilityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, contract_task_resumption_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `contract_task_resumption_id` | `uuid` | 否 | `—` | 销售办理处置的不可变准确事实；不解除合同或撤销执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `disposition_id` | `uuid` | 否 | `—` | 主管CONTINUE决定。 |
+| `cancelled_task_id` | `uuid` | 否 | `—` | 准确取消明细。 |
+| `prior_task_id` | `uuid` | 否 | `—` | 被暂停的原责任。 |
+| `next_task_id` | `uuid` | 否 | `—` | 新建的同目的责任。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库可信记录时间。 |
+
+约束：
+
+- `ck_contract_task_resumption__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_contract_task_resumption__cancelled_task_id`（`UNIQUE`：`tenant_id, cancelled_task_id`）：引用只能接续一次。
+- `uq_contract_task_resumption__prior_task_id`（`UNIQUE`：`tenant_id, prior_task_id`）：引用只能接续一次。
+- `uq_contract_task_resumption__next_task_id`（`UNIQUE`：`tenant_id, next_task_id`）：引用只能接续一次。
+
+物理外键：
+
+- `fk_contract_task_resumption__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_contract_task_resumption__disposition_id`：`(tenant_id, disposition_id) → contract.negotiation_disposition(tenant_id, negotiation_disposition_id)`。同租户准确事实引用。
+- `fk_contract_task_resumption__cancelled_task_id`：`(tenant_id, cancelled_task_id) → contract.negotiation_cancelled_task(tenant_id, negotiation_cancelled_task_id)`。同租户准确事实引用。
+- `fk_contract_task_resumption__prior_task_id`：`(tenant_id, prior_task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_contract_task_resumption__next_task_id`：`(tenant_id, next_task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
 
 ## `execution`
 
@@ -1183,6 +1253,85 @@ Provider入站事实：一行保存一个Provider账户已通过验签的不可�
 
 - `ix_evidence_binding__active_target`：列`(tenant_id, target_type, target_id, purpose_code)`；唯一=`否`；谓词=`revoked_at IS NULL`。有效证据查询：按租户、准确目标标识和用途定位尚未撤回的绑定。
 
+### `evidence.material_upload_basis`
+
+材料上传准确责任及受保护元数据；不改变既有证据链。
+
+- Fact Owner：`EvidenceRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, material_upload_basis_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `material_upload_basis_id` | `uuid` | 否 | `—` | 材料上传准确责任及受保护元数据；不改变既有证据链。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `upload_session_id` | `uuid` | 否 | `—` | 唯一既有上传会话。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | 准确商机版本。 |
+| `responsibility_type` | `varchar(64)` | 否 | `—` | 准确责任类型。 |
+| `responsibility_id` | `uuid` | 否 | `—` | 准确责任身份。 |
+| `responsibility_revision` | `bigint` | 否 | `—` | 准确责任版本。 |
+| `owner_appointment_id` | `uuid` | 否 | `—` | 当前责任任职。 |
+| `customer_confirmation_id` | `uuid` | 是 | `—` | 可选准确客户确认不可变版本。 |
+| `original_task_id` | `uuid` | 是 | `—` | 原跟进事项。 |
+| `original_task_revision` | `bigint` | 是 | `—` | 原事项准确版本。 |
+| `expected_previous_version_id` | `uuid` | 是 | `—` | 补交所期望的准确前版。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 冻结时间。 |
+
+约束：
+
+- `ck_material_upload_basis__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_material_upload_basis__session`（`UNIQUE`：`tenant_id, upload_session_id`）：一会话唯一依据。
+- `ck_material_upload_basis__identity`（`CHECK`：`material_upload_basis_id=upload_session_id`）：会话与不可变依据共享身份但版本语义独立。
+- `ck_material_upload_basis__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：受保护文件名及说明大小。
+- `ck_material_upload_basis__selectors`（`CHECK`：`opportunity_revision BETWEEN 0 AND 9007199254740991 AND responsibility_revision BETWEEN 0 AND 9007199254740991 AND responsibility_type IN ('opportunity.opportunity','opportunity.responsibility_handoff') AND ((original_task_id IS NULL AND original_task_revision IS NULL) OR (original_task_id IS NOT NULL AND original_task_revision IS NOT NULL AND original_task_revision BETWEEN 0 AND 9007199254740991))`）：完整准确选择器。
+- `ck_material_upload_basis__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_material_upload_basis__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_material_upload_basis__upload_session_id`：`(tenant_id, upload_session_id) → evidence.upload_session(tenant_id, upload_session_id)`。同租户准确事实引用。
+- `fk_material_upload_basis__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_material_upload_basis__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_material_upload_basis__customer_confirmation_id`：`(tenant_id, customer_confirmation_id) → opportunity.customer_requirement_confirmation(tenant_id, customer_requirement_confirmation_id)`。同租户准确事实引用。
+- `fk_material_upload_basis__original_task_id`：`(tenant_id, original_task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_material_upload_basis__expected_previous_version_id`：`(tenant_id, expected_previous_version_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+
+### `evidence.material_upload_check`
+
+技术处理状态不可变历史；未知禁止静默重传。
+
+- Fact Owner：`EvidenceRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, material_upload_check_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `material_upload_check_id` | `uuid` | 否 | `—` | 技术处理状态不可变历史；未知禁止静默重传。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `upload_basis_id` | `uuid` | 否 | `—` | 准确上传依据。 |
+| `previous_check_id` | `uuid` | 是 | `—` | 准确前次检查状态。 |
+| `status` | `varchar(32)` | 否 | `—` | 技术状态。 |
+| `result_code` | `varchar(64)` | 是 | `—` | 静态安全结果码，不保存正文。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 状态形成时间。 |
+
+约束：
+
+- `ck_material_upload_check__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_material_upload_check__previous`（`UNIQUE`：`tenant_id, previous_check_id`）：检查状态单一后继。
+- `ck_material_upload_check__status`（`CHECK`：`status IN ('CHECKING','UNKNOWN','SCAN_UNAVAILABLE','PASSED','REJECTED')`）：技术状态域。
+- `ck_material_upload_check__code`（`CHECK`：`result_code IS NULL OR result_code ~ '^[A-Z][A-Z0-9_]{0,63}$'`）：有界安全结果代码。
+
+物理外键：
+
+- `fk_material_upload_check__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_material_upload_check__upload_basis_id`：`(tenant_id, upload_basis_id) → evidence.material_upload_basis(tenant_id, material_upload_basis_id)`。同租户准确事实引用。
+- `fk_material_upload_check__previous_check_id`：`(tenant_id, previous_check_id) → evidence.material_upload_check(tenant_id, material_upload_check_id)`。同租户准确事实引用。
+
 ## `party`
 
 主体域：保存跨业务流程共享的当前态主体锚点、受保护主标识与一跳合并关系。
@@ -1236,6 +1385,40 @@ Provider入站事实：一行保存一个Provider账户已通过验签的不可�
 - `ix_party__canonical_name`：列`(tenant_id, canonical_name)`；唯一=`否`；谓词=`None`。主体检索：按租户和当前规范名定位活动或已合并主体锚点。
 - `ix_party__merge_target`：列`(tenant_id, merged_into_party_id)`；唯一=`否`；谓词=`merged_into_party_id IS NOT NULL`。合并追溯：定位直接并入某个最终活动主体的一跳来源。
 
+### `party.profile_version`
+
+主体资料不可变版本；复用Party身份，不建立第二主体库。
+
+- Fact Owner：`PartyRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, profile_version_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `profile_version_id` | `uuid` | 否 | `—` | 主体资料不可变版本；复用Party身份，不建立第二主体库。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `party_id` | `uuid` | 否 | `—` | 准确Party主体。 |
+| `party_revision` | `bigint` | 否 | `—` | 保存时准确主体版本。 |
+| `party_type` | `varchar(32)` | 否 | `—` | 主体种类。 |
+| `canonical_name` | `text` | 否 | `—` | 当时规范名称。 |
+| `created_by_appointment_id` | `uuid` | 否 | `—` | 实际维护者。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 资料版本形成时间。 |
+
+约束：
+
+- `ck_profile_version__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_profile_version__party_revision`（`UNIQUE`：`tenant_id, party_id, party_revision`）：主体准确版本唯一。
+- `ck_profile_version__party_revision`（`CHECK`：`party_revision BETWEEN 0 AND 9007199254740991`）：准确主体版本。
+- `ck_profile_version__type`（`CHECK`：`party_type IN ('PERSON','ORGANIZATION')`）：主体类型域。
+- `ck_profile_version__name`（`CHECK`：`length(btrim(canonical_name)) BETWEEN 1 AND 300`）：必要名称范围。
+
+物理外键：
+
+- `fk_profile_version__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_profile_version__party_id`：`(tenant_id, party_id) → party.party(tenant_id, party_id)`。同租户准确事实引用。
+- `fk_profile_version__created_by_appointment_id`：`(tenant_id, created_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
 ## `lead`
 
 销售接入域：保存不可覆盖Lead、追加分派链与追加联系结果，不承载机会、报价或冲突决定。
@@ -1286,6 +1469,8 @@ Lead接入事实：一行代表渠道一次不可覆盖的原始接入，由销�
 | `ingress_completed_by_appointment_id` | `uuid` | 是 | `—` | 补全执行任命：指向同租户执行完成接入命令的准确Appointment。 |
 | `ingress_completed_at` | `timestamptz(6)` | 是 | `—` | 补全完成时间：完成接入命令写入整槽的带时区微秒精度时间。 |
 | `ingress_completion_digest` | `bytea` | 是 | `—` | 补全完成摘要：覆盖规范化补全值、来源、执行任命与完成时间的32字节摘要。 |
+| `customer_name_ciphertext` | `bytea` | 是 | `—` | 客户名称密文：独立可选原始接入事实，创建后不可变。 |
+| `contact_name_ciphertext` | `bytea` | 是 | `—` | 联系人名称密文：独立可选原始接入事实，创建后不可变。 |
 
 约束：
 
@@ -1528,13 +1713,14 @@ Opportunity进展事实：一行代表一项法律需求的一次已发生进展
 | `progress_type_code` | `varchar(64)` | 否 | `—` | 进展类型代码：描述会谈、材料收到、方案确认等已发生事实，写入后不可变。 |
 | `progress_contract_code` | `varchar(64)` | 否 | `—` | 进展事实合同代码：静态注册并准确解释该类型进展的来源与语义。 |
 | `progress_contract_version` | `integer` | 否 | `—` | 进展事实合同版本：静态注册合同的正整数版本。 |
-| `progress_digest` | `bytea` | 否 | `—` | 进展事实摘要：覆盖类型、合同版本和准确来源Fact，不复制来源正文。 |
+| `progress_digest` | `bytea` | 否 | `—` | 进展事实摘要：历史合同覆盖类型与准确来源；R2_OPPORTUNITY_PROGRESS_V1覆盖规范受保护正文及准确业务身份。 |
 | `occurred_at` | `timestamptz(6)` | 否 | `—` | 发生时间：进展实际发生的带时区微秒精度时间，写入后不可变。 |
 | `created_at` | `timestamptz(6)` | 否 | `—` | 创建时间：进展事实首次持久化的时间，永久冻结。 |
 | `source_fact_type` | `varchar(64)` | 是 | `—` | 触发本次OpportunityProgress的多态准确来源事实的静态注册类型。 |
 | `source_fact_id` | `uuid` | 是 | `—` | 触发本次OpportunityProgress的多态准确来源事实在所属租户内的准确标识。 |
 | `source_fact_revision` | `bigint` | 是 | `—` | 触发本次OpportunityProgress的多态准确来源事实的准确修订号；按哈希冻结时为空。 |
 | `source_fact_hash` | `bytea` | 是 | `—` | 触发本次OpportunityProgress的多态准确来源事实的准确规范摘要；按修订冻结时为空。 |
+| `progress_body_ciphertext` | `bytea` | 是 | `—` | R2进展正文密文：绑定租户、商机与进展身份；历史无正文记录为空，创建后不可变。 |
 
 约束：
 
@@ -1544,6 +1730,7 @@ Opportunity进展事实：一行代表一项法律需求的一次已发生进展
 - `ck_opportunity_progress__source_fact_exact`（`CHECK`：`((source_fact_type IS NOT NULL AND source_fact_id IS NOT NULL AND ((source_fact_revision IS NOT NULL AND source_fact_revision >= 0 AND source_fact_hash IS NULL) OR (source_fact_revision IS NULL AND source_fact_hash IS NOT NULL))) OR (source_fact_type IS NULL AND source_fact_id IS NULL AND source_fact_revision IS NULL AND source_fact_hash IS NULL))`）：准确引用：触发本次OpportunityProgress的多态准确来源事实必须完整给出类型、标识以及修订号或摘要二者之一。
 - `ck_opportunity_progress__progress_digest_length`（`CHECK`：`octet_length(progress_digest) = 32`）：摘要格式：progress_digest必须保存32字节的规范二进制值。
 - `ck_opportunity_progress__source_fact_hash_length`（`CHECK`：`octet_length(source_fact_hash) = 32`）：摘要格式：source_fact_hash必须保存32字节的规范二进制值。
+- `ck_opportunity_progress__protected_body`（`CHECK`：`(progress_contract_code = 'R2_OPPORTUNITY_PROGRESS_V1' AND progress_contract_version = 1 AND progress_body_ciphertext IS NOT NULL AND octet_length(progress_body_ciphertext) >= 29) OR (progress_contract_code <> 'R2_OPPORTUNITY_PROGRESS_V1' AND progress_body_ciphertext IS NULL)`）：R2受保护正文仅由准确进展合同写入；历史合同不混用此正文。
 
 物理外键：
 
@@ -1744,6 +1931,7 @@ QuoteIssue事实：一行代表某不可变QuoteRevision向一个冻结收件人
 | `delivery_fact_id` | `uuid` | 否 | `—` | 逐收件人报价已权威发送的准确证明Fact在所属租户内的准确标识。 |
 | `delivery_fact_revision` | `bigint` | 是 | `—` | 逐收件人报价已权威发送的准确证明Fact的准确修订号；按哈希冻结时为空。 |
 | `delivery_fact_hash` | `bytea` | 是 | `—` | 逐收件人报价已权威发送的准确证明Fact的准确规范摘要；按修订冻结时为空。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 事实形成的顶层事务；迁移前事实回填迁移事务，不冒充后续命令。 |
 
 约束：
 
@@ -1797,6 +1985,7 @@ QuoteResponse事实：一行代表收件人对准确QuoteIssue版本的一次已
 | `recorded_by_appointment_id` | `uuid` | 是 | `—` | 记录任职标识：由内部人员确认响应时记录；纯Provider事实可为空。 |
 | `received_at` | `timestamptz(6)` | 否 | `—` | 收到时间：响应实际接收的带时区微秒精度时间，写入后不可变。 |
 | `created_at` | `timestamptz(6)` | 否 | `—` | 创建时间：响应事实首次持久化的时间，永久冻结。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 事实形成的顶层事务；迁移前事实回填迁移事务，不冒充后续命令。 |
 
 约束：
 
@@ -1818,6 +2007,965 @@ QuoteResponse事实：一行代表收件人对准确QuoteIssue版本的一次已
 索引：
 
 - `ix_quote_response__issue_time`：列`(tenant_id, quote_issue_id, received_at)`；唯一=`否`；谓词=`None`。响应历史索引：支持按QuoteIssue标识和接收时间读取追加响应。
+
+### `opportunity.owner_exception`
+
+负责人异常版本：每次观察保留准确历史版本。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`CONTROLLED`
+- 主键：`(tenant_id, owner_exception_id, revision)`
+- 允许更新字段：`is_current`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `owner_exception_id` | `uuid` | 否 | `—` | 负责人异常版本标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `is_current` | `boolean` | 否 | `true` | 当前版本定位标记，仅允许退役。 |
+| `opportunity_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | T01准确版本，JSON安全整数。 |
+| `responsibility_slot` | `varchar(64)` | 否 | `'OPPORTUNITY_OWNER'` | 冻结责任槽。 |
+| `frozen_owner_appointment_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `current_owner_appointment_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `basis_type` | `varchar(64)` | 否 | `—` | 当前有效责任依据类型。 |
+| `basis_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `basis_revision` | `bigint` | 否 | `—` | T01准确版本，JSON安全整数。 |
+| `task_occurrence_id` | `uuid` | 是 | `—` | T01同租户准确身份。 |
+| `task_revision` | `bigint` | 是 | `—` | T01准确版本，JSON安全整数。 |
+| `wait_receipt_id` | `uuid` | 是 | `—` | T01同租户准确身份。 |
+| `wait_hash` | `bytea` | 是 | `—` | 准确等待摘要。 |
+| `reason_codes` | `varchar(64)[]` | 否 | `—` | 规范有序的异常原因集合。 |
+| `state` | `varchar(64)` | 否 | `—` | 活动或终态。 |
+| `first_observed_at` | `timestamptz(6)` | 否 | `—` | T01数据库业务时刻。 |
+| `last_observed_at` | `timestamptz(6)` | 否 | `—` | T01数据库业务时刻。 |
+| `last_disposition_id` | `uuid` | 是 | `—` | T01同租户准确身份。 |
+| `review_due_at` | `timestamptz(6)` | 是 | `—` | T01数据库业务时刻。 |
+| `resolution_kind` | `varchar(64)` | 是 | `—` | 解决类别。 |
+| `resolution_type` | `varchar(64)` | 是 | `—` | 准确解决事实类型。 |
+| `resolution_id` | `uuid` | 是 | `—` | T01同租户准确身份。 |
+| `resolution_revision` | `bigint` | 是 | `—` | T01准确版本，JSON安全整数。 |
+| `resolution_hash` | `bytea` | 是 | `—` | 准确不可变验证审计摘要；与解决版本互斥。 |
+
+约束：
+
+- `ck_owner_exception__slot`（`CHECK`：`responsibility_slot = 'OPPORTUNITY_OWNER'`）：T01具名事实一致性。
+- `ck_owner_exception__state`（`CHECK`：`state IN ('ACTIVE','COORDINATING','RESOLVED','NO_LONGER_APPLICABLE')`）：T01具名事实一致性。
+- `ck_owner_exception__basis`（`CHECK`：`basis_type IN ('opportunity.opportunity','opportunity.responsibility_handoff')`）：T01具名事实一致性。
+- `ck_owner_exception__times`（`CHECK`：`last_observed_at >= first_observed_at`）：T01具名事实一致性。
+- `ck_owner_exception__task`（`CHECK`：`(task_occurrence_id IS NULL) = (task_revision IS NULL)`）：T01具名事实一致性。
+- `ck_owner_exception__wait`（`CHECK`：`(wait_receipt_id IS NULL) = (wait_hash IS NULL)`）：T01具名事实一致性。
+- `ck_owner_exception__coordination`（`CHECK`：`state <> 'COORDINATING' OR (last_disposition_id IS NOT NULL AND review_due_at IS NOT NULL)`）：T01具名事实一致性。
+- `ck_owner_exception__resolution`（`CHECK`：`(state IN ('ACTIVE','COORDINATING') AND resolution_kind IS NULL AND resolution_type IS NULL AND resolution_id IS NULL AND resolution_revision IS NULL AND resolution_hash IS NULL) OR (resolution_id IS NOT NULL AND resolution_kind IS NOT NULL AND resolution_type IS NOT NULL AND ((state='RESOLVED' AND resolution_kind='TRANSFER' AND resolution_type='opportunity.responsibility_handoff' AND resolution_revision IS NOT NULL AND resolution_revision=0 AND resolution_hash IS NULL) OR (state='RESOLVED' AND resolution_kind='OWNER_VALIDATED' AND resolution_type='audit.audit_entry' AND resolution_revision IS NULL AND resolution_hash IS NOT NULL) OR (state='NO_LONGER_APPLICABLE' AND resolution_kind='OPPORTUNITY_CLOSED' AND resolution_type='opportunity.opportunity' AND resolution_revision IS NOT NULL AND resolution_hash IS NULL)))`）：T01具名事实一致性。
+- `ck_owner_exception__wait_hash_length`（`CHECK`：`octet_length(wait_hash) = 32`）：摘要格式：wait_hash必须保存32字节的规范二进制值。
+- `ck_owner_exception__resolution_hash_length`（`CHECK`：`octet_length(resolution_hash) = 32`）：摘要格式：resolution_hash必须保存32字节的规范二进制值。
+- `ck_owner_exception__revision_bound`（`CHECK`：`revision BETWEEN 0 AND 9007199254740991`）：T01具名事实一致性。
+- `ck_owner_exception__opportunity_revision_bound`（`CHECK`：`opportunity_revision BETWEEN 0 AND 9007199254740991`）：T01具名事实一致性。
+- `ck_owner_exception__basis_revision_bound`（`CHECK`：`basis_revision BETWEEN 0 AND 9007199254740991`）：T01具名事实一致性。
+- `ck_owner_exception__task_revision_bound`（`CHECK`：`task_revision BETWEEN 0 AND 9007199254740991`）：T01具名事实一致性。
+- `ck_owner_exception__resolution_revision_bound`（`CHECK`：`resolution_revision BETWEEN 0 AND 9007199254740991`）：T01具名事实一致性。
+
+物理外键：
+
+- `fk_owner_exception__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_owner_exception__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_owner_exception__frozen_owner_appointment_id`：`(tenant_id, frozen_owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_owner_exception__current_owner_appointment_id`：`(tenant_id, current_owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_owner_exception__task_occurrence_id`：`(tenant_id, task_occurrence_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_owner_exception__wait_receipt_id`：`(tenant_id, wait_receipt_id) → responsibility.wait_receipt(tenant_id, wait_receipt_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_owner_exception__last_disposition_id`：`(tenant_id, last_disposition_id) → opportunity.owner_exception_disposition(tenant_id, owner_exception_disposition_id)`。同租户身份存在性，准确版本由Owner复验。
+
+索引：
+
+- `uq_owner_exception__current`：列`(tenant_id, owner_exception_id)`；唯一=`是`；谓词=`is_current`。单当前版本。
+- `uq_owner_exception__active_slot`：列`(tenant_id, opportunity_id, responsibility_slot)`；唯一=`是`；谓词=`is_current AND state IN ('ACTIVE','COORDINATING')`。同商机责任槽至多一个活动异常周期。
+
+### `opportunity.owner_exception_disposition`
+
+负责人异常处置：不可变人工决定。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, owner_exception_disposition_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `owner_exception_disposition_id` | `uuid` | 否 | `—` | 负责人异常处置标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `owner_exception_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `owner_exception_revision` | `bigint` | 否 | `—` | T01准确版本，JSON安全整数。 |
+| `kind` | `varchar(64)` | 否 | `—` | TRANSFER或COORDINATION。 |
+| `actor_appointment_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `reason` | `text` | 否 | `—` | 规范人工原因。 |
+| `decided_at` | `timestamptz(6)` | 否 | `—` | T01数据库业务时刻。 |
+| `review_due_at` | `timestamptz(6)` | 是 | `—` | T01数据库业务时刻。 |
+| `receiver_appointment_id` | `uuid` | 是 | `—` | T01同租户准确身份。 |
+| `responsibility_handoff_id` | `uuid` | 是 | `—` | T01同租户准确身份。 |
+
+约束：
+
+- `ck_owner_exception_disposition__revision_zero`（`CHECK`：`revision=0`）：T01具名事实一致性。
+- `ck_owner_exception_disposition__reason`（`CHECK`：`char_length(btrim(reason)) BETWEEN 1 AND 2000`）：T01具名事实一致性。
+- `ck_owner_exception_disposition__kind`（`CHECK`：`(kind='COORDINATION' AND review_due_at IS NOT NULL AND review_due_at > decided_at AND receiver_appointment_id IS NULL AND responsibility_handoff_id IS NULL) OR (kind='TRANSFER' AND review_due_at IS NULL AND receiver_appointment_id IS NOT NULL AND responsibility_handoff_id IS NOT NULL)`）：T01具名事实一致性。
+- `ck_owner_exception_disposition__revision_bound`（`CHECK`：`revision BETWEEN 0 AND 9007199254740991`）：T01具名事实一致性。
+- `ck_owner_exception_disposition__owner_exception_revision_bound`（`CHECK`：`owner_exception_revision BETWEEN 0 AND 9007199254740991`）：T01具名事实一致性。
+
+物理外键：
+
+- `fk_owner_exception_disposition__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_owner_exception_disposition__exact_exception`：`(tenant_id, owner_exception_id, owner_exception_revision) → opportunity.owner_exception(tenant_id, owner_exception_id, revision)`。准确异常历史版本。
+- `fk_owner_exception_disposition__actor_appointment_id`：`(tenant_id, actor_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_owner_exception_disposition__receiver_appointment_id`：`(tenant_id, receiver_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_owner_exception_disposition__responsibility_handoff_id`：`(tenant_id, responsibility_handoff_id) → opportunity.responsibility_handoff(tenant_id, responsibility_handoff_id)`。同租户身份存在性，准确版本由Owner复验。
+
+### `opportunity.responsibility_handoff`
+
+商机责任交接：不可变唯一责任链。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, responsibility_handoff_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `responsibility_handoff_id` | `uuid` | 否 | `—` | 商机责任交接标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `opportunity_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | T01准确版本，JSON安全整数。 |
+| `prior_basis_type` | `varchar(64)` | 否 | `—` | 准确前任责任类型。 |
+| `prior_basis_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `prior_basis_revision` | `bigint` | 否 | `—` | T01准确版本，JSON安全整数。 |
+| `from_appointment_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `to_appointment_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `actor_appointment_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `owner_exception_disposition_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `old_task_occurrence_id` | `uuid` | 是 | `—` | T01同租户准确身份。 |
+| `old_task_revision` | `bigint` | 是 | `—` | T01准确版本，JSON安全整数。 |
+| `new_task_occurrence_id` | `uuid` | 否 | `—` | T01同租户准确身份。 |
+| `new_task_revision` | `bigint` | 否 | `—` | T01准确版本，JSON安全整数。 |
+| `original_due_at` | `timestamptz(6)` | 否 | `—` | T01数据库业务时刻。 |
+| `original_wait_receipt_id` | `uuid` | 是 | `—` | T01同租户准确身份。 |
+| `original_wait_hash` | `bytea` | 是 | `—` | 准确原等待摘要。 |
+| `handed_off_at` | `timestamptz(6)` | 否 | `—` | T01数据库业务时刻。 |
+
+约束：
+
+- `ck_responsibility_handoff__revision_zero`（`CHECK`：`revision=0`）：T01具名事实一致性。
+- `uq_responsibility_handoff__prior`（`UNIQUE`：`tenant_id, opportunity_id, prior_basis_type, prior_basis_id, prior_basis_revision`）：准确前任至多一个后继。
+- `uq_responsibility_handoff__decision`（`UNIQUE`：`tenant_id, owner_exception_disposition_id`）：决定至多一个交接。
+- `ck_responsibility_handoff__basis`（`CHECK`：`prior_basis_type IN ('opportunity.opportunity','opportunity.responsibility_handoff') AND prior_basis_id <> responsibility_handoff_id`）：T01具名事实一致性。
+- `ck_responsibility_handoff__receiver`（`CHECK`：`from_appointment_id <> to_appointment_id`）：T01具名事实一致性。
+- `ck_responsibility_handoff__tasks`（`CHECK`：`(old_task_occurrence_id IS NULL) = (old_task_revision IS NULL) AND (old_task_occurrence_id IS NULL OR old_task_occurrence_id <> new_task_occurrence_id)`）：T01具名事实一致性。
+- `ck_responsibility_handoff__wait`（`CHECK`：`(original_wait_receipt_id IS NULL) = (original_wait_hash IS NULL)`）：T01具名事实一致性。
+- `ck_responsibility_handoff__original_wait_hash_length`（`CHECK`：`octet_length(original_wait_hash) = 32`）：摘要格式：original_wait_hash必须保存32字节的规范二进制值。
+- `ck_responsibility_handoff__revision_bound`（`CHECK`：`revision BETWEEN 0 AND 9007199254740991`）：T01具名事实一致性。
+- `ck_responsibility_handoff__opportunity_revision_bound`（`CHECK`：`opportunity_revision BETWEEN 0 AND 9007199254740991`）：T01具名事实一致性。
+- `ck_responsibility_handoff__prior_basis_revision_bound`（`CHECK`：`prior_basis_revision BETWEEN 0 AND 9007199254740991`）：T01具名事实一致性。
+- `ck_responsibility_handoff__old_task_revision_bound`（`CHECK`：`old_task_revision BETWEEN 0 AND 9007199254740991`）：T01具名事实一致性。
+- `ck_responsibility_handoff__new_task_revision_bound`（`CHECK`：`new_task_revision BETWEEN 0 AND 9007199254740991`）：T01具名事实一致性。
+- `uq_responsibility_handoff__new_task`（`UNIQUE`：`tenant_id, new_task_occurrence_id`）：新任务只能由一个交接创建。
+
+物理外键：
+
+- `fk_responsibility_handoff__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_responsibility_handoff__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_responsibility_handoff__from_appointment_id`：`(tenant_id, from_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_responsibility_handoff__to_appointment_id`：`(tenant_id, to_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_responsibility_handoff__actor_appointment_id`：`(tenant_id, actor_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_responsibility_handoff__owner_exception_disposition_id`：`(tenant_id, owner_exception_disposition_id) → opportunity.owner_exception_disposition(tenant_id, owner_exception_disposition_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_responsibility_handoff__old_task_occurrence_id`：`(tenant_id, old_task_occurrence_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_responsibility_handoff__new_task_occurrence_id`：`(tenant_id, new_task_occurrence_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户身份存在性，准确版本由Owner复验。
+- `fk_responsibility_handoff__original_wait_receipt_id`：`(tenant_id, original_wait_receipt_id) → responsibility.wait_receipt(tenant_id, wait_receipt_id)`。同租户身份存在性，准确版本由Owner复验。
+
+索引：
+
+- `uq_responsibility_handoff__initial`：列`(tenant_id, opportunity_id)`；唯一=`是`；谓词=`prior_basis_type='opportunity.opportunity'`。商机只能有一个首次交接。
+
+### `opportunity.closure`
+
+不可变商机终结事实；无待办也保留明确依据；说明加密且仅授权后解密。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, closure_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `closure_id` | `uuid` | 否 | `—` | 不可变商机终结事实；无待办也保留明确依据；说明加密且仅授权后解密。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 终结的准确商机。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | 终结前准确商机版本。 |
+| `responsibility_type` | `varchar(64)` | 否 | `—` | 有效责任依据类型。 |
+| `responsibility_id` | `uuid` | 否 | `—` | 有效责任依据身份。 |
+| `responsibility_revision` | `bigint` | 否 | `—` | 有效责任依据版本。 |
+| `task_occurrence_id` | `uuid` | 是 | `—` | 实际取消的当前普通任务；未建卡时为空。 |
+| `task_revision` | `bigint` | 是 | `—` | 取消前任务版本。 |
+| `wait_receipt_id` | `uuid` | 是 | `—` | 取消前准确等待事实。 |
+| `wait_hash` | `bytea` | 是 | `—` | 取消前准确等待摘要。 |
+| `closed_by_appointment_id` | `uuid` | 否 | `—` | 实际终结操作者。 |
+| `reason_code` | `varchar(64)` | 否 | `—` | 明确终结原因。 |
+| `closure_summary_ciphertext` | `bytea` | 否 | `—` | 受保护简短终结说明；独立AAD绑定租户商机终结事实。 |
+| `summary_digest` | `bytea` | 否 | `—` | 规范说明摘要，只用于完整性复验。 |
+| `closed_at` | `timestamptz(6)` | 否 | `—` | 数据库终结时间。 |
+
+约束：
+
+- `uq_closure__opportunity`（`UNIQUE`：`tenant_id, opportunity_id`）：每个商机至多一个终结事实。
+- `ck_closure__revision`（`CHECK`：`revision=0`）：商机终结具名一致性。
+- `ck_closure__opportunity_revision`（`CHECK`：`opportunity_revision BETWEEN 0 AND 9007199254740990`）：商机终结具名一致性。
+- `ck_closure__responsibility_revision`（`CHECK`：`responsibility_revision BETWEEN 0 AND 9007199254740991`）：商机终结具名一致性。
+- `ck_closure__responsibility_type`（`CHECK`：`responsibility_type IN ('opportunity.opportunity','opportunity.responsibility_handoff')`）：商机终结具名一致性。
+- `ck_closure__reason`（`CHECK`：`reason_code IN ('CLIENT_DECLINED','NEED_CANCELLED','OTHER')`）：商机终结具名一致性。
+- `ck_closure__task`（`CHECK`：`(task_occurrence_id IS NULL) = (task_revision IS NULL) AND (task_revision IS NULL OR task_revision BETWEEN 0 AND 9007199254740990)`）：商机终结具名一致性。
+- `ck_closure__wait`（`CHECK`：`(wait_receipt_id IS NULL) = (wait_hash IS NULL) AND (wait_receipt_id IS NULL OR task_occurrence_id IS NOT NULL)`）：商机终结具名一致性。
+- `ck_closure__protected_body`（`CHECK`：`octet_length(closure_summary_ciphertext) BETWEEN 29 AND 16384`）：商机终结具名一致性。
+- `ck_closure__wait_hash_length`（`CHECK`：`octet_length(wait_hash) = 32`）：摘要格式：wait_hash必须保存32字节的规范二进制值。
+- `ck_closure__summary_digest_length`（`CHECK`：`octet_length(summary_digest) = 32`）：摘要格式：summary_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_closure__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_closure__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确来源。
+- `fk_closure__task_occurrence_id`：`(tenant_id, task_occurrence_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确来源。
+- `fk_closure__wait_receipt_id`：`(tenant_id, wait_receipt_id) → responsibility.wait_receipt(tenant_id, wait_receipt_id)`。同租户准确来源。
+- `fk_closure__closed_by_appointment_id`：`(tenant_id, closed_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确来源。
+
+### `opportunity.customer_requirement_draft`
+
+责任人独立不可变草稿；不依赖普通任务且不会成为确认事实。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, customer_requirement_draft_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `customer_requirement_draft_id` | `uuid` | 否 | `—` | 责任人独立不可变草稿；不依赖普通任务且不会成为确认事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 由插入守卫强制写入顶层事务身份；子事务保存点不能改变集合冻结边界。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | 读取的商机版本。 |
+| `responsibility_type` | `varchar(64)` | 否 | `—` | 责任依据类型。 |
+| `responsibility_id` | `uuid` | 否 | `—` | 责任依据身份。 |
+| `responsibility_revision` | `bigint` | 否 | `—` | 责任依据版本。 |
+| `owner_appointment_id` | `uuid` | 否 | `—` | 保存/确认的当前负责人。 |
+| `previous_draft_id` | `uuid` | 是 | `—` | 准确前一保存；首次为空。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 保存时间。 |
+
+约束：
+
+- `ck_customer_requirement_draft__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_customer_requirement_draft__basis`（`CHECK`：`responsibility_type IN ('opportunity.opportunity','opportunity.responsibility_handoff') AND responsibility_revision BETWEEN 0 AND 9007199254740991 AND opportunity_revision BETWEEN 0 AND 9007199254740991`）：准确责任和版本。
+- `ck_customer_requirement_draft__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界加密正文。
+- `uq_customer_requirement_draft__previous`（`UNIQUE`：`tenant_id, previous_draft_id`）：同一保存版本只能有一个后继。
+- `ck_customer_requirement_draft__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_customer_requirement_draft__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_customer_requirement_draft__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_customer_requirement_draft__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_customer_requirement_draft__previous_draft_id`：`(tenant_id, previous_draft_id) → opportunity.customer_requirement_draft(tenant_id, customer_requirement_draft_id)`。同租户准确事实引用。
+
+### `opportunity.customer_requirement_confirmation`
+
+客户参与方及服务需求的不可变完整确认版本；不完成普通任务。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, customer_requirement_confirmation_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `customer_requirement_confirmation_id` | `uuid` | 否 | `—` | 客户参与方及服务需求的不可变完整确认版本；不完成普通任务。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 由插入守卫强制写入顶层事务身份；子事务保存点不能改变集合冻结边界。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | 读取的商机版本。 |
+| `responsibility_type` | `varchar(64)` | 否 | `—` | 责任依据类型。 |
+| `responsibility_id` | `uuid` | 否 | `—` | 责任依据身份。 |
+| `responsibility_revision` | `bigint` | 否 | `—` | 责任依据版本。 |
+| `owner_appointment_id` | `uuid` | 否 | `—` | 保存/确认的当前负责人。 |
+| `draft_id` | `uuid` | 否 | `—` | 准确不可变草稿。 |
+| `previous_confirmation_id` | `uuid` | 是 | `—` | 前一完整确认；首次为空。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `confirmed_at` | `timestamptz(6)` | 否 | `—` | 确认时间。 |
+
+约束：
+
+- `ck_customer_requirement_confirmation__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_customer_requirement_confirmation__basis`（`CHECK`：`responsibility_type IN ('opportunity.opportunity','opportunity.responsibility_handoff') AND responsibility_revision BETWEEN 0 AND 9007199254740991 AND opportunity_revision BETWEEN 0 AND 9007199254740991`）：准确责任和版本。
+- `ck_customer_requirement_confirmation__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界加密正文。
+- `uq_customer_requirement_confirmation__draft`（`UNIQUE`：`tenant_id, draft_id`）：一份草稿至多确认一次。
+- `uq_customer_requirement_confirmation__previous`（`UNIQUE`：`tenant_id, previous_confirmation_id`）：完整确认版本不允许分叉。
+- `ck_customer_requirement_confirmation__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_customer_requirement_confirmation__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_customer_requirement_confirmation__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_customer_requirement_confirmation__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_customer_requirement_confirmation__draft_id`：`(tenant_id, draft_id) → opportunity.customer_requirement_draft(tenant_id, customer_requirement_draft_id)`。同租户准确事实引用。
+- `fk_customer_requirement_confirmation__previous_confirmation_id`：`(tenant_id, previous_confirmation_id) → opportunity.customer_requirement_confirmation(tenant_id, customer_requirement_confirmation_id)`。同租户准确事实引用。
+
+### `opportunity.customer_requirement_participant`
+
+完整确认中的准确参与方；未知对方只存正文状态，不创建占位主体。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, customer_requirement_participant_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `customer_requirement_participant_id` | `uuid` | 否 | `—` | 完整确认中的准确参与方；未知对方只存正文状态，不创建占位主体。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `confirmation_id` | `uuid` | 否 | `—` | 完整确认版本。 |
+| `party_id` | `uuid` | 否 | `—` | 准确主体。 |
+| `party_revision` | `bigint` | 否 | `—` | 当时主体版本。 |
+| `role` | `varchar(32)` | 否 | `—` | 参与角色。 |
+| `profile_version_id` | `uuid` | 否 | `—` | 准确不可变主体显示快照。 |
+
+约束：
+
+- `ck_customer_requirement_participant__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_customer_requirement_participant__role`（`UNIQUE`：`tenant_id, confirmation_id, party_id, role`）：集合中主体角色唯一。
+- `ck_customer_requirement_participant__role`（`CHECK`：`role IN ('CLIENT','OPPONENT','OTHER')`）：具名参与方角色。
+- `ck_customer_requirement_participant__party_revision`（`CHECK`：`party_revision BETWEEN 0 AND 9007199254740991`）：准确主体版本。
+
+物理外键：
+
+- `fk_customer_requirement_participant__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_customer_requirement_participant__confirmation_id`：`(tenant_id, confirmation_id) → opportunity.customer_requirement_confirmation(tenant_id, customer_requirement_confirmation_id)`。同租户准确事实引用。
+- `fk_customer_requirement_participant__party_id`：`(tenant_id, party_id) → party.party(tenant_id, party_id)`。同租户准确事实引用。
+- `fk_customer_requirement_participant__profile_version_id`：`(tenant_id, profile_version_id) → party.profile_version(tenant_id, profile_version_id)`。同租户准确事实引用。
+
+### `opportunity.customer_requirement_draft_party`
+
+草稿准确主体来源集合；回执逐事实授权无需解密正文。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, customer_requirement_draft_party_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `customer_requirement_draft_party_id` | `uuid` | 否 | `—` | 草稿准确主体来源集合；回执逐事实授权无需解密正文。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `draft_id` | `uuid` | 否 | `—` | 准确不可变草稿。 |
+| `party_id` | `uuid` | 否 | `—` | 人工选定的准确主体。 |
+| `party_revision` | `bigint` | 否 | `—` | 保存时准确主体版本。 |
+
+约束：
+
+- `ck_customer_requirement_draft_party__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_customer_requirement_draft_party__party`（`UNIQUE`：`tenant_id, draft_id, party_id`）：一份草稿每个主体来源唯一。
+- `ck_customer_requirement_draft_party__party_revision`（`CHECK`：`party_revision BETWEEN 0 AND 9007199254740991`）：准确主体版本。
+
+物理外键：
+
+- `fk_customer_requirement_draft_party__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_customer_requirement_draft_party__draft_id`：`(tenant_id, draft_id) → opportunity.customer_requirement_draft(tenant_id, customer_requirement_draft_id)`。同租户准确事实引用。
+- `fk_customer_requirement_draft_party__party_id`：`(tenant_id, party_id) → party.party(tenant_id, party_id)`。同租户准确事实引用。
+
+### `opportunity.material_version`
+
+材料条目不可变版本；当前版以无后继派生，历史引用保留。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, material_version_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `material_version_id` | `uuid` | 否 | `—` | 材料条目不可变版本；当前版以无后继派生，历史引用保留。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `material_item_id` | `uuid` | 否 | `—` | 首版本身份作为稳定条目身份。 |
+| `previous_version_id` | `uuid` | 是 | `—` | 准确前版。 |
+| `upload_basis_id` | `uuid` | 否 | `—` | 准确上传依据。 |
+| `upload_session_id` | `uuid` | 否 | `—` | 既有上传会话。 |
+| `received_source_object_id` | `uuid` | 否 | `—` | 既有扫描来源。 |
+| `evidence_submission_id` | `uuid` | 否 | `—` | 既有不可变提交。 |
+| `evidence_binding_id` | `uuid` | 否 | `—` | 既有准确绑定。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 所属商机。 |
+| `purpose_code` | `varchar(64)` | 否 | `—` | 静态材料用途。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `received_by_appointment_id` | `uuid` | 否 | `—` | 实际接收任职。 |
+| `received_at` | `timestamptz(6)` | 否 | `—` | 人工接收时间。 |
+
+约束：
+
+- `ck_material_version__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_material_version__previous_version_id`（`UNIQUE`：`tenant_id, previous_version_id`）：准确链节点只能接收一次。
+- `uq_material_version__upload_basis_id`（`UNIQUE`：`tenant_id, upload_basis_id`）：准确链节点只能接收一次。
+- `uq_material_version__upload_session_id`（`UNIQUE`：`tenant_id, upload_session_id`）：准确链节点只能接收一次。
+- `uq_material_version__evidence_submission_id`（`UNIQUE`：`tenant_id, evidence_submission_id`）：准确链节点只能接收一次。
+- `uq_material_version__evidence_binding_id`（`UNIQUE`：`tenant_id, evidence_binding_id`）：准确链节点只能接收一次。
+- `ck_material_version__purpose`（`CHECK`：`purpose_code IN ('CONTRACT_BUSINESS','CORRESPONDENCE','OTHER')`）：用途不是案件分类。
+- `ck_material_version__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：加密材料元数据有界。
+- `ck_material_version__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_material_version__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_material_version__previous_version_id`：`(tenant_id, previous_version_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+- `fk_material_version__upload_basis_id`：`(tenant_id, upload_basis_id) → evidence.material_upload_basis(tenant_id, material_upload_basis_id)`。同租户准确事实引用。
+- `fk_material_version__upload_session_id`：`(tenant_id, upload_session_id) → evidence.upload_session(tenant_id, upload_session_id)`。同租户准确事实引用。
+- `fk_material_version__received_source_object_id`：`(tenant_id, received_source_object_id) → evidence.received_source_object(tenant_id, received_source_object_id)`。同租户准确事实引用。
+- `fk_material_version__evidence_submission_id`：`(tenant_id, evidence_submission_id) → evidence.evidence_submission(tenant_id, evidence_submission_id)`。同租户准确事实引用。
+- `fk_material_version__evidence_binding_id`：`(tenant_id, evidence_binding_id) → evidence.evidence_binding(tenant_id, evidence_binding_id)`。同租户准确事实引用。
+- `fk_material_version__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_material_version__received_by_appointment_id`：`(tenant_id, received_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `opportunity.quote_draft`
+
+不可变报价草稿；保存不完成任何待办。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_draft_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_draft_id` | `uuid` | 否 | `—` | 不可变报价草稿；保存不完成任何待办。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 由插入守卫强制写入顶层事务身份；子事务保存点不能改变集合冻结边界。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | 读取的商机版本。 |
+| `responsibility_type` | `varchar(64)` | 否 | `—` | 责任依据类型。 |
+| `responsibility_id` | `uuid` | 否 | `—` | 责任依据身份。 |
+| `responsibility_revision` | `bigint` | 否 | `—` | 责任依据版本。 |
+| `owner_appointment_id` | `uuid` | 否 | `—` | 保存/确认的当前负责人。 |
+| `customer_confirmation_id` | `uuid` | 否 | `—` | 准确已确认客户需求。 |
+| `previous_draft_id` | `uuid` | 是 | `—` | 同一责任人的前次草稿。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 保存时间。 |
+
+约束：
+
+- `ck_quote_draft__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_quote_draft__basis`（`CHECK`：`responsibility_type IN ('opportunity.opportunity','opportunity.responsibility_handoff') AND responsibility_revision BETWEEN 0 AND 9007199254740991 AND opportunity_revision BETWEEN 0 AND 9007199254740991`）：准确责任和版本。
+- `ck_quote_draft__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界加密正文。
+- `uq_quote_draft__previous`（`UNIQUE`：`tenant_id, previous_draft_id`）：草稿不分叉。
+- `ck_quote_draft__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_quote_draft__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_draft__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_quote_draft__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_quote_draft__customer_confirmation_id`：`(tenant_id, customer_confirmation_id) → opportunity.customer_requirement_confirmation(tenant_id, customer_requirement_confirmation_id)`。同租户准确事实引用。
+- `fk_quote_draft__previous_draft_id`：`(tenant_id, previous_draft_id) → opportunity.quote_draft(tenant_id, quote_draft_id)`。同租户准确事实引用。
+
+### `opportunity.quote_package_basis`
+
+既有报价版本的唯一受保护依据；不建立第二报价身份。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_package_basis_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_package_basis_id` | `uuid` | 否 | `—` | 既有报价版本的唯一受保护依据；不建立第二报价身份。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 由守卫写入报价包形成事务，防止后来追加子项。 |
+| `quote_revision_id` | `uuid` | 否 | `—` | 唯一既有报价版本。 |
+| `quote_draft_id` | `uuid` | 否 | `—` | 准确被确认草稿。 |
+| `customer_confirmation_id` | `uuid` | 否 | `—` | 准确客户确认。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 形成时间。 |
+
+约束：
+
+- `ck_quote_package_basis__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_quote_package_basis__quote`（`UNIQUE`：`tenant_id, quote_revision_id`）：每个报价一个依据。
+- `uq_quote_package_basis__draft`（`UNIQUE`：`tenant_id, quote_draft_id`）：草稿只能形成一个报价。
+- `ck_quote_package_basis__identity`（`CHECK`：`quote_package_basis_id=quote_revision_id`）：同一报价身份。
+- `ck_quote_package_basis__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：受保护正文有界。
+- `ck_quote_package_basis__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_quote_package_basis__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_package_basis__quote_revision_id`：`(tenant_id, quote_revision_id) → opportunity.quote_revision(tenant_id, quote_revision_id)`。同租户准确事实引用。
+- `fk_quote_package_basis__quote_draft_id`：`(tenant_id, quote_draft_id) → opportunity.quote_draft(tenant_id, quote_draft_id)`。同租户准确事实引用。
+- `fk_quote_package_basis__customer_confirmation_id`：`(tenant_id, customer_confirmation_id) → opportunity.customer_requirement_confirmation(tenant_id, customer_requirement_confirmation_id)`。同租户准确事实引用。
+
+### `opportunity.quote_approval_policy`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_approval_policy_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_approval_policy_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `organization_unit_id` | `uuid` | 否 | `—` | 明确适用组织。 |
+| `policy_code` | `varchar(64)` | 否 | `—` | 具名审批策略。 |
+| `policy_version` | `bigint` | 否 | `—` | 策略版本。 |
+| `mode` | `varchar(64)` | 否 | `—` | 审批方式。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 配置时间。 |
+
+约束：
+
+- `ck_quote_approval_policy__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_quote_approval_policy__values`（`CHECK`：`policy_code='R2_QUOTE_APPROVAL_V1' AND policy_version BETWEEN 1 AND 9007199254740991 AND mode IN ('REQUIRE_APPROVAL','SELF_AUTHORIZED')`）：明确策略及授权模式。
+- `uq_quote_approval_policy__version`（`UNIQUE`：`tenant_id, organization_unit_id, policy_code, policy_version`）：同组织策略版本唯一。
+
+物理外键：
+
+- `fk_quote_approval_policy__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_approval_policy__organization_unit_id`：`(tenant_id, organization_unit_id) → identity.organization_unit(tenant_id, organization_unit_id)`。同租户准确事实引用。
+
+### `opportunity.quote_approval_policy_signer`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_approval_policy_signer_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_approval_policy_signer_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `policy_id` | `uuid` | 否 | `—` | 准确配置策略。 |
+| `appointment_id` | `uuid` | 否 | `—` | 明确获授权的审批或权限内任职。 |
+
+约束：
+
+- `ck_quote_approval_policy_signer__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_quote_approval_policy_signer__member`（`UNIQUE`：`tenant_id, policy_id, appointment_id`）：配置成员不重复。
+
+物理外键：
+
+- `fk_quote_approval_policy_signer__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_approval_policy_signer__policy_id`：`(tenant_id, policy_id) → opportunity.quote_approval_policy(tenant_id, quote_approval_policy_id)`。同租户准确事实引用。
+- `fk_quote_approval_policy_signer__appointment_id`：`(tenant_id, appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `opportunity.quote_approval_request`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_approval_request_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_approval_request_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `quote_revision_id` | `uuid` | 否 | `—` | 准确报价。 |
+| `policy_id` | `uuid` | 否 | `—` | 准确策略版本。 |
+| `policy_code` | `varchar(64)` | 否 | `—` | 策略代码。 |
+| `policy_version` | `bigint` | 否 | `—` | 策略版本。 |
+| `requested_by` | `uuid` | 否 | `—` | 提交任职。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 提交时间。 |
+
+约束：
+
+- `ck_quote_approval_request__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_quote_approval_request__quote`（`UNIQUE`：`tenant_id, quote_revision_id`）：准确报价仅一次审批请求。
+
+物理外键：
+
+- `fk_quote_approval_request__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_approval_request__quote_revision_id`：`(tenant_id, quote_revision_id) → opportunity.quote_revision(tenant_id, quote_revision_id)`。同租户准确事实引用。
+- `fk_quote_approval_request__policy_id`：`(tenant_id, policy_id) → opportunity.quote_approval_policy(tenant_id, quote_approval_policy_id)`。同租户准确事实引用。
+- `fk_quote_approval_request__requested_by`：`(tenant_id, requested_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `opportunity.quote_approval_member`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_approval_member_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_approval_member_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `request_id` | `uuid` | 否 | `—` | 准确审批请求。 |
+| `appointment_id` | `uuid` | 否 | `—` | 明确审批人。 |
+| `task_id` | `uuid` | 否 | `—` | 准确审批待办。 |
+
+约束：
+
+- `ck_quote_approval_member__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_quote_approval_member__appointment`（`UNIQUE`：`tenant_id, request_id, appointment_id`）：请求成员唯一。
+- `uq_quote_approval_member__task`（`UNIQUE`：`tenant_id, task_id`）：待办只属于一个成员。
+
+物理外键：
+
+- `fk_quote_approval_member__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_approval_member__request_id`：`(tenant_id, request_id) → opportunity.quote_approval_request(tenant_id, quote_approval_request_id)`。同租户准确事实引用。
+- `fk_quote_approval_member__appointment_id`：`(tenant_id, appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_quote_approval_member__task_id`：`(tenant_id, task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+
+### `opportunity.quote_approval_decision`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_approval_decision_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_approval_decision_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `member_id` | `uuid` | 否 | `—` | 准确审批成员。 |
+| `decision` | `varchar(64)` | 否 | `—` | 批准或退回。 |
+| `reason_ciphertext` | `bytea` | 否 | `—` | 审批说明密文。 |
+| `reason_digest` | `bytea` | 否 | `—` | 审批说明摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 决定时间。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 事实形成的顶层事务；迁移前事实回填迁移事务，不冒充后续命令。 |
+
+约束：
+
+- `ck_quote_approval_decision__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_quote_approval_decision__member`（`UNIQUE`：`tenant_id, member_id`）：每个审批成员一次决定。
+- `ck_quote_approval_decision__values`（`CHECK`：`decision IN ('APPROVED','RETURNED') AND octet_length(reason_ciphertext) BETWEEN 29 AND 131072`）：决定及有界密文。
+- `ck_quote_approval_decision__reason_digest_length`（`CHECK`：`octet_length(reason_digest) = 32`）：摘要格式：reason_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_quote_approval_decision__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_approval_decision__member_id`：`(tenant_id, member_id) → opportunity.quote_approval_member(tenant_id, quote_approval_member_id)`。同租户准确事实引用。
+
+### `opportunity.quote_manual_delivery`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_manual_delivery_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_manual_delivery_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `quote_revision_id` | `uuid` | 否 | `—` | 准确报价。 |
+| `material_version_id` | `uuid` | 否 | `—` | T06准确证据版本。 |
+| `recipient_ciphertext` | `bytea` | 否 | `—` | 实际接收人受保护内容。 |
+| `body_digest` | `bytea` | 否 | `—` | 交付内容摘要。 |
+| `channel` | `varchar(64)` | 否 | `—` | 实际交付方式。 |
+| `occurred_at` | `timestamptz(6)` | 否 | `—` | 实际发生时间。 |
+| `recorded_by` | `uuid` | 否 | `—` | 确认交付任职。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 记录时间。 |
+
+约束：
+
+- `ck_quote_manual_delivery__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_quote_manual_delivery__values`（`CHECK`：`octet_length(recipient_ciphertext) BETWEEN 29 AND 131072 AND channel ~ '^[A-Z][A-Z0-9_]{0,63}$' AND occurred_at<=created_at`）：必要交付信息及时间。
+- `ck_quote_manual_delivery__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_quote_manual_delivery__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_manual_delivery__quote_revision_id`：`(tenant_id, quote_revision_id) → opportunity.quote_revision(tenant_id, quote_revision_id)`。同租户准确事实引用。
+- `fk_quote_manual_delivery__material_version_id`：`(tenant_id, material_version_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+- `fk_quote_manual_delivery__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `opportunity.quote_response_basis`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_response_basis_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_response_basis_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `quote_response_id` | `uuid` | 否 | `—` | 既有准确客户回复。 |
+| `material_version_id` | `uuid` | 否 | `—` | T06准确证明版本。 |
+| `next_check_at` | `timestamptz(6)` | 是 | `—` | 暂不接受或不明确时下一行动。 |
+
+约束：
+
+- `ck_quote_response_basis__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_quote_response_basis__response`（`UNIQUE`：`tenant_id, quote_response_id`）：回复唯一补充依据。
+- `ck_quote_response_basis__identity`（`CHECK`：`quote_response_basis_id=quote_response_id`）：与既有回复身份一致。
+
+物理外键：
+
+- `fk_quote_response_basis__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_response_basis__quote_response_id`：`(tenant_id, quote_response_id) → opportunity.quote_response(tenant_id, quote_response_id)`。同租户准确事实引用。
+- `fk_quote_response_basis__material_version_id`：`(tenant_id, material_version_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+
+### `opportunity.contract_preparation_source`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, contract_preparation_source_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `contract_preparation_source_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `quote_response_id` | `uuid` | 否 | `—` | 准确接受回复。 |
+| `source_kind` | `varchar(64)` | 否 | `—` | 本阶段只允许报价接受来源。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 形成时间。 |
+
+约束：
+
+- `ck_contract_preparation_source__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_contract_preparation_source__response`（`UNIQUE`：`tenant_id, quote_response_id`）：接受来源唯一。
+- `ck_contract_preparation_source__kind`（`CHECK`：`source_kind='ACCEPTED_QUOTE'`）：不伪造直接授权来源。
+
+物理外键：
+
+- `fk_contract_preparation_source__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_contract_preparation_source__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_contract_preparation_source__quote_response_id`：`(tenant_id, quote_response_id) → opportunity.quote_response(tenant_id, quote_response_id)`。同租户准确事实引用。
+
+### `opportunity.quote_workflow`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_workflow_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_workflow_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `quote_revision_id` | `uuid` | 是 | `—` | 准确报价。 |
+| `previous_workflow_id` | `uuid` | 是 | `—` | 直接前一工作流事实。 |
+| `stage` | `varchar(64)` | 否 | `—` | 有界业务阶段。 |
+| `owner_appointment_id` | `uuid` | 否 | `—` | 下一责任任职。 |
+| `task_id` | `uuid` | 是 | `—` | 对应已有待办。 |
+| `prior_task_id` | `uuid` | 是 | `—` | 移交的原跟进待办。 |
+| `next_check_at` | `timestamptz(6)` | 是 | `—` | 约定下一行动。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 形成时间。 |
+
+约束：
+
+- `ck_quote_workflow__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_quote_workflow__previous`（`UNIQUE`：`tenant_id, previous_workflow_id`）：工作流事实不分叉。
+- `ck_quote_workflow__stage`（`CHECK`：`stage IN ('PREPARE','SUBMIT_APPROVAL','AWAIT_APPROVAL','DELIVER','AWAIT_REPLY','FOLLOW_UP','CLARIFY_REPLY','SALES_DISPOSITION','ACCEPTED','RETURNED','OWNER_EXCEPTION')`）：报价业务阶段域。
+- `ck_quote_workflow__initial_preparation`（`CHECK`：`quote_revision_id IS NOT NULL OR (stage='PREPARE' AND previous_workflow_id IS NULL AND task_id IS NOT NULL AND next_check_at IS NULL)`）：正式报价前仅允许具名准备责任。
+
+物理外键：
+
+- `fk_quote_workflow__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_workflow__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_quote_workflow__quote_revision_id`：`(tenant_id, quote_revision_id) → opportunity.quote_revision(tenant_id, quote_revision_id)`。同租户准确事实引用。
+- `fk_quote_workflow__previous_workflow_id`：`(tenant_id, previous_workflow_id) → opportunity.quote_workflow(tenant_id, quote_workflow_id)`。同租户准确事实引用。
+- `fk_quote_workflow__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_quote_workflow__task_id`：`(tenant_id, task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_quote_workflow__prior_task_id`：`(tenant_id, prior_task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+
+### `opportunity.quote_preparation_intent`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_preparation_intent_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_preparation_intent_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | 提交时商机版本。 |
+| `customer_confirmation_id` | `uuid` | 否 | `—` | 人工确认的准确客户资料。 |
+| `responsibility_type` | `varchar(64)` | 否 | `—` | 准确责任来源类型。 |
+| `responsibility_id` | `uuid` | 否 | `—` | 准确责任来源。 |
+| `responsibility_revision` | `bigint` | 否 | `—` | 准确责任版本。 |
+| `workflow_id` | `uuid` | 否 | `—` | 本次报价准备工作流。 |
+| `task_id` | `uuid` | 否 | `—` | 接管后的报价准备待办。 |
+| `prior_task_id` | `uuid` | 是 | `—` | 被接管的普通跟进待办。 |
+| `requested_by` | `uuid` | 否 | `—` | 明确开始准备的任职。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 可信提交时间。 |
+
+约束：
+
+- `ck_quote_preparation_intent__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_quote_preparation_intent__opportunity`（`UNIQUE`：`tenant_id, opportunity_id`）：首次准备意图唯一。
+- `uq_quote_preparation_intent__workflow`（`UNIQUE`：`tenant_id, workflow_id`）：准备工作流唯一来源。
+- `ck_quote_preparation_intent__versions`（`CHECK`：`opportunity_revision>=0 AND responsibility_revision>=0 AND responsibility_type IN ('opportunity.opportunity','opportunity.responsibility_handoff')`）：准确责任及版本。
+
+物理外键：
+
+- `fk_quote_preparation_intent__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_preparation_intent__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_quote_preparation_intent__customer_confirmation_id`：`(tenant_id, customer_confirmation_id) → opportunity.customer_requirement_confirmation(tenant_id, customer_requirement_confirmation_id)`。同租户准确事实引用。
+- `fk_quote_preparation_intent__workflow_id`：`(tenant_id, workflow_id) → opportunity.quote_workflow(tenant_id, quote_workflow_id)`。同租户准确事实引用。
+- `fk_quote_preparation_intent__task_id`：`(tenant_id, task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_quote_preparation_intent__prior_task_id`：`(tenant_id, prior_task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_quote_preparation_intent__requested_by`：`(tenant_id, requested_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `opportunity.followup_attempt`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, followup_attempt_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `followup_attempt_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | 提交时版本。 |
+| `responsibility_type` | `varchar(64)` | 否 | `—` | 准确责任来源。 |
+| `responsibility_id` | `uuid` | 否 | `—` | 准确责任来源身份。 |
+| `responsibility_revision` | `bigint` | 否 | `—` | 准确责任来源版本。 |
+| `context_code` | `varchar(64)` | 否 | `—` | 普通跟进或报价回复。 |
+| `attempt_code` | `varchar(64)` | 否 | `—` | 本次真实情况。 |
+| `prior_task_id` | `uuid` | 否 | `—` | 被本次安排接管的任务。 |
+| `prior_task_revision` | `bigint` | 否 | `—` | 原任务准确版本。 |
+| `prior_wait_id` | `uuid` | 是 | `—` | 原等待。 |
+| `prior_wait_hash` | `bytea` | 是 | `—` | 原等待摘要。 |
+| `task_id` | `uuid` | 否 | `—` | 唯一后继任务。 |
+| `quote_workflow_id` | `uuid` | 是 | `—` | 本次报价前序工作流。 |
+| `next_quote_workflow_id` | `uuid` | 是 | `—` | 本次报价等待工作流。 |
+| `recorded_by` | `uuid` | 否 | `—` | 实际记录任职。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系尝试说明密文。 |
+| `body_digest` | `bytea` | 否 | `—` | 规范尝试正文与来源摘要。 |
+| `occurred_at` | `timestamptz(6)` | 否 | `—` | 实际联系时间。 |
+| `next_check_at` | `timestamptz(6)` | 否 | `—` | 约定下一次联系。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_followup_attempt__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_followup_attempt__prior_task`（`UNIQUE`：`tenant_id, prior_task_id`）：每项原责任仅一次安排。
+- `uq_followup_attempt__task`（`UNIQUE`：`tenant_id, task_id`）：后继只由一次尝试形成。
+- `ck_followup_attempt__values`（`CHECK`：`context_code IN ('OPPORTUNITY','QUOTE') AND attempt_code IN ('NOT_CONNECTED','NO_REPLY','NO_EFFECTIVE_PROGRESS') AND prior_task_id<>task_id AND opportunity_revision BETWEEN 0 AND 9007199254740991 AND prior_task_revision BETWEEN 0 AND 9007199254740990 AND responsibility_revision BETWEEN 0 AND 9007199254740991 AND responsibility_type IN ('opportunity.opportunity','opportunity.responsibility_handoff') AND occurred_at<=created_at AND next_check_at>created_at AND (prior_wait_id IS NULL)=(prior_wait_hash IS NULL) AND ((context_code='QUOTE' AND quote_workflow_id IS NOT NULL AND next_quote_workflow_id IS NOT NULL) OR (context_code='OPPORTUNITY' AND quote_workflow_id IS NULL AND next_quote_workflow_id IS NULL))`）：准确来源及过去尝试、未来安排。
+- `ck_followup_attempt__prior_wait_hash_length`（`CHECK`：`octet_length(prior_wait_hash) = 32`）：摘要格式：prior_wait_hash必须保存32字节的规范二进制值。
+- `ck_followup_attempt__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_followup_attempt__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_followup_attempt__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_followup_attempt__prior_task_id`：`(tenant_id, prior_task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_followup_attempt__task_id`：`(tenant_id, task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_followup_attempt__prior_wait_id`：`(tenant_id, prior_wait_id) → responsibility.wait_receipt(tenant_id, wait_receipt_id)`。同租户准确事实引用。
+- `fk_followup_attempt__quote_workflow_id`：`(tenant_id, quote_workflow_id) → opportunity.quote_workflow(tenant_id, quote_workflow_id)`。同租户准确事实引用。
+- `fk_followup_attempt__next_quote_workflow_id`：`(tenant_id, next_quote_workflow_id) → opportunity.quote_workflow(tenant_id, quote_workflow_id)`。同租户准确事实引用。
+- `fk_followup_attempt__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `opportunity.quote_termination`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_termination_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_termination_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 本次商机。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | 结束前准确商机版本。 |
+| `quote_workflow_id` | `uuid` | 否 | `—` | 准确末端报价工作流。 |
+| `quote_revision_id` | `uuid` | 是 | `—` | 准确当前报价；准备阶段可空。 |
+| `closure_id` | `uuid` | 否 | `—` | 本次主线终点及受保护原因。 |
+| `recorded_by` | `uuid` | 否 | `—` | 现任销售。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 可信记录时间。 |
+
+约束：
+
+- `ck_quote_termination__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_quote_termination__opportunity`（`UNIQUE`：`tenant_id, opportunity_id`）：每个报价主线仅一个终点。
+- `uq_quote_termination__closure`（`UNIQUE`：`tenant_id, closure_id`）：准确终点唯一。
+- `ck_quote_termination__opportunity_revision`（`CHECK`：`opportunity_revision BETWEEN 0 AND 9007199254740990`）：版本可安全递增。
+
+物理外键：
+
+- `fk_quote_termination__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_termination__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_quote_termination__quote_workflow_id`：`(tenant_id, quote_workflow_id) → opportunity.quote_workflow(tenant_id, quote_workflow_id)`。同租户准确事实引用。
+- `fk_quote_termination__quote_revision_id`：`(tenant_id, quote_revision_id) → opportunity.quote_revision(tenant_id, quote_revision_id)`。同租户准确事实引用。
+- `fk_quote_termination__closure_id`：`(tenant_id, closure_id) → opportunity.closure(tenant_id, closure_id)`。同租户准确事实引用。
+- `fk_quote_termination__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `opportunity.quote_termination_task`
+
+报价闭环不可变准确事实；不构成合同签署。
+
+- Fact Owner：`OpportunityRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, quote_termination_task_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `quote_termination_task_id` | `uuid` | 否 | `—` | 报价闭环不可变准确事实；不构成合同签署。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `quote_termination_id` | `uuid` | 否 | `—` | 准确终止依据。 |
+| `task_id` | `uuid` | 否 | `—` | 取消的未完成任务。 |
+| `task_revision` | `bigint` | 否 | `—` | 取消前准确版本。 |
+| `prior_state` | `varchar(64)` | 否 | `—` | 取消前状态。 |
+| `wait_id` | `uuid` | 是 | `—` | 准确末端等待。 |
+| `wait_hash` | `bytea` | 是 | `—` | 准确末端等待摘要。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 可信记录时间。 |
+
+约束：
+
+- `ck_quote_termination_task__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_quote_termination_task__task`（`UNIQUE`：`tenant_id, task_id`）：未完成责任仅取消一次。
+- `ck_quote_termination_task__state`（`CHECK`：`task_revision BETWEEN 0 AND 9007199254740990 AND ((prior_state='OPEN' AND wait_id IS NULL AND wait_hash IS NULL) OR (prior_state='WAITING' AND wait_id IS NOT NULL AND wait_hash IS NOT NULL))`）：准确取消前状态和等待。
+- `ck_quote_termination_task__wait_hash_length`（`CHECK`：`octet_length(wait_hash) = 32`）：摘要格式：wait_hash必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_quote_termination_task__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_quote_termination_task__quote_termination_id`：`(tenant_id, quote_termination_id) → opportunity.quote_termination(tenant_id, quote_termination_id)`。同租户准确事实引用。
+- `fk_quote_termination_task__task_id`：`(tenant_id, task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_quote_termination_task__wait_id`：`(tenant_id, wait_id) → responsibility.wait_receipt(tenant_id, wait_receipt_id)`。同租户准确事实引用。
 
 ## `conflict`
 
@@ -2018,7 +3166,7 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
 | `contract_id` | `uuid` | 否 | `—` | 合同锚点标识：由应用生成的UUIDv7。 |
 | `opportunity_id` | `uuid` | 否 | `—` | 来源商机标识：合同所承接的唯一法律需求。 |
-| `accepted_quote_response_id` | `uuid` | 否 | `—` | 接受报价回应标识：合同成立准备工作的准确销售来源。 |
+| `accepted_quote_response_id` | `uuid` | 是 | `—` | 接受报价回应标识：合同成立准备工作的准确销售来源。 |
 | `current_revision_id` | `uuid` | 是 | `—` | 当前合同版本标识：可随新版本前移，但不改变旧版本。 |
 | `approved_revision_id` | `uuid` | 是 | `—` | 当前已批准合同版本标识：只能等于当前版本；形成新版本时可原子清空或前移，旧批准历史保留在准确DecisionRecord中，执行后冻结。 |
 | `contract_execution_id` | `uuid` | 是 | `—` | 合同执行事实标识：全部执行门禁通过后一次写入。 |
@@ -2031,6 +3179,10 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `activation_source_id` | `uuid` | 是 | `—` | 合同激活依据事实在所属租户内的准确标识。 |
 | `activation_source_revision` | `bigint` | 是 | `—` | 合同激活依据事实的准确修订号；按哈希冻结时为空。 |
 | `activation_source_hash` | `bytea` | 是 | `—` | 合同激活依据事实的准确规范摘要；按修订冻结时为空。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `created_by_appointment_id` | `uuid` | 是 | `—` | R2合同创建者；旧合同可空。 |
+| `direct_preparation_decision_id` | `uuid` | 是 | `—` | 最初消费的直接准备授权；后续版本独立记录来源。 |
+| `preparation_contract_code` | `varchar(64)` | 是 | `—` | 具名R2双入口锚点；旧合同为空。 |
 
 约束：
 
@@ -2040,6 +3192,8 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 - `ck_contract__revision_nonnegative`（`CHECK`：`revision >= 0`）：CAS修订号不得为负数。
 - `ck_contract__activation_source_exact`（`CHECK`：`((activation_source_type IS NOT NULL AND activation_source_id IS NOT NULL AND ((activation_source_revision IS NOT NULL AND activation_source_revision >= 0 AND activation_source_hash IS NULL) OR (activation_source_revision IS NULL AND activation_source_hash IS NOT NULL))) OR (activation_source_type IS NULL AND activation_source_id IS NULL AND activation_source_revision IS NULL AND activation_source_hash IS NULL))`）：准确引用：合同激活依据事实必须完整给出类型、标识以及修订号或摘要二者之一。
 - `ck_contract__activation_source_hash_length`（`CHECK`：`octet_length(activation_source_hash) = 32`）：摘要格式：activation_source_hash必须保存32字节的规范二进制值。
+- `uq_contract__direct_source`（`UNIQUE`：`tenant_id, direct_preparation_decision_id`）：准确事实唯一。
+- `ck_contract__r2_source`（`CHECK`：`(preparation_contract_code IS NULL AND accepted_quote_response_id IS NOT NULL AND direct_preparation_decision_id IS NULL) OR (preparation_contract_code IS NOT NULL AND preparation_contract_code='R2_CONTRACT_PREPARATION_V1' AND created_by_appointment_id IS NOT NULL AND num_nonnulls(accepted_quote_response_id,direct_preparation_decision_id)=1)`）：具名双入口；旧结构不放宽。
 
 物理外键：
 
@@ -2050,6 +3204,8 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 - `fk_contract__approved_revision`：`(tenant_id, approved_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。批准槽：必须指向同租户准确合同版本。
 - `fk_contract__execution`：`(tenant_id, contract_execution_id) → contract.contract_execution(tenant_id, contract_execution_id)`。执行槽：必须指向同租户唯一合同执行事实。
 - `fk_contract__termination`：`(tenant_id, contract_termination_id) → contract.contract_termination(tenant_id, contract_termination_id)`。终止槽：必须指向同租户准确终止事实。
+- `fk_contract__direct_preparation_decision_id`：`(tenant_id, direct_preparation_decision_id) → contract.preparation_decision(tenant_id, preparation_decision_id)`。同租户准确事实引用。
+- `fk_contract__created_by_appointment_id`：`(tenant_id, created_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
 
 类型化准确引用：
 
@@ -2074,19 +3230,32 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `contract_id` | `uuid` | 否 | `—` | 合同标识：该版本所属的合同锚点。 |
 | `revision_no` | `integer` | 否 | `—` | 版本序号：从一开始在同一合同内连续递增。 |
 | `predecessor_revision_id` | `uuid` | 是 | `—` | 前序合同版本标识：首版本为空，其余版本准确引用直接前序。 |
-| `confirmed_action_draft_id` | `uuid` | 否 | `—` | 确认草案标识：形成该版本包的准确候选输入。 |
-| `source_quote_revision_id` | `uuid` | 否 | `—` | 来源报价版本标识：商业条件的准确来源。 |
-| `source_quote_response_id` | `uuid` | 否 | `—` | 来源报价回应标识：客户接受的准确发出与回应链。 |
-| `body_evidence_submission_id` | `uuid` | 否 | `—` | 合同正文证据提交标识：准确指向不可变正文对象。 |
+| `confirmed_action_draft_id` | `uuid` | 是 | `—` | 确认草案标识：形成该版本包的准确候选输入。 |
+| `source_quote_revision_id` | `uuid` | 是 | `—` | 来源报价版本标识：商业条件的准确来源。 |
+| `source_quote_response_id` | `uuid` | 是 | `—` | 来源报价回应标识：客户接受的准确发出与回应链。 |
+| `body_evidence_submission_id` | `uuid` | 是 | `—` | 合同正文证据提交标识：准确指向不可变正文对象。 |
 | `body_sha256` | `bytea` | 否 | `—` | 合同正文SHA-256：正文准确对象字节的32字节服务端摘要。 |
-| `pre_contract_review_id` | `uuid` | 否 | `—` | 签约前冲突审查标识：该版本包冻结的独立PRE_CONTRACT审查。 |
-| `pre_contract_scope_hash` | `bytea` | 否 | `—` | 签约前审查范围摘要：准确参与方、规则和语料范围的32字节摘要。 |
-| `pre_contract_resolution_digest` | `bytea` | 否 | `—` | 签约前审查结论摘要：可用于本版本放行的准确结论摘要。 |
+| `pre_contract_review_id` | `uuid` | 是 | `—` | 签约前冲突审查标识：该版本包冻结的独立PRE_CONTRACT审查。 |
+| `pre_contract_scope_hash` | `bytea` | 是 | `—` | 签约前审查范围摘要：准确参与方、规则和语料范围的32字节摘要。 |
+| `pre_contract_resolution_digest` | `bytea` | 是 | `—` | 签约前审查结论摘要：可用于本版本放行的准确结论摘要。 |
 | `package_contract_code` | `varchar(64)` | 否 | `—` | 版本包合同代码：静态注册的合同结构类型。 |
 | `package_contract_version` | `integer` | 否 | `—` | 版本包合同版本：解释全部子项结构的正整数版本。 |
 | `content_digest` | `bytea` | 否 | `—` | 版本包内容摘要：覆盖正文对象版本、全部子项和签约前审查快照。 |
 | `created_by_appointment_id` | `uuid` | 否 | `—` | 创建任职标识：确认并提交该版本包的准确任职。 |
 | `created_at` | `timestamptz(6)` | 否 | `—` | 创建时间：版本包在同一短事务封存的可信时间。 |
+| `preparation_draft_id` | `uuid` | 是 | `—` | 真实准备草稿。 |
+| `source_direct_decision_id` | `uuid` | 是 | `—` | 本版准确直接授权。 |
+| `customer_confirmation_id` | `uuid` | 是 | `—` | 准确客户确认。 |
+| `commercial_digest` | `bytea` | 是 | `—` | 准确商业摘要。 |
+| `body_evidence_version_id` | `uuid` | 是 | `—` | 准确T06正文版本。 |
+| `template_version_id` | `uuid` | 是 | `—` | 已审核真实模板版本。 |
+| `party_snapshot_digest` | `bytea` | 是 | `—` | 准确参与方快照。 |
+| `package_ciphertext` | `bytea` | 是 | `—` | 本版完整规范包受保护密文。 |
+| `receipt_required_before_transfer` | `boolean` | 是 | `—` | 仅明确付款约定阻断转案。 |
+| `required_amount_minor` | `bigint` | 是 | `—` | 明确先到账金额。 |
+| `approval_requirement_count` | `integer` | 是 | `—` | 在版本形成事务冻结的必要审批数量。 |
+| `clause_count` | `integer` | 是 | `—` | 本版条款集合数量。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
 
 约束：
 
@@ -2101,6 +3270,10 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 - `ck_contract_revision__pre_contract_scope_hash_length`（`CHECK`：`octet_length(pre_contract_scope_hash) = 32`）：摘要格式：pre_contract_scope_hash必须保存32字节的规范二进制值。
 - `ck_contract_revision__pre_contract_resolution_digest_length`（`CHECK`：`octet_length(pre_contract_resolution_digest) = 32`）：摘要格式：pre_contract_resolution_digest必须保存32字节的规范二进制值。
 - `ck_contract_revision__content_digest_length`（`CHECK`：`octet_length(content_digest) = 32`）：摘要格式：content_digest必须保存32字节的规范二进制值。
+- `ck_contract_revision__commercial_digest_length`（`CHECK`：`octet_length(commercial_digest) = 32`）：摘要格式：commercial_digest必须保存32字节的规范二进制值。
+- `ck_contract_revision__party_snapshot_digest_length`（`CHECK`：`octet_length(party_snapshot_digest) = 32`）：摘要格式：party_snapshot_digest必须保存32字节的规范二进制值。
+- `ck_contract_revision__r2_shape`（`CHECK`：`(package_contract_code='R2_CONTRACT_PREPARATION_V1' AND package_contract_version=1 AND preparation_draft_id IS NOT NULL AND customer_confirmation_id IS NOT NULL AND commercial_digest IS NOT NULL AND body_evidence_version_id IS NOT NULL AND template_version_id IS NOT NULL AND party_snapshot_digest IS NOT NULL AND package_ciphertext IS NOT NULL AND receipt_required_before_transfer IS NOT NULL AND approval_requirement_count IS NOT NULL AND clause_count IS NOT NULL AND pre_contract_review_id IS NULL AND pre_contract_scope_hash IS NULL AND pre_contract_resolution_digest IS NULL AND confirmed_action_draft_id IS NULL AND num_nonnulls(source_quote_response_id,source_direct_decision_id)=1 AND ((source_quote_response_id IS NOT NULL AND source_quote_revision_id IS NOT NULL) OR (source_direct_decision_id IS NOT NULL AND source_quote_revision_id IS NULL)) AND octet_length(package_ciphertext) BETWEEN 29 AND 1048576 AND approval_requirement_count BETWEEN 1 AND 100 AND clause_count BETWEEN 0 AND 200 AND ((receipt_required_before_transfer AND required_amount_minor IS NOT NULL AND required_amount_minor BETWEEN 1 AND 9007199254740991) OR (NOT receipt_required_before_transfer AND required_amount_minor IS NULL))) OR (package_contract_code<>'R2_CONTRACT_PREPARATION_V1' AND confirmed_action_draft_id IS NOT NULL AND source_quote_revision_id IS NOT NULL AND source_quote_response_id IS NOT NULL AND body_evidence_submission_id IS NOT NULL AND pre_contract_review_id IS NOT NULL AND pre_contract_scope_hash IS NOT NULL AND pre_contract_resolution_digest IS NOT NULL AND source_direct_decision_id IS NULL AND preparation_draft_id IS NULL AND customer_confirmation_id IS NULL AND commercial_digest IS NULL AND body_evidence_version_id IS NULL AND template_version_id IS NULL AND party_snapshot_digest IS NULL AND package_ciphertext IS NULL AND receipt_required_before_transfer IS NULL AND approval_requirement_count IS NULL AND clause_count IS NULL AND required_amount_minor IS NULL)`）：具名准备版本与完整旧版本分离；不伪造审查。
+- `uq_contract_revision__preparation_draft_id`（`UNIQUE`：`tenant_id, preparation_draft_id`）：准确事实唯一。
 
 物理外键：
 
@@ -2113,6 +3286,11 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 - `fk_contract_revision__body_evidence`：`(tenant_id, body_evidence_submission_id) → evidence.evidence_submission(tenant_id, evidence_submission_id)`。正文来源：版本包必须引用准确EvidenceSubmission。
 - `fk_contract_revision__pre_contract_review`：`(tenant_id, pre_contract_review_id) → conflict.conflict_review(tenant_id, conflict_review_id)`。审查来源：版本包必须引用独立PRE_CONTRACT审查。
 - `fk_contract_revision__creator`：`(tenant_id, created_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。创建主体：版本包必须记录同租户准确任职。
+- `fk_contract_revision__preparation_draft_id`：`(tenant_id, preparation_draft_id) → contract.preparation_draft(tenant_id, preparation_draft_id)`。同租户准确事实引用。
+- `fk_contract_revision__source_direct_decision_id`：`(tenant_id, source_direct_decision_id) → contract.preparation_decision(tenant_id, preparation_decision_id)`。同租户准确事实引用。
+- `fk_contract_revision__customer_confirmation_id`：`(tenant_id, customer_confirmation_id) → opportunity.customer_requirement_confirmation(tenant_id, customer_requirement_confirmation_id)`。同租户准确事实引用。
+- `fk_contract_revision__body_evidence_version_id`：`(tenant_id, body_evidence_version_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+- `fk_contract_revision__template_version_id`：`(tenant_id, template_version_id) → contract.template_version(tenant_id, template_version_id)`。同租户准确事实引用。
 
 ### `contract.contract_participation`
 
@@ -2252,21 +3430,23 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `contract_revision_id` | `uuid` | 否 | `—` | 合同版本标识：签署槽所属的准确版本包。 |
 | `slot_no` | `integer` | 否 | `—` | 签署槽序号：在合同版本内稳定排序。 |
 | `authority_slot_code` | `varchar(64)` | 否 | `—` | 签署授权槽代码：静态注册的签署能力要求。 |
-| `contract_participation_id` | `uuid` | 否 | `—` | 合同参与项标识：计划签署人对应的准确参与事实。 |
+| `contract_participation_id` | `uuid` | 是 | `—` | 合同参与项标识：计划签署人对应的准确参与事实。 |
 | `signer_party_id` | `uuid` | 否 | `—` | 签署主体标识：必须与合同参与项中的Party一致。 |
 | `signature_method_code` | `varchar(64)` | 否 | `—` | 签署方式：静态注册的电子、线下等方式。 |
 | `seal_required` | `boolean` | 否 | `—` | 印章要求：该槽是否必须核验准确印章事实。 |
 | `required` | `boolean` | 否 | `—` | 必需标志：执行前该槽是否必须具有有效签署事实。 |
 | `plan_digest` | `bytea` | 否 | `—` | 计划摘要：该签署槽规范内容的32字节摘要。 |
 | `created_at` | `timestamptz(6)` | 否 | `—` | 创建时间：随合同版本包封存的可信时间。 |
+| `arrangement_id` | `uuid` | 是 | `—` | 具名人工签署安排；历史计划为空。 |
+| `signature_required` | `boolean` | 否 | `true` | 本槽是否必须签字。 |
+| `template_signing_party_id` | `uuid` | 是 | `—` | 审核模板冻结的律所绑定；与合同参与项互斥。 |
 
 约束：
 
-- `uk_signature_plan__revision_slot_no`（`UNIQUE`：`tenant_id, contract_revision_id, slot_no`）：签署槽唯一：同一合同版本内槽序号不得重复。
-- `uk_signature_plan__revision_authority_slot`（`UNIQUE`：`tenant_id, contract_revision_id, authority_slot_code`）：授权槽唯一：同一合同版本内静态授权槽不得重复。
 - `uk_signature_plan__id_revision_signer`（`UNIQUE`：`tenant_id, signature_plan_id, contract_revision_id, signer_party_id`）：准确签署计划候选键：供ContractSignature证明Plan、版本和签署Party一致。
 - `ck_signature_plan__slot_no_positive`（`CHECK`：`slot_no > 0`）：签署槽序号必须为正数。
 - `ck_signature_plan__plan_digest_length`（`CHECK`：`octet_length(plan_digest) = 32`）：摘要格式：plan_digest必须保存32字节的规范二进制值。
+- `ck_signature_plan__manual`（`CHECK`：`(arrangement_id IS NULL AND contract_participation_id IS NOT NULL AND template_signing_party_id IS NULL) OR (arrangement_id IS NOT NULL AND signature_method_code='MANUAL' AND num_nonnulls(contract_participation_id,template_signing_party_id)=1 AND (signature_required OR seal_required))`）：历史参与引用不放宽；人工安排独立登记。
 
 物理外键：
 
@@ -2275,6 +3455,16 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 - `fk_signature_plan__participation`：`(tenant_id, contract_participation_id) → contract.contract_participation(tenant_id, contract_participation_id)`。参与方归属：签署槽必须引用准确合同参与项。
 - `fk_signature_plan__signer_party`：`(tenant_id, signer_party_id) → party.party(tenant_id, party_id)`。签署主体：签署槽必须引用同租户Party。
 - `fk_signature_plan__participation_path`：`(tenant_id, contract_participation_id, contract_revision_id, signer_party_id) → contract.contract_participation(tenant_id, contract_participation_id, contract_revision_id, party_id)`。签署计划路径：参与项必须属于同一合同版本且其Party就是计划签署主体。
+- `fk_signature_plan__arrangement_id`：`(tenant_id, arrangement_id) → contract.signature_arrangement(tenant_id, signature_arrangement_id)`。同租户准确事实引用。
+- `fk_signature_plan__template_signing_party_id`：`(tenant_id, template_signing_party_id) → contract.template_signing_party(tenant_id, template_signing_party_id)`。同租户准确事实引用。
+
+索引：
+
+- `uk_signature_plan__revision_slot_no`：列`(tenant_id, contract_revision_id, slot_no)`；唯一=`是`；谓词=`arrangement_id IS NULL`。历史计划槽唯一。
+- `uk_signature_plan__revision_authority_slot`：列`(tenant_id, contract_revision_id, authority_slot_code)`；唯一=`是`；谓词=`arrangement_id IS NULL`。历史计划槽唯一。
+- `uq_signature_plan__arrangement_slot`：列`(tenant_id, arrangement_id, slot_no)`；唯一=`是`；谓词=`arrangement_id IS NOT NULL`。同安排槽唯一。
+- `uq_signature_plan__arrangement_authority`：列`(tenant_id, arrangement_id, authority_slot_code)`；唯一=`是`；谓词=`arrangement_id IS NOT NULL`。同安排权限唯一。
+- `uq_signature_plan__arrangement_party`：列`(tenant_id, arrangement_id, signer_party_id)`；唯一=`是`；谓词=`arrangement_id IS NOT NULL`。同安排主体唯一。
 
 ### `contract.contract_signature`
 
@@ -2293,7 +3483,7 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `contract_revision_id` | `uuid` | 否 | `—` | 合同版本标识：签署内容对应的准确版本。 |
 | `signature_plan_id` | `uuid` | 否 | `—` | 签署计划标识：本签署满足的准确计划槽。 |
 | `signature_no` | `integer` | 否 | `—` | 签署序号：同一计划槽重新签署时递增。 |
-| `evidence_submission_id` | `uuid` | 否 | `—` | 签署证据提交标识：经核验的准确EvidenceSubmission。 |
+| `evidence_submission_id` | `uuid` | 是 | `—` | 签署证据提交标识：经核验的准确EvidenceSubmission。 |
 | `external_action_id` | `uuid` | 是 | `—` | 外部签署动作标识：使用外部签署服务时准确引用。 |
 | `provider_inbox_id` | `uuid` | 是 | `—` | Provider消息标识：可信外部结果来自回调时准确引用。 |
 | `signer_party_id` | `uuid` | 否 | `—` | 实际签署Party标识：必须符合计划槽和版本参与方。 |
@@ -2310,6 +3500,7 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
 | `created_at` | `timestamptz(6)` | 否 | `—` | 创建时间：签署事实经核验后追加的可信时间。 |
 | `changed_at` | `timestamptz(6)` | 否 | `—` | 变更时间：签署撤回槽最近一次受控写入时间。 |
+| `verification_id` | `uuid` | 是 | `—` | 人工证据核验通过事实；历史签署为空。 |
 
 约束：
 
@@ -2322,6 +3513,8 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 - `ck_contract_signature__signer_authority_digest_length`（`CHECK`：`octet_length(signer_authority_digest) = 32`）：摘要格式：signer_authority_digest必须保存32字节的规范二进制值。
 - `ck_contract_signature__signed_content_digest_length`（`CHECK`：`octet_length(signed_content_digest) = 32`）：摘要格式：signed_content_digest必须保存32字节的规范二进制值。
 - `ck_contract_signature__revocation_authorization_digest_length`（`CHECK`：`octet_length(revocation_authorization_digest) = 32`）：摘要格式：revocation_authorization_digest必须保存32字节的规范二进制值。
+- `uq_contract_signature__verification_id`（`UNIQUE`：`tenant_id, verification_id`）：准确事实唯一。
+- `ck_contract_signature__manual`（`CHECK`：`(verification_id IS NULL AND evidence_submission_id IS NOT NULL) OR (verification_id IS NOT NULL AND evidence_submission_id IS NULL AND external_action_id IS NULL AND provider_inbox_id IS NULL AND verification_method_code='MANUAL')`）：人工核验与旧外部证据互斥。
 
 物理外键：
 
@@ -2334,6 +3527,7 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 - `fk_contract_signature__signer_party`：`(tenant_id, signer_party_id) → party.party(tenant_id, party_id)`。签署主体：实际签署人必须是同租户Party。
 - `fk_contract_signature__revoker`：`(tenant_id, revoked_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。撤回主体：撤回必须记录准确任职。
 - `fk_contract_signature__plan_path`：`(tenant_id, signature_plan_id, contract_revision_id, signer_party_id) → contract.signature_plan(tenant_id, signature_plan_id, contract_revision_id, signer_party_id)`。签署路径：签署事实的Plan、版本和实际Party必须完全一致。
+- `fk_contract_signature__verification_id`：`(tenant_id, verification_id) → contract.signature_verification(tenant_id, signature_verification_id)`。同租户准确事实引用。
 
 索引：
 
@@ -2357,10 +3551,11 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `signature_set_digest` | `bytea` | 否 | `—` | 签署集合摘要：覆盖全部必要且未撤回的签署事实。 |
 | `review_scope_hash` | `bytea` | 否 | `—` | 审查范围摘要：执行时复验的PRE_CONTRACT准确范围。 |
 | `review_resolution_digest` | `bytea` | 否 | `—` | 审查结论摘要：执行时仍可用于放行的准确结论。 |
-| `archive_evidence_submission_id` | `uuid` | 否 | `—` | 归档证据提交标识：执行版本的准确归档文件。 |
+| `archive_evidence_submission_id` | `uuid` | 是 | `—` | 归档证据提交标识：执行版本的准确归档文件。 |
 | `execution_digest` | `bytea` | 否 | `—` | 执行摘要：覆盖合同版本及全部执行门禁结果。 |
 | `executed_by_appointment_id` | `uuid` | 否 | `—` | 执行任职标识：实施执行命令的准确任职。 |
 | `executed_at` | `timestamptz(6)` | 否 | `—` | 执行时间：唯一合同执行事实提交的可信时间。 |
+| `execution_verification_id` | `uuid` | 是 | `—` | R2准确归档后的人工执行条件核验；与旧归档证据互斥。 |
 
 约束：
 
@@ -2372,6 +3567,7 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 - `ck_contract_execution__review_scope_hash_length`（`CHECK`：`octet_length(review_scope_hash) = 32`）：摘要格式：review_scope_hash必须保存32字节的规范二进制值。
 - `ck_contract_execution__review_resolution_digest_length`（`CHECK`：`octet_length(review_resolution_digest) = 32`）：摘要格式：review_resolution_digest必须保存32字节的规范二进制值。
 - `ck_contract_execution__execution_digest_length`（`CHECK`：`octet_length(execution_digest) = 32`）：摘要格式：execution_digest必须保存32字节的规范二进制值。
+- `ck_contract_execution__manual`（`CHECK`：`num_nonnulls(archive_evidence_submission_id,execution_verification_id)=1`）：保留完整旧执行依据；具名R2执行必须引用人工核验。
 
 物理外键：
 
@@ -2381,6 +3577,7 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 - `fk_contract_execution__revision_contract`：`(tenant_id, contract_revision_id, contract_id) → contract.contract_revision(tenant_id, contract_revision_id, contract_id)`。执行归属：被执行Revision必须属于同一Contract。
 - `fk_contract_execution__archive_evidence`：`(tenant_id, archive_evidence_submission_id) → evidence.evidence_submission(tenant_id, evidence_submission_id)`。归档证据：执行事实必须引用准确EvidenceSubmission。
 - `fk_contract_execution__executor`：`(tenant_id, executed_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。执行主体：执行事实必须记录准确任职。
+- `fk_contract_execution__execution_verification_id`：`(tenant_id, execution_verification_id) → contract.execution_verification(tenant_id, execution_verification_id)`。同租户准确事实引用。
 
 ### `contract.payment_confirmation`
 
@@ -2489,6 +3686,1347 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 - `fk_contract_termination__decision`：`(tenant_id, decision_record_id) → responsibility.decision_record(tenant_id, decision_record_id)`。决定依据：终止事实必须引用准确授权决定。
 - `fk_contract_termination__evidence`：`(tenant_id, evidence_submission_id) → evidence.evidence_submission(tenant_id, evidence_submission_id)`。证据来源：可选引用准确终止材料。
 - `fk_contract_termination__terminator`：`(tenant_id, terminated_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。执行主体：终止事实必须记录准确任职。
+
+### `contract.preparation_request`
+
+直接准备合同的准确申请；不是报价接受、合同或批准。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, preparation_request_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `preparation_request_id` | `uuid` | 否 | `—` | 直接准备合同的准确申请；不是报价接受、合同或批准。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 由插入守卫强制写入顶层事务身份；子事务保存点不能改变集合冻结边界。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | 读取的商机版本。 |
+| `responsibility_type` | `varchar(64)` | 否 | `—` | 责任依据类型。 |
+| `responsibility_id` | `uuid` | 否 | `—` | 责任依据身份。 |
+| `responsibility_revision` | `bigint` | 否 | `—` | 责任依据版本。 |
+| `owner_appointment_id` | `uuid` | 否 | `—` | 保存/确认的当前负责人。 |
+| `customer_confirmation_id` | `uuid` | 否 | `—` | 准确客户需求确认。 |
+| `commercial_digest` | `bytea` | 否 | `—` | 已申请服务范围及费用付款条款的规范摘要。 |
+| `previous_request_id` | `uuid` | 是 | `—` | 本商机的准确前次申请；旧决定不适用于新申请。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 服务端形成时间。 |
+
+约束：
+
+- `ck_preparation_request__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_preparation_request__basis`（`CHECK`：`responsibility_type IN ('opportunity.opportunity','opportunity.responsibility_handoff') AND responsibility_revision BETWEEN 0 AND 9007199254740991 AND opportunity_revision BETWEEN 0 AND 9007199254740991`）：准确责任和版本。
+- `ck_preparation_request__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界加密正文。
+- `uq_preparation_request__previous`（`UNIQUE`：`tenant_id, previous_request_id`）：申请单后继。
+- `ck_preparation_request__commercial_digest_length`（`CHECK`：`octet_length(commercial_digest) = 32`）：摘要格式：commercial_digest必须保存32字节的规范二进制值。
+- `ck_preparation_request__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_preparation_request__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_preparation_request__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_preparation_request__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_preparation_request__customer_confirmation_id`：`(tenant_id, customer_confirmation_id) → opportunity.customer_requirement_confirmation(tenant_id, customer_requirement_confirmation_id)`。同租户准确事实引用。
+- `fk_preparation_request__previous_request_id`：`(tenant_id, previous_request_id) → contract.preparation_request(tenant_id, preparation_request_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_preparation_request__root`：列`(tenant_id, opportunity_id)`；唯一=`是`；谓词=`previous_request_id IS NULL`。每商机只有一个首申请；不依赖事务快照刷新。
+
+### `contract.preparation_decision`
+
+准确申请的不可变决定；仍需命令运行时授权，不代表合同审批。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, preparation_decision_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `preparation_decision_id` | `uuid` | 否 | `—` | 准确申请的不可变决定；仍需命令运行时授权，不代表合同审批。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `preparation_request_id` | `uuid` | 否 | `—` | 被决定的唯一准确申请。 |
+| `decision_code` | `varchar(64)` | 否 | `—` | 批准或退回。 |
+| `decided_by_appointment_id` | `uuid` | 否 | `—` | 实际有权决定任职。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `effective_from` | `timestamptz(6)` | 是 | `—` | 批准生效起点；由服务端决定时间写入。 |
+| `effective_until` | `timestamptz(6)` | 是 | `—` | 批准自然到期；空表示未设自然到期。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 服务端决定时间。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+
+约束：
+
+- `ck_preparation_decision__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_preparation_decision__request`（`UNIQUE`：`tenant_id, preparation_request_id`）：每份申请只有一个最终决定。
+- `ck_preparation_decision__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：决定说明有界密文。
+- `ck_preparation_decision__shape`（`CHECK`：`(decision_code='APPROVED' AND effective_from IS NOT NULL AND (effective_until IS NULL OR effective_until>effective_from)) OR (decision_code='RETURNED' AND effective_from IS NULL AND effective_until IS NULL)`）：退回没有授权区间。
+- `ck_preparation_decision__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_preparation_decision__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_preparation_decision__preparation_request_id`：`(tenant_id, preparation_request_id) → contract.preparation_request(tenant_id, preparation_request_id)`。同租户准确事实引用。
+- `fk_preparation_decision__decided_by_appointment_id`：`(tenant_id, decided_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `contract.approval_policy`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, approval_policy_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `approval_policy_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `organization_unit_id` | `uuid` | 否 | `—` | 明确适用组织。 |
+| `policy_code` | `varchar(64)` | 否 | `—` | 具名合同审批策略。 |
+| `policy_version` | `bigint` | 否 | `—` | 明确策略版本。 |
+| `mode` | `varchar(64)` | 否 | `—` | 明确要求批准；不复用报价自授权。 |
+| `policy_digest` | `bytea` | 否 | `—` | 策略和审批成员规范摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+
+约束：
+
+- `ck_approval_policy__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_approval_policy__version`（`UNIQUE`：`tenant_id, organization_unit_id, policy_code, policy_version`）：组织策略版本唯一。
+- `ck_approval_policy__values`（`CHECK`：`policy_code='R2_CONTRACT_APPROVAL_V1' AND policy_version BETWEEN 1 AND 9007199254740991 AND mode='REQUIRE_APPROVAL'`）：明确合同审批策略。
+- `ck_approval_policy__policy_digest_length`（`CHECK`：`octet_length(policy_digest) = 32`）：摘要格式：policy_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_approval_policy__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_approval_policy__organization_unit_id`：`(tenant_id, organization_unit_id) → identity.organization_unit(tenant_id, organization_unit_id)`。同租户准确事实引用。
+
+### `contract.approval_policy_member`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, approval_policy_member_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `approval_policy_member_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `policy_id` | `uuid` | 否 | `—` | 准确策略版本。 |
+| `requirement_code` | `varchar(64)` | 否 | `—` | 明确审批要求。 |
+| `appointment_id` | `uuid` | 否 | `—` | 明确有权审批任职。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+
+约束：
+
+- `ck_approval_policy_member__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_approval_policy_member__requirement`（`UNIQUE`：`tenant_id, policy_id, requirement_code`）：每个策略要求唯一。
+
+物理外键：
+
+- `fk_approval_policy_member__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_approval_policy_member__policy_id`：`(tenant_id, policy_id) → contract.approval_policy(tenant_id, approval_policy_id)`。同租户准确事实引用。
+- `fk_approval_policy_member__appointment_id`：`(tenant_id, appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `contract.preparation_workflow`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, preparation_workflow_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `preparation_workflow_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `contract_id` | `uuid` | 是 | `—` | 形成后的唯一合同身份。 |
+| `previous_workflow_id` | `uuid` | 是 | `—` | 直接前一流程事实。 |
+| `stage_code` | `varchar(64)` | 否 | `—` | 明确合同准备责任阶段。 |
+| `owner_appointment_id` | `uuid` | 否 | `—` | 实际后继负责人。 |
+| `task_id` | `uuid` | 是 | `—` | 可办理的后继待办。 |
+| `prior_task_id` | `uuid` | 是 | `—` | 移交的准确前序待办。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+| `created_by_appointment_id` | `uuid` | 否 | `—` | 真实流程写入任职；与后继责任人分离。 |
+| `recovery_resume_stage` | `varchar(64)` | 是 | `—` | 失权时保留的准确恢复阶段；原任务类型和期限不变。 |
+
+约束：
+
+- `ck_preparation_workflow__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_preparation_workflow__previous_workflow_id`（`UNIQUE`：`tenant_id, previous_workflow_id`）：准确事实唯一。
+- `ck_preparation_workflow__stage`（`CHECK`：`stage_code IN ('DIRECT_REQUEST','DIRECT_REVIEW','DIRECT_RETURNED','PREPARE','RETURNED','SUBMIT_REVIEW','AWAIT_REVIEW','REVIEW_SUPPLEMENT','REVIEW_BLOCKED','SUBMIT_APPROVAL','AWAIT_APPROVAL','READY_FOR_SIGNATURE','AWAITING_NEXT_STAGE','OWNER_EXCEPTION') AND (stage_code NOT IN ('READY_FOR_SIGNATURE','AWAITING_NEXT_STAGE') OR task_id IS NULL)`）：明确责任阶段；下阶段边界不创建占位待办。
+- `ck_preparation_workflow__recovery_resume`（`CHECK`：`recovery_resume_stage IS NULL OR (stage_code='OWNER_EXCEPTION' AND recovery_resume_stage IN ('DIRECT_RETURNED','PREPARE','RETURNED','REVIEW_BLOCKED','SUBMIT_REVIEW','SUBMIT_APPROVAL','REVIEW_SUPPLEMENT') AND task_id IS NULL AND prior_task_id IS NOT NULL)`）：仅无可办理任务的负责人异常保留恢复目标；不伪造退回决定。
+
+物理外键：
+
+- `fk_preparation_workflow__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_preparation_workflow__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_preparation_workflow__contract_id`：`(tenant_id, contract_id) → contract.contract(tenant_id, contract_id)`。同租户准确事实引用。
+- `fk_preparation_workflow__previous_workflow_id`：`(tenant_id, previous_workflow_id) → contract.preparation_workflow(tenant_id, preparation_workflow_id)`。同租户准确事实引用。
+- `fk_preparation_workflow__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_preparation_workflow__task_id`：`(tenant_id, task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_preparation_workflow__prior_task_id`：`(tenant_id, prior_task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_preparation_workflow__created_by_appointment_id`：`(tenant_id, created_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_preparation_workflow__root`：列`(tenant_id, opportunity_id)`；唯一=`是`；谓词=`previous_workflow_id IS NULL`。每商机只有一个流程根。
+
+### `contract.revision_approval_request`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, revision_approval_request_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `revision_approval_request_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 准确版本。 |
+| `review_binding_id` | `uuid` | 否 | `—` | 本版通过审查。 |
+| `requested_by_appointment_id` | `uuid` | 否 | `—` | 提交任职。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+
+约束：
+
+- `ck_revision_approval_request__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_revision_approval_request__contract_revision_id`（`UNIQUE`：`tenant_id, contract_revision_id`）：准确事实唯一。
+- `uq_revision_approval_request__review_binding_id`（`UNIQUE`：`tenant_id, review_binding_id`）：准确事实唯一。
+
+物理外键：
+
+- `fk_revision_approval_request__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_revision_approval_request__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_revision_approval_request__review_binding_id`：`(tenant_id, review_binding_id) → contract.revision_review_binding(tenant_id, revision_review_binding_id)`。同租户准确事实引用。
+- `fk_revision_approval_request__requested_by_appointment_id`：`(tenant_id, requested_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `contract.preparation_draft`
+
+准备草稿；保存不等于形成版本或完成责任。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, preparation_draft_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `preparation_draft_id` | `uuid` | 否 | `—` | 准备草稿；保存不等于形成版本或完成责任。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 由插入守卫强制写入顶层事务身份；子事务保存点不能改变集合冻结边界。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | 读取的商机版本。 |
+| `responsibility_type` | `varchar(64)` | 否 | `—` | 责任依据类型。 |
+| `responsibility_id` | `uuid` | 否 | `—` | 责任依据身份。 |
+| `responsibility_revision` | `bigint` | 否 | `—` | 责任依据版本。 |
+| `owner_appointment_id` | `uuid` | 否 | `—` | 保存/确认的当前负责人。 |
+| `customer_confirmation_id` | `uuid` | 否 | `—` | 当前客户需求确认。 |
+| `previous_draft_id` | `uuid` | 是 | `—` | 同商机直接前稿；换负责人也沿用单链。 |
+| `source_quote_response_id` | `uuid` | 是 | `—` | 准确接受报价。 |
+| `source_direct_decision_id` | `uuid` | 是 | `—` | 准确直接授权。 |
+| `commercial_digest` | `bytea` | 否 | `—` | 准确商业摘要。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 保存时间。 |
+
+约束：
+
+- `ck_preparation_draft__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_preparation_draft__basis`（`CHECK`：`responsibility_type IN ('opportunity.opportunity','opportunity.responsibility_handoff') AND responsibility_revision BETWEEN 0 AND 9007199254740991 AND opportunity_revision BETWEEN 0 AND 9007199254740991`）：准确责任和版本。
+- `ck_preparation_draft__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界加密正文。
+- `uq_preparation_draft__previous_draft_id`（`UNIQUE`：`tenant_id, previous_draft_id`）：准确事实唯一。
+- `ck_preparation_draft__source`（`CHECK`：`num_nonnulls(source_quote_response_id,source_direct_decision_id)=1`）：双入口互斥。
+- `ck_preparation_draft__commercial_digest_length`（`CHECK`：`octet_length(commercial_digest) = 32`）：摘要格式：commercial_digest必须保存32字节的规范二进制值。
+- `ck_preparation_draft__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_preparation_draft__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_preparation_draft__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_preparation_draft__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_preparation_draft__customer_confirmation_id`：`(tenant_id, customer_confirmation_id) → opportunity.customer_requirement_confirmation(tenant_id, customer_requirement_confirmation_id)`。同租户准确事实引用。
+- `fk_preparation_draft__previous_draft_id`：`(tenant_id, previous_draft_id) → contract.preparation_draft(tenant_id, preparation_draft_id)`。同租户准确事实引用。
+- `fk_preparation_draft__source_quote_response_id`：`(tenant_id, source_quote_response_id) → opportunity.quote_response(tenant_id, quote_response_id)`。同租户准确事实引用。
+- `fk_preparation_draft__source_direct_decision_id`：`(tenant_id, source_direct_decision_id) → contract.preparation_decision(tenant_id, preparation_decision_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_preparation_draft__root`：列`(tenant_id, opportunity_id)`；唯一=`是`；谓词=`previous_draft_id IS NULL`。每个商机只有一个草稿根。
+
+### `contract.template_version`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, template_version_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `template_version_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `document_code` | `varchar(64)` | 否 | `—` | 受控文档代码。 |
+| `version_no` | `integer` | 否 | `—` | 已审核文档版本。 |
+| `evidence_version_id` | `uuid` | 否 | `—` | 真实T06原件版本。 |
+| `body_sha256` | `bytea` | 否 | `—` | 真实文档字节摘要。 |
+| `approved_by_appointment_id` | `uuid` | 否 | `—` | 有权审核者。 |
+| `approved_at` | `timestamptz(6)` | 否 | `—` | 真实审核时间。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+
+约束：
+
+- `ck_template_version__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_template_version__code_version`（`UNIQUE`：`tenant_id, document_code, version_no`）：已审核文档版本唯一。
+- `ck_template_version__version`（`CHECK`：`version_no>0 AND approved_at<=created_at`）：真实审核版本和时间。
+- `ck_template_version__body_sha256_length`（`CHECK`：`octet_length(body_sha256) = 32`）：摘要格式：body_sha256必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_template_version__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_template_version__evidence_version_id`：`(tenant_id, evidence_version_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+- `fk_template_version__approved_by_appointment_id`：`(tenant_id, approved_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `contract.clause_version`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, clause_version_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `clause_version_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `document_code` | `varchar(64)` | 否 | `—` | 受控文档代码。 |
+| `version_no` | `integer` | 否 | `—` | 已审核文档版本。 |
+| `evidence_version_id` | `uuid` | 否 | `—` | 真实T06原件版本。 |
+| `body_sha256` | `bytea` | 否 | `—` | 真实文档字节摘要。 |
+| `approved_by_appointment_id` | `uuid` | 否 | `—` | 有权审核者。 |
+| `approved_at` | `timestamptz(6)` | 否 | `—` | 真实审核时间。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+
+约束：
+
+- `ck_clause_version__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_clause_version__code_version`（`UNIQUE`：`tenant_id, document_code, version_no`）：已审核文档版本唯一。
+- `ck_clause_version__version`（`CHECK`：`version_no>0 AND approved_at<=created_at`）：真实审核版本和时间。
+- `ck_clause_version__body_sha256_length`（`CHECK`：`octet_length(body_sha256) = 32`）：摘要格式：body_sha256必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_clause_version__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_clause_version__evidence_version_id`：`(tenant_id, evidence_version_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+- `fk_clause_version__approved_by_appointment_id`：`(tenant_id, approved_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `contract.revision_clause`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, revision_clause_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `revision_clause_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 准确合同版本。 |
+| `clause_version_id` | `uuid` | 否 | `—` | 准确已审核条款。 |
+| `clause_no` | `integer` | 否 | `—` | 版本内顺序。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+
+约束：
+
+- `ck_revision_clause__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_revision_clause__number`（`UNIQUE`：`tenant_id, contract_revision_id, clause_no`）：序号唯一。
+- `uq_revision_clause__clause`（`UNIQUE`：`tenant_id, contract_revision_id, clause_version_id`）：条款唯一。
+- `ck_revision_clause__no`（`CHECK`：`clause_no BETWEEN 1 AND 200`）：有界条款集合。
+
+物理外键：
+
+- `fk_revision_clause__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_revision_clause__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_revision_clause__clause_version_id`：`(tenant_id, clause_version_id) → contract.clause_version(tenant_id, clause_version_id)`。同租户准确事实引用。
+
+### `contract.revision_review_request`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, revision_review_request_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `revision_review_request_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 请求审查的准确版本。 |
+| `scope_hash` | `bytea` | 否 | `—` | 本次准确审查范围。 |
+| `requested_by_appointment_id` | `uuid` | 否 | `—` | 提交任职。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+| `previous_request_id` | `uuid` | 是 | `—` | 前次补正审查申请。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+
+约束：
+
+- `ck_revision_review_request__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_revision_review_request__scope_hash_length`（`CHECK`：`octet_length(scope_hash) = 32`）：摘要格式：scope_hash必须保存32字节的规范二进制值。
+- `uq_revision_review_request__previous_request_id`（`UNIQUE`：`tenant_id, previous_request_id`）：准确事实唯一。
+- `ck_revision_review_request__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+
+物理外键：
+
+- `fk_revision_review_request__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_revision_review_request__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_revision_review_request__requested_by_appointment_id`：`(tenant_id, requested_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_revision_review_request__previous_request_id`：`(tenant_id, previous_request_id) → contract.revision_review_request(tenant_id, revision_review_request_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_revision_review_request__root`：列`(tenant_id, contract_revision_id)`；唯一=`是`；谓词=`previous_request_id IS NULL`。每版只有一个审查申请根。
+
+### `contract.revision_review_decision`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, revision_review_decision_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `revision_review_decision_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `request_id` | `uuid` | 否 | `—` | 准确审查申请。 |
+| `conflict_review_id` | `uuid` | 否 | `—` | 真实独立冲突审查。 |
+| `decision_code` | `varchar(64)` | 否 | `—` | 审查结果CLEAR/WAIVED/NEED_INFO/BLOCKED。 |
+| `scope_hash` | `bytea` | 否 | `—` | 准确范围。 |
+| `resolution_digest` | `bytea` | 是 | `—` | 准确结论摘要；补正阻断可空。 |
+| `decided_by_appointment_id` | `uuid` | 否 | `—` | 实际审查任职。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+
+约束：
+
+- `ck_revision_review_decision__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_revision_review_decision__request_id`（`UNIQUE`：`tenant_id, request_id`）：准确事实唯一。
+- `ck_revision_review_decision__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `ck_revision_review_decision__code`（`CHECK`：`decision_code IN ('CLEAR','WAIVED','NEED_INFO','BLOCKED') AND (decision_code NOT IN ('CLEAR','WAIVED') OR resolution_digest IS NOT NULL)`）：通过必须有准确结论依据。
+- `ck_revision_review_decision__scope_hash_length`（`CHECK`：`octet_length(scope_hash) = 32`）：摘要格式：scope_hash必须保存32字节的规范二进制值。
+- `ck_revision_review_decision__resolution_digest_length`（`CHECK`：`octet_length(resolution_digest) = 32`）：摘要格式：resolution_digest必须保存32字节的规范二进制值。
+- `ck_revision_review_decision__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_revision_review_decision__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_revision_review_decision__request_id`：`(tenant_id, request_id) → contract.revision_review_request(tenant_id, revision_review_request_id)`。同租户准确事实引用。
+- `fk_revision_review_decision__conflict_review_id`：`(tenant_id, conflict_review_id) → conflict.conflict_review(tenant_id, conflict_review_id)`。同租户准确事实引用。
+- `fk_revision_review_decision__decided_by_appointment_id`：`(tenant_id, decided_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `contract.revision_review_binding`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, revision_review_binding_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `revision_review_binding_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 被放行版本。 |
+| `review_decision_id` | `uuid` | 否 | `—` | 真实通过决定。 |
+| `conflict_review_id` | `uuid` | 否 | `—` | 准确审查。 |
+| `scope_hash` | `bytea` | 否 | `—` | 准确审查范围。 |
+| `resolution_digest` | `bytea` | 否 | `—` | 准确可用结论。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+
+约束：
+
+- `ck_revision_review_binding__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_revision_review_binding__contract_revision_id`（`UNIQUE`：`tenant_id, contract_revision_id`）：准确事实唯一。
+- `uq_revision_review_binding__review_decision_id`（`UNIQUE`：`tenant_id, review_decision_id`）：准确事实唯一。
+- `ck_revision_review_binding__scope_hash_length`（`CHECK`：`octet_length(scope_hash) = 32`）：摘要格式：scope_hash必须保存32字节的规范二进制值。
+- `ck_revision_review_binding__resolution_digest_length`（`CHECK`：`octet_length(resolution_digest) = 32`）：摘要格式：resolution_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_revision_review_binding__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_revision_review_binding__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_revision_review_binding__review_decision_id`：`(tenant_id, review_decision_id) → contract.revision_review_decision(tenant_id, revision_review_decision_id)`。同租户准确事实引用。
+- `fk_revision_review_binding__conflict_review_id`：`(tenant_id, conflict_review_id) → conflict.conflict_review(tenant_id, conflict_review_id)`。同租户准确事实引用。
+
+### `contract.revision_approval_requirement`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, revision_approval_requirement_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `revision_approval_requirement_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 准确版本。 |
+| `requirement_code` | `varchar(64)` | 否 | `—` | 明确审批要求。 |
+| `approver_appointment_id` | `uuid` | 否 | `—` | 明确审批任职。 |
+| `policy_digest` | `bytea` | 否 | `—` | 本版审批策略摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+| `policy_id` | `uuid` | 否 | `—` | 本版明确合同审批策略。 |
+
+约束：
+
+- `ck_revision_approval_requirement__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_revision_approval_requirement__code`（`UNIQUE`：`tenant_id, contract_revision_id, requirement_code`）：审批要求唯一。
+- `ck_revision_approval_requirement__policy_digest_length`（`CHECK`：`octet_length(policy_digest) = 32`）：摘要格式：policy_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_revision_approval_requirement__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_revision_approval_requirement__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_revision_approval_requirement__approver_appointment_id`：`(tenant_id, approver_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_revision_approval_requirement__policy_id`：`(tenant_id, policy_id) → contract.approval_policy(tenant_id, approval_policy_id)`。同租户准确事实引用。
+
+### `contract.revision_approval_decision`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, revision_approval_decision_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `revision_approval_decision_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `requirement_id` | `uuid` | 否 | `—` | 准确审批要求。 |
+| `review_binding_id` | `uuid` | 否 | `—` | 本版通过审查。 |
+| `decision_code` | `varchar(64)` | 否 | `—` | 批准或退回。 |
+| `decided_by_appointment_id` | `uuid` | 否 | `—` | 实际审批任职。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+| `approval_request_id` | `uuid` | 否 | `—` | 正式提交的准确审批申请。 |
+
+约束：
+
+- `ck_revision_approval_decision__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_revision_approval_decision__requirement_id`（`UNIQUE`：`tenant_id, requirement_id`）：准确事实唯一。
+- `ck_revision_approval_decision__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `ck_revision_approval_decision__code`（`CHECK`：`decision_code IN ('APPROVED','RETURNED')`）：明确审批结果。
+- `ck_revision_approval_decision__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_revision_approval_decision__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_revision_approval_decision__requirement_id`：`(tenant_id, requirement_id) → contract.revision_approval_requirement(tenant_id, revision_approval_requirement_id)`。同租户准确事实引用。
+- `fk_revision_approval_decision__review_binding_id`：`(tenant_id, review_binding_id) → contract.revision_review_binding(tenant_id, revision_review_binding_id)`。同租户准确事实引用。
+- `fk_revision_approval_decision__decided_by_appointment_id`：`(tenant_id, decided_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_revision_approval_decision__approval_request_id`：`(tenant_id, approval_request_id) → contract.revision_approval_request(tenant_id, revision_approval_request_id)`。同租户准确事实引用。
+
+### `contract.signature_readiness`
+
+T08准确不可变事实；不是签署或执行事实。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, signature_readiness_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `signature_readiness_id` | `uuid` | 否 | `—` | T08准确不可变事实；不是签署或执行事实。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 已完成审查与审批的准确当前版本。 |
+| `review_binding_id` | `uuid` | 否 | `—` | 本版通过审查依据。 |
+| `state_code` | `varchar(64)` | 否 | `—` | 明确下一阶段交接边界；不创建签署待办。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库形成时间。 |
+
+约束：
+
+- `ck_signature_readiness__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_signature_readiness__contract_revision_id`（`UNIQUE`：`tenant_id, contract_revision_id`）：准确事实唯一。
+- `ck_signature_readiness__state`（`CHECK`：`state_code='READY_FOR_SIGNATURE'`）：等待下一阶段，不是已签署。
+
+物理外键：
+
+- `fk_signature_readiness__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_signature_readiness__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_signature_readiness__review_binding_id`：`(tenant_id, review_binding_id) → contract.revision_review_binding(tenant_id, revision_review_binding_id)`。同租户准确事实引用。
+
+### `contract.template_signing_party`
+
+审核模板同事务冻结的律所签约主体；不得为旧模板补造绑定。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, template_signing_party_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `template_signing_party_id` | `uuid` | 否 | `—` | 审核模板同事务冻结的律所签约主体；不得为旧模板补造绑定。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `template_version_id` | `uuid` | 否 | `—` | 准确审核模板。 |
+| `party_id` | `uuid` | 否 | `—` | 真实律所主体。 |
+| `party_revision` | `bigint` | 否 | `—` | 批准时主体版本。 |
+| `profile_version_id` | `uuid` | 否 | `—` | 准确不可变主体资料。 |
+| `party_snapshot_digest` | `bytea` | 否 | `—` | 资料身份规范摘要。 |
+| `role_code` | `varchar(64)` | 否 | `—` | 明确模板签署角色FIRM。 |
+| `created_by_appointment_id` | `uuid` | 否 | `—` | 与模板审核者相同的任职。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库冻结时间。 |
+
+约束：
+
+- `ck_template_signing_party__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_template_signing_party__template_role`（`UNIQUE`：`tenant_id, template_version_id, role_code`）：模板内律所角色唯一。
+- `uq_template_signing_party__template_party`（`UNIQUE`：`tenant_id, template_version_id, party_id`）：模板主体唯一。
+- `ck_template_signing_party__values`（`CHECK`：`role_code='FIRM' AND party_revision BETWEEN 0 AND 9007199254740991`）：明确律所绑定及准确资料版本。
+- `ck_template_signing_party__party_snapshot_digest_length`（`CHECK`：`octet_length(party_snapshot_digest) = 32`）：摘要格式：party_snapshot_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_template_signing_party__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_template_signing_party__template_version_id`：`(tenant_id, template_version_id) → contract.template_version(tenant_id, template_version_id)`。同租户准确事实引用。
+- `fk_template_signing_party__party_id`：`(tenant_id, party_id) → party.party(tenant_id, party_id)`。同租户准确事实引用。
+- `fk_template_signing_party__profile_version_id`：`(tenant_id, profile_version_id) → party.profile_version(tenant_id, profile_version_id)`。同租户准确事实引用。
+- `fk_template_signing_party__created_by_appointment_id`：`(tenant_id, created_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `contract.signature_arrangement`
+
+人工签署不可变准确事实；不是合同执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, signature_arrangement_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `signature_arrangement_id` | `uuid` | 否 | `—` | 人工签署不可变准确事实；不是合同执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `readiness_id` | `uuid` | 否 | `—` | 准确签署准备依据。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 批准正文版本。 |
+| `previous_arrangement_id` | `uuid` | 是 | `—` | 同正文安排补正前序。 |
+| `registered_by_appointment_id` | `uuid` | 否 | `—` | 登记任职。 |
+| `slot_count` | `integer` | 否 | `—` | 完整明确槽数量。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_signature_arrangement__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_signature_arrangement__previous_arrangement_id`（`UNIQUE`：`tenant_id, previous_arrangement_id`）：准确事实唯一。
+- `ck_signature_arrangement__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `ck_signature_arrangement__count`（`CHECK`：`slot_count BETWEEN 1 AND 100`）：有限非空安排。
+- `ck_signature_arrangement__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_signature_arrangement__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_signature_arrangement__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_signature_arrangement__readiness_id`：`(tenant_id, readiness_id) → contract.signature_readiness(tenant_id, signature_readiness_id)`。同租户准确事实引用。
+- `fk_signature_arrangement__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_signature_arrangement__previous_arrangement_id`：`(tenant_id, previous_arrangement_id) → contract.signature_arrangement(tenant_id, signature_arrangement_id)`。同租户准确事实引用。
+- `fk_signature_arrangement__registered_by_appointment_id`：`(tenant_id, registered_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_signature_arrangement__root`：列`(tenant_id, readiness_id)`；唯一=`是`；谓词=`previous_arrangement_id IS NULL`。同一准确依据唯一链根。
+
+### `contract.signature_draft`
+
+人工签署不可变准确事实；不是合同执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, signature_draft_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `signature_draft_id` | `uuid` | 否 | `—` | 人工签署不可变准确事实；不是合同执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `readiness_id` | `uuid` | 否 | `—` | 准确签署准备依据。 |
+| `arrangement_id` | `uuid` | 是 | `—` | 已登记安排；登记前草稿为空。 |
+| `previous_draft_id` | `uuid` | 是 | `—` | 上一不可变草稿。 |
+| `saved_by_appointment_id` | `uuid` | 否 | `—` | 保存任职。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_signature_draft__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_signature_draft__previous_draft_id`（`UNIQUE`：`tenant_id, previous_draft_id`）：准确事实唯一。
+- `ck_signature_draft__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `ck_signature_draft__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_signature_draft__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_signature_draft__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_signature_draft__readiness_id`：`(tenant_id, readiness_id) → contract.signature_readiness(tenant_id, signature_readiness_id)`。同租户准确事实引用。
+- `fk_signature_draft__arrangement_id`：`(tenant_id, arrangement_id) → contract.signature_arrangement(tenant_id, signature_arrangement_id)`。同租户准确事实引用。
+- `fk_signature_draft__previous_draft_id`：`(tenant_id, previous_draft_id) → contract.signature_draft(tenant_id, signature_draft_id)`。同租户准确事实引用。
+- `fk_signature_draft__saved_by_appointment_id`：`(tenant_id, saved_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_signature_draft__root`：列`(tenant_id, readiness_id)`；唯一=`是`；谓词=`previous_draft_id IS NULL`。同一准确依据唯一链根。
+
+### `contract.signature_submission`
+
+人工签署不可变准确事实；不是合同执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, signature_submission_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `signature_submission_id` | `uuid` | 否 | `—` | 人工签署不可变准确事实；不是合同执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `arrangement_id` | `uuid` | 否 | `—` | 准确安排。 |
+| `signature_plan_id` | `uuid` | 否 | `—` | 准确计划槽。 |
+| `previous_submission_id` | `uuid` | 是 | `—` | 同槽前次补证。 |
+| `submitted_by_appointment_id` | `uuid` | 否 | `—` | 提交任职。 |
+| `material_version_id` | `uuid` | 否 | `—` | 正式已接收签字件。 |
+| `authority_material_version_id` | `uuid` | 否 | `—` | 正式权限材料。 |
+| `material_sha256` | `bytea` | 否 | `—` | 签字文件字节摘要。 |
+| `authority_material_sha256` | `bytea` | 否 | `—` | 权限文件字节摘要。 |
+| `approved_body_sha256` | `bytea` | 否 | `—` | 批准正文摘要；无需等于签字文件。 |
+| `signed_at` | `timestamptz(6)` | 否 | `—` | 实际签署业务时间。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_signature_submission__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_signature_submission__previous_submission_id`（`UNIQUE`：`tenant_id, previous_submission_id`）：准确事实唯一。
+- `ck_signature_submission__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `ck_signature_submission__time`（`CHECK`：`signed_at<=created_at`）：业务时间不晚于系统记录。
+- `ck_signature_submission__material_sha256_length`（`CHECK`：`octet_length(material_sha256) = 32`）：摘要格式：material_sha256必须保存32字节的规范二进制值。
+- `ck_signature_submission__authority_material_sha256_length`（`CHECK`：`octet_length(authority_material_sha256) = 32`）：摘要格式：authority_material_sha256必须保存32字节的规范二进制值。
+- `ck_signature_submission__approved_body_sha256_length`（`CHECK`：`octet_length(approved_body_sha256) = 32`）：摘要格式：approved_body_sha256必须保存32字节的规范二进制值。
+- `ck_signature_submission__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_signature_submission__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_signature_submission__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_signature_submission__arrangement_id`：`(tenant_id, arrangement_id) → contract.signature_arrangement(tenant_id, signature_arrangement_id)`。同租户准确事实引用。
+- `fk_signature_submission__signature_plan_id`：`(tenant_id, signature_plan_id) → contract.signature_plan(tenant_id, signature_plan_id)`。同租户准确事实引用。
+- `fk_signature_submission__previous_submission_id`：`(tenant_id, previous_submission_id) → contract.signature_submission(tenant_id, signature_submission_id)`。同租户准确事实引用。
+- `fk_signature_submission__submitted_by_appointment_id`：`(tenant_id, submitted_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_signature_submission__material_version_id`：`(tenant_id, material_version_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+- `fk_signature_submission__authority_material_version_id`：`(tenant_id, authority_material_version_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_signature_submission__root`：列`(tenant_id, signature_plan_id)`；唯一=`是`；谓词=`previous_submission_id IS NULL`。同一准确依据唯一链根。
+
+### `contract.signature_verification`
+
+人工签署不可变准确事实；不是合同执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, signature_verification_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `signature_verification_id` | `uuid` | 否 | `—` | 人工签署不可变准确事实；不是合同执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `submission_id` | `uuid` | 否 | `—` | 准确不可变提交。 |
+| `verified_by_appointment_id` | `uuid` | 否 | `—` | 有权核验任职。 |
+| `decision_code` | `varchar(64)` | 否 | `—` | 准确核验结论。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_signature_verification__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_signature_verification__submission_id`（`UNIQUE`：`tenant_id, submission_id`）：准确事实唯一。
+- `ck_signature_verification__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `ck_signature_verification__decision`（`CHECK`：`decision_code IN ('VERIFIED','NEED_INFO','REVISION_REQUIRED','ARRANGEMENT_CORRECTION')`）：明确结果，不直接等于全合同完成。
+- `ck_signature_verification__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_signature_verification__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_signature_verification__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_signature_verification__submission_id`：`(tenant_id, submission_id) → contract.signature_submission(tenant_id, signature_submission_id)`。同租户准确事实引用。
+- `fk_signature_verification__verified_by_appointment_id`：`(tenant_id, verified_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `contract.signature_archive`
+
+人工签署不可变准确事实；不是合同执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, signature_archive_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `signature_archive_id` | `uuid` | 否 | `—` | 人工签署不可变准确事实；不是合同执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `arrangement_id` | `uuid` | 否 | `—` | 全部必要签署的准确安排。 |
+| `material_version_id` | `uuid` | 否 | `—` | 完整正式归档文件。 |
+| `archived_by_appointment_id` | `uuid` | 否 | `—` | 归档任职。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_signature_archive__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_signature_archive__arrangement_id`（`UNIQUE`：`tenant_id, arrangement_id`）：准确事实唯一。
+- `ck_signature_archive__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `ck_signature_archive__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_signature_archive__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_signature_archive__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_signature_archive__arrangement_id`：`(tenant_id, arrangement_id) → contract.signature_arrangement(tenant_id, signature_arrangement_id)`。同租户准确事实引用。
+- `fk_signature_archive__material_version_id`：`(tenant_id, material_version_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+- `fk_signature_archive__archived_by_appointment_id`：`(tenant_id, archived_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `contract.signature_revision_return`
+
+人工签署不可变准确事实；不是合同执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, signature_revision_return_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `signature_revision_return_id` | `uuid` | 否 | `—` | 人工签署不可变准确事实；不是合同执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `readiness_id` | `uuid` | 否 | `—` | 失效前准确准备依据。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 需要真实修订的正文。 |
+| `created_by_appointment_id` | `uuid` | 否 | `—` | 退回任职。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_signature_revision_return__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_signature_revision_return__readiness_id`（`UNIQUE`：`tenant_id, readiness_id`）：准确事实唯一。
+- `ck_signature_revision_return__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `ck_signature_revision_return__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_signature_revision_return__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_signature_revision_return__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_signature_revision_return__readiness_id`：`(tenant_id, readiness_id) → contract.signature_readiness(tenant_id, signature_readiness_id)`。同租户准确事实引用。
+- `fk_signature_revision_return__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_signature_revision_return__created_by_appointment_id`：`(tenant_id, created_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `contract.signature_workflow`
+
+人工签署不可变准确事实；不是合同执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, signature_workflow_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `signature_workflow_id` | `uuid` | 否 | `—` | 人工签署不可变准确事实；不是合同执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `readiness_id` | `uuid` | 否 | `—` | 唯一消费准确准备依据。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 准确批准正文。 |
+| `previous_workflow_id` | `uuid` | 是 | `—` | CAS直接前序流程。 |
+| `stage_code` | `varchar(64)` | 否 | `—` | 真实办理阶段。 |
+| `owner_appointment_id` | `uuid` | 是 | `—` | 实际责任任职；异常可空。 |
+| `task_id` | `uuid` | 是 | `—` | 可办理待办；终态无占位任务。 |
+| `prior_task_id` | `uuid` | 是 | `—` | 前序待办。 |
+| `arrangement_id` | `uuid` | 是 | `—` | 准确当前安排。 |
+| `submission_id` | `uuid` | 是 | `—` | 等待核验的准确提交。 |
+| `created_by_appointment_id` | `uuid` | 否 | `—` | 实际写入任职。 |
+| `due_at` | `timestamptz(6)` | 否 | `—` | 原责任期限，恢复不延长。 |
+| `recovery_resume_stage` | `varchar(64)` | 是 | `—` | 异常恢复原阶段。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_signature_workflow__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_signature_workflow__previous_workflow_id`（`UNIQUE`：`tenant_id, previous_workflow_id`）：准确事实唯一。
+- `ck_signature_workflow__stage`（`CHECK`：`stage_code IN ('ARRANGE','COLLECT','AWAIT_VERIFICATION','SUPPLEMENT','PARTIAL','ARCHIVE','SIGNATURE_COMPLETE','REVISION_REQUIRED','OWNER_EXCEPTION') AND (stage_code NOT IN ('SIGNATURE_COMPLETE','REVISION_REQUIRED','OWNER_EXCEPTION') OR task_id IS NULL) AND (stage_code IN ('OWNER_EXCEPTION','SIGNATURE_COMPLETE','REVISION_REQUIRED') OR owner_appointment_id IS NOT NULL)`）：终态不创建不可办理占位任务。
+- `ck_signature_workflow__recovery`（`CHECK`：`recovery_resume_stage IS NULL OR (stage_code='OWNER_EXCEPTION' AND recovery_resume_stage IN ('ARRANGE','COLLECT','AWAIT_VERIFICATION','SUPPLEMENT','PARTIAL','ARCHIVE','SIGNATURE_COMPLETE','REVISION_REQUIRED'))`）：异常保留准确恢复阶段。
+
+物理外键：
+
+- `fk_signature_workflow__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_signature_workflow__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_signature_workflow__readiness_id`：`(tenant_id, readiness_id) → contract.signature_readiness(tenant_id, signature_readiness_id)`。同租户准确事实引用。
+- `fk_signature_workflow__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_signature_workflow__previous_workflow_id`：`(tenant_id, previous_workflow_id) → contract.signature_workflow(tenant_id, signature_workflow_id)`。同租户准确事实引用。
+- `fk_signature_workflow__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_signature_workflow__created_by_appointment_id`：`(tenant_id, created_by_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_signature_workflow__task_id`：`(tenant_id, task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_signature_workflow__prior_task_id`：`(tenant_id, prior_task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_signature_workflow__arrangement_id`：`(tenant_id, arrangement_id) → contract.signature_arrangement(tenant_id, signature_arrangement_id)`。同租户准确事实引用。
+- `fk_signature_workflow__submission_id`：`(tenant_id, submission_id) → contract.signature_submission(tenant_id, signature_submission_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_signature_workflow__root`：列`(tenant_id, readiness_id)`；唯一=`是`；谓词=`previous_workflow_id IS NULL`。同一准确依据唯一链根。
+
+### `contract.signature_handoff`
+
+人工签署不可变准确事实；不是合同执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, signature_handoff_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `signature_handoff_id` | `uuid` | 否 | `—` | 人工签署不可变准确事实；不是合同执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `readiness_id` | `uuid` | 否 | `—` | 已消费准备依据。 |
+| `arrangement_id` | `uuid` | 否 | `—` | 已全部核验的安排。 |
+| `archive_id` | `uuid` | 否 | `—` | 准确完整归档。 |
+| `state_code` | `varchar(64)` | 否 | `—` | 持久化后续等待边界。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_signature_handoff__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_signature_handoff__readiness_id`（`UNIQUE`：`tenant_id, readiness_id`）：准确事实唯一。
+- `uq_signature_handoff__arrangement_id`（`UNIQUE`：`tenant_id, arrangement_id`）：准确事实唯一。
+- `uq_signature_handoff__archive_id`（`UNIQUE`：`tenant_id, archive_id`）：准确事实唯一。
+- `ck_signature_handoff__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `ck_signature_handoff__state`（`CHECK`：`state_code='AWAITING_EXECUTION_CONDITIONS'`）：不等于合同执行、到账或建案。
+- `ck_signature_handoff__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_signature_handoff__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_signature_handoff__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_signature_handoff__readiness_id`：`(tenant_id, readiness_id) → contract.signature_readiness(tenant_id, signature_readiness_id)`。同租户准确事实引用。
+- `fk_signature_handoff__arrangement_id`：`(tenant_id, arrangement_id) → contract.signature_arrangement(tenant_id, signature_arrangement_id)`。同租户准确事实引用。
+- `fk_signature_handoff__archive_id`：`(tenant_id, archive_id) → contract.signature_archive(tenant_id, signature_archive_id)`。同租户准确事实引用。
+
+### `contract.negotiation_disposition`
+
+销售办理处置的不可变准确事实；不解除合同或撤销执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, negotiation_disposition_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `negotiation_disposition_id` | `uuid` | 否 | `—` | 销售办理处置的不可变准确事实；不解除合同或撤销执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 销售主线。 |
+| `opportunity_revision` | `bigint` | 否 | `—` | 准确商机修订。 |
+| `previous_disposition_id` | `uuid` | 是 | `—` | 直接前序处置，单链。 |
+| `request_disposition_id` | `uuid` | 是 | `—` | 主管处置所核对的准确请求。 |
+| `kind` | `varchar(64)` | 否 | `—` | STOP_UNSIGNED/REQUEST_REVIEW/STOP_REVIEWED/CONTINUE。 |
+| `contract_id` | `uuid` | 是 | `—` | 当前合同身份；直接授权申请阶段可空。 |
+| `contract_revision` | `bigint` | 是 | `—` | 合同身份准确修订。 |
+| `contract_version_id` | `uuid` | 是 | `—` | 准确合同正文版本。 |
+| `preparation_workflow_id` | `uuid` | 否 | `—` | 准确准备办理依据。 |
+| `signature_workflow_id` | `uuid` | 是 | `—` | 当前签署办理依据。 |
+| `recorded_by` | `uuid` | 否 | `—` | 实际申请或核对任职。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库可信记录时间。 |
+
+约束：
+
+- `ck_negotiation_disposition__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_negotiation_disposition__previous_disposition_id`（`UNIQUE`：`tenant_id, previous_disposition_id`）：引用只能接续一次。
+- `ck_negotiation_disposition__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `ck_negotiation_disposition__shape`（`CHECK`：`opportunity_revision BETWEEN 0 AND 9007199254740991 AND ((contract_id IS NULL AND contract_revision IS NULL AND contract_version_id IS NULL) OR (contract_id IS NOT NULL AND contract_revision BETWEEN 0 AND 9007199254740991)) AND ((kind IN ('STOP_UNSIGNED','REQUEST_REVIEW') AND request_disposition_id IS NULL) OR (kind IN ('STOP_REVIEWED','CONTINUE') AND request_disposition_id=previous_disposition_id AND request_disposition_id IS NOT NULL))`）：明确形状与准确版本。
+- `ck_negotiation_disposition__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_negotiation_disposition__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_negotiation_disposition__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_negotiation_disposition__previous_disposition_id`：`(tenant_id, previous_disposition_id) → contract.negotiation_disposition(tenant_id, negotiation_disposition_id)`。同租户准确事实引用。
+- `fk_negotiation_disposition__request_disposition_id`：`(tenant_id, request_disposition_id) → contract.negotiation_disposition(tenant_id, negotiation_disposition_id)`。同租户准确事实引用。
+- `fk_negotiation_disposition__contract_id`：`(tenant_id, contract_id) → contract.contract(tenant_id, contract_id)`。同租户准确事实引用。
+- `fk_negotiation_disposition__contract_version_id`：`(tenant_id, contract_version_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_negotiation_disposition__preparation_workflow_id`：`(tenant_id, preparation_workflow_id) → contract.preparation_workflow(tenant_id, preparation_workflow_id)`。同租户准确事实引用。
+- `fk_negotiation_disposition__signature_workflow_id`：`(tenant_id, signature_workflow_id) → contract.signature_workflow(tenant_id, signature_workflow_id)`。同租户准确事实引用。
+- `fk_negotiation_disposition__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_negotiation_disposition__root`：列`(tenant_id, opportunity_id)`；唯一=`是`；谓词=`previous_disposition_id IS NULL`。每条销售主线仅一个处置链根。
+
+### `contract.termination_review_assignment`
+
+销售办理处置的不可变准确事实；不解除合同或撤销执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, termination_review_assignment_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `termination_review_assignment_id` | `uuid` | 否 | `—` | 销售办理处置的不可变准确事实；不解除合同或撤销执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `request_id` | `uuid` | 否 | `—` | 准确终止核对请求。 |
+| `previous_assignment_id` | `uuid` | 是 | `—` | 直接前序责任安排。 |
+| `owner_appointment_id` | `uuid` | 是 | `—` | 有权主管；未配置时为空。 |
+| `task_id` | `uuid` | 是 | `—` | 实际主管任务；未配置时为空。 |
+| `due_at` | `timestamptz(6)` | 否 | `—` | 原核对期限，重新分配不延长。 |
+| `recorded_by` | `uuid` | 否 | `—` | 申请者或恢复服务任职。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库可信记录时间。 |
+
+约束：
+
+- `ck_termination_review_assignment__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_termination_review_assignment__previous_assignment_id`（`UNIQUE`：`tenant_id, previous_assignment_id`）：引用只能接续一次。
+- `uq_termination_review_assignment__task_id`（`UNIQUE`：`tenant_id, task_id`）：引用只能接续一次。
+- `ck_termination_review_assignment__owner`（`CHECK`：`(owner_appointment_id IS NULL)=(task_id IS NULL)`）：无主管不伪造可办理任务。
+
+物理外键：
+
+- `fk_termination_review_assignment__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_termination_review_assignment__request_id`：`(tenant_id, request_id) → contract.negotiation_disposition(tenant_id, negotiation_disposition_id)`。同租户准确事实引用。
+- `fk_termination_review_assignment__previous_assignment_id`：`(tenant_id, previous_assignment_id) → contract.termination_review_assignment(tenant_id, termination_review_assignment_id)`。同租户准确事实引用。
+- `fk_termination_review_assignment__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_termination_review_assignment__task_id`：`(tenant_id, task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_termination_review_assignment__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_termination_review_assignment__root`：列`(tenant_id, request_id)`；唯一=`是`；谓词=`previous_assignment_id IS NULL`。每个请求一个责任安排链根。
+
+### `contract.negotiation_cancelled_task`
+
+销售办理处置的不可变准确事实；不解除合同或撤销执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, negotiation_cancelled_task_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `negotiation_cancelled_task_id` | `uuid` | 否 | `—` | 销售办理处置的不可变准确事实；不解除合同或撤销执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `disposition_id` | `uuid` | 否 | `—` | 停止或暂停的准确依据。 |
+| `task_id` | `uuid` | 否 | `—` | 原未完成责任。 |
+| `task_revision` | `bigint` | 否 | `—` | 取消前准确修订。 |
+| `prior_state` | `varchar(64)` | 否 | `—` | 取消前OPEN/WAITING。 |
+| `wait_id` | `uuid` | 是 | `—` | WAITING的末端等待。 |
+| `wait_hash` | `bytea` | 是 | `—` | 准确等待摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库可信记录时间。 |
+
+约束：
+
+- `ck_negotiation_cancelled_task__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_negotiation_cancelled_task__task_id`（`UNIQUE`：`tenant_id, task_id`）：引用只能接续一次。
+- `ck_negotiation_cancelled_task__state`（`CHECK`：`task_revision BETWEEN 0 AND 9007199254740990 AND ((prior_state='OPEN' AND wait_id IS NULL AND wait_hash IS NULL) OR (prior_state='WAITING' AND wait_id IS NOT NULL AND wait_hash IS NOT NULL))`）：准确取消集合。
+- `ck_negotiation_cancelled_task__wait_hash_length`（`CHECK`：`octet_length(wait_hash) = 32`）：摘要格式：wait_hash必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_negotiation_cancelled_task__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_negotiation_cancelled_task__disposition_id`：`(tenant_id, disposition_id) → contract.negotiation_disposition(tenant_id, negotiation_disposition_id)`。同租户准确事实引用。
+- `fk_negotiation_cancelled_task__task_id`：`(tenant_id, task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_negotiation_cancelled_task__wait_id`：`(tenant_id, wait_id) → responsibility.wait_receipt(tenant_id, wait_receipt_id)`。同租户准确事实引用。
+
+### `contract.execution_verification`
+
+执行条件办理不可变事实；不代替到账或合同执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, execution_verification_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `execution_verification_id` | `uuid` | 否 | `—` | 执行条件办理不可变事实；不代替到账或合同执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确销售主线。 |
+| `handoff_id` | `uuid` | 否 | `—` | 准确签署归档交接。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 批准合同版本。 |
+| `recorded_by` | `uuid` | 否 | `—` | 人工核验任职。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_execution_verification__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_execution_verification__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `ck_execution_verification__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_execution_verification__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_execution_verification__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_execution_verification__handoff_id`：`(tenant_id, handoff_id) → contract.signature_handoff(tenant_id, signature_handoff_id)`。同租户准确事实引用。
+- `fk_execution_verification__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_execution_verification__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `contract.execution_workflow`
+
+执行条件办理不可变事实；不代替到账或合同执行。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, execution_workflow_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `execution_workflow_id` | `uuid` | 否 | `—` | 执行条件办理不可变事实；不代替到账或合同执行。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确销售主线。 |
+| `handoff_id` | `uuid` | 否 | `—` | 唯一归档交接来源。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 当前批准合同版本。 |
+| `previous_workflow_id` | `uuid` | 是 | `—` | 直接前序责任；根为空。 |
+| `stage_code` | `varchar(64)` | 否 | `—` | 执行条件办理阶段。 |
+| `owner_appointment_id` | `uuid` | 是 | `—` | 合格责任人；异常为空。 |
+| `task_id` | `uuid` | 是 | `—` | 可办理责任；异常或完成为空。 |
+| `verification_id` | `uuid` | 是 | `—` | 已人工核验条件。 |
+| `execution_id` | `uuid` | 是 | `—` | 满足门禁后的合同执行事实。 |
+| `recorded_by` | `uuid` | 否 | `—` | 办理者或恢复服务任职。 |
+| `due_at` | `timestamptz(6)` | 否 | `—` | 首次交接确定的原期限，恢复不延长。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_execution_workflow__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_execution_workflow__previous`（`UNIQUE`：`tenant_id, previous_workflow_id`）：只允许一个后继。
+- `ck_execution_workflow__stage`（`CHECK`：`stage_code IN ('CHECK_CONDITIONS','WAIT_RECEIPT','READY_TRANSFER','OWNER_EXCEPTION') AND ((stage_code IN ('CHECK_CONDITIONS','WAIT_RECEIPT') AND owner_appointment_id IS NOT NULL AND task_id IS NOT NULL) OR (stage_code IN ('READY_TRANSFER','OWNER_EXCEPTION') AND task_id IS NULL)) AND (stage_code='READY_TRANSFER')=(execution_id IS NOT NULL) AND (stage_code<>'READY_TRANSFER' OR verification_id IS NOT NULL)`）：阶段与可办理责任一致。
+
+物理外键：
+
+- `fk_execution_workflow__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_execution_workflow__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_execution_workflow__handoff_id`：`(tenant_id, handoff_id) → contract.signature_handoff(tenant_id, signature_handoff_id)`。同租户准确事实引用。
+- `fk_execution_workflow__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_execution_workflow__previous_workflow_id`：`(tenant_id, previous_workflow_id) → contract.execution_workflow(tenant_id, execution_workflow_id)`。同租户准确事实引用。
+- `fk_execution_workflow__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_execution_workflow__task_id`：`(tenant_id, task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_execution_workflow__verification_id`：`(tenant_id, verification_id) → contract.execution_verification(tenant_id, execution_verification_id)`。同租户准确事实引用。
+- `fk_execution_workflow__execution_id`：`(tenant_id, execution_id) → contract.contract_execution(tenant_id, contract_execution_id)`。同租户准确事实引用。
+- `fk_execution_workflow__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_execution_workflow__root`：列`(tenant_id, handoff_id)`；唯一=`是`；谓词=`previous_workflow_id IS NULL`。交接只形成一个责任链根。
+
+### `contract.payment_request`
+
+收款办理不可变事实；独立于销售执行责任。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, payment_request_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `payment_request_id` | `uuid` | 否 | `—` | 收款办理不可变事实；独立于销售执行责任。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `handoff_id` | `uuid` | 否 | `—` | 准确签署归档交接。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 准确批准合同版本。 |
+| `material_version_id` | `uuid` | 是 | `—` | 后续逐笔核对的明确凭证；首项可空。 |
+| `recorded_by` | `uuid` | 否 | `—` | 发起任职。 |
+| `due_at` | `timestamptz(6)` | 否 | `—` | 本次责任原期限。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_payment_request__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_payment_request__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `ck_payment_request__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_payment_request__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_payment_request__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_payment_request__handoff_id`：`(tenant_id, handoff_id) → contract.signature_handoff(tenant_id, signature_handoff_id)`。同租户准确事实引用。
+- `fk_payment_request__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_payment_request__material_version_id`：`(tenant_id, material_version_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+- `fk_payment_request__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_payment_request__initial`：列`(tenant_id, handoff_id)`；唯一=`是`；谓词=`material_version_id IS NULL`。交接首项唯一。
+- `uq_payment_request__material`：列`(tenant_id, handoff_id, material_version_id)`；唯一=`是`；谓词=`material_version_id IS NOT NULL`。后续同版凭证不可重复起项。
+
+### `contract.payment_workflow`
+
+收款办理不可变事实；独立于销售执行责任。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, payment_workflow_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `payment_workflow_id` | `uuid` | 否 | `—` | 收款办理不可变事实；独立于销售执行责任。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `request_id` | `uuid` | 否 | `—` | 本次核对请求。 |
+| `previous_workflow_id` | `uuid` | 是 | `—` | 直接前序。 |
+| `stage_code` | `varchar(64)` | 否 | `—` | 财务核对、销售补正、结束或责任异常。 |
+| `target_stage_code` | `varchar(64)` | 否 | `—` | 责任异常时仍保留原办理环节。 |
+| `owner_appointment_id` | `uuid` | 是 | `—` | 责任任职。 |
+| `task_id` | `uuid` | 是 | `—` | 办理事项。 |
+| `review_id` | `uuid` | 是 | `—` | 触发本次变化的核对事实。 |
+| `recorded_by` | `uuid` | 否 | `—` | 记录任职。 |
+| `due_at` | `timestamptz(6)` | 否 | `—` | 原请求期限，不随补正重置。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_payment_workflow__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_payment_workflow__previous`（`UNIQUE`：`tenant_id, previous_workflow_id`）：前序唯一后继。
+- `ck_payment_workflow__stage`（`CHECK`：`target_stage_code IN ('CHECK_RECEIPT','SUPPLEMENT_RECEIPT','COMPLETE') AND (stage_code=target_stage_code OR (stage_code='OWNER_EXCEPTION' AND target_stage_code<>'COMPLETE')) AND stage_code IN ('CHECK_RECEIPT','SUPPLEMENT_RECEIPT','COMPLETE','OWNER_EXCEPTION') AND ((stage_code IN ('CHECK_RECEIPT','SUPPLEMENT_RECEIPT') AND task_id IS NOT NULL AND owner_appointment_id IS NOT NULL) OR (stage_code IN ('COMPLETE','OWNER_EXCEPTION') AND task_id IS NULL))`）：办理责任与阶段一致。
+
+物理外键：
+
+- `fk_payment_workflow__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_payment_workflow__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_payment_workflow__request_id`：`(tenant_id, request_id) → contract.payment_request(tenant_id, payment_request_id)`。同租户准确事实引用。
+- `fk_payment_workflow__previous_workflow_id`：`(tenant_id, previous_workflow_id) → contract.payment_workflow(tenant_id, payment_workflow_id)`。同租户准确事实引用。
+- `fk_payment_workflow__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_payment_workflow__task_id`：`(tenant_id, task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_payment_workflow__review_id`：`(tenant_id, review_id) → contract.payment_review(tenant_id, payment_review_id)`。同租户准确事实引用。
+- `fk_payment_workflow__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_payment_workflow__root`：列`(tenant_id, request_id)`；唯一=`是`；谓词=`previous_workflow_id IS NULL`。一请求一个责任链根。
+
+### `contract.payment_review`
+
+收款办理不可变事实；独立于销售执行责任。
+
+- Fact Owner：`ContractRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, payment_review_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `payment_review_id` | `uuid` | 否 | `—` | 收款办理不可变事实；独立于销售执行责任。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `workflow_id` | `uuid` | 否 | `—` | 核对的准确当前责任。 |
+| `decision_code` | `varchar(64)` | 否 | `—` | 确认到账、退回或补正。 |
+| `material_version_id` | `uuid` | 是 | `—` | 准确材料；退回不要求。 |
+| `confirmation_id` | `uuid` | 是 | `—` | 本笔到账；退回及补正不得填写。 |
+| `recorded_by` | `uuid` | 否 | `—` | 实际办理任职。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_payment_review__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_payment_review__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `uq_payment_review__workflow`（`UNIQUE`：`tenant_id, workflow_id`）：同一责任版本只记录一次结果。
+- `uq_payment_review__confirmation`（`UNIQUE`：`tenant_id, confirmation_id`）：同一到账只归入一次核对。
+- `ck_payment_review__decision`（`CHECK`：`decision_code IN ('CONFIRMED','RETURNED','SUPPLEMENTED') AND (decision_code='CONFIRMED')=(confirmation_id IS NOT NULL) AND (decision_code='RETURNED' OR material_version_id IS NOT NULL)`）：退回补正不能伪造到账。
+- `ck_payment_review__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_payment_review__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_payment_review__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_payment_review__workflow_id`：`(tenant_id, workflow_id) → contract.payment_workflow(tenant_id, payment_workflow_id)`。同租户准确事实引用。
+- `fk_payment_review__material_version_id`：`(tenant_id, material_version_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+- `fk_payment_review__confirmation_id`：`(tenant_id, confirmation_id) → contract.payment_confirmation(tenant_id, payment_confirmation_id)`。同租户准确事实引用。
+- `fk_payment_review__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
 
 ## `transfer`
 
@@ -2676,6 +5214,314 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 
 - `ix_transfer_return_item__snapshot`：列`(tenant_id, reviewed_snapshot_id, item_no)`；唯一=`否`；谓词=`None`。审查查询：按已审快照读取全部不可变退回项。
 
+### `transfer.workflow`
+
+转案办理不可变事实；接收之前不生成案件。
+
+- Fact Owner：`TransferRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, workflow_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `workflow_id` | `uuid` | 否 | `—` | 转案办理不可变事实；接收之前不生成案件。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `transfer_request_id` | `uuid` | 否 | `—` | 准确转案来源。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `previous_workflow_id` | `uuid` | 是 | `—` | 直接前序责任。 |
+| `stage_code` | `varchar(64)` | 否 | `—` | 当前可办理阶段或责任异常。 |
+| `target_stage_code` | `varchar(64)` | 否 | `—` | 责任异常仍保留原阶段。 |
+| `owner_appointment_id` | `uuid` | 是 | `—` | 当前责任任职。 |
+| `task_id` | `uuid` | 是 | `—` | 当前待办。 |
+| `submission_id` | `uuid` | 是 | `—` | 准确待审提交。 |
+| `review_id` | `uuid` | 是 | `—` | 本次独立审查。 |
+| `intake_id` | `uuid` | 是 | `—` | 准确案管接收或退回。 |
+| `classification_id` | `uuid` | 是 | `—` | 本案分类及承接事实。 |
+| `recorded_by` | `uuid` | 否 | `—` | 记录任职。 |
+| `due_at` | `timestamptz(6)` | 否 | `—` | 原责任期限，恢复和补正不重置。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_workflow__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `uq_transfer_workflow__previous`（`UNIQUE`：`tenant_id, previous_workflow_id`）：同一责任只有一个后继。
+- `ck_transfer_workflow__stage`（`CHECK`：`target_stage_code IN ('PREPARE','REVIEW_TRANSFER','INTAKE','SUPPLEMENT','CLASSIFY','COMPLETE') AND (stage_code=target_stage_code OR stage_code='OWNER_EXCEPTION') AND ((stage_code IN ('OWNER_EXCEPTION','COMPLETE') AND task_id IS NULL AND owner_appointment_id IS NULL) OR (stage_code NOT IN ('OWNER_EXCEPTION','COMPLETE') AND task_id IS NOT NULL AND owner_appointment_id IS NOT NULL)) AND (target_stage_code='PREPARE')=(submission_id IS NULL)`）：阶段、待审提交与责任一致。
+
+物理外键：
+
+- `fk_workflow__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_workflow__transfer_request_id`：`(tenant_id, transfer_request_id) → transfer.transfer_request(tenant_id, transfer_request_id)`。同租户准确事实引用。
+- `fk_workflow__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_workflow__previous_workflow_id`：`(tenant_id, previous_workflow_id) → transfer.workflow(tenant_id, workflow_id)`。同租户准确事实引用。
+- `fk_workflow__owner_appointment_id`：`(tenant_id, owner_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_workflow__task_id`：`(tenant_id, task_id) → responsibility.task_occurrence(tenant_id, task_occurrence_id)`。同租户准确事实引用。
+- `fk_workflow__submission_id`：`(tenant_id, submission_id) → transfer.submission(tenant_id, submission_id)`。同租户准确事实引用。
+- `fk_workflow__review_id`：`(tenant_id, review_id) → transfer.review(tenant_id, review_id)`。同租户准确事实引用。
+- `fk_workflow__intake_id`：`(tenant_id, intake_id) → transfer.intake(tenant_id, intake_id)`。同租户准确事实引用。
+- `fk_workflow__classification_id`：`(tenant_id, classification_id) → transfer.classification(tenant_id, classification_id)`。同租户准确事实引用。
+- `fk_workflow__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+索引：
+
+- `uq_transfer_workflow__root`：列`(tenant_id, transfer_request_id)`；唯一=`是`；谓词=`previous_workflow_id IS NULL`。一请求仅有一个责任链根。
+
+### `transfer.submission`
+
+转案办理不可变事实；接收之前不生成案件。
+
+- Fact Owner：`TransferRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, submission_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `submission_id` | `uuid` | 否 | `—` | 转案办理不可变事实；接收之前不生成案件。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `transfer_request_id` | `uuid` | 否 | `—` | 准确转案来源。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `evidence_submission_ids` | `uuid[]` | 否 | `—` | 本次完整已接收证据集合，包含补正证据。 |
+| `previous_submission_id` | `uuid` | 是 | `—` | 补正对应的上一提交。 |
+| `previous_review_id` | `uuid` | 是 | `—` | 补正对应的准确退回审查。 |
+| `previous_intake_id` | `uuid` | 是 | `—` | 案管退回的准确决定。 |
+| `workflow_id` | `uuid` | 否 | `—` | 本次销售办理的准确责任。 |
+| `contract_revision_id` | `uuid` | 否 | `—` | 批准合同版本。 |
+| `customer_confirmation_id` | `uuid` | 否 | `—` | 当前客户及需求确认。 |
+| `client_identity_material_id` | `uuid` | 否 | `—` | 已接收主体证明。 |
+| `signature_archive_material_id` | `uuid` | 否 | `—` | 已接收完整签署归档。 |
+| `confirmed_action_draft_id` | `uuid` | 否 | `—` | 人工确认的准确输入草案。 |
+| `action_draft_digest` | `bytea` | 否 | `—` | 准确确认草案摘要。 |
+| `contract_context_digest` | `bytea` | 否 | `—` | 执行来源与合同上下文摘要。 |
+| `legal_need_context_digest` | `bytea` | 否 | `—` | 提交时法律需求摘要。 |
+| `recorded_by` | `uuid` | 否 | `—` | 实际销售提交任职。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_submission__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_submission__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `uq_transfer_submission__workflow`（`UNIQUE`：`tenant_id, workflow_id`）：一销售责任只提交一次。
+- `uq_transfer_submission__draft`（`UNIQUE`：`tenant_id, confirmed_action_draft_id`）：一确认草案只形成一次提交。
+- `ck_submission__action_draft_digest_length`（`CHECK`：`octet_length(action_draft_digest) = 32`）：摘要格式：action_draft_digest必须保存32字节的规范二进制值。
+- `ck_submission__contract_context_digest_length`（`CHECK`：`octet_length(contract_context_digest) = 32`）：摘要格式：contract_context_digest必须保存32字节的规范二进制值。
+- `ck_submission__legal_need_context_digest_length`（`CHECK`：`octet_length(legal_need_context_digest) = 32`）：摘要格式：legal_need_context_digest必须保存32字节的规范二进制值。
+- `ck_submission__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_submission__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_submission__transfer_request_id`：`(tenant_id, transfer_request_id) → transfer.transfer_request(tenant_id, transfer_request_id)`。同租户准确事实引用。
+- `fk_submission__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_submission__previous_submission_id`：`(tenant_id, previous_submission_id) → transfer.submission(tenant_id, submission_id)`。同租户准确事实引用。
+- `fk_submission__previous_review_id`：`(tenant_id, previous_review_id) → transfer.review(tenant_id, review_id)`。同租户准确事实引用。
+- `fk_submission__previous_intake_id`：`(tenant_id, previous_intake_id) → transfer.intake(tenant_id, intake_id)`。同租户准确事实引用。
+- `fk_submission__workflow_id`：`(tenant_id, workflow_id) → transfer.workflow(tenant_id, workflow_id)`。同租户准确事实引用。
+- `fk_submission__contract_revision_id`：`(tenant_id, contract_revision_id) → contract.contract_revision(tenant_id, contract_revision_id)`。同租户准确事实引用。
+- `fk_submission__customer_confirmation_id`：`(tenant_id, customer_confirmation_id) → opportunity.customer_requirement_confirmation(tenant_id, customer_requirement_confirmation_id)`。同租户准确事实引用。
+- `fk_submission__client_identity_material_id`：`(tenant_id, client_identity_material_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+- `fk_submission__signature_archive_material_id`：`(tenant_id, signature_archive_material_id) → opportunity.material_version(tenant_id, material_version_id)`。同租户准确事实引用。
+- `fk_submission__confirmed_action_draft_id`：`(tenant_id, confirmed_action_draft_id) → responsibility.action_draft(tenant_id, action_draft_id)`。同租户准确事实引用。
+- `fk_submission__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `transfer.review`
+
+转案办理不可变事实；接收之前不生成案件。
+
+- Fact Owner：`TransferRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, review_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `review_id` | `uuid` | 否 | `—` | 转案办理不可变事实；接收之前不生成案件。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `transfer_request_id` | `uuid` | 否 | `—` | 准确转案来源。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `workflow_id` | `uuid` | 否 | `—` | 被办理的独立审查责任。 |
+| `submission_id` | `uuid` | 否 | `—` | 准确销售提交。 |
+| `conflict_review_id` | `uuid` | 否 | `—` | 独立PRE_TRANSFER事实。 |
+| `outcome_code` | `varchar(64)` | 否 | `—` | 人工审查结果。 |
+| `confirmed_action_draft_id` | `uuid` | 否 | `—` | 准确确认草案。 |
+| `action_draft_digest` | `bytea` | 否 | `—` | 准确草案摘要。 |
+| `scope_digest` | `bytea` | 否 | `—` | 范围摘要。 |
+| `corpus_digest` | `bytea` | 否 | `—` | 语料摘要。 |
+| `recorded_by` | `uuid` | 否 | `—` | 实际独立审查人。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_review__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_review__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `uq_transfer_review__workflow`（`UNIQUE`：`tenant_id, workflow_id`）：一次责任一个审查结果。
+- `uq_transfer_review__conflict`（`UNIQUE`：`tenant_id, conflict_review_id`）：审查事实专属本提交。
+- `ck_transfer_review__outcome`（`CHECK`：`outcome_code IN ('CLEAR','NEED_INFO','BLOCKED')`）：不自动豁免。
+- `ck_review__action_draft_digest_length`（`CHECK`：`octet_length(action_draft_digest) = 32`）：摘要格式：action_draft_digest必须保存32字节的规范二进制值。
+- `ck_review__scope_digest_length`（`CHECK`：`octet_length(scope_digest) = 32`）：摘要格式：scope_digest必须保存32字节的规范二进制值。
+- `ck_review__corpus_digest_length`（`CHECK`：`octet_length(corpus_digest) = 32`）：摘要格式：corpus_digest必须保存32字节的规范二进制值。
+- `ck_review__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_review__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_review__transfer_request_id`：`(tenant_id, transfer_request_id) → transfer.transfer_request(tenant_id, transfer_request_id)`。同租户准确事实引用。
+- `fk_review__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_review__workflow_id`：`(tenant_id, workflow_id) → transfer.workflow(tenant_id, workflow_id)`。同租户准确事实引用。
+- `fk_review__submission_id`：`(tenant_id, submission_id) → transfer.submission(tenant_id, submission_id)`。同租户准确事实引用。
+- `fk_review__conflict_review_id`：`(tenant_id, conflict_review_id) → conflict.conflict_review(tenant_id, conflict_review_id)`。同租户准确事实引用。
+- `fk_review__confirmed_action_draft_id`：`(tenant_id, confirmed_action_draft_id) → responsibility.action_draft(tenant_id, action_draft_id)`。同租户准确事实引用。
+- `fk_review__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `transfer.review_return_item`
+
+转案办理不可变事实；接收之前不生成案件。
+
+- Fact Owner：`TransferRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, review_return_item_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `review_return_item_id` | `uuid` | 否 | `—` | 转案办理不可变事实；接收之前不生成案件。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `transfer_request_id` | `uuid` | 否 | `—` | 准确转案来源。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `review_id` | `uuid` | 否 | `—` | 准确非通过审查。 |
+| `requirement_code` | `varchar(64)` | 否 | `—` | 准确补正要求。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_review_return_item__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_review_return_item__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `uq_transfer_review_return_item__requirement`（`UNIQUE`：`tenant_id, review_id, requirement_code`）：一次审查一个具名要求。
+- `ck_review_return_item__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_review_return_item__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_review_return_item__transfer_request_id`：`(tenant_id, transfer_request_id) → transfer.transfer_request(tenant_id, transfer_request_id)`。同租户准确事实引用。
+- `fk_review_return_item__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_review_return_item__review_id`：`(tenant_id, review_id) → transfer.review(tenant_id, review_id)`。同租户准确事实引用。
+
+### `transfer.intake`
+
+转案办理不可变事实；接收之前不生成案件。
+
+- Fact Owner：`TransferRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, intake_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `intake_id` | `uuid` | 否 | `—` | 转案办理不可变事实；接收之前不生成案件。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `transfer_request_id` | `uuid` | 否 | `—` | 准确转案来源。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `workflow_id` | `uuid` | 否 | `—` | 准确案管待办。 |
+| `submission_id` | `uuid` | 否 | `—` | 接收的提交。 |
+| `review_id` | `uuid` | 否 | `—` | 准确独立审查。 |
+| `snapshot_id` | `uuid` | 否 | `—` | 案管核对的完整冻结快照。 |
+| `decision_record_id` | `uuid` | 否 | `—` | 独立案管决定。 |
+| `outcome_code` | `varchar(64)` | 否 | `—` | 接收或退回。 |
+| `requirement_code` | `varchar(64)` | 是 | `—` | 退回项目。 |
+| `matter_id` | `uuid` | 是 | `—` | 接收后唯一案件身份。 |
+| `matter_no` | `varchar(64)` | 是 | `—` | 唯一案件编号。 |
+| `confirmed_action_draft_id` | `uuid` | 否 | `—` | 接收核对草案。 |
+| `action_draft_digest` | `bytea` | 否 | `—` | 草案摘要。 |
+| `recorded_by` | `uuid` | 否 | `—` | 案管接收任职。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_intake__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_intake__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `uq_transfer_intake__workflow`（`UNIQUE`：`tenant_id, workflow_id`）：一责任一决定。
+- `uq_transfer_intake__snapshot`（`UNIQUE`：`tenant_id, snapshot_id`）：一快照一决定。
+- `ck_transfer_intake__outcome`（`CHECK`：`(outcome_code='ACCEPT' AND matter_id IS NOT NULL AND matter_no IS NOT NULL AND requirement_code IS NULL) OR (outcome_code='RETURN' AND matter_id IS NULL AND matter_no IS NULL AND requirement_code IS NOT NULL)`）：未接收不得生成案件。
+- `ck_intake__action_draft_digest_length`（`CHECK`：`octet_length(action_draft_digest) = 32`）：摘要格式：action_draft_digest必须保存32字节的规范二进制值。
+- `ck_intake__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_intake__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_intake__transfer_request_id`：`(tenant_id, transfer_request_id) → transfer.transfer_request(tenant_id, transfer_request_id)`。同租户准确事实引用。
+- `fk_intake__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_intake__workflow_id`：`(tenant_id, workflow_id) → transfer.workflow(tenant_id, workflow_id)`。同租户准确事实引用。
+- `fk_intake__submission_id`：`(tenant_id, submission_id) → transfer.submission(tenant_id, submission_id)`。同租户准确事实引用。
+- `fk_intake__review_id`：`(tenant_id, review_id) → transfer.review(tenant_id, review_id)`。同租户准确事实引用。
+- `fk_intake__snapshot_id`：`(tenant_id, snapshot_id) → transfer.transfer_snapshot(tenant_id, transfer_snapshot_id)`。同租户准确事实引用。
+- `fk_intake__decision_record_id`：`(tenant_id, decision_record_id) → responsibility.decision_record(tenant_id, decision_record_id)`。同租户准确事实引用。
+- `fk_intake__confirmed_action_draft_id`：`(tenant_id, confirmed_action_draft_id) → responsibility.action_draft(tenant_id, action_draft_id)`。同租户准确事实引用。
+- `fk_intake__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
+### `transfer.classification`
+
+转案办理不可变事实；接收之前不生成案件。
+
+- Fact Owner：`TransferRuntime`
+- 更新策略：`IMMUTABLE`
+- 主键：`(tenant_id, classification_id)`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户标识：复合主键和所有租户内关联的第一列。 |
+| `classification_id` | `uuid` | 否 | `—` | 转案办理不可变事实；接收之前不生成案件。标识：由应用生成的UUIDv7。 |
+| `revision` | `bigint` | 否 | `0` | CAS修订号：每次受控更新必须精确递增一，初始为零。 |
+| `created_in_transaction` | `xid8` | 否 | `pg_current_xact_id()` | 冻结配置或审批成员集合的形成事务。 |
+| `transfer_request_id` | `uuid` | 否 | `—` | 准确转案来源。 |
+| `opportunity_id` | `uuid` | 否 | `—` | 准确商机。 |
+| `previous_classification_id` | `uuid` | 是 | `—` | 明确更正时保留前次分类。 |
+| `workflow_id` | `uuid` | 否 | `—` | 已接收案件的分类责任。 |
+| `intake_id` | `uuid` | 否 | `—` | 准确接收事实。 |
+| `matter_id` | `uuid` | 否 | `—` | 保持已接收案件身份。 |
+| `category_code` | `varchar(64)` | 否 | `—` | 综法、执行或其他。 |
+| `recipient_appointment_id` | `uuid` | 否 | `—` | 有权承接任职。 |
+| `confirmed_action_draft_id` | `uuid` | 否 | `—` | 人工分类草案。 |
+| `action_draft_digest` | `bytea` | 否 | `—` | 分类草案摘要。 |
+| `recorded_by` | `uuid` | 否 | `—` | 分类确认人。 |
+| `body_ciphertext` | `bytea` | 否 | `—` | 联系方式、服务需求和显示快照密文；AAD绑定租户、商机及事实身份。 |
+| `body_digest` | `bytea` | 否 | `—` | 受保护规范正文完整性摘要。 |
+| `created_at` | `timestamptz(6)` | 否 | `—` | 数据库记录时间。 |
+
+约束：
+
+- `ck_classification__revision`（`CHECK`：`revision=0`）：不可变保存版本。
+- `ck_classification__body`（`CHECK`：`octet_length(body_ciphertext) BETWEEN 29 AND 131072`）：有界受保护正文。
+- `uq_transfer_classification__previous`（`UNIQUE`：`tenant_id, previous_classification_id`）：前次分类只允许一个更正后继。
+- `uq_transfer_classification__workflow`（`UNIQUE`：`tenant_id, workflow_id`）：一个分类责任一个结果。
+- `ck_transfer_classification__category`（`CHECK`：`category_code IN ('GENERAL','ENFORCEMENT','OTHER')`）：限定MVP分类。
+- `ck_classification__action_draft_digest_length`（`CHECK`：`octet_length(action_draft_digest) = 32`）：摘要格式：action_draft_digest必须保存32字节的规范二进制值。
+- `ck_classification__body_digest_length`（`CHECK`：`octet_length(body_digest) = 32`）：摘要格式：body_digest必须保存32字节的规范二进制值。
+
+物理外键：
+
+- `fk_classification__tenant`：`(tenant_id) → identity.tenant(tenant_id)`。租户边界：该记录必须属于一个已存在的租户。
+- `fk_classification__transfer_request_id`：`(tenant_id, transfer_request_id) → transfer.transfer_request(tenant_id, transfer_request_id)`。同租户准确事实引用。
+- `fk_classification__opportunity_id`：`(tenant_id, opportunity_id) → opportunity.opportunity(tenant_id, opportunity_id)`。同租户准确事实引用。
+- `fk_classification__previous_classification_id`：`(tenant_id, previous_classification_id) → transfer.classification(tenant_id, classification_id)`。同租户准确事实引用。
+- `fk_classification__workflow_id`：`(tenant_id, workflow_id) → transfer.workflow(tenant_id, workflow_id)`。同租户准确事实引用。
+- `fk_classification__intake_id`：`(tenant_id, intake_id) → transfer.intake(tenant_id, intake_id)`。同租户准确事实引用。
+- `fk_classification__recipient_appointment_id`：`(tenant_id, recipient_appointment_id) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+- `fk_classification__confirmed_action_draft_id`：`(tenant_id, confirmed_action_draft_id) → responsibility.action_draft(tenant_id, action_draft_id)`。同租户准确事实引用。
+- `fk_classification__recorded_by`：`(tenant_id, recorded_by) → identity.appointment(tenant_id, appointment_id)`。同租户准确事实引用。
+
 ## `platform_meta`
 
 平台元数据域：仅保存部署门禁；Flyway历史表由Flyway独占管理。
@@ -2709,6 +5555,31 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 - `ck_deployment_state__active_release_digest_length`（`CHECK`：`octet_length(active_release_digest) = 32`）：摘要格式：active_release_digest必须为32字节规范摘要。
 - `ck_deployment_state__active_manifest_hash_length`（`CHECK`：`octet_length(active_manifest_hash) = 32`）：摘要格式：active_manifest_hash必须为32字节规范摘要。
 
+### `platform_meta.r2_opportunity_checkpoint`
+
+R2 Worker技术检查点；仅用于跨重启调度恢复，不构成业务事实或通用任务队列。
+
+- Fact Owner：`R2OpportunityCheckpointStore`
+- 更新策略：`CONTROLLED`
+- 主键：`(tenant_id, principal_id, appointment_id, scan_kind)`
+- 允许更新字段：`checkpoint_body, revision, updated_at`
+
+| 字段 | PostgreSQL类型 | 可空 | 默认值 | 说明 |
+|---|---|---:|---|---|
+| `tenant_id` | `uuid` | 否 | `—` | 租户身份：仅技术调度键，不替代应用授权。 |
+| `principal_id` | `uuid` | 否 | `—` | 服务主体身份：冻结当前配置的服务绑定。 |
+| `appointment_id` | `uuid` | 否 | `—` | 服务任职身份：与主体和租户共同隔离检查点。 |
+| `scan_kind` | `varchar(32)` | 否 | `—` | 具名扫描种类：INITIAL承接或DUE到期恢复。 |
+| `checkpoint_body` | `bytea` | 否 | `—` | 版本化技术检查点：仅候选准确引用、游标、重试与诊断；不得保存客户正文或业务事实。 |
+| `revision` | `bigint` | 否 | `0` | 并发修订号：初始为零，每次写入准确递增一。 |
+| `updated_at` | `timestamptz(6)` | 否 | `clock_timestamp()` | 数据库更新时间：每次写入由数据库时钟设置。 |
+
+约束：
+
+- `ck_r2_opportunity_checkpoint__kind`（`CHECK`：`scan_kind IN ('INITIAL','DUE','OWNER_EXCEPTION','CONTRACT_PREPARATION')`）：种类仅允许两种已注册商机维护扫描。
+- `ck_r2_opportunity_checkpoint__body`（`CHECK`：`octet_length(checkpoint_body) BETWEEN 1 AND 65536`）：技术正文不能为空且不得超过64KiB。
+- `ck_r2_opportunity_checkpoint__revision`（`CHECK`：`revision BETWEEN 0 AND 9007199254740991`）：修订号必须是JSON安全非负整数。
+
 ## 跨域复合外键矩阵
 
 只列出Schema之间的稳定单表关系；所有租户内关系都以`tenant_id`为第一列并使用`NO ACTION`，不存在级联删除。
@@ -2729,9 +5600,14 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `responsibility.decision_record` | `fk_decision_record__decided_by_appointment` | `(tenant_id, decided_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
 | `responsibility.wait_receipt` | `fk_wait_receipt__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `responsibility.wait_receipt` | `fk_wait_receipt__recorded_by_appointment` | `(tenant_id, recorded_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `responsibility.wait_receipt` | `fk_wait_receipt__handoff_fact_id` | `(tenant_id, handoff_fact_id)` | `opportunity.responsibility_handoff` | `(tenant_id, responsibility_handoff_id)` | 是 |
+| `responsibility.wait_receipt` | `fk_wait_receipt__origin_progress_id` | `(tenant_id, origin_progress_id)` | `opportunity.opportunity_progress` | `(tenant_id, opportunity_progress_id)` | 是 |
 | `responsibility.action_draft` | `fk_action_draft__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `responsibility.action_draft` | `fk_action_draft__created_by_appointment` | `(tenant_id, created_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
 | `responsibility.action_draft` | `fk_action_draft__confirmed_by_appointment` | `(tenant_id, confirmed_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `responsibility.contract_task_resumption` | `fk_contract_task_resumption__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `responsibility.contract_task_resumption` | `fk_contract_task_resumption__disposition_id` | `(tenant_id, disposition_id)` | `contract.negotiation_disposition` | `(tenant_id, negotiation_disposition_id)` | 否 |
+| `responsibility.contract_task_resumption` | `fk_contract_task_resumption__cancelled_task_id` | `(tenant_id, cancelled_task_id)` | `contract.negotiation_cancelled_task` | `(tenant_id, negotiation_cancelled_task_id)` | 否 |
 | `execution.command_execution_slot` | `fk_command_execution_slot__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `execution.command_receipt` | `fk_command_receipt__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `execution.domain_event` | `fk_domain_event__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
@@ -2747,7 +5623,16 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `evidence.evidence_binding` | `fk_evidence_binding__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `evidence.evidence_binding` | `fk_evidence_binding__binder` | `(tenant_id, bound_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
 | `evidence.evidence_binding` | `fk_evidence_binding__revoker` | `(tenant_id, revoked_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `evidence.material_upload_basis` | `fk_material_upload_basis__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `evidence.material_upload_basis` | `fk_material_upload_basis__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `evidence.material_upload_basis` | `fk_material_upload_basis__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `evidence.material_upload_basis` | `fk_material_upload_basis__customer_confirmation_id` | `(tenant_id, customer_confirmation_id)` | `opportunity.customer_requirement_confirmation` | `(tenant_id, customer_requirement_confirmation_id)` | 否 |
+| `evidence.material_upload_basis` | `fk_material_upload_basis__original_task_id` | `(tenant_id, original_task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `evidence.material_upload_basis` | `fk_material_upload_basis__expected_previous_version_id` | `(tenant_id, expected_previous_version_id)` | `opportunity.material_version` | `(tenant_id, material_version_id)` | 否 |
+| `evidence.material_upload_check` | `fk_material_upload_check__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `party.party` | `fk_party__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `party.profile_version` | `fk_profile_version__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `party.profile_version` | `fk_profile_version__created_by_appointment_id` | `(tenant_id, created_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
 | `lead.lead` | `fk_lead__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `lead.lead` | `fk_lead__parsed_party` | `(tenant_id, parsed_party_id)` | `party.party` | `(tenant_id, party_id)` | 否 |
 | `lead.lead` | `fk_lead__ingress_completed_by_appointment` | `(tenant_id, ingress_completed_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
@@ -2779,6 +5664,76 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `opportunity.quote_response` | `fk_quote_response__provider_inbox` | `(tenant_id, provider_inbox_id)` | `external_action.provider_inbox` | `(tenant_id, provider_inbox_id)` | 否 |
 | `opportunity.quote_response` | `fk_quote_response__evidence_submission` | `(tenant_id, evidence_submission_id)` | `evidence.evidence_submission` | `(tenant_id, evidence_submission_id)` | 否 |
 | `opportunity.quote_response` | `fk_quote_response__recorder` | `(tenant_id, recorded_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.owner_exception` | `fk_owner_exception__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.owner_exception` | `fk_owner_exception__frozen_owner_appointment_id` | `(tenant_id, frozen_owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 是 |
+| `opportunity.owner_exception` | `fk_owner_exception__current_owner_appointment_id` | `(tenant_id, current_owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 是 |
+| `opportunity.owner_exception` | `fk_owner_exception__task_occurrence_id` | `(tenant_id, task_occurrence_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 是 |
+| `opportunity.owner_exception` | `fk_owner_exception__wait_receipt_id` | `(tenant_id, wait_receipt_id)` | `responsibility.wait_receipt` | `(tenant_id, wait_receipt_id)` | 是 |
+| `opportunity.owner_exception_disposition` | `fk_owner_exception_disposition__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.owner_exception_disposition` | `fk_owner_exception_disposition__actor_appointment_id` | `(tenant_id, actor_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 是 |
+| `opportunity.owner_exception_disposition` | `fk_owner_exception_disposition__receiver_appointment_id` | `(tenant_id, receiver_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 是 |
+| `opportunity.responsibility_handoff` | `fk_responsibility_handoff__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.responsibility_handoff` | `fk_responsibility_handoff__from_appointment_id` | `(tenant_id, from_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 是 |
+| `opportunity.responsibility_handoff` | `fk_responsibility_handoff__to_appointment_id` | `(tenant_id, to_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 是 |
+| `opportunity.responsibility_handoff` | `fk_responsibility_handoff__actor_appointment_id` | `(tenant_id, actor_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 是 |
+| `opportunity.responsibility_handoff` | `fk_responsibility_handoff__old_task_occurrence_id` | `(tenant_id, old_task_occurrence_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 是 |
+| `opportunity.responsibility_handoff` | `fk_responsibility_handoff__new_task_occurrence_id` | `(tenant_id, new_task_occurrence_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 是 |
+| `opportunity.responsibility_handoff` | `fk_responsibility_handoff__original_wait_receipt_id` | `(tenant_id, original_wait_receipt_id)` | `responsibility.wait_receipt` | `(tenant_id, wait_receipt_id)` | 是 |
+| `opportunity.closure` | `fk_closure__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.closure` | `fk_closure__task_occurrence_id` | `(tenant_id, task_occurrence_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `opportunity.closure` | `fk_closure__wait_receipt_id` | `(tenant_id, wait_receipt_id)` | `responsibility.wait_receipt` | `(tenant_id, wait_receipt_id)` | 否 |
+| `opportunity.closure` | `fk_closure__closed_by_appointment_id` | `(tenant_id, closed_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.customer_requirement_draft` | `fk_customer_requirement_draft__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.customer_requirement_draft` | `fk_customer_requirement_draft__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.customer_requirement_confirmation` | `fk_customer_requirement_confirmation__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.customer_requirement_confirmation` | `fk_customer_requirement_confirmation__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.customer_requirement_participant` | `fk_customer_requirement_participant__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.customer_requirement_participant` | `fk_customer_requirement_participant__party_id` | `(tenant_id, party_id)` | `party.party` | `(tenant_id, party_id)` | 否 |
+| `opportunity.customer_requirement_participant` | `fk_customer_requirement_participant__profile_version_id` | `(tenant_id, profile_version_id)` | `party.profile_version` | `(tenant_id, profile_version_id)` | 否 |
+| `opportunity.customer_requirement_draft_party` | `fk_customer_requirement_draft_party__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.customer_requirement_draft_party` | `fk_customer_requirement_draft_party__party_id` | `(tenant_id, party_id)` | `party.party` | `(tenant_id, party_id)` | 否 |
+| `opportunity.material_version` | `fk_material_version__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.material_version` | `fk_material_version__upload_basis_id` | `(tenant_id, upload_basis_id)` | `evidence.material_upload_basis` | `(tenant_id, material_upload_basis_id)` | 否 |
+| `opportunity.material_version` | `fk_material_version__upload_session_id` | `(tenant_id, upload_session_id)` | `evidence.upload_session` | `(tenant_id, upload_session_id)` | 否 |
+| `opportunity.material_version` | `fk_material_version__received_source_object_id` | `(tenant_id, received_source_object_id)` | `evidence.received_source_object` | `(tenant_id, received_source_object_id)` | 否 |
+| `opportunity.material_version` | `fk_material_version__evidence_submission_id` | `(tenant_id, evidence_submission_id)` | `evidence.evidence_submission` | `(tenant_id, evidence_submission_id)` | 否 |
+| `opportunity.material_version` | `fk_material_version__evidence_binding_id` | `(tenant_id, evidence_binding_id)` | `evidence.evidence_binding` | `(tenant_id, evidence_binding_id)` | 否 |
+| `opportunity.material_version` | `fk_material_version__received_by_appointment_id` | `(tenant_id, received_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.quote_draft` | `fk_quote_draft__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_draft` | `fk_quote_draft__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.quote_package_basis` | `fk_quote_package_basis__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_approval_policy` | `fk_quote_approval_policy__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_approval_policy` | `fk_quote_approval_policy__organization_unit_id` | `(tenant_id, organization_unit_id)` | `identity.organization_unit` | `(tenant_id, organization_unit_id)` | 否 |
+| `opportunity.quote_approval_policy_signer` | `fk_quote_approval_policy_signer__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_approval_policy_signer` | `fk_quote_approval_policy_signer__appointment_id` | `(tenant_id, appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.quote_approval_request` | `fk_quote_approval_request__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_approval_request` | `fk_quote_approval_request__requested_by` | `(tenant_id, requested_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.quote_approval_member` | `fk_quote_approval_member__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_approval_member` | `fk_quote_approval_member__appointment_id` | `(tenant_id, appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.quote_approval_member` | `fk_quote_approval_member__task_id` | `(tenant_id, task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `opportunity.quote_approval_decision` | `fk_quote_approval_decision__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_manual_delivery` | `fk_quote_manual_delivery__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_manual_delivery` | `fk_quote_manual_delivery__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.quote_response_basis` | `fk_quote_response_basis__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.contract_preparation_source` | `fk_contract_preparation_source__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_workflow` | `fk_quote_workflow__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_workflow` | `fk_quote_workflow__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.quote_workflow` | `fk_quote_workflow__task_id` | `(tenant_id, task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `opportunity.quote_workflow` | `fk_quote_workflow__prior_task_id` | `(tenant_id, prior_task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `opportunity.quote_preparation_intent` | `fk_quote_preparation_intent__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_preparation_intent` | `fk_quote_preparation_intent__task_id` | `(tenant_id, task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `opportunity.quote_preparation_intent` | `fk_quote_preparation_intent__prior_task_id` | `(tenant_id, prior_task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `opportunity.quote_preparation_intent` | `fk_quote_preparation_intent__requested_by` | `(tenant_id, requested_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.followup_attempt` | `fk_followup_attempt__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.followup_attempt` | `fk_followup_attempt__prior_task_id` | `(tenant_id, prior_task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `opportunity.followup_attempt` | `fk_followup_attempt__task_id` | `(tenant_id, task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `opportunity.followup_attempt` | `fk_followup_attempt__prior_wait_id` | `(tenant_id, prior_wait_id)` | `responsibility.wait_receipt` | `(tenant_id, wait_receipt_id)` | 否 |
+| `opportunity.followup_attempt` | `fk_followup_attempt__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.quote_termination` | `fk_quote_termination__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_termination` | `fk_quote_termination__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `opportunity.quote_termination_task` | `fk_quote_termination_task__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `opportunity.quote_termination_task` | `fk_quote_termination_task__task_id` | `(tenant_id, task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `opportunity.quote_termination_task` | `fk_quote_termination_task__wait_id` | `(tenant_id, wait_id)` | `responsibility.wait_receipt` | `(tenant_id, wait_receipt_id)` | 否 |
 | `conflict.conflict_review` | `fk_conflict_review__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `conflict.conflict_review_party` | `fk_conflict_review_party__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `conflict.conflict_review_party` | `fk_conflict_review_party__party` | `(tenant_id, party_id)` | `party.party` | `(tenant_id, party_id)` | 否 |
@@ -2787,6 +5742,7 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `contract.contract` | `fk_contract__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `contract.contract` | `fk_contract__opportunity` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
 | `contract.contract` | `fk_contract__accepted_quote_response` | `(tenant_id, accepted_quote_response_id)` | `opportunity.quote_response` | `(tenant_id, quote_response_id)` | 否 |
+| `contract.contract` | `fk_contract__created_by_appointment_id` | `(tenant_id, created_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
 | `contract.contract_revision` | `fk_contract_revision__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `contract.contract_revision` | `fk_contract_revision__action_draft` | `(tenant_id, confirmed_action_draft_id)` | `responsibility.action_draft` | `(tenant_id, action_draft_id)` | 否 |
 | `contract.contract_revision` | `fk_contract_revision__quote_revision` | `(tenant_id, source_quote_revision_id)` | `opportunity.quote_revision` | `(tenant_id, quote_revision_id)` | 否 |
@@ -2794,6 +5750,8 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `contract.contract_revision` | `fk_contract_revision__body_evidence` | `(tenant_id, body_evidence_submission_id)` | `evidence.evidence_submission` | `(tenant_id, evidence_submission_id)` | 否 |
 | `contract.contract_revision` | `fk_contract_revision__pre_contract_review` | `(tenant_id, pre_contract_review_id)` | `conflict.conflict_review` | `(tenant_id, conflict_review_id)` | 否 |
 | `contract.contract_revision` | `fk_contract_revision__creator` | `(tenant_id, created_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.contract_revision` | `fk_contract_revision__customer_confirmation_id` | `(tenant_id, customer_confirmation_id)` | `opportunity.customer_requirement_confirmation` | `(tenant_id, customer_requirement_confirmation_id)` | 否 |
+| `contract.contract_revision` | `fk_contract_revision__body_evidence_version_id` | `(tenant_id, body_evidence_version_id)` | `opportunity.material_version` | `(tenant_id, material_version_id)` | 否 |
 | `contract.contract_participation` | `fk_contract_participation__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `contract.contract_participation` | `fk_contract_participation__party` | `(tenant_id, party_id)` | `party.party` | `(tenant_id, party_id)` | 否 |
 | `contract.contract_participation` | `fk_contract_participation__source_opportunity_participation` | `(tenant_id, source_opportunity_participation_id)` | `opportunity.opportunity_participation` | `(tenant_id, opportunity_participation_id)` | 否 |
@@ -2821,6 +5779,112 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `contract.contract_termination` | `fk_contract_termination__decision` | `(tenant_id, decision_record_id)` | `responsibility.decision_record` | `(tenant_id, decision_record_id)` | 否 |
 | `contract.contract_termination` | `fk_contract_termination__evidence` | `(tenant_id, evidence_submission_id)` | `evidence.evidence_submission` | `(tenant_id, evidence_submission_id)` | 否 |
 | `contract.contract_termination` | `fk_contract_termination__terminator` | `(tenant_id, terminated_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.preparation_request` | `fk_preparation_request__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.preparation_request` | `fk_preparation_request__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.preparation_request` | `fk_preparation_request__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.preparation_request` | `fk_preparation_request__customer_confirmation_id` | `(tenant_id, customer_confirmation_id)` | `opportunity.customer_requirement_confirmation` | `(tenant_id, customer_requirement_confirmation_id)` | 否 |
+| `contract.preparation_decision` | `fk_preparation_decision__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.preparation_decision` | `fk_preparation_decision__decided_by_appointment_id` | `(tenant_id, decided_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.approval_policy` | `fk_approval_policy__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.approval_policy` | `fk_approval_policy__organization_unit_id` | `(tenant_id, organization_unit_id)` | `identity.organization_unit` | `(tenant_id, organization_unit_id)` | 否 |
+| `contract.approval_policy_member` | `fk_approval_policy_member__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.approval_policy_member` | `fk_approval_policy_member__appointment_id` | `(tenant_id, appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.preparation_workflow` | `fk_preparation_workflow__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.preparation_workflow` | `fk_preparation_workflow__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.preparation_workflow` | `fk_preparation_workflow__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.preparation_workflow` | `fk_preparation_workflow__task_id` | `(tenant_id, task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `contract.preparation_workflow` | `fk_preparation_workflow__prior_task_id` | `(tenant_id, prior_task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `contract.preparation_workflow` | `fk_preparation_workflow__created_by_appointment_id` | `(tenant_id, created_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.revision_approval_request` | `fk_revision_approval_request__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.revision_approval_request` | `fk_revision_approval_request__requested_by_appointment_id` | `(tenant_id, requested_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.preparation_draft` | `fk_preparation_draft__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.preparation_draft` | `fk_preparation_draft__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.preparation_draft` | `fk_preparation_draft__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.preparation_draft` | `fk_preparation_draft__customer_confirmation_id` | `(tenant_id, customer_confirmation_id)` | `opportunity.customer_requirement_confirmation` | `(tenant_id, customer_requirement_confirmation_id)` | 否 |
+| `contract.preparation_draft` | `fk_preparation_draft__source_quote_response_id` | `(tenant_id, source_quote_response_id)` | `opportunity.quote_response` | `(tenant_id, quote_response_id)` | 否 |
+| `contract.template_version` | `fk_template_version__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.template_version` | `fk_template_version__evidence_version_id` | `(tenant_id, evidence_version_id)` | `opportunity.material_version` | `(tenant_id, material_version_id)` | 否 |
+| `contract.template_version` | `fk_template_version__approved_by_appointment_id` | `(tenant_id, approved_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.clause_version` | `fk_clause_version__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.clause_version` | `fk_clause_version__evidence_version_id` | `(tenant_id, evidence_version_id)` | `opportunity.material_version` | `(tenant_id, material_version_id)` | 否 |
+| `contract.clause_version` | `fk_clause_version__approved_by_appointment_id` | `(tenant_id, approved_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.revision_clause` | `fk_revision_clause__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.revision_review_request` | `fk_revision_review_request__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.revision_review_request` | `fk_revision_review_request__requested_by_appointment_id` | `(tenant_id, requested_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.revision_review_decision` | `fk_revision_review_decision__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.revision_review_decision` | `fk_revision_review_decision__conflict_review_id` | `(tenant_id, conflict_review_id)` | `conflict.conflict_review` | `(tenant_id, conflict_review_id)` | 否 |
+| `contract.revision_review_decision` | `fk_revision_review_decision__decided_by_appointment_id` | `(tenant_id, decided_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.revision_review_binding` | `fk_revision_review_binding__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.revision_review_binding` | `fk_revision_review_binding__conflict_review_id` | `(tenant_id, conflict_review_id)` | `conflict.conflict_review` | `(tenant_id, conflict_review_id)` | 否 |
+| `contract.revision_approval_requirement` | `fk_revision_approval_requirement__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.revision_approval_requirement` | `fk_revision_approval_requirement__approver_appointment_id` | `(tenant_id, approver_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.revision_approval_decision` | `fk_revision_approval_decision__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.revision_approval_decision` | `fk_revision_approval_decision__decided_by_appointment_id` | `(tenant_id, decided_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.signature_readiness` | `fk_signature_readiness__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.template_signing_party` | `fk_template_signing_party__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.template_signing_party` | `fk_template_signing_party__party_id` | `(tenant_id, party_id)` | `party.party` | `(tenant_id, party_id)` | 否 |
+| `contract.template_signing_party` | `fk_template_signing_party__profile_version_id` | `(tenant_id, profile_version_id)` | `party.profile_version` | `(tenant_id, profile_version_id)` | 否 |
+| `contract.template_signing_party` | `fk_template_signing_party__created_by_appointment_id` | `(tenant_id, created_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.signature_arrangement` | `fk_signature_arrangement__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.signature_arrangement` | `fk_signature_arrangement__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.signature_arrangement` | `fk_signature_arrangement__registered_by_appointment_id` | `(tenant_id, registered_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.signature_draft` | `fk_signature_draft__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.signature_draft` | `fk_signature_draft__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.signature_draft` | `fk_signature_draft__saved_by_appointment_id` | `(tenant_id, saved_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.signature_submission` | `fk_signature_submission__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.signature_submission` | `fk_signature_submission__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.signature_submission` | `fk_signature_submission__submitted_by_appointment_id` | `(tenant_id, submitted_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.signature_submission` | `fk_signature_submission__material_version_id` | `(tenant_id, material_version_id)` | `opportunity.material_version` | `(tenant_id, material_version_id)` | 否 |
+| `contract.signature_submission` | `fk_signature_submission__authority_material_version_id` | `(tenant_id, authority_material_version_id)` | `opportunity.material_version` | `(tenant_id, material_version_id)` | 否 |
+| `contract.signature_verification` | `fk_signature_verification__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.signature_verification` | `fk_signature_verification__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.signature_verification` | `fk_signature_verification__verified_by_appointment_id` | `(tenant_id, verified_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.signature_archive` | `fk_signature_archive__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.signature_archive` | `fk_signature_archive__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.signature_archive` | `fk_signature_archive__material_version_id` | `(tenant_id, material_version_id)` | `opportunity.material_version` | `(tenant_id, material_version_id)` | 否 |
+| `contract.signature_archive` | `fk_signature_archive__archived_by_appointment_id` | `(tenant_id, archived_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.signature_revision_return` | `fk_signature_revision_return__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.signature_revision_return` | `fk_signature_revision_return__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.signature_revision_return` | `fk_signature_revision_return__created_by_appointment_id` | `(tenant_id, created_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.signature_workflow` | `fk_signature_workflow__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.signature_workflow` | `fk_signature_workflow__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.signature_workflow` | `fk_signature_workflow__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.signature_workflow` | `fk_signature_workflow__created_by_appointment_id` | `(tenant_id, created_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.signature_workflow` | `fk_signature_workflow__task_id` | `(tenant_id, task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `contract.signature_workflow` | `fk_signature_workflow__prior_task_id` | `(tenant_id, prior_task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `contract.signature_handoff` | `fk_signature_handoff__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.signature_handoff` | `fk_signature_handoff__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.negotiation_disposition` | `fk_negotiation_disposition__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.negotiation_disposition` | `fk_negotiation_disposition__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.negotiation_disposition` | `fk_negotiation_disposition__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.termination_review_assignment` | `fk_termination_review_assignment__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.termination_review_assignment` | `fk_termination_review_assignment__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.termination_review_assignment` | `fk_termination_review_assignment__task_id` | `(tenant_id, task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `contract.termination_review_assignment` | `fk_termination_review_assignment__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.negotiation_cancelled_task` | `fk_negotiation_cancelled_task__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.negotiation_cancelled_task` | `fk_negotiation_cancelled_task__task_id` | `(tenant_id, task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `contract.negotiation_cancelled_task` | `fk_negotiation_cancelled_task__wait_id` | `(tenant_id, wait_id)` | `responsibility.wait_receipt` | `(tenant_id, wait_receipt_id)` | 否 |
+| `contract.execution_verification` | `fk_execution_verification__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.execution_verification` | `fk_execution_verification__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.execution_verification` | `fk_execution_verification__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.execution_workflow` | `fk_execution_workflow__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.execution_workflow` | `fk_execution_workflow__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.execution_workflow` | `fk_execution_workflow__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.execution_workflow` | `fk_execution_workflow__task_id` | `(tenant_id, task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `contract.execution_workflow` | `fk_execution_workflow__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.payment_request` | `fk_payment_request__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.payment_request` | `fk_payment_request__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.payment_request` | `fk_payment_request__material_version_id` | `(tenant_id, material_version_id)` | `opportunity.material_version` | `(tenant_id, material_version_id)` | 否 |
+| `contract.payment_request` | `fk_payment_request__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.payment_workflow` | `fk_payment_workflow__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.payment_workflow` | `fk_payment_workflow__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.payment_workflow` | `fk_payment_workflow__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.payment_workflow` | `fk_payment_workflow__task_id` | `(tenant_id, task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `contract.payment_workflow` | `fk_payment_workflow__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `contract.payment_review` | `fk_payment_review__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `contract.payment_review` | `fk_payment_review__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `contract.payment_review` | `fk_payment_review__material_version_id` | `(tenant_id, material_version_id)` | `opportunity.material_version` | `(tenant_id, material_version_id)` | 否 |
+| `contract.payment_review` | `fk_payment_review__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
 | `transfer.transfer_request` | `fk_transfer_request__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `transfer.transfer_request` | `fk_transfer_request__opportunity` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
 | `transfer.transfer_request` | `fk_transfer_request__contract` | `(tenant_id, contract_id)` | `contract.contract` | `(tenant_id, contract_id)` | 否 |
@@ -2838,6 +5902,36 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `transfer.transfer_snapshot` | `fk_transfer_snapshot__submitter` | `(tenant_id, submitted_by_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
 | `transfer.transfer_return_item` | `fk_transfer_return_item__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
 | `transfer.transfer_return_item` | `fk_transfer_return_item__return_decision` | `(tenant_id, return_decision_record_id)` | `responsibility.decision_record` | `(tenant_id, decision_record_id)` | 否 |
+| `transfer.workflow` | `fk_workflow__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `transfer.workflow` | `fk_workflow__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `transfer.workflow` | `fk_workflow__owner_appointment_id` | `(tenant_id, owner_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `transfer.workflow` | `fk_workflow__task_id` | `(tenant_id, task_id)` | `responsibility.task_occurrence` | `(tenant_id, task_occurrence_id)` | 否 |
+| `transfer.workflow` | `fk_workflow__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `transfer.submission` | `fk_submission__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `transfer.submission` | `fk_submission__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `transfer.submission` | `fk_submission__contract_revision_id` | `(tenant_id, contract_revision_id)` | `contract.contract_revision` | `(tenant_id, contract_revision_id)` | 否 |
+| `transfer.submission` | `fk_submission__customer_confirmation_id` | `(tenant_id, customer_confirmation_id)` | `opportunity.customer_requirement_confirmation` | `(tenant_id, customer_requirement_confirmation_id)` | 否 |
+| `transfer.submission` | `fk_submission__client_identity_material_id` | `(tenant_id, client_identity_material_id)` | `opportunity.material_version` | `(tenant_id, material_version_id)` | 否 |
+| `transfer.submission` | `fk_submission__signature_archive_material_id` | `(tenant_id, signature_archive_material_id)` | `opportunity.material_version` | `(tenant_id, material_version_id)` | 否 |
+| `transfer.submission` | `fk_submission__confirmed_action_draft_id` | `(tenant_id, confirmed_action_draft_id)` | `responsibility.action_draft` | `(tenant_id, action_draft_id)` | 否 |
+| `transfer.submission` | `fk_submission__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `transfer.review` | `fk_review__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `transfer.review` | `fk_review__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `transfer.review` | `fk_review__conflict_review_id` | `(tenant_id, conflict_review_id)` | `conflict.conflict_review` | `(tenant_id, conflict_review_id)` | 否 |
+| `transfer.review` | `fk_review__confirmed_action_draft_id` | `(tenant_id, confirmed_action_draft_id)` | `responsibility.action_draft` | `(tenant_id, action_draft_id)` | 否 |
+| `transfer.review` | `fk_review__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `transfer.review_return_item` | `fk_review_return_item__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `transfer.review_return_item` | `fk_review_return_item__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `transfer.intake` | `fk_intake__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `transfer.intake` | `fk_intake__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `transfer.intake` | `fk_intake__decision_record_id` | `(tenant_id, decision_record_id)` | `responsibility.decision_record` | `(tenant_id, decision_record_id)` | 否 |
+| `transfer.intake` | `fk_intake__confirmed_action_draft_id` | `(tenant_id, confirmed_action_draft_id)` | `responsibility.action_draft` | `(tenant_id, action_draft_id)` | 否 |
+| `transfer.intake` | `fk_intake__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `transfer.classification` | `fk_classification__tenant` | `(tenant_id)` | `identity.tenant` | `(tenant_id)` | 否 |
+| `transfer.classification` | `fk_classification__opportunity_id` | `(tenant_id, opportunity_id)` | `opportunity.opportunity` | `(tenant_id, opportunity_id)` | 否 |
+| `transfer.classification` | `fk_classification__recipient_appointment_id` | `(tenant_id, recipient_appointment_id)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
+| `transfer.classification` | `fk_classification__confirmed_action_draft_id` | `(tenant_id, confirmed_action_draft_id)` | `responsibility.action_draft` | `(tenant_id, action_draft_id)` | 否 |
+| `transfer.classification` | `fk_classification__recorded_by` | `(tenant_id, recorded_by)` | `identity.appointment` | `(tenant_id, appointment_id)` | 否 |
 
 ## 类型化准确引用矩阵
 
@@ -2845,24 +5939,26 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 
 | 表 | 引用槽 | 可空 | 物理列 | 允许目标类型 |
 |---|---|---:|---|---|
-| `identity.object_access_grant` | `object_subject` | 否 | `object_subject_type, object_subject_id, object_subject_revision, object_subject_hash` | `party.party, lead.lead, lead.lead_assignment, opportunity.opportunity, opportunity.opportunity_participation, opportunity.quote_revision, opportunity.quote_issue, conflict.conflict_review, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item, evidence.evidence_submission, evidence.evidence_binding, responsibility.task_occurrence, responsibility.decision_record, external_action.external_action` |
-| `audit.audit_entry` | `subject` | 否 | `subject_type, subject_id, subject_revision, subject_hash` | `identity.tenant, identity.principal, identity.organization_unit, identity.appointment, identity.authority_grant, identity.delegation_grant, identity.object_access_grant, audit.audit_entry, responsibility.task_occurrence, responsibility.decision_record, responsibility.wait_receipt, responsibility.action_draft, execution.command_execution_slot, execution.command_receipt, execution.domain_event, execution.domain_event_outbox, external_action.external_action, external_action.external_action_outbox, external_action.provider_inbox, evidence.upload_session, evidence.received_source_object, evidence.evidence_submission, evidence.evidence_binding, party.party, lead.lead, lead.lead_assignment, lead.lead_contact_result, opportunity.opportunity, opportunity.opportunity_participation, opportunity.opportunity_progress, opportunity.quote_revision, opportunity.quote_service_scope, opportunity.quote_line, opportunity.quote_payment_term, opportunity.quote_issue, opportunity.quote_response, conflict.conflict_review, conflict.conflict_review_party, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.contract_participation, contract.contract_fee_term, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item` |
+| `identity.object_access_grant` | `object_subject` | 否 | `object_subject_type, object_subject_id, object_subject_revision, object_subject_hash` | `party.party, lead.lead, lead.lead_assignment, opportunity.opportunity, opportunity.opportunity_participation, opportunity.quote_revision, opportunity.quote_issue, conflict.conflict_review, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item, evidence.evidence_submission, evidence.evidence_binding, responsibility.task_occurrence, responsibility.decision_record, external_action.external_action, opportunity.closure, party.profile_version, opportunity.customer_requirement_draft, opportunity.customer_requirement_confirmation, opportunity.customer_requirement_participant, opportunity.customer_requirement_draft_party, evidence.material_upload_basis, evidence.material_upload_check, opportunity.material_version, opportunity.quote_draft, opportunity.quote_package_basis, opportunity.quote_approval_policy, opportunity.quote_approval_policy_signer, opportunity.quote_approval_request, opportunity.quote_approval_member, opportunity.quote_approval_decision, opportunity.quote_manual_delivery, opportunity.quote_response_basis, opportunity.contract_preparation_source, opportunity.quote_workflow, contract.approval_policy, contract.approval_policy_member, contract.preparation_workflow, contract.revision_approval_request, contract.preparation_draft, contract.template_version, contract.clause_version, contract.revision_clause, contract.revision_review_request, contract.revision_review_decision, contract.revision_review_binding, contract.revision_approval_requirement, contract.revision_approval_decision, contract.signature_readiness, contract.preparation_request, contract.preparation_decision, contract.signature_arrangement, contract.signature_draft, contract.signature_submission, contract.signature_verification, contract.signature_archive, contract.signature_revision_return, contract.signature_workflow, contract.signature_handoff, contract.template_signing_party, transfer.workflow, transfer.submission, transfer.review, transfer.review_return_item, transfer.intake, transfer.classification` |
+| `audit.audit_entry` | `subject` | 否 | `subject_type, subject_id, subject_revision, subject_hash` | `identity.tenant, identity.principal, identity.organization_unit, identity.appointment, identity.authority_grant, identity.delegation_grant, identity.object_access_grant, audit.audit_entry, responsibility.task_occurrence, responsibility.decision_record, responsibility.wait_receipt, responsibility.action_draft, execution.command_execution_slot, execution.command_receipt, execution.domain_event, execution.domain_event_outbox, external_action.external_action, external_action.external_action_outbox, external_action.provider_inbox, evidence.upload_session, evidence.received_source_object, evidence.evidence_submission, evidence.evidence_binding, party.party, lead.lead, lead.lead_assignment, lead.lead_contact_result, opportunity.opportunity, opportunity.opportunity_participation, opportunity.opportunity_progress, opportunity.quote_revision, opportunity.quote_service_scope, opportunity.quote_line, opportunity.quote_payment_term, opportunity.quote_issue, opportunity.quote_response, conflict.conflict_review, conflict.conflict_review_party, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.contract_participation, contract.contract_fee_term, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item, opportunity.owner_exception, opportunity.owner_exception_disposition, opportunity.responsibility_handoff, opportunity.closure, party.profile_version, opportunity.customer_requirement_draft, opportunity.customer_requirement_confirmation, opportunity.customer_requirement_participant, opportunity.customer_requirement_draft_party, evidence.material_upload_basis, evidence.material_upload_check, opportunity.material_version, opportunity.quote_draft, opportunity.quote_package_basis, opportunity.quote_approval_policy, opportunity.quote_approval_policy_signer, opportunity.quote_approval_request, opportunity.quote_approval_member, opportunity.quote_approval_decision, opportunity.quote_manual_delivery, opportunity.quote_response_basis, opportunity.contract_preparation_source, opportunity.quote_workflow, contract.approval_policy, contract.approval_policy_member, contract.preparation_workflow, contract.revision_approval_request, contract.preparation_draft, contract.template_version, contract.clause_version, contract.revision_clause, contract.revision_review_request, contract.revision_review_decision, contract.revision_review_binding, contract.revision_approval_requirement, contract.revision_approval_decision, contract.signature_readiness, contract.preparation_request, contract.preparation_decision, contract.signature_arrangement, contract.signature_draft, contract.signature_submission, contract.signature_verification, contract.signature_archive, contract.signature_revision_return, contract.signature_workflow, contract.signature_handoff, contract.template_signing_party, transfer.workflow, transfer.submission, transfer.review, transfer.review_return_item, transfer.intake, transfer.classification` |
 | `audit.audit_entry` | `correction_target` | 是 | `correction_target_type, correction_target_id, correction_target_revision, correction_target_hash` | `audit.audit_entry` |
 | `audit.audit_entry` | `authorization_fact` | 是 | `authorization_fact_type, authorization_fact_id, authorization_fact_revision, authorization_fact_hash` | `identity.appointment, identity.authority_grant, identity.delegation_grant, identity.object_access_grant, responsibility.decision_record` |
 | `responsibility.task_occurrence` | `subject` | 否 | `subject_type, subject_id, subject_revision, subject_hash` | `party.party, lead.lead, lead.lead_assignment, opportunity.opportunity, opportunity.opportunity_participation, opportunity.quote_revision, opportunity.quote_issue, conflict.conflict_review, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item, evidence.evidence_submission, evidence.evidence_binding, responsibility.task_occurrence, responsibility.decision_record, external_action.external_action` |
-| `responsibility.task_occurrence` | `completion_fact` | 是 | `completion_fact_type, completion_fact_id, completion_fact_revision, completion_fact_hash` | `identity.tenant, identity.principal, identity.organization_unit, identity.appointment, identity.authority_grant, identity.delegation_grant, identity.object_access_grant, responsibility.task_occurrence, responsibility.decision_record, responsibility.wait_receipt, responsibility.action_draft, external_action.external_action, external_action.provider_inbox, evidence.upload_session, evidence.received_source_object, evidence.evidence_submission, evidence.evidence_binding, party.party, lead.lead, lead.lead_assignment, lead.lead_contact_result, opportunity.opportunity, opportunity.opportunity_participation, opportunity.opportunity_progress, opportunity.quote_revision, opportunity.quote_service_scope, opportunity.quote_line, opportunity.quote_payment_term, opportunity.quote_issue, opportunity.quote_response, conflict.conflict_review, conflict.conflict_review_party, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.contract_participation, contract.contract_fee_term, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item` |
+| `responsibility.task_occurrence` | `completion_fact` | 是 | `completion_fact_type, completion_fact_id, completion_fact_revision, completion_fact_hash` | `identity.tenant, identity.principal, identity.organization_unit, identity.appointment, identity.authority_grant, identity.delegation_grant, identity.object_access_grant, responsibility.task_occurrence, responsibility.decision_record, responsibility.wait_receipt, responsibility.action_draft, external_action.external_action, external_action.provider_inbox, evidence.upload_session, evidence.received_source_object, evidence.evidence_submission, evidence.evidence_binding, party.party, lead.lead, lead.lead_assignment, lead.lead_contact_result, opportunity.opportunity, opportunity.opportunity_participation, opportunity.opportunity_progress, opportunity.quote_revision, opportunity.quote_service_scope, opportunity.quote_line, opportunity.quote_payment_term, opportunity.quote_issue, opportunity.quote_response, conflict.conflict_review, conflict.conflict_review_party, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.contract_participation, contract.contract_fee_term, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item, opportunity.quote_approval_request, opportunity.quote_approval_decision, contract.preparation_request, contract.preparation_decision, contract.revision_review_request, contract.revision_review_decision, contract.revision_approval_request, contract.revision_approval_decision, contract.signature_readiness, contract.signature_arrangement, contract.signature_submission, contract.signature_verification, contract.signature_archive, contract.signature_revision_return, contract.signature_handoff, transfer.submission, transfer.review, transfer.intake, transfer.classification` |
+| `responsibility.task_occurrence` | `responsibility_basis` | 是 | `responsibility_basis_type, responsibility_basis_id, responsibility_basis_revision, responsibility_basis_hash` | `opportunity.opportunity, opportunity.responsibility_handoff` |
+| `responsibility.task_occurrence` | `cancellation_fact` | 是 | `cancellation_fact_type, cancellation_fact_id, cancellation_fact_revision, cancellation_fact_hash` | `opportunity.responsibility_handoff, opportunity.closure` |
 | `responsibility.decision_record` | `decision_subject` | 否 | `decision_subject_type, decision_subject_id, decision_subject_revision, decision_subject_hash` | `party.party, lead.lead, lead.lead_assignment, opportunity.opportunity, opportunity.opportunity_participation, opportunity.quote_revision, opportunity.quote_issue, conflict.conflict_review, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item, evidence.evidence_submission, evidence.evidence_binding, responsibility.task_occurrence, responsibility.decision_record, external_action.external_action` |
 | `responsibility.wait_receipt` | `awaited_fact` | 是 | `awaited_fact_type, awaited_fact_id, awaited_fact_revision, awaited_fact_hash` | `identity.tenant, identity.principal, identity.organization_unit, identity.appointment, identity.authority_grant, identity.delegation_grant, identity.object_access_grant, responsibility.task_occurrence, responsibility.decision_record, responsibility.wait_receipt, responsibility.action_draft, external_action.external_action, external_action.provider_inbox, evidence.upload_session, evidence.received_source_object, evidence.evidence_submission, evidence.evidence_binding, party.party, lead.lead, lead.lead_assignment, lead.lead_contact_result, opportunity.opportunity, opportunity.opportunity_participation, opportunity.opportunity_progress, opportunity.quote_revision, opportunity.quote_service_scope, opportunity.quote_line, opportunity.quote_payment_term, opportunity.quote_issue, opportunity.quote_response, conflict.conflict_review, conflict.conflict_review_party, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.contract_participation, contract.contract_fee_term, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item` |
-| `execution.command_receipt` | `result_fact` | 是 | `result_fact_type, result_fact_id, result_fact_revision, result_fact_hash` | `identity.tenant, identity.principal, identity.organization_unit, identity.appointment, identity.authority_grant, identity.delegation_grant, identity.object_access_grant, responsibility.task_occurrence, responsibility.decision_record, responsibility.wait_receipt, responsibility.action_draft, external_action.external_action, external_action.provider_inbox, evidence.upload_session, evidence.received_source_object, evidence.evidence_submission, evidence.evidence_binding, party.party, lead.lead, lead.lead_assignment, lead.lead_contact_result, opportunity.opportunity, opportunity.opportunity_participation, opportunity.opportunity_progress, opportunity.quote_revision, opportunity.quote_service_scope, opportunity.quote_line, opportunity.quote_payment_term, opportunity.quote_issue, opportunity.quote_response, conflict.conflict_review, conflict.conflict_review_party, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.contract_participation, contract.contract_fee_term, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item` |
-| `execution.domain_event` | `source_fact` | 否 | `source_fact_type, source_fact_id, source_fact_revision, source_fact_hash` | `identity.tenant, identity.principal, identity.organization_unit, identity.appointment, identity.authority_grant, identity.delegation_grant, identity.object_access_grant, responsibility.task_occurrence, responsibility.decision_record, responsibility.wait_receipt, responsibility.action_draft, external_action.external_action, external_action.provider_inbox, evidence.upload_session, evidence.received_source_object, evidence.evidence_submission, evidence.evidence_binding, party.party, lead.lead, lead.lead_assignment, lead.lead_contact_result, opportunity.opportunity, opportunity.opportunity_participation, opportunity.opportunity_progress, opportunity.quote_revision, opportunity.quote_service_scope, opportunity.quote_line, opportunity.quote_payment_term, opportunity.quote_issue, opportunity.quote_response, conflict.conflict_review, conflict.conflict_review_party, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.contract_participation, contract.contract_fee_term, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item` |
+| `execution.command_receipt` | `result_fact` | 是 | `result_fact_type, result_fact_id, result_fact_revision, result_fact_hash` | `identity.tenant, identity.principal, identity.organization_unit, identity.appointment, identity.authority_grant, identity.delegation_grant, identity.object_access_grant, responsibility.task_occurrence, responsibility.decision_record, responsibility.wait_receipt, responsibility.action_draft, external_action.external_action, external_action.provider_inbox, evidence.upload_session, evidence.received_source_object, evidence.evidence_submission, evidence.evidence_binding, party.party, lead.lead, lead.lead_assignment, lead.lead_contact_result, opportunity.opportunity, opportunity.opportunity_participation, opportunity.opportunity_progress, opportunity.quote_revision, opportunity.quote_service_scope, opportunity.quote_line, opportunity.quote_payment_term, opportunity.quote_issue, opportunity.quote_response, conflict.conflict_review, conflict.conflict_review_party, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.contract_participation, contract.contract_fee_term, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item, opportunity.owner_exception, opportunity.owner_exception_disposition, opportunity.responsibility_handoff, opportunity.closure, party.profile_version, opportunity.customer_requirement_draft, opportunity.customer_requirement_confirmation, opportunity.customer_requirement_participant, opportunity.customer_requirement_draft_party, evidence.material_upload_basis, evidence.material_upload_check, opportunity.material_version, opportunity.quote_draft, opportunity.quote_package_basis, opportunity.quote_approval_policy, opportunity.quote_approval_policy_signer, opportunity.quote_approval_request, opportunity.quote_approval_member, opportunity.quote_approval_decision, opportunity.quote_manual_delivery, opportunity.quote_response_basis, opportunity.contract_preparation_source, opportunity.quote_workflow, contract.approval_policy, contract.approval_policy_member, contract.preparation_workflow, contract.revision_approval_request, contract.preparation_draft, contract.template_version, contract.clause_version, contract.revision_clause, contract.revision_review_request, contract.revision_review_decision, contract.revision_review_binding, contract.revision_approval_requirement, contract.revision_approval_decision, contract.signature_readiness, contract.preparation_request, contract.preparation_decision, contract.signature_arrangement, contract.signature_draft, contract.signature_submission, contract.signature_verification, contract.signature_archive, contract.signature_revision_return, contract.signature_workflow, contract.signature_handoff, contract.template_signing_party, transfer.workflow, transfer.submission, transfer.review, transfer.review_return_item, transfer.intake, transfer.classification` |
+| `execution.domain_event` | `source_fact` | 否 | `source_fact_type, source_fact_id, source_fact_revision, source_fact_hash` | `identity.tenant, identity.principal, identity.organization_unit, identity.appointment, identity.authority_grant, identity.delegation_grant, identity.object_access_grant, responsibility.task_occurrence, responsibility.decision_record, responsibility.wait_receipt, responsibility.action_draft, external_action.external_action, external_action.provider_inbox, evidence.upload_session, evidence.received_source_object, evidence.evidence_submission, evidence.evidence_binding, party.party, lead.lead, lead.lead_assignment, lead.lead_contact_result, opportunity.opportunity, opportunity.opportunity_participation, opportunity.opportunity_progress, opportunity.quote_revision, opportunity.quote_service_scope, opportunity.quote_line, opportunity.quote_payment_term, opportunity.quote_issue, opportunity.quote_response, conflict.conflict_review, conflict.conflict_review_party, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.contract_participation, contract.contract_fee_term, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item, opportunity.owner_exception, opportunity.owner_exception_disposition, opportunity.responsibility_handoff, opportunity.closure, party.profile_version, opportunity.customer_requirement_draft, opportunity.customer_requirement_confirmation, opportunity.customer_requirement_participant, opportunity.customer_requirement_draft_party, evidence.material_upload_basis, evidence.material_upload_check, opportunity.material_version, opportunity.quote_draft, opportunity.quote_package_basis, opportunity.quote_approval_policy, opportunity.quote_approval_policy_signer, opportunity.quote_approval_request, opportunity.quote_approval_member, opportunity.quote_approval_decision, opportunity.quote_manual_delivery, opportunity.quote_response_basis, opportunity.contract_preparation_source, opportunity.quote_workflow, contract.approval_policy, contract.approval_policy_member, contract.preparation_workflow, contract.revision_approval_request, contract.preparation_draft, contract.template_version, contract.clause_version, contract.revision_clause, contract.revision_review_request, contract.revision_review_decision, contract.revision_review_binding, contract.revision_approval_requirement, contract.revision_approval_decision, contract.signature_readiness, contract.preparation_request, contract.preparation_decision, contract.signature_arrangement, contract.signature_draft, contract.signature_submission, contract.signature_verification, contract.signature_archive, contract.signature_revision_return, contract.signature_workflow, contract.signature_handoff, contract.template_signing_party, transfer.workflow, transfer.submission, transfer.review, transfer.review_return_item, transfer.intake, transfer.classification` |
 | `external_action.external_action` | `subject` | 否 | `subject_type, subject_id, subject_revision, subject_hash` | `party.party, lead.lead, lead.lead_assignment, opportunity.opportunity, opportunity.opportunity_participation, opportunity.quote_revision, opportunity.quote_issue, conflict.conflict_review, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item, evidence.evidence_submission, evidence.evidence_binding, responsibility.task_occurrence, responsibility.decision_record, external_action.external_action` |
 | `external_action.external_action` | `resolution_source` | 是 | `resolution_source_type, resolution_source_id, resolution_source_revision, resolution_source_hash` | `external_action.provider_inbox, responsibility.decision_record` |
 | `evidence.upload_session` | `target` | 否 | `target_type, target_id, target_revision, target_hash` | `party.party, lead.lead, lead.lead_assignment, opportunity.opportunity, opportunity.opportunity_participation, opportunity.quote_revision, opportunity.quote_issue, conflict.conflict_review, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item, evidence.evidence_submission, evidence.evidence_binding, responsibility.task_occurrence, responsibility.decision_record, external_action.external_action` |
 | `evidence.evidence_binding` | `target` | 否 | `target_type, target_id, target_revision, target_hash` | `party.party, lead.lead, lead.lead_assignment, opportunity.opportunity, opportunity.opportunity_participation, opportunity.quote_revision, opportunity.quote_issue, conflict.conflict_review, conflict.conflict_finding, contract.contract, contract.contract_revision, contract.payment_gate, contract.signature_plan, contract.contract_signature, contract.contract_execution, contract.payment_confirmation, contract.contract_termination, transfer.transfer_request, transfer.transfer_snapshot, transfer.transfer_return_item, evidence.evidence_submission, evidence.evidence_binding, responsibility.task_occurrence, responsibility.decision_record, external_action.external_action` |
 | `opportunity.opportunity_progress` | `source_fact` | 是 | `source_fact_type, source_fact_id, source_fact_revision, source_fact_hash` | `lead.lead_contact_result, opportunity.quote_issue, opportunity.quote_response, responsibility.decision_record, external_action.external_action, external_action.provider_inbox, evidence.evidence_submission` |
-| `opportunity.quote_issue` | `delivery_fact` | 否 | `delivery_fact_type, delivery_fact_id, delivery_fact_revision, delivery_fact_hash` | `external_action.external_action, external_action.provider_inbox` |
-| `conflict.conflict_review` | `trigger_fact` | 否 | `trigger_fact_type, trigger_fact_id, trigger_fact_revision, trigger_fact_hash` | `opportunity.quote_revision, opportunity.quote_response, contract.contract_revision, transfer.transfer_request, responsibility.action_draft` |
-| `conflict.conflict_review_party` | `source_item` | 否 | `source_item_type, source_item_id, source_item_revision, source_item_hash` | `party.party, opportunity.opportunity_participation, contract.contract_participation, transfer.transfer_snapshot` |
+| `opportunity.quote_issue` | `delivery_fact` | 否 | `delivery_fact_type, delivery_fact_id, delivery_fact_revision, delivery_fact_hash` | `external_action.external_action, external_action.provider_inbox, opportunity.quote_manual_delivery` |
+| `conflict.conflict_review` | `trigger_fact` | 否 | `trigger_fact_type, trigger_fact_id, trigger_fact_revision, trigger_fact_hash` | `opportunity.quote_revision, opportunity.quote_response, contract.contract_revision, transfer.transfer_request, responsibility.action_draft, transfer.submission` |
+| `conflict.conflict_review_party` | `source_item` | 否 | `source_item_type, source_item_id, source_item_revision, source_item_hash` | `party.party, opportunity.opportunity_participation, contract.contract_participation, transfer.transfer_snapshot, opportunity.customer_requirement_participant` |
 | `conflict.conflict_finding` | `matched_fact` | 否 | `matched_fact_type, matched_fact_id, matched_fact_revision, matched_fact_hash` | `party.party, opportunity.opportunity_participation, contract.contract_participation, conflict.conflict_review_party, transfer.transfer_request` |
 | `conflict.conflict_finding` | `source_fact` | 是 | `source_fact_type, source_fact_id, source_fact_revision, source_fact_hash` | `party.party, opportunity.opportunity_participation, contract.contract_participation, transfer.transfer_snapshot, evidence.evidence_submission` |
 | `contract.contract` | `activation_source` | 是 | `activation_source_type, activation_source_id, activation_source_revision, activation_source_hash` | `contract.payment_gate, responsibility.decision_record` |
@@ -2899,7 +5995,7 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `identity.authority_grant` | `CONTROLLED` | `state, revoked_at, revocation_reason_code, revision` |
 | `identity.delegation_grant` | `CONTROLLED` | `state, revoked_at, revocation_reason_code, revision` |
 | `identity.object_access_grant` | `CONTROLLED` | `state, revoked_at, revocation_reason_code, revision` |
-| `responsibility.task_occurrence` | `CONTROLLED` | `state, completed_at, cancelled_at, cancellation_reason_code, completion_fact_type, completion_fact_id, completion_fact_revision, completion_fact_hash, revision` |
+| `responsibility.task_occurrence` | `CONTROLLED` | `state, completed_at, cancelled_at, cancellation_reason_code, completion_fact_type, completion_fact_id, completion_fact_revision, completion_fact_hash, revision, cancellation_fact_type, cancellation_fact_id, cancellation_fact_revision, cancellation_fact_hash` |
 | `responsibility.action_draft` | `CONTROLLED` | `candidate_payload, candidate_payload_digest, last_edited_at, state, confirmed_by_appointment_id, confirmed_at, confirmed_payload_digest, revision` |
 | `execution.domain_event_outbox` | `QUEUE` | `status, available_at, lease_owner, lease_until, fencing_token, attempt_count, delivered_at, last_error_code, revision` |
 | `external_action.external_action` | `CONTROLLED` | `status, dispatched_at, provider_action_id, completed_at, result_code, result_digest, resolution_method_code, resolution_source_type, resolution_source_id, resolution_source_revision, resolution_source_hash, last_error_code, revision` |
@@ -2911,6 +6007,7 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `lead.lead_assignment` | `CONTROLLED` | `assignment_status_code, closed_at, close_reason_code, revision` |
 | `opportunity.opportunity` | `CONTROLLED` | `current_quote_revision_id, close_outcome_code, closed_at, revision` |
 | `opportunity.quote_issue` | `CONTROLLED` | `issue_status_code, revoked_at, revocation_reason_code, revision` |
+| `opportunity.owner_exception` | `CONTROLLED` | `is_current` |
 | `conflict.conflict_review` | `CONTROLLED` | `resolution_code, resolution_digest, resolved_at, revision` |
 | `contract.contract` | `CONTROLLED` | `current_revision_id, approved_revision_id, contract_execution_id, deal_activated_at, activation_source_type, activation_source_id, activation_source_revision, activation_source_hash, contract_termination_id, revision, changed_at` |
 | `contract.payment_gate` | `CONTROLLED` | `gate_state, satisfied_at, satisfaction_digest, payment_confirmation_ids, confirmation_set_digest, risk_decision_record_id, revision, changed_at` |
@@ -2918,9 +6015,11 @@ ConflictFinding事实：一行代表某Review基于冻结规则与语料产生�
 | `contract.contract_termination` | `CONTROLLED` | `refund_calculation_minor, refund_currency_code, refund_calculation_digest, refund_calculated_at, revision, changed_at` |
 | `transfer.transfer_request` | `CONTROLLED` | `accepted_snapshot_id, accept_decision_record_id, matter_id, matter_no, matter_type_code, matter_capability_pack_code, matter_capability_pack_version, matter_created_at, revision, changed_at` |
 | `platform_meta.deployment_state` | `CONTROLLED` | `operating_mode, active_release_digest, active_manifest_hash, schema_contract_version, revision, changed_at` |
+| `platform_meta.r2_opportunity_checkpoint` | `CONTROLLED` | `checkpoint_body, revision, updated_at` |
 
 ## Platform Meta边界
 
-- `platform_meta.deployment_state`是唯一自建技术表，由受控发布作业使用迁移Owner维护且四个应用角色只读；迁移Owner不是应用启动角色，凭据边界由IaC验证。
+- `platform_meta.deployment_state`是发布状态技术表，由受控发布作业使用迁移Owner维护且四个应用角色只读；迁移Owner不是应用启动角色，凭据边界由IaC验证。
 - `platform_meta.flyway_schema_history`是第二张技术表，由固定版本Flyway独占创建和维护；本合同只补中文注释，不创建、修改或授权应用写入。
-- 结构验证迁移要求52张应用事实表加上述2张技术表恰好等于54张；任何额外第55张表都会使迁移失败。
+- 历史V840验证52张业务表和2张技术表；追加V890后为52张业务表和3张技术表，共55张。版本标识52-plus-2-r2-v3沿用合同谱系名称，不表示物理表数仍为54。
+- `platform_meta.r2_opportunity_checkpoint`是新增Worker专用技术检查点，仅保存有界版本化技术状态；Worker只可读取、插入和更新正文/修订/数据库时间，其他应用角色无访问权。

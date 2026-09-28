@@ -1,0 +1,532 @@
+{
+  "unitSuites": [
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.CustomerRequirementsBoundaryTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.CustomerRequirementsJsonTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.internal.storage.ClamdLiveProbeTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "2"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.internal.storage.ClamdMalwareScannerTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.internal.storage.MaterialObjectStoreFactoryTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.LeadIntakeConfigurationTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.MaterialsJsonTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.OpenApiContractTest",
+      "tests": "22",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.OwnerExceptionObservationDiscoveryTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.R2OpportunityClosureWireTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.R2OpportunityOwnerExceptionInputTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.R2OpportunityOwnerExceptionWireTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.R2WorkcardOptionalWireTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.security.HumanCredentialTransportTest",
+      "tests": "15",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.ArchitectureTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.audit.OpportunityClosureReceiptMetadataTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.audit.OpportunityCustomerReceiptMetadataTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.audit.R2WorkcardDisclosureTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.audit.ReceiptRecoveryMetadataTest",
+      "tests": "18",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.bootstrap.RuntimeRoleTest",
+      "tests": "17",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.bootstrap.RuntimeWebRoleTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.evidence.internal.persistence.SubmissionHashTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.evidence.internal.storage.LocalPrivateMaterialObjectStoreTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "1"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.CanonicalJsonTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.CommandEnvelopeTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.CustomerRequirementsScopeTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.MaterialExecutionContractTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.OpportunityBusinessScopePolicyTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.OpportunityHandoffRecoveryEventTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.OpportunityOwnerExceptionEventTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.PublicFactReferencesTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.QuoteScopeTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.QuoteWaitRecoveryScopeTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.R1EventPolicyTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.R2OpportunityCommandContractTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.execution.R2RecoveryBoundaryTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.identity.ActorScopeProtectionTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.identity.BootstrapCandidateProtectionTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.identity.IdentityBootstrapManifestTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.identity.OpportunityLedgerGrantContractTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.identity.OwnerExceptionGrantContractTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.lead.ActionDraftCandidatesTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.lead.internal.persistence.R1ProjectionContactHashTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.lead.LeadCanonicalizationTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.lead.LeadNamesTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.lead.LeadProtectionTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.lead.RetryPolicyTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.opportunity.CustomerRequirementDocumentTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressInputTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.opportunity.QuoteDocumentRendererTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.opportunity.QuotePackageTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.opportunity.QuoteProtectionTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.opportunity.QuoteReplyTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.opportunity.QuoteWorkflowServiceTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.query.OpportunityResponsibilityProjectionTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.responsibility.OpportunityTaskHandoffTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.responsibility.R1BusinessTimeTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.responsibility.R1ResourceTagsTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.testing.PostgresImageLockTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.worker.OwnerExceptionCheckpointTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.worker.R1ProjectionDispatcherTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.worker.R1WorkerDeploymentTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.worker.R2OpportunityCheckpointTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.worker.R2OpportunityTaskSchedulerTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.worker.WorkerRuntimeHealthTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "unitTotal": 282,
+  "integrationSuites": [
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.R2QuoteWorkflowIT",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.QuoteHandoffIT",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.QuoteDueRecoveryIT",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.R2QuoteHttpIT",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.R1WorkcardHttpIT",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "io.github.windyzhu3.ontologylaw.api.R2QuoteLedgerReadIT",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "integrationTotal": 21,
+  "previousBehavioralSuite": {
+    "name": "io.github.windyzhu3.ontologylaw.api.R2QuoteWorkflowIT",
+    "tests": "18",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "timestamp": "0"
+  },
+  "frontend": {
+    "files": 62,
+    "tests": 742,
+    "failed": 0
+  },
+  "schemaTests": 85,
+  "schemaProjectionTests": 6,
+  "localBuild": {
+    "jarSha256": "bf12ff7736eab41d9484d1a9d26828c0ef9f9d3dcbad523b520c8049d636c28e",
+    "manifestSha256": "b368ee39b9b785b9a494f835de3f819f97017568a825124a494b318996501665",
+    "schema": "52-plus-2-r2-v10",
+    "source": "C:\\Users\\Jacob\\.cache\\codex-worktrees\\ontology-law-r2-sales",
+    "purpose": "local T07 human review; not release acceptance",
+    "backup": "C:\\Users\\Jacob\\.cache\\codex-worktrees\\ontology-law-r2-sales\\.superpowers\\r2-review-runtime\\before-t07-20260920-225326"
+  },
+  "localSpa": {
+    "index-BUrfRGLP.js": "02a80a6bc8ee42270ce7bab592bd6ecb61e6193b018fb40fab37a18d7ddf176d",
+    "index-CBJkPLrP.css": "5fcc2c601d0978008dd303d93db2e3bd1ce33f4ba3d50606a64c901f00d9734c"
+  }
+}

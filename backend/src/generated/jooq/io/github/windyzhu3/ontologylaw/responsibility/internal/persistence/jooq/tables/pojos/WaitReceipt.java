@@ -95,6 +95,41 @@ public class WaitReceipt implements Serializable {
      */
     private final byte[] awaitedFactHash;
 
+    /**
+     * T01同租户准确身份。
+     */
+    private final UUID handoffFactId;
+
+    /**
+     * T01准确版本，JSON安全整数。
+     */
+    private final Long handoffFactRevision;
+
+    /**
+     * T01同租户准确身份。
+     */
+    private final UUID inheritedWaitReceiptId;
+
+    /**
+     * 准确原等待摘要。
+     */
+    private final byte[] inheritedWaitHash;
+
+    /**
+     * T01同租户准确身份。
+     */
+    private final UUID originProgressId;
+
+    /**
+     * 准确原进展摘要。
+     */
+    private final byte[] originProgressHash;
+
+    /**
+     * T01数据库业务时刻。
+     */
+    private final OffsetDateTime originalSlaDueAt;
+
     public WaitReceipt(WaitReceipt value) {
         this.tenantId = value.tenantId;
         this.waitReceiptId = value.waitReceiptId;
@@ -111,6 +146,13 @@ public class WaitReceipt implements Serializable {
         this.awaitedFactId = value.awaitedFactId;
         this.awaitedFactRevision = value.awaitedFactRevision;
         this.awaitedFactHash = value.awaitedFactHash;
+        this.handoffFactId = value.handoffFactId;
+        this.handoffFactRevision = value.handoffFactRevision;
+        this.inheritedWaitReceiptId = value.inheritedWaitReceiptId;
+        this.inheritedWaitHash = value.inheritedWaitHash;
+        this.originProgressId = value.originProgressId;
+        this.originProgressHash = value.originProgressHash;
+        this.originalSlaDueAt = value.originalSlaDueAt;
     }
 
     public WaitReceipt(
@@ -128,7 +170,14 @@ public class WaitReceipt implements Serializable {
         String awaitedFactType,
         UUID awaitedFactId,
         Long awaitedFactRevision,
-        byte[] awaitedFactHash
+        byte[] awaitedFactHash,
+        UUID handoffFactId,
+        Long handoffFactRevision,
+        UUID inheritedWaitReceiptId,
+        byte[] inheritedWaitHash,
+        UUID originProgressId,
+        byte[] originProgressHash,
+        OffsetDateTime originalSlaDueAt
     ) {
         this.tenantId = tenantId;
         this.waitReceiptId = waitReceiptId;
@@ -145,6 +194,13 @@ public class WaitReceipt implements Serializable {
         this.awaitedFactId = awaitedFactId;
         this.awaitedFactRevision = awaitedFactRevision;
         this.awaitedFactHash = awaitedFactHash;
+        this.handoffFactId = handoffFactId;
+        this.handoffFactRevision = handoffFactRevision;
+        this.inheritedWaitReceiptId = inheritedWaitReceiptId;
+        this.inheritedWaitHash = inheritedWaitHash;
+        this.originProgressId = originProgressId;
+        this.originProgressHash = originProgressHash;
+        this.originalSlaDueAt = originalSlaDueAt;
     }
 
     /**
@@ -270,6 +326,64 @@ public class WaitReceipt implements Serializable {
         return this.awaitedFactHash;
     }
 
+    /**
+     * Getter for <code>responsibility.wait_receipt.handoff_fact_id</code>.
+     * T01同租户准确身份。
+     */
+    public UUID getHandoffFactId() {
+        return this.handoffFactId;
+    }
+
+    /**
+     * Getter for
+     * <code>responsibility.wait_receipt.handoff_fact_revision</code>.
+     * T01准确版本，JSON安全整数。
+     */
+    public Long getHandoffFactRevision() {
+        return this.handoffFactRevision;
+    }
+
+    /**
+     * Getter for
+     * <code>responsibility.wait_receipt.inherited_wait_receipt_id</code>.
+     * T01同租户准确身份。
+     */
+    public UUID getInheritedWaitReceiptId() {
+        return this.inheritedWaitReceiptId;
+    }
+
+    /**
+     * Getter for <code>responsibility.wait_receipt.inherited_wait_hash</code>.
+     * 准确原等待摘要。
+     */
+    public byte[] getInheritedWaitHash() {
+        return this.inheritedWaitHash;
+    }
+
+    /**
+     * Getter for <code>responsibility.wait_receipt.origin_progress_id</code>.
+     * T01同租户准确身份。
+     */
+    public UUID getOriginProgressId() {
+        return this.originProgressId;
+    }
+
+    /**
+     * Getter for <code>responsibility.wait_receipt.origin_progress_hash</code>.
+     * 准确原进展摘要。
+     */
+    public byte[] getOriginProgressHash() {
+        return this.originProgressHash;
+    }
+
+    /**
+     * Getter for <code>responsibility.wait_receipt.original_sla_due_at</code>.
+     * T01数据库业务时刻。
+     */
+    public OffsetDateTime getOriginalSlaDueAt() {
+        return this.originalSlaDueAt;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (this == obj)
@@ -369,6 +483,48 @@ public class WaitReceipt implements Serializable {
         }
         else if (!Arrays.equals(this.awaitedFactHash, other.awaitedFactHash))
             return false;
+        if (this.handoffFactId == null) {
+            if (other.handoffFactId != null)
+                return false;
+        }
+        else if (!this.handoffFactId.equals(other.handoffFactId))
+            return false;
+        if (this.handoffFactRevision == null) {
+            if (other.handoffFactRevision != null)
+                return false;
+        }
+        else if (!this.handoffFactRevision.equals(other.handoffFactRevision))
+            return false;
+        if (this.inheritedWaitReceiptId == null) {
+            if (other.inheritedWaitReceiptId != null)
+                return false;
+        }
+        else if (!this.inheritedWaitReceiptId.equals(other.inheritedWaitReceiptId))
+            return false;
+        if (this.inheritedWaitHash == null) {
+            if (other.inheritedWaitHash != null)
+                return false;
+        }
+        else if (!Arrays.equals(this.inheritedWaitHash, other.inheritedWaitHash))
+            return false;
+        if (this.originProgressId == null) {
+            if (other.originProgressId != null)
+                return false;
+        }
+        else if (!this.originProgressId.equals(other.originProgressId))
+            return false;
+        if (this.originProgressHash == null) {
+            if (other.originProgressHash != null)
+                return false;
+        }
+        else if (!Arrays.equals(this.originProgressHash, other.originProgressHash))
+            return false;
+        if (this.originalSlaDueAt == null) {
+            if (other.originalSlaDueAt != null)
+                return false;
+        }
+        else if (!this.originalSlaDueAt.equals(other.originalSlaDueAt))
+            return false;
         return true;
     }
 
@@ -391,6 +547,13 @@ public class WaitReceipt implements Serializable {
         result = prime * result + ((this.awaitedFactId == null) ? 0 : this.awaitedFactId.hashCode());
         result = prime * result + ((this.awaitedFactRevision == null) ? 0 : this.awaitedFactRevision.hashCode());
         result = prime * result + ((this.awaitedFactHash == null) ? 0 : Arrays.hashCode(this.awaitedFactHash));
+        result = prime * result + ((this.handoffFactId == null) ? 0 : this.handoffFactId.hashCode());
+        result = prime * result + ((this.handoffFactRevision == null) ? 0 : this.handoffFactRevision.hashCode());
+        result = prime * result + ((this.inheritedWaitReceiptId == null) ? 0 : this.inheritedWaitReceiptId.hashCode());
+        result = prime * result + ((this.inheritedWaitHash == null) ? 0 : Arrays.hashCode(this.inheritedWaitHash));
+        result = prime * result + ((this.originProgressId == null) ? 0 : this.originProgressId.hashCode());
+        result = prime * result + ((this.originProgressHash == null) ? 0 : Arrays.hashCode(this.originProgressHash));
+        result = prime * result + ((this.originalSlaDueAt == null) ? 0 : this.originalSlaDueAt.hashCode());
         return result;
     }
 
@@ -413,6 +576,13 @@ public class WaitReceipt implements Serializable {
         sb.append(", ").append(awaitedFactId);
         sb.append(", ").append(awaitedFactRevision);
         sb.append(", ").append("[binary...]");
+        sb.append(", ").append(handoffFactId);
+        sb.append(", ").append(handoffFactRevision);
+        sb.append(", ").append(inheritedWaitReceiptId);
+        sb.append(", ").append("[binary...]");
+        sb.append(", ").append(originProgressId);
+        sb.append(", ").append("[binary...]");
+        sb.append(", ").append(originalSlaDueAt);
 
         sb.append(")");
         return sb.toString();

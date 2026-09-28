@@ -2,17 +2,17 @@
 
 > 以准确业务事实驱动责任：**一张卡、一个 Owner、一个主命令、一个明确结果**。当一张卡无法维持这一约束时，拆分责任或后置能力，不增加通用流程结构。
 
-本仓库保存 Ontology Law System 的产品、领域、架构及 PostgreSQL 契约。[当前最新基线](docs/baseline/CURRENT-MVP-BASELINE.md)已经从原则设计推进到可机械验证的 **52 张应用事实表＋2 张 `platform_meta` 技术表**字段合同、V860 四列QUERY读取能力后继及独立保留的 PostgreSQL 18 v1.1 历史运行时证据。R1 的 A/B（脚手架、OpenAPI）、C0 合同修正及 C 数据库基础设施已合并；D 的 CommandRuntime、实时授权与审计基础设施及实库测试已通过 PR #12 合并（`ae88e63257699715dc3ee0c139563f5bfafdb2b7`）。MVP-2026-09-05.2 的合同收口与可复用运行时机制随后通过[功能 PR #14](https://github.com/windyzhu3/Ontology-law-systerm/pull/14)合并，最终功能合并提交为`037b3f9f547493153c2edaffabdd53904c752e64`；准确 head/tree、PR test-merge 及 exact-head 托管 CI 绑定见[分层验收记录](docs/progress/2026-09-05-r1-contract-closure-acceptance.md)。
+[基线总入口](docs/baseline/CURRENT-MVP-BASELINE.md)保留冻结合同，并导航至当前具名后继。当前开发沿用用户已确认的 [R2.5 MVP 收口计划](docs/superpowers/plans/2026-09-28-r2.5-mvp-replan.md)。销售主链、登录与身份管理、合同及签后办理、M01 已有实现；待收口的是有界查询与性能、M02、早期线索管理、经营概览、三项人工确认 AI 和真实试点条件。
 
-该功能合并冻结了capture、draft、两类recovery的命令专属授权和完整R1成功事件集合，补齐`OpportunityOpened`的Schema/Owner Outbox映射，把`CONNECTED_VALID`校正为2 Event/2 Outbox，并将可复用授权与精确事件校验接入真实Owner facts及CommandRuntime。它仍不包含生产业务Handler/Controller，不交付业务SPA或浏览器E2E；ADM-01～07仍只是视觉设计和身份数据原语、尚不可操作，R2/R3也未交付。下一业务工作仍是原计划Task 5；完整R1后端、SPA和浏览器E2E业务门禁仍未满足。
+从 [当前实现/合同索引](docs/baseline/R2.5-CURRENT-IMPLEMENTATION.md) 和 [唯一执行记录](docs/progress/2026-09-28-r2.5-execution.md) 开始阅读。当前 R2 实现在 `codex/r2-sales-mvp` 工作树，含大量未提交变更；不能把同 HEAD 的 main 当作同一源码快照。数据库已到具名 v19 后继，119 张应用表、122 张物理表、40 个 SQL 迁移至 V1050。
 
-> 当前权威以当前MVP基线为准；历史规格仅保留为设计演进证据。销售MVP终点、P0验收映射及52＋2边界均由该基线统一解释。
+本页以下保留 R1 原始结构说明；其中 52＋2、V860、仅 MatterRef 等描述只适用于原冻结阶段。具名 R2 后继及已确认分类/承接范围以当前索引为入口，旧合同未被增量替代部分继续生效。历史验收与本轮验证分开，R1 暂停验收、R2 未获发布准入的状态保留。
 
 ## 1. 当前正式冻结基线
 
 最新权威交付物：
 
-- 当前MVP基线（见上文）
+- R1 冻结基线及具名后继（见上文基线总入口）
 - [ADR-0007：R1命令授权与事件合同收口](docs/adr/ADR-0007-r1-command-policy-event-closure.md)
 - [R1命令授权及事件合同](docs/contracts/r1/R1-COMMAND-POLICY-EVENT-CONTRACT.md)
 - [R1 version-1空通知payload Schema](contracts/events/r1-domain-notification-v1.schema.json)

@@ -3,15 +3,30 @@ package io.github.windyzhu3.ontologylaw.opportunity.internal.persistence;
 import io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Subject;
 import io.github.windyzhu3.ontologylaw.opportunity.EventOpportunityReader;
 import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import static io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.Tables.OPPORTUNITY_;
 
 public final class JooqEventOpportunityReader implements EventOpportunityReader {
+    private record Scope(Connection connection,UUID tenant,Map<UUID,Opportunity> rows) {}
+    private static final ThreadLocal<Scope> CURRENT=new ThreadLocal<>();
+    public io.github.windyzhu3.ontologylaw.identity.AuthorizationService.ReadScope fencedReadScope(Connection c,UUID tenant)throws SQLException {
+        if(c.getAutoCommit()||c.getTransactionIsolation()!=Connection.TRANSACTION_READ_COMMITTED||CURRENT.get()!=null)throw new SQLException("Fenced opportunity read scope required","25001");
+        CURRENT.set(new Scope(c,java.util.Objects.requireNonNull(tenant),new HashMap<>()));
+        return CURRENT::remove;
+    }
     public Opportunity byId(Connection c,UUID tenant,UUID id){
+        var scope=CURRENT.get();
+        boolean reusable=scope!=null&&scope.connection()==c&&scope.tenant().equals(tenant);
+        if(reusable&&scope.rows().containsKey(id))return scope.rows().get(id);
         var o=OPPORTUNITY_;var r=DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)).select(o.OPPORTUNITY_ID,o.REVISION,o.SOURCE_LEAD_ID,o.SOURCE_ASSIGNMENT_ID,o.SOURCE_CONTACT_RESULT_ID,o.OWNER_APPOINTMENT_ID).from(o).where(o.TENANT_ID.eq(tenant)).and(o.OPPORTUNITY_ID.eq(id)).fetchOne();
-        return r==null?null:new Opportunity(new Subject("opportunity.opportunity",r.value1(),r.value2(),null),r.value3(),r.value4(),r.value5(),r.value6());
+        var result=r==null?null:new Opportunity(new Subject("opportunity.opportunity",r.value1(),r.value2(),null),r.value3(),r.value4(),r.value5(),r.value6());
+        if(reusable&&scope.rows().size()<100)scope.rows().put(id,result);
+        return result;
     }
     public Opportunity forContact(Connection c,UUID tenant,UUID contactId) {
         var o=OPPORTUNITY_;

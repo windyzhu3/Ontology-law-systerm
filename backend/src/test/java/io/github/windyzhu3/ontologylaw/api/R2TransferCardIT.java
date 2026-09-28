@@ -1,0 +1,9 @@
+package io.github.windyzhu3.ontologylaw.api;
+import java.util.*;import org.junit.jupiter.api.Test;import static org.junit.jupiter.api.Assertions.*;import io.github.windyzhu3.ontologylaw.identity.AuthorizationService;import io.github.windyzhu3.ontologylaw.execution.*;import io.github.windyzhu3.ontologylaw.audit.AuditAppender;
+class R2TransferCardIT extends R2TransferAuthorityIT {
+ @Test void transfer_card_uses_destination_scope_for_the_exact_current_review_task()throws Exception{
+  var initial=beginTransfer();submitTransfer(initial);for(String code:List.of("TRANSFER_REVIEW","CONTRACT_READ"))mutate("insert into identity.authority_grant(tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values(?,?,?,?,?,?,clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",seed.tenant(),UUID.randomUUID(),reviewer,seed.appointment(),destination,code);
+  UUID task=UUID.fromString(scalar("select task_id from transfer.workflow where tenant_id=? and stage_code='REVIEW_TRANSFER'",seed.tenant()));var actor=reviewerActor();var authority=AuthorizationService.databaseBacked();var sources=new CurrentWorkCardSources(authority,protection,policies,cipher);var reader=new SensitiveReadRuntime(authority,AuditAppender.databaseBacked("F11_CURRENT_CARD"));
+  try(var c=database.apiConnection()){var result=reader.read(c,actor,UUID.randomUUID(),null,(tx,now)->sources.read(tx,actor,now,task));var card=(Map<?,?>)result.body().get("currentCard");assertNotNull(card);assertNotNull(R1WireModels.model(result.body(),io.github.windyzhu3.ontologylaw.api.adapter.generated.model.CurrentWorkCardEnvelope.class).getCurrentCard());assertEquals("REVIEW_TRANSFER",card.get("taskType"));assertEquals("TRANSFER_CONFLICT_REVIEW",card.get("expectedCompletionFact"));assertEquals("办理转案事项",((Map<?,?>)card.get("primaryCommand")).get("label"));}
+ }
+}

@@ -91,7 +91,9 @@ class CurrentWorkCardDisclosureIT extends WorkcardTestFixture {
             setupCard(TaskFactory.Type.COMPLETE_LEAD_INGRESS);
             String tag=cached?readCard(null).etag():null;long before=auditCount();
             try(var connection=database.apiConnection()) {
-                var probe=new ReadConnectionProbe(connection);probe.pauseAuditAt=3;probe.pauseCommit=true;
+                // Five exact rows now share one synchronous batch. Hold before that
+                // batch and again before commit acknowledgement, preserving both gates.
+                var probe=new ReadConnectionProbe(connection);probe.pauseAuditAt=1;probe.pauseCommit=true;
                 var observed=new AtomicLong(-1);var failure=new AtomicReference<Throwable>();
                 var server=HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(),0),0);
                 server.createContext("/api/v1/workcards/current",exchange->{
@@ -107,7 +109,7 @@ class CurrentWorkCardDisclosureIT extends WorkcardTestFixture {
                     socket.setSoTimeout(150);socket.getOutputStream().write(("GET /api/v1/workcards/current HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n"+(tag==null?"":"If-None-Match: "+tag+"\r\n")+"\r\n").getBytes(StandardCharsets.US_ASCII));
                     assertTrue(probe.auditReached.await(10,TimeUnit.SECONDS));assertEquals(before,auditCount());
                     assertThrows(SocketTimeoutException.class,()->socket.getInputStream().read());
-                    probe.auditContinue.countDown();assertTrue(probe.commitReached.await(10,TimeUnit.SECONDS));assertEquals(5,probe.inserts.get());assertEquals(before,auditCount());
+                    probe.auditContinue.countDown();assertTrue(probe.commitReached.await(10,TimeUnit.SECONDS));assertEquals(5,probe.auditRows.get());assertEquals(before,auditCount());
                     assertThrows(SocketTimeoutException.class,()->socket.getInputStream().read());
                     probe.commitContinue.countDown();socket.setSoTimeout(10000);String response=new String(socket.getInputStream().readAllBytes(),StandardCharsets.UTF_8);
                     assertNull(failure.get());assertTrue(response.startsWith(cached?"HTTP/1.1 304":"HTTP/1.1 200"));assertTrue(response.toLowerCase(Locale.ROOT).contains("etag: \"wb."));

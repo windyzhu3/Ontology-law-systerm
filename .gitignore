@@ -7,3 +7,12 @@ node_modules/
 target/
 dist/
 build/
+
+# Local review runtimes, credentials, material objects and agent/browser scratch.
+/.local/
+/.superpowers/
+/.playwright-cli/
+/output/
+*.log
+*.jfr
+*.tsbuildinfo

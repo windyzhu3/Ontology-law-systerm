@@ -1,5 +1,7 @@
 # 当前MVP基线
 
+> **2026-09-28 当前实现入口：** [R2.5 当前实现与完整后继索引](R2.5-CURRENT-IMPLEMENTATION.md)，[唯一执行记录](../progress/2026-09-28-r2.5-execution.md)。本页保留冻结 R1 合同及其具名后继；下文 v1.2/52＋2 是历史合同口径，当前 R2 为 v19、119 张应用表、122 张物理表。开发确认不提升发布门禁。
+
 Baseline ID: MVP-2026-09-08.3
 
 Delegated-context authority: [ADR-0015](../adr/ADR-0015-task9-delegated-context.md). This named static successor preserves legal one-hop delegated entry under [Identity V1.1](../contracts/r1/R1-IDENTITY-ACCESS-CONTRACT.md): optional paired X-On-Behalf-Appointment-Id, two required context fields, SELF max101 and pending recovery-marker retention until explicit identity choice. HTTP V1.5 / Workbench V1.3 / OpenAPI1.4.0 activate; Command V1.3 business policies, nine request bodies, fourteen events,37/32/5 and physical52-plus-2-v1.2 remain unchanged. Identity management stays HUMAN/own Appointment/DIRECT. Task9.2a static verification cannot establish T9-D02–08 runtime PASS.
@@ -171,6 +173,18 @@ P0-01至P0-15是销售主链的冻结验收映射；历史七份规格文末P0�
 
 ## r1-r2-r3-gates
 
+### R2-0 named development admission (2026-09-13)
+
+R2 development profile: R2_DEVELOPMENT_ADMISSION_V1
+R2 development plan: docs/superpowers/plans/2026-09-13-r2-complete-sales-mvp-plan.md
+R2 scope ID: R2-COMPLETE-SALES-MVP-2026-09-13
+R2 task selection authority: [R2_MY_TASK_SELECTION_V1](R2-MY-TASK-SELECTION-V1.md). Only the exact optional taskId parameter and optional myTasks/recommendedTaskId/selectionNotice/subjectTitle response additions activate; all remaining R1 transport shapes, security and errors retain their frozen hashes.
+R1 acceptance: PAUSED; R2 release acceptance: NOT_GRANTED
+
+用户已确认[完整销售MVP计划](../superpowers/plans/2026-09-13-r2-complete-sales-mvp-plan.md)并要求开始开发。本具名修订允许该计划范围内的 R2 开发，不再以前轮 R1 暂停验收反复阻断。下文旧 R2 entry 条件保留为完整验收检查，不能据此声称已经验收通过。
+
+运行 `python scripts/baseline/verify_baseline.py --r2-development .` 必须通过全部基线结构一致性检查，并校验本具名配置、准确计划及确认/暂停声明。该命令仍输出未满足的旧准入项；`--strict-r2` 保持原有失败关闭语义，两种模式不能组合。不提升任何台账状态，不替代数据库运行时、端到端、非功能或发布验收。接口、字段、当前卡选择、报价/合同来源、付款条件和案件分类的语义改变仍须在对应工作包实施前完成具名合同修订；本开发准入不自动激活这些变化。
+
 R1只覆盖Lead接入至首联结果：去重/缺失处理、唯一Owner分配或受控异常、创建`CONTACT_LEAD` TaskOccurrence、SPA显示唯一CurrentCard、保存/确认ActionDraft、写准确ContactResult、同事务写DomainEvent/AuditEntry/CommandReceipt并完成原Task；按结果创建重试或主管复核责任，有效接通形成R2可消费的`OpportunityOpened`边界。R1不实现Opportunity实质推进、报价、冲突审查、合同、签署、付款、转案、AI写入、客户入口、Provider真实发送、新表或通用平台组件。
 
 R1_PROJECTION对Lead、Draft、Task等可变source revision只重新读取当前Fact，必须容忍延迟、重复和乱序而不让旧事件倒退投影。R2以后启用OpportunityOpened具名消费者时，必须覆盖已被R1投影消费的历史事件、并发新增、重复、乱序和中断重试，并以Tenant＋Opportunity＋首个推进责任类型保证至多一次；本轮不注册R2 QueueOwner、不创建R2 Outbox或Task。
@@ -182,3 +196,8 @@ R1生产代码不得开始，直到`docs/adr/ADR-0002-lead-ingress-completion-sl
 P0-04的`REQUEST_SOURCE_INTAKE_STOP`只表示请求，不证明来源已停用；R1形成绑定准确Lead和Task的`DecisionRecord(LEAD_ROUTING_DISPOSITION)`，并给准确Source Intake Owner创建`ACK_SOURCE_INTAKE_STOP_REQUEST`。只有该Owner执行具名确认命令并写`DecisionRecord(SOURCE_INTAKE_STOP_REQUEST_ACKNOWLEDGED)`后才完成后继责任，仍不改变SourceAccount状态。
 
 R2只有在收口设计、当前基线和PR #2视觉资产已进入`main`，R1计划与五份实施合同保持`FROZEN`且位于`main`，独立`DB-52P2-PG18-RUNTIME`行为`RUNTIME_VERIFIED`，`R1-OPENAPI`、`R1-BACKEND`、`R1-SPA`均为`IMPLEMENTED`，`R1-E2E-GOLDEN`和`R1-E2E-FAILURES`均为`RUNTIME_VERIFIED`，且未通过新增通用平台能力绕过冻结边界时才能开始。`FROZEN`文档只表示实现输入已确定，不表示生产能力已经实现。R3只能在R2以同样标准完成后开始；后续页面设计可处于`DRAFT`，不得标为已实现或驱动R1扩大范围。
+
+
+### T07 quote implementation amendment (2026-09-20)
+
+[R2_QUOTE_PACKAGE_V1](R2-QUOTE-PACKAGE-V1.md) 明确统一销售报价、准确报价包、人工交付证据和四态客户回复的实施边界。K2 已由用户确认；该修订不改变 R1 传输契约或提升任何生产验收状态。旧执行类折扣分档不得用于强迫销售提前分类，人工交付不得伪造供应商发送结果。具体服务、迁移、权限、待办及页面以 T07 分项验收为准。

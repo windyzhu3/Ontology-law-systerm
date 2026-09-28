@@ -1,0 +1,24 @@
+{
+  "phase": "classify",
+  "opportunityId": "01a0e261-44d4-788f-b905-ad718699d212",
+  "receipts": [
+    {
+      "path": "/api/v1/opportunities/01a0e261-44d4-788f-b905-ad718699d212/transfers/classifications",
+      "status": 200,
+      "outcome": "SUCCEEDED",
+      "receiptId": "01a0e27c-83ff-782c-a5a0-0b44ebb8b64e"
+    }
+  ],
+  "matterContexts": [
+    {
+      "path": "/api/v1/transfer-tasks/01a0e27c-1126-799f-ac76-63ea4e8a5071/context",
+      "matter": {
+        "id": "01a0e27c-043c-749e-9656-deb295f31b0a",
+        "number": "R2-01a0e27c-043c-749e-9656-deb295f31b0a"
+      },
+      "category": null,
+      "stage": "CLASSIFY"
+    }
+  ],
+  "errors": []
+}

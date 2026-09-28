@@ -4,6 +4,12 @@
 package io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq;
 
 
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.Closure;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.OpportunityProgress;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.OwnerException;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.OwnerExceptionDisposition;
+import io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.ResponsibilityHandoff;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -27,10 +33,36 @@ public class Opportunity extends SchemaImpl {
     public static final Opportunity OPPORTUNITY = new Opportunity();
 
     /**
+     * Fact Owner：OpportunityRuntime；不可变商机终结事实；无待办也保留明确依据；说明加密且仅授权后解密。
+     */
+    public final Closure CLOSURE = Closure.CLOSURE;
+
+    /**
      * Fact
      * Owner：OpportunityRuntime；Opportunity锚点：一行代表从一个Lead及其唯一Assignment路径形成的一项准确法律需求和Owner；只保存当前报价指针及一次终结槽，不保存通用Stage或Status。
      */
     public final io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.Opportunity OPPORTUNITY_ = io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.Opportunity.OPPORTUNITY_;
+
+    /**
+     * Fact Owner：OpportunityRuntime；Opportunity进展事实：一行代表一项法律需求的一次已发生进展，Fact
+     * Owner为OpportunityRuntime并按序追加；机会Owner只是责任Actor，不可覆盖且不代表可变的当前机会阶段。
+     */
+    public final OpportunityProgress OPPORTUNITY_PROGRESS = OpportunityProgress.OPPORTUNITY_PROGRESS;
+
+    /**
+     * Fact Owner：OpportunityRuntime；负责人异常版本：每次观察保留准确历史版本。
+     */
+    public final OwnerException OWNER_EXCEPTION = OwnerException.OWNER_EXCEPTION;
+
+    /**
+     * Fact Owner：OpportunityRuntime；负责人异常处置：不可变人工决定。
+     */
+    public final OwnerExceptionDisposition OWNER_EXCEPTION_DISPOSITION = OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION;
+
+    /**
+     * Fact Owner：OpportunityRuntime；商机责任交接：不可变唯一责任链。
+     */
+    public final ResponsibilityHandoff RESPONSIBILITY_HANDOFF = ResponsibilityHandoff.RESPONSIBILITY_HANDOFF;
 
     /**
      * No further instances allowed
@@ -48,7 +80,12 @@ public class Opportunity extends SchemaImpl {
     @Override
     public final List<Table<?>> getTables() {
         return Arrays.asList(
-            io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.Opportunity.OPPORTUNITY_
+            Closure.CLOSURE,
+            io.github.windyzhu3.ontologylaw.opportunity.internal.persistence.jooq.tables.Opportunity.OPPORTUNITY_,
+            OpportunityProgress.OPPORTUNITY_PROGRESS,
+            OwnerException.OWNER_EXCEPTION,
+            OwnerExceptionDisposition.OWNER_EXCEPTION_DISPOSITION,
+            ResponsibilityHandoff.RESPONSIBILITY_HANDOFF
         );
     }
 }

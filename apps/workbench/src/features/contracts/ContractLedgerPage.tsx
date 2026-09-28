@@ -1,0 +1,28 @@
+import {ManagementLedgerPage} from './ManagementLedgerPage';
+import type {ManagementView} from './ManagementLedger';
+import {createManagementTransport} from '../../lib/managementTransport';
+import {selectContractPayment} from './paymentSelection';
+import {readWithDeadline} from '../../lib/readDeadline';
+import {useEffect,useRef,useState,useMemo,type ReactNode} from 'react';
+import type {WorkbenchSession} from '../../lib/api';
+import type {ContractsTransport} from '../../lib/contractsTransport';
+import type {ContractContext} from './types';
+import {ContractLedger} from './ContractLedger';
+import {ContractRuntimeCard} from './ContractRuntimeCard';
+import scales from '../opportunities/assets/Scales-green.svg';
+const rememberedViews=new WeakMap<WorkbenchSession,ManagementView|'contracts'>();
+export function ContractLedgerPage({session,api,onTasks,onTeam,onLeads,onOverview,onBack,sessionActions,onHandle,onCorrectClassification,onManagementTask,initialView='contracts'}:{initialView?:ManagementView|'contracts';onManagementTask?:(id:string)=>void|Promise<void>;session:WorkbenchSession;api:ContractsTransport;onTasks?:()=>void;onTeam?:()=>void;onLeads?:()=>void;onOverview?:()=>void;onBack?:()=>void;sessionActions?:ReactNode;onCorrectClassification?:(id:string)=>void;onHandle?:(context:ContractContext)=>Promise<void>|void}){
+ const managementApi=useMemo(()=>createManagementTransport(),[]);
+ const [view,setView]=useState<ManagementView|'contracts'>(()=>{const wanted=rememberedViews.get(session)??initialView;return !session.businessManagementViews||session.businessManagementViews.includes(wanted)?wanted:session.businessManagementViews[0]??initialView;});
+ useEffect(()=>{if(session.isCurrent())rememberedViews.set(session,view);},[session,view]);
+ const [page,setPage]=useState<Awaited<ReturnType<ContractsTransport['list']>>|null>(null),[detail,setDetail]=useState<ContractContext|null>(null),[selected,setSelected]=useState<string|null>(null),[handling,setHandling]=useState<{id:string;viewOnly:boolean}|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false),[refresh,setRefresh]=useState(0),[cursor,setCursor]=useState<string>();
+ const [filters,setFilters]=useState({search:'',state:''});
+ const current=useRef(session);current.current=session;const authority=useRef<WorkbenchSession|null>(null);
+ useEffect(()=>{setHandling(null);setCursor(undefined);setFilters(previous=>previous.search||previous.state?{search:'',state:''}:previous);},[session]);
+ useEffect(()=>{if(view!=='contracts')return;let live=true;const c=new AbortController();setPage(null);setDetail(null);setSelected(null);setError('');setLoading(true);readWithDeadline(signal=>api.list(session,signal,cursor,filters),c.signal).then(p=>{if(live&&current.current===session&&session.isCurrent()){authority.current=session;setPage(p);}}).catch(()=>{if(live){setPage(null);setDetail(null);setError('合同台账读取失败或权限已经变化。');}}).finally(()=>{if(live)setLoading(false);});return()=>{live=false;c.abort();};},[session,api,refresh,cursor,view,filters]);
+ useEffect(()=>{let live=true;const c=new AbortController();setDetail(null);const row=page?.items.find(r=>r.id===selected);if(row)readWithDeadline(signal=>api.context(session,row.opportunityId,signal),c.signal).then(d=>{if(live&&current.current===session&&session.isCurrent())setDetail(selectContractPayment(d));}).catch(()=>{if(live){setPage(null);setDetail(null);setSelected(null);setError('合同详情读取失败或权限已经变化。');}});return()=>{live=false;c.abort();};},[session,api,selected,page]);
+ if(!session.isCurrent())return null;
+ if(view!=='contracts')return <><header className="app-header"><div className="brand"><img className="icon" src={scales} alt=""/>律所工作助手</div><div className="session">{sessionActions??session.displayName}</div></header><ManagementLedgerPage key={`${session.actorScopeKey}:${session.identityEpoch}:${view}`} session={session} api={managementApi} view={view} onView={setView} onTasks={onTasks} onTeam={onTeam} onLeads={onLeads} onOverview={onOverview} onOpportunities={onBack} onTask={id=>{if(!onManagementTask)throw Error('当前入口无法接续办理');return onManagementTask(id);}}/></>;
+ if(handling&&onTasks&&authority.current===session)return <ContractRuntimeCard session={session} api={api} opportunityId={handling.id} viewOnly={handling.viewOnly} onTasks={onTasks} sessionActions={sessionActions}/>;
+ return <><header className="app-header"><div className="brand"><img className="icon" src={scales} alt=""/>律所工作助手</div><div className="session">{sessionActions??session.displayName}</div></header><ContractLedger onTeam={onTeam} onLeads={onLeads} onOverview={onOverview} filters={filters} onFilter={(search,state)=>{setPage(null);setDetail(null);setSelected(null);setCursor(undefined);setFilters({search,state});}} managementViews={session.businessManagementViews} onManagementView={setView} onCorrectClassification={onCorrectClassification} onOpportunities={onBack} rows={authority.current===session?page?.items??[]:[]} detail={authority.current===session?detail:null} selectedId={selected} loading={loading} error={error} onSelect={setSelected} onHandle={c=>{if(onHandle){void Promise.resolve().then(()=>onHandle(c)).catch(()=>setError('当前事项已变化，请重新查询后办理。'));}else setHandling({id:c.opportunity.id,viewOnly:false});}} onView={c=>setHandling({id:c.opportunity.id,viewOnly:true})} onTasks={onTasks} onReload={()=>setRefresh(n=>n+1)}/>{page?.nextCursor&&<button className="link-button" disabled={loading} onClick={()=>setCursor(page.nextCursor!)}>下一页</button>}{cursor&&<button className="link-button" onClick={()=>setCursor(undefined)}>返回第一页</button>}</>;
+}

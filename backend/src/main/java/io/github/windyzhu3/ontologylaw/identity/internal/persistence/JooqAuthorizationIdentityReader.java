@@ -10,7 +10,10 @@ import static io.github.windyzhu3.ontologylaw.identity.internal.persistence.jooq
 
 public final class JooqAuthorizationIdentityReader implements AuthorizationIdentityReader {
     private DSLContext db(Connection c) { return DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)); }
-    public Registration registration(Connection c,UUID tenant,UUID appointment) {
+    private record RegistrationSource(UUID appointment){}
+    private record OwnerSource(UUID appointment){}
+    public Registration registration(Connection c,UUID tenant,UUID appointment){return JooqAuthorizationService.lockedFacts(c,tenant,new RegistrationSource(appointment),()->registrationUncached(c,tenant,appointment));}
+    private Registration registrationUncached(Connection c,UUID tenant,UUID appointment) {
         var a=APPOINTMENT;var p=PRINCIPAL;
         var row=db(c).select(p.PRINCIPAL_ID,p.PRINCIPAL_KIND,p.IDENTITY_PROVIDER_CODE).from(a).join(p)
                 .on(p.TENANT_ID.eq(a.TENANT_ID).and(p.PRINCIPAL_ID.eq(a.PRINCIPAL_ID)))
@@ -25,9 +28,9 @@ public final class JooqAuthorizationIdentityReader implements AuthorizationIdent
     }
     public Owner owner(Connection c,UUID tenant,UUID appointment,Instant now) {
         var a=APPOINTMENT;var p=PRINCIPAL;
-        var row=db(c).select(a.PRINCIPAL_ID,a.ORGANIZATION_UNIT_ID,a.STATE,a.EFFECTIVE_FROM,a.EFFECTIVE_UNTIL,a.REVISION,p.STATE,p.REVISION)
+        var row=JooqAuthorizationService.lockedFacts(c,tenant,new OwnerSource(appointment),()->db(c).select(a.PRINCIPAL_ID,a.ORGANIZATION_UNIT_ID,a.STATE,a.EFFECTIVE_FROM,a.EFFECTIVE_UNTIL,a.REVISION,p.STATE,p.REVISION)
                 .from(a).join(p).on(p.TENANT_ID.eq(a.TENANT_ID).and(p.PRINCIPAL_ID.eq(a.PRINCIPAL_ID)))
-                .where(a.TENANT_ID.eq(tenant)).and(a.APPOINTMENT_ID.eq(appointment)).fetchOne();
+                .where(a.TENANT_ID.eq(tenant)).and(a.APPOINTMENT_ID.eq(appointment)).fetchOne());
         if(row==null)return null;
         boolean active="ACTIVE".equals(row.get(a.STATE)) && "ACTIVE".equals(row.get(p.STATE))
                 && !row.get(a.EFFECTIVE_FROM).toInstant().isAfter(now)

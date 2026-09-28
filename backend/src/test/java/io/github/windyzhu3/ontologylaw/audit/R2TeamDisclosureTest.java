@@ -1,0 +1,9 @@
+package io.github.windyzhu3.ontologylaw.audit;
+import io.github.windyzhu3.ontologylaw.identity.AuthorizationSnapshot;
+import io.github.windyzhu3.ontologylaw.identity.AuthorizationService.*;
+import java.time.Instant;import java.util.*;
+import org.junit.jupiter.api.Test;import static org.junit.jupiter.api.Assertions.*;
+class R2TeamDisclosureTest {
+ private AuditAppender.ManagementDisclosureEntry entry(String code,String slot,Path path,boolean allowed,boolean same){var source=new Subject("responsibility.task_occurrence",UUID.randomUUID(),0L,null);var request=new Request(new Actor(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),null,null),same?source:new Subject(source.type(),UUID.randomUUID(),0L,null),UUID.randomUUID(),new Requirement(code,slot,path,UUID.randomUUID()));return new AuditAppender.ManagementDisclosureEntry(UUID.randomUUID(),UUID.randomUUID(),source,new AuthorizationSnapshot(request,Instant.now(),allowed,null,null,"fixture",new byte[32]));}
+ @Test void team_disclosure_is_exact_direct_and_limited_to_registered_slots(){for(var slot:List.of("SOURCE_INTAKE_OWNER","ROUTING_SUPERVISOR","ASSIGNMENT_OWNER","OPPORTUNITY_OWNER")){assertNotNull(entry("TEAM_TASK_READ",slot,Path.DIRECT,true,true));assertThrows(IllegalArgumentException.class,()->entry("TEAM_TASK_READ",slot,Path.DELEGATED,true,true));assertThrows(IllegalArgumentException.class,()->entry("TEAM_TASK_READ",slot,Path.DIRECT,false,true));assertThrows(IllegalArgumentException.class,()->entry("TEAM_TASK_READ",slot,Path.DIRECT,true,false));}assertThrows(IllegalArgumentException.class,()->entry("TEAM_TASK_READ","UNREGISTERED",Path.DIRECT,true,true));assertThrows(IllegalArgumentException.class,()->entry("PAYMENT_LEDGER_READ","SOURCE_INTAKE_OWNER",Path.DIRECT,true,true));assertThrows(IllegalArgumentException.class,()->entry("CONTRACT_PREPARE","OPPORTUNITY_OWNER",Path.DIRECT,true,true));}
+}

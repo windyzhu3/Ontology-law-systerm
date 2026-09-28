@@ -9,6 +9,7 @@ final class CurrentWorkCardForms {
     static Map<String,Object> form(CurrentWorkCardQuery.CardData data) {
         var values=new LinkedHashMap<String,Object>();var fields=new ArrayList<Map<String,Object>>();
         switch(data.task().type()) {
+            case PROGRESS_OPPORTUNITY -> throw new IllegalArgumentException("Opportunity command form is not activated");
             case RESOLVE_LEAD_DUPLICATE -> {
                 values.put("candidateLeadId",data.duplicate().lead().id().toString());values.put("candidateLeadRevision",data.duplicate().lead().revision());
                 values.put("partyId",data.candidateParty().selector().id().toString());values.put("partyRevision",data.candidateParty().selector().revision());
@@ -22,6 +23,14 @@ final class CurrentWorkCardForms {
             case ASSIGN_LEAD -> {
                 var choices=new ArrayList<Map<String,Object>>();for(var owner:data.assignmentOptions())choices.add(option(owner.appointment().selector().id().toString(),CurrentWorkCardQuery.text(owner.principal().displayName()+" · "+owner.organization().displayName(),"负责人",200)));
                 select(values,fields,"ownerAppointmentId","联系负责人",choices);
+            }
+            case RESOLVE_SOURCE_REQUEST -> {
+                var choices=options("ASSIGN_SELECTED","继续分配","SCHEDULE_REVIEW","约时复查","END_LEAD","明确结束本线索");
+                if(data.assignmentOptions().isEmpty())choices.getFirst().put("disabled",true);
+                select(values,fields,"decisionCode","后续安排",choices);
+                var owners=new ArrayList<Map<String,Object>>();for(var owner:data.assignmentOptions())owners.add(option(owner.appointment().selector().id().toString(),CurrentWorkCardQuery.text(owner.principal().displayName()+" · "+owner.organization().displayName(),"负责人",200)));
+                values.put("ownerAppointmentId","");fields.add(object("name","ownerAppointmentId","label","合格销售","control","SELECT","required",false,"readOnly",false,"options",owners));
+                text(values,fields,"reviewAt","复查时间","TEXT",false);text(values,fields,"rationaleSummary","安排依据","TEXTAREA",true);
             }
             case RESOLVE_LEAD_ROUTING_GAP -> {
                 select(values,fields,"decisionCode","调配决定",options("SCHEDULE_ROUTING_REVIEW","安排下次复核","RETRY_ASSIGNMENT_NOW","再次尝试分配","REQUEST_SOURCE_INTAKE_STOP","请求确认来源处理"));text(values,fields,"rationaleSummary","决定理由","TEXTAREA",true);

@@ -1,0 +1,113 @@
+{
+  "account": "task9-local-contact",
+  "caseResults": {
+    "C30": {
+      "ledger": {
+        "taskState": "OPEN",
+        "canHandle": true,
+        "nextActionLabel": "准备合同正文",
+        "taskPresent": true
+      },
+      "closure": {
+        "status": "BLOCKED"
+      },
+      "quotes": {
+        "readonly": true,
+        "allowedActions": []
+      }
+    },
+    "C32": {
+      "ledger": {
+        "taskState": "OPEN",
+        "canHandle": true,
+        "nextActionLabel": "审核直接合同准备申请",
+        "taskPresent": true
+      },
+      "closure": {
+        "status": "BLOCKED"
+      },
+      "quotes": {
+        "readonly": true,
+        "allowedActions": []
+      }
+    },
+    "C39": {
+      "ledger": {
+        "taskState": "OPEN",
+        "canHandle": true,
+        "nextActionLabel": "准备合同正文",
+        "taskPresent": true
+      },
+      "closure": {
+        "status": "BLOCKED"
+      },
+      "quotes": {
+        "readonly": true,
+        "allowedActions": []
+      }
+    },
+    "C45": {
+      "ledger": {
+        "taskState": "NONE",
+        "canHandle": false,
+        "nextActionLabel": "查看合同办理结果",
+        "taskPresent": false
+      },
+      "closure": {
+        "status": "BLOCKED"
+      },
+      "quotes": {
+        "readonly": true,
+        "allowedActions": []
+      }
+    }
+  },
+  "timingsMs": {
+    "/api/v1/opportunities/01a0bf20-bab5-7f4d-a908-74a44aa1a480": [
+      566
+    ],
+    "/api/v1/opportunities/01a0bf20-bab5-7f4d-a908-74a44aa1a480/closure": [
+      1918
+    ],
+    "/api/v1/opportunities/01a0bf20-bab5-7f4d-a908-74a44aa1a480/quotes": [
+      429
+    ],
+    "/api/v1/opportunities/01a0c371-a186-768f-9814-e6229b7f7ceb": [
+      293
+    ],
+    "/api/v1/opportunities/01a0c371-a186-768f-9814-e6229b7f7ceb/closure": [
+      533
+    ],
+    "/api/v1/opportunities/01a0c371-a186-768f-9814-e6229b7f7ceb/quotes": [
+      297
+    ],
+    "/api/v1/opportunities/01a0c373-8808-7cf3-85b6-db7b1f889487": [
+      653
+    ],
+    "/api/v1/opportunities/01a0c373-8808-7cf3-85b6-db7b1f889487/closure": [
+      436
+    ],
+    "/api/v1/opportunities/01a0c373-8808-7cf3-85b6-db7b1f889487/quotes": [
+      261
+    ],
+    "/api/v1/opportunities/01a0cd92-890a-7375-a8e6-85da6eaec5ba": [
+      228
+    ],
+    "/api/v1/opportunities/01a0cd92-890a-7375-a8e6-85da6eaec5ba/closure": [
+      474
+    ],
+    "/api/v1/opportunities/01a0cd92-890a-7375-a8e6-85da6eaec5ba/quotes": [
+      323
+    ],
+    "/api/v1/opportunities?limit=20": [
+      1970,
+      2095,
+      2072
+    ],
+    "/api/v1/contracts": [
+      7072,
+      6812,
+      6932
+    ]
+  }
+}

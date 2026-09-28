@@ -2,7 +2,16 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { CurrentCard } from "./CurrentCard";
 import { envelope } from "../../test/fixtures";
-it("disables completion immediately when the user edits saved candidate text", () => {
+it.each([0,1,2,3,4,5,6])("blocks stale basis on R1 card %i instead of inviting repeated submissions", index => {
+  const data=envelope(index);data.currentCard!.versionStatus="REFRESH_RECOMMENDED";
+  const submit=vi.fn(),save=vi.fn();
+  render(<CurrentCard card={data.currentCard!} composer={data.chatComposer} busy={false} blocked={false} save={save} submit={submit}/>);
+  expect(screen.getByText(/责任依据与关联资料不一致/)).toBeInTheDocument();
+  expect(screen.getByRole('button',{name:data.currentCard!.primaryCommand.label})).toBeDisabled();
+  expect(screen.getByRole('button',{name:'保存草稿'})).toBeDisabled();
+  expect(submit).not.toHaveBeenCalled();expect(save).not.toHaveBeenCalled();
+});
+it("keeps one confirmation action available for edited input without a separate candidate editor", () => {
   const data = envelope(5, true);
   render(
     <CurrentCard
@@ -19,10 +28,12 @@ it("disables completion immediately when the user edits saved candidate text", (
   fireEvent.change(screen.getByLabelText("联系说明"), {
     target: { value: "更新说明" },
   });
-  expect(complete).toBeDisabled();
-  expect(screen.getByRole("button", { name: "保存候选" })).toBeEnabled();
+  expect(complete).toBeEnabled();
+  expect(screen.getAllByLabelText("联系说明")).toHaveLength(1);
+  expect(screen.queryByRole("region", { name: "候选输入" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "保存草稿" })).toBeEnabled();
 });
-it("uses assignment composer only to save the structured selection", () => {
+it("offers a secondary draft action inside the assignment card without another editor", () => {
   const data = envelope(2);
   render(
     <CurrentCard
@@ -34,9 +45,8 @@ it("uses assignment composer only to save the structured selection", () => {
       submit={vi.fn()}
     />,
   );
-  expect(screen.getByRole("region", { name: "候选输入" })).toHaveTextContent(
-    "保存上方所选负责人",
-  );
+  expect(screen.queryByRole("region", { name: "候选输入" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", {name:"保存草稿"})).toBeEnabled();
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   expect(
     screen.queryByRole("button", { name: /附件|上传|语音|通知/ }),

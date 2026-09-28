@@ -12,7 +12,7 @@ function problem(code: string, status: number, retryPolicy: string) { return jso
 
 it("retries the identical page original after loss using a rotated token and the shared clue", async () => {
   let token = "old", count = 0;
-  const f = fixture(path, { handle: async request => { if (request.method === "PATCH" && ++count === 1) throw new Error("lost"); } });
+  const f = fixture(path, { handle: async request => { if (request.method === "PATCH" && ++count === 1) throw new Error("lost"); return undefined; } });
   f.session = { ...f.session, getValidAccessToken: async () => token };
   const view = mount(f); await rename();
   await screen.findByRole("button", { name: "重试原请求" });

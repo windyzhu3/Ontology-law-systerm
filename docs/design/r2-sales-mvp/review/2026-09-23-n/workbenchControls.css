@@ -1,0 +1,11 @@
+/* Shared controls retain the frozen workbench palette and 44px interaction target. */
+html :is(button,summary).workbench-control {box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 14px;line-height:22px;font-size:15px;font-weight:400;border:1px solid var(--border);border-radius:var(--radius,4px);background:var(--surface,#fff);color:var(--graphite);white-space:nowrap;cursor:pointer;position:static;margin:0;}
+html summary.workbench-control {list-style:none;}
+html summary.workbench-control::-webkit-details-marker {display:none;}
+html .workbench-control svg {width:20px;height:20px;flex-shrink:0;}
+html .workbench-control:focus-visible {outline:2px solid var(--emerald);outline-offset:3px;}
+html .sidebar .workbench-control {justify-content:flex-start;width:100%;}
+.ledger-detail-actions {display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px;}
+
+html .workbench-control:disabled {cursor:default;color:var(--muted);background:#f2f3f4;}
+@media(max-width:620px){html .sidebar .workbench-control{width:auto;}html .app-header{height:auto;min-height:66px;flex-wrap:wrap;padding-block:12px;}.today{flex-wrap:wrap;}}
