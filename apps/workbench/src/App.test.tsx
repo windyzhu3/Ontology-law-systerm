@@ -233,7 +233,7 @@ it("keeps MyTasks and ledger navigation available while a cached card refreshes"
  render(<App session={{...session,canReadOpportunityLedger:true}} api={api}/>);
  await screen.findByLabelText("联系说明");fireEvent.click(screen.getByText("我的待办（1）"));
  fireEvent(window,new Event("focus"));await waitFor(()=>expect(reads).toBe(2));
- expect(screen.getByRole("button",{name:"商机台账"})).toBeEnabled();
+ expect(screen.getByRole("button",{name:"业务管理"})).toBeEnabled();
  const choose=screen.getByRole("button",{name:/解决疑似重复线索/});expect(choose).toBeEnabled();fireEvent.click(choose);
  expect(await screen.findByRole("heading",{name:"解决疑似重复线索"})).toBeVisible();
 });
@@ -245,12 +245,12 @@ it('returns from the ledger directly to the expanded task queue',async()=>{
 
 it('keeps the original unsaved workcard guard when navigating to lead management',async()=>{
  const onLeads=vi.fn();render(<App session={session} api={createWorkbenchApi(async()=>jsonResponse(envelope()))} onLeads={onLeads}/>);
- fireEvent.change(await screen.findByLabelText('联系说明'),{target:{value:'保留原联系草稿'}});fireEvent.click(screen.getByRole('button',{name:'客户与线索'}));
+ fireEvent.change(await screen.findByLabelText('联系说明'),{target:{value:'保留原联系草稿'}});fireEvent.click(screen.getByRole('button',{name:'业务管理'}));
  expect(screen.getByRole('dialog')).toBeVisible();expect(onLeads).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'继续填写'}));expect(screen.getByLabelText('联系说明')).toHaveValue('保留原联系草稿');
 });
 it('keeps the unsaved original draft when navigating to the overview',async()=>{
  const onOverview=vi.fn();render(<App session={session} api={createWorkbenchApi(async()=>jsonResponse(envelope()))} onOverview={onOverview}/>);
- fireEvent.change(await screen.findByLabelText('联系说明'),{target:{value:'概览不绕过原草稿'}});fireEvent.click(screen.getByRole('button',{name:'经营概览'}));expect(screen.getByRole('dialog')).toBeVisible();expect(onOverview).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'继续填写'}));expect(screen.getByLabelText('联系说明')).toHaveValue('概览不绕过原草稿');
+ fireEvent.change(await screen.findByLabelText('联系说明'),{target:{value:'概览不绕过原草稿'}});fireEvent.click(screen.getByRole('button',{name:'业务管理'}));expect(screen.getByRole('dialog')).toBeVisible();expect(onOverview).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'继续填写'}));expect(screen.getByLabelText('联系说明')).toHaveValue('概览不绕过原草稿');
 });
 
 it('guards browser navigation with the same unsaved draft confirmation',async()=>{
@@ -265,4 +265,14 @@ it('guards browser navigation with the same unsaved draft confirmation',async()=
  act(()=>guard?.(next));
  expect(screen.getByRole('dialog',{name:'离开当前待办？'})).toBeVisible();expect(next).not.toHaveBeenCalled();
  fireEvent.click(screen.getByRole('button',{name:'继续填写'}));expect(screen.getByLabelText('联系说明')).toHaveValue('返回前保留草稿');expect(next).not.toHaveBeenCalled();
+});
+
+it('exposes one business management entry instead of per-module header buttons',async()=>{
+ const onLeads=vi.fn(),onTeam=vi.fn(),onOverview=vi.fn();
+ render(<App session={{...session,canReadOpportunityLedger:true}} api={createWorkbenchApi(async()=>jsonResponse(envelope()))} onLeads={onLeads} onTeam={onTeam} onOverview={onOverview}/>);
+ await screen.findByLabelText('联系说明');
+ const header=within(screen.getByRole('banner'));
+ expect(header.getByRole('button',{name:'业务管理'})).toBeEnabled();
+ for(const name of ['商机台账','团队待办','客户与线索','经营概览'])expect(header.queryByRole('button',{name})).toBeNull();
+ fireEvent.click(header.getByRole('button',{name:'业务管理'}));expect(onLeads).toHaveBeenCalledOnce();expect(onTeam).not.toHaveBeenCalled();expect(onOverview).not.toHaveBeenCalled();
 });
