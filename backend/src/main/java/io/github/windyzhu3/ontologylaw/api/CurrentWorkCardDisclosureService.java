@@ -32,4 +32,9 @@ public final class CurrentWorkCardDisclosureService {
             return new Response(failure.status(),null,null,"private, no-cache","Authorization",failure.code());
         }
     }
+    public Response readWaiting(Connection c,Actor actor,UUID correlation,UUID id,int limit,String cursor) {
+        try {var committed=runtime.read(c,actor,correlation,null,(connection,now)->sources.readWaiting(connection,actor,now,new CurrentWorkCardSources.WaitingRequest(id,limit,cursor)));
+            return new Response(committed.status(),committed.body(),committed.etag(),"no-store","Authorization",null);
+        }catch(SensitiveReadRuntime.Failure failure){return new Response(failure.status(),null,null,"no-store","Authorization",failure.code());}
+    }
 }

@@ -101,6 +101,10 @@ public final class R1ApiServices {
     R1ProjectionConsumer.Response consume(Actor actor,io.github.windyzhu3.ontologylaw.api.adapter.generated.model.ConsumeR1ProjectionV1 request){
         try(var c=database.open()){return consumer.consume(c,actor,request);}catch(java.sql.SQLException unavailable){return new R1ProjectionConsumer.Response(503,"SERVICE_UNAVAILABLE");}
     }
+    CurrentWorkCardDisclosureService.Response waiting(Actor actor,UUID id,int limit,String cursor){
+        try(var c=database.open()){return cards.readWaiting(c,actor,UUID.randomUUID(),id,limit,cursor);}
+        catch(java.sql.SQLException unavailable){return new CurrentWorkCardDisclosureService.Response(503,null,null,"no-store","Authorization","SERVICE_UNAVAILABLE");}
+    }
     CurrentWorkCardDisclosureService.Response card(Actor actor,UUID correlation,String ifNoneMatch,UUID selectedTaskId){
         try(var c=database.open()){return cards.read(c,actor,correlation,ifNoneMatch,selectedTaskId);}
         catch(java.sql.SQLException unavailable){return new CurrentWorkCardDisclosureService.Response(503,null,null,"private, no-cache","Authorization","SERVICE_UNAVAILABLE");}

@@ -40,7 +40,8 @@ public final class SensitiveReadRuntime {
                     metrics.mark("identityLock");
                     prepared=work.read(c,SensitiveReadClock.now(c));metrics.mark("prepare");
                 }
-                boolean sensitive=prepared.envelope().get("currentCard")!=null;
+                boolean sensitive=prepared.envelope().get("currentCard")!=null||prepared.envelope().get("waitingDetail")!=null
+                    ||prepared.envelope().get("waitingItems") instanceof List<?> items&&!items.isEmpty();
                 if(sensitive&&prepared.disclosure().entries().isEmpty())throw new IllegalArgumentException("Missing disclosure sources");
                 String etag=etag(actor,prepared);
                 boolean matched=etag.equals(ifNoneMatch);

@@ -276,3 +276,25 @@ it('exposes one business management entry instead of per-module header buttons',
  for(const name of ['商机台账','团队待办','客户与线索','经营概览'])expect(header.queryByRole('button',{name})).toBeNull();
  fireEvent.click(header.getByRole('button',{name:'业务管理'}));expect(onLeads).toHaveBeenCalledOnce();expect(onTeam).not.toHaveBeenCalled();expect(onOverview).not.toHaveBeenCalled();
 });
+
+it('protects the current draft before opening a ready personal waiting task',async()=>{
+ const waitingId='20000000-0000-4000-8000-000000000001';
+ const row={id:waitingId,customerLabel:'等待客户',purposeLabel:'再次联系',state:'WAIT_DUE' as const,reason:'约定已到',resumeAt:'2026-09-29T01:00:00Z'};
+ const waitingApi={list:vi.fn().mockResolvedValue({waitingItems:[row],totalCount:1,nextCursor:null,asOf:'2026-09-29T01:00:00Z'}),detail:vi.fn().mockResolvedValue({waitingDetail:{...row,state:'READY',ownerLabel:'本人',nextAction:'进入原卡',canHandle:true,history:[]},totalCount:0})};
+ render(<App session={session} waitingApi={waitingApi} api={createWorkbenchApi(async()=>jsonResponse(envelope()))}/>);
+ fireEvent.change(await screen.findByLabelText('联系说明'),{target:{value:'保留当前填写'}});fireEvent.click(screen.getByRole('button',{name:/查看等待事项/}));fireEvent.click(await screen.findByRole('button',{name:/等待客户/}));fireEvent.click(await screen.findByRole('button',{name:'前往办理'}));
+ expect(screen.getByRole('dialog')).toBeVisible();expect(waitingApi.detail).toHaveBeenCalledTimes(1);fireEvent.click(screen.getByRole('button',{name:'继续填写'}));expect(screen.getByLabelText('联系说明')).toHaveValue('保留当前填写');
+ fireEvent.click(screen.getByRole('button',{name:'前往办理'}));fireEvent.click(screen.getByRole('button',{name:'放弃并继续'}));await waitFor(()=>expect(waitingApi.detail).toHaveBeenCalledTimes(2));
+});
+
+it('locks the original inputs and navigation throughout waiting target revalidation',async()=>{
+ const id='20000000-0000-4000-8000-000000000001',pending=deferred<any>();
+ const row={id,customerLabel:'核对中的客户',purposeLabel:'再次联系',state:'WAIT_DUE' as const,reason:'约定已到',resumeAt:null};
+ const ready={waitingDetail:{...row,state:'READY',ownerLabel:'本人',nextAction:'进入原卡',canHandle:true,history:[]},totalCount:0};
+ const waitingApi={list:vi.fn().mockResolvedValue({waitingItems:[row],totalCount:1,nextCursor:null,asOf:'2026-09-29T01:00:00Z'}),detail:vi.fn().mockResolvedValueOnce(ready).mockReturnValueOnce(pending.promise)};
+ let guard:((next:()=>void)=>void)|null=null;const next=vi.fn();
+ render(<BusinessNavigationContext.Provider value={{registerLeaveGuard:g=>{guard=g;}}}><App session={session} waitingApi={waitingApi} api={createWorkbenchApi(async()=>jsonResponse(envelope()))}/></BusinessNavigationContext.Provider>);
+ const input=await screen.findByLabelText('联系说明');fireEvent.click(screen.getByRole('button',{name:/查看等待事项/}));fireEvent.click(await screen.findByRole('button',{name:/核对中的客户/}));fireEvent.click(await screen.findByRole('button',{name:'前往办理'}));
+ await waitFor(()=>expect(waitingApi.detail).toHaveBeenCalledTimes(2));expect(input.closest('main')).toHaveAttribute('inert');expect(screen.getByRole('banner')).toHaveAttribute('inert');act(()=>guard?.(next));expect(next).not.toHaveBeenCalled();
+ await act(async()=>pending.resolve({...ready,waitingDetail:{...ready.waitingDetail,canHandle:false}}));await screen.findByRole('alert');expect(input.closest('main')).not.toHaveAttribute('inert');
+});
