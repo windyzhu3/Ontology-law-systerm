@@ -16848,29 +16848,29 @@ components:
       - reason
       - resumeAt
       properties:
-        id: &id001
+        id:
           type: string
           format: uuid
-        customerLabel: &id002
+        customerLabel:
           type: string
           minLength: 1
           maxLength: 2000
-        purposeLabel: &id003
+        purposeLabel:
           type: string
           minLength: 1
           maxLength: 2000
-        state: &id004
+        state:
           type: string
           enum:
           - WAIT_FUTURE
           - WAIT_CONDITION
           - WAIT_DUE
           - READY
-        reason: &id005
+        reason:
           type: string
           minLength: 1
           maxLength: 2000
-        resumeAt: &id006
+        resumeAt:
           type:
           - string
           - 'null'
@@ -16890,12 +16890,33 @@ components:
       - canHandle
       - history
       properties:
-        id: *id001
-        customerLabel: *id002
-        purposeLabel: *id003
-        state: *id004
-        reason: *id005
-        resumeAt: *id006
+        id:
+          type: string
+          format: uuid
+        customerLabel:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        purposeLabel:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        state:
+          type: string
+          enum:
+          - WAIT_FUTURE
+          - WAIT_CONDITION
+          - WAIT_DUE
+          - READY
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        resumeAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
         ownerLabel:
           type: string
           minLength: 1
@@ -16923,8 +16944,8 @@ components:
                 type: string
                 minLength: 1
                 maxLength: 2000
-      x-cross-field-invariant: canHandle is true exactly when state is READY; only the
-        server establishes readiness.
+      x-cross-field-invariant: canHandle is true exactly when state is READY; only the server establishes
+        readiness.
     PersonalWaitingPageV1:
       type: object
       additionalProperties: false
