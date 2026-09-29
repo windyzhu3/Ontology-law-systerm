@@ -363,9 +363,12 @@ public class OpenApiContractTest {
         registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/transfers/conflict-reviews"), "recordTransferConflictReview");
         registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/transfers/intake-decisions"), "recordTransferIntake");
         registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/transfers/classifications"), "classifyMatter");
+        // Approved U personal waiting reads add no business mutation surface.
+        registered.put(new OperationKey("GET", "/api/v1/workbench/waiting"), "listPersonalWaiting");
+        registered.put(new OperationKey("GET", "/api/v1/workbench/waiting/{taskId}"), "getPersonalWaiting");
         assertEquals(registered, actual, "R1 plus registered R2 and R2.5 operations must remain closed and exact");
         assertEquals(
-                129,
+                131,
                 paths.size(),
                 "Four Identity collection paths share GET and POST; all operation pairs stay exact"
         );
