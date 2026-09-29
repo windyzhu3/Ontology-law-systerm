@@ -67,7 +67,7 @@ public final class JooqEventResponsibilityReader implements EventResponsibilityR
             for(var f:extra.fields()){Object value=extra.get(f);fields.put(f.getName(),value instanceof byte[] bytes?base64(bytes):value instanceof OffsetDateTime time?timestamp(time):value instanceof UUID uuid?uuid.toString():value);}
         }
         return new R1EventFacts.Wait(new Subject("responsibility.wait_receipt",r.get(w.WAIT_RECEIPT_ID),null,base64(CanonicalJson.digest(CanonicalJson.encode(fields)))),
-                taskId,r.get(w.TASK_REVISION),r.get(w.WAIT_CONTRACT_CODE),r.get(w.WAIT_CONTRACT_VERSION),r.get(w.RESUME_DUE_AT)==null?null:r.get(w.RESUME_DUE_AT).toInstant());
+                taskId,r.get(w.TASK_REVISION),r.get(w.WAIT_CONTRACT_CODE),r.get(w.WAIT_CONTRACT_VERSION),r.get(w.RESUME_DUE_AT)==null?null:r.get(w.RESUME_DUE_AT).toInstant(),r.get(w.ENTERED_WAITING_AT).toInstant(),r.get(w.WAIT_REASON_CODE));
     }
     private static Subject subject(String type,UUID id,Long revision,byte[] hash){return type==null?null:new Subject(type,id,revision,base64(hash));}
     private static String base64(byte[] value){return value==null?null:Base64.getUrlEncoder().withoutPadding().encodeToString(value);}

@@ -25,11 +25,11 @@ describe("workbench status through real App and transport", () => {
     const pending = deferred<Response>();
     render(<App session={testSession()} api={createWorkbenchApi(async () => pending.promise)} />);
     expect(screen.getByText("正在读取当前责任…")).toBeVisible();
-    expect(screen.queryByText("等待 0")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {name:/等待 0 项/})).not.toBeInTheDocument();
     expect(screen.queryByRole("heading")).not.toBeInTheDocument();
     await act(async () => pending.resolve(jsonResponse(empty(count))));
     expect(screen.getByRole("heading", { name: count ? "当前无可处理责任，另有等待事项" : "当前暂无可处理责任" })).toBeVisible();
-    expect(screen.getByText(`等待 ${count}`)).toBeVisible();
+    expect(screen.getByRole("button", {name:`等待 ${count} 项 · 查看等待事项`})).toBeVisible();
     expect(screen.getByText("今日已处理八项责任。")).toBeVisible();
     expect(screen.queryByRole("button", { name: "保存草稿" })).not.toBeInTheDocument();
   });
@@ -39,7 +39,7 @@ describe("workbench status through real App and transport", () => {
     data.todaySummary = "今日已处理八项责任。";
     render(<App session={testSession()} api={createWorkbenchApi(async () => jsonResponse(data))} />);
     await screen.findByText(data.todaySummary);
-    const next = screen.getByRole("region", { name: "后续责任与等待" });
+    const next = screen.getByRole("region", { name: "后续责任" });
     expect(within(next).queryAllByRole("button")).toHaveLength(0);
     expect(next.querySelectorAll(".next-summary")).toHaveLength(count);
     expect(screen.getAllByRole("article")).toHaveLength(1);
@@ -50,7 +50,7 @@ describe("workbench status through real App and transport", () => {
     render(<App session={testSession()} api={createWorkbenchApi(async () => jsonResponse({}, 503))} />);
     expect(await screen.findByRole("alert")).toBeVisible();
     expect(screen.queryByRole("heading")).not.toBeInTheDocument();
-    expect(screen.queryByText("等待 0")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {name:/等待 0 项/})).not.toBeInTheDocument();
     expect(refresh()).toBeEnabled();
   });
 
@@ -79,7 +79,7 @@ describe("workbench status through real App and transport", () => {
     fireEvent.click(refresh());
     expect(await screen.findByRole("alert")).toBeVisible();
     expect(screen.queryByText("王某 · 劳动仲裁咨询")).not.toBeInTheDocument();
-    expect(screen.queryByText("等待 0")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {name:/等待 0 项/})).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "保存联系结果" })).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain("private network detail");
   });

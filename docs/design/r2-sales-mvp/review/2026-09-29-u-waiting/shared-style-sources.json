@@ -1,0 +1,17 @@
+[
+  {
+    "source": "apps\\workbench\\src\\styles\\tokens.css",
+    "file": "tokens.css",
+    "sha256": "6ea1acf88911f8c3e61e164f4ce7ac5a53dde7551a2a870f8c007dcb2405b9d8"
+  },
+  {
+    "source": "apps\\workbench\\src\\styles\\workbench.css",
+    "file": "workbench.css",
+    "sha256": "604351c18af358cdb6ce830b73a1a50274b95579331e731b8eb243f5af9a7c49"
+  },
+  {
+    "source": "apps\\workbench\\src\\styles\\sharedControls.css",
+    "file": "sharedControls.css",
+    "sha256": "c5b514b0393f7812567f655c81f874b7894bca10245cab5c99ffaeb759898b14"
+  }
+]

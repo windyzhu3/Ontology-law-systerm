@@ -1,3 +1,4 @@
+import {createPersonalWaitingTransport,type PersonalWaitingTransport} from './lib/personalWaitingTransport';
 import {SquaresFour} from '@phosphor-icons/react/SquaresFour';
 import './styles/sharedControls.css';
 import {BusinessNavigationContext} from './features/workcard/BusinessNavigation';
@@ -53,6 +54,7 @@ function WorkbenchApp({
   ledgerApi,
   quotesApi,
   contractsApi,
+  waitingApi,
 }: {
   session?: WorkbenchSession | null;
   api?: WorkbenchApi;
@@ -66,7 +68,9 @@ function WorkbenchApp({
   ledgerApi?: OpportunityLedgerTransport;
   quotesApi?: QuotesTransport;
   contractsApi?: ContractsTransport;
+  waitingApi?: PersonalWaitingTransport;
 }) {
+  const waitingTransport=useMemo(()=>waitingApi??createPersonalWaitingTransport(),[waitingApi]);
   const [contractReceiptConfirmed,setContractReceiptConfirmed]=useState(false);
   const [contractRevision,setContractRevision]=useState<{session:WorkbenchSession;opportunityId:string}|null>(null);
   const [correction,setCorrection]=useState<{session:WorkbenchSession;opportunityId:string}|null>(null);
@@ -84,9 +88,10 @@ function WorkbenchApp({
   const materialsTransport = useMemo(() => createMaterialsTransport(transport.recovery), [transport]);
   const customerTransport = useMemo(() => createCustomerRequirementsTransport(transport.recovery), [transport]); const closureTransport = useMemo(() => createOpportunityClosureTransport(transport.recovery), [transport]);
   const [dirty, setDirty] = useState(false);
+  const [waitingChecking,setWaitingChecking]=useState(false);
   const [contractLocked,setContractLocked]=useState(false);
   const activeContract=useRef(false);
-  const work = useCurrentCard(session, transport, { initialTaskId, deferInitialRead: window.location.pathname === "/management/opportunities", pauseAutomaticRead:contractReceiptConfirmed||(dirty&&activeContract.current)||contractLocked||!!continuation||!!correction||!!contractRevision });
+  const work = useCurrentCard(session, transport, { initialTaskId, deferInitialRead: window.location.pathname === "/management/opportunities", pauseAutomaticRead:waitingChecking||contractReceiptConfirmed||(dirty&&activeContract.current)||contractLocked||!!continuation||!!correction||!!contractRevision });
   const envelope = session ? work.envelope : null;
   const canSaveCurrentDraft=!contractRevision&&!correction&&(!envelope?.currentCard||!isTransferCard(envelope.currentCard));
   activeContract.current=!!contractRevision||!!correction||(!!envelope?.currentCard&&(isContractCard(envelope.currentCard)||isTransferCard(envelope.currentCard)));
@@ -103,12 +108,12 @@ function WorkbenchApp({
   const {registerLeaveGuard}=useContext(BusinessNavigationContext);
   useEffect(()=>{
     registerLeaveGuard?.(next=>{
-      if(protectedWrite||leaving||taskDialogOpen||intakeDiscard)return;
+      if(waitingChecking||protectedWrite||leaving||taskDialogOpen||intakeDiscard)return;
       if(dirty){leaveDestination.current=next;setLeaveError('');setIntakeDiscard(document.activeElement as HTMLElement);}
       else next();
     });
     return()=>registerLeaveGuard?.(null);
-  },[registerLeaveGuard,protectedWrite,leaving,taskDialogOpen,intakeDiscard,dirty]);
+  },[registerLeaveGuard,waitingChecking,protectedWrite,leaving,taskDialogOpen,intakeDiscard,dirty]);
   const saveBeforeIntake = async () => {
     if (leaveLock.current || protectedWrite) return;
     const captured = session;
@@ -130,11 +135,12 @@ function WorkbenchApp({
     if (document.activeElement === document.body && logicalFocus.current)
       document.getElementById(logicalFocus.current)?.focus();
   }, [envelope]);
+  const selectPersonalTask=(id:string)=>{if(protectedWrite||!session?.isCurrent())return;setContractReceiptConfirmed(false);setContractRevision(null);setCorrection(null);setContinuation(null);setDirty(false);setTaskQueueRequest(0);setDismissedQuote(null);void work.selectTask(id);};
   const allowedRoute =
     window.location.pathname === "/workbench" ||
     window.location.pathname === "/" || window.location.pathname === "/management/opportunities";
   if(!contractRevision&&!correction&&session&&continuation?.session===session&&!ledger)return <OpportunityContinuation key={continuation.taskId} session={session} taskId={continuation.taskId} initialView={continuation.view} ledgerApi={ledgerTransport} quotesApi={quotesTransport} customerApi={customerTransport} materialsApi={materialsTransport} contractsApi={contractsTransport} closureApi={closureTransport} sessionActions={sessionActions} onBack={()=>{setContinuation(null);void work.refresh();}} onTasks={()=>{setContinuation(null);setTaskQueueRequest(n=>n+1);void work.refresh();}}/>;
-  if(!contractRevision&&!correction&&session && !ledger && taskQueueRequest===0 && envelope?.currentCard && isQuoteCard(envelope.currentCard) && dismissedQuote!==envelope.currentCard.taskId) return <QuoteTaskCard session={session} taskId={envelope.currentCard.taskId} api={quotesTransport} sessionActions={sessionActions} onTasks={()=>{setTaskQueueRequest(n=>n+1);setDismissedQuote(envelope.currentCard!.taskId);void work.refresh();}} onLedger={session.canReadOpportunityLedger?()=>navigateLedger(true):undefined}/>;
+  if(!contractRevision&&!correction&&session && !ledger && taskQueueRequest===0 && envelope?.currentCard && isQuoteCard(envelope.currentCard) && dismissedQuote!==envelope.currentCard.taskId) return <QuoteTaskCard waiting={{next:envelope.nextSummaries,count:envelope.waitingCount,session,api:waitingTransport,revision:envelope,onChecking:setWaitingChecking,onSelect:selectPersonalTask}} session={session} taskId={envelope.currentCard.taskId} api={quotesTransport} sessionActions={sessionActions} onTasks={()=>{setTaskQueueRequest(n=>n+1);setDismissedQuote(envelope.currentCard!.taskId);void work.refresh();}} onLedger={session.canReadOpportunityLedger?()=>navigateLedger(true):undefined}/>;
   return (
     <>
       {session && <OpportunityLedgerPage onTeam={!protectedWrite&&!dirty?onTeam:undefined} onLeads={!protectedWrite&&!dirty?onLeads:undefined} onOverview={!protectedWrite&&!dirty?onOverview:undefined} onContractRevision={id=>{if(protectedWrite||!session.isCurrent())return;setDirty(false);setContinuation(null);setTaskQueueRequest(0);navigateLedger(false);setContractRevision({session,opportunityId:id});void work.selectTask(null);}} onCorrectClassification={id=>{if(!session||protectedWrite||!session.isCurrent())return;setDirty(false);setContinuation(null);setTaskQueueRequest(0);navigateLedger(false);setCorrection({session,opportunityId:id});void work.selectTask(null);}} session={session} api={ledgerTransport} closureApi={closureTransport} customerApi={customerTransport} materialsApi={materialsTransport} quotesApi={quotesTransport} contractsApi={contractsTransport} recoveryActions={(work.recoveryMarker||work.recoveryBlocked)&&<section aria-label="核对原操作结果"><WorkbenchStatus work={work}/>{work.recoveryMarker&&<button className="primary" disabled={work.busy} onClick={()=>void work.recover()}>核对本次结果</button>}</section>} onContractTask={taskId=>{if(protectedWrite||!session.isCurrent())return;setTaskQueueRequest(0);setDismissedQuote(null);setDirty(false);navigateLedger(false);void work.selectTask(taskId);}} active={ledger} blocked={protectedWrite || dirty} sessionActions={sessionActions} onReturn={session.canEnterWorkbench === true ? () => {setTaskQueueRequest(n=>n+1);navigateLedger(false); if(!envelope)void work.selectTask(null);} : undefined} onHandle={detail => {
@@ -144,7 +150,7 @@ function WorkbenchApp({
         if(dirty){leaveDestination.current=next;setLeaveError('');setIntakeDiscard(document.activeElement as HTMLElement);}else next();
       }} />}
       <div hidden={ledger}>
-      <header className="app-header" inert={!!intakeDiscard || taskDialogOpen}>
+      <header className="app-header" inert={waitingChecking || !!intakeDiscard || taskDialogOpen}>
         <div className="brand">
           <Scales size={30} aria-hidden="true" />
           <span>律所工作助手</span>
@@ -155,7 +161,7 @@ function WorkbenchApp({
       </header>
       <main
         className="workbench"
-        inert={!!intakeDiscard || taskDialogOpen}
+        inert={waitingChecking || !!intakeDiscard || taskDialogOpen}
         aria-label="责任工作台"
         onFocusCapture={(event) => {
           logicalFocus.current = event.target.id || null;
@@ -232,6 +238,9 @@ function WorkbenchApp({
               <WaitingSummary
                 next={envelope.nextSummaries}
                 count={envelope.waitingCount}
+                session={session} api={waitingTransport} revision={envelope} blocked={protectedWrite||!!intakeDiscard||taskDialogOpen||leaving}
+                onNavigate={next=>{if(waitingChecking||protectedWrite||leaving||taskDialogOpen||intakeDiscard)return;const proceed=()=>window.setTimeout(next,0);if(dirty){leaveDestination.current=proceed;setLeaveError('');setIntakeDiscard(document.activeElement as HTMLElement);}else proceed();}}
+                onChecking={setWaitingChecking} onSelect={selectPersonalTask}
               />
             )}
           </>

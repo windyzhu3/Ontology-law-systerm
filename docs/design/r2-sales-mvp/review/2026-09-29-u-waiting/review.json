@@ -1,0 +1,200 @@
+{
+  "layouts": [
+    {
+      "width": 1440,
+      "scene": "collapsed",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "scene": "expanded",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "scene": "detail",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "scene": "due",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "scene": "ready",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "scene": "dirty",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "scene": "changed",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "scene": "loading",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "scene": "error",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "scene": "revoked",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "scene": "empty",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "scene": "no-current",
+      "overflow": false
+    },
+    {
+      "width": 1440,
+      "scene": "many",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "collapsed",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "expanded",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "detail",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "due",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "ready",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "dirty",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "changed",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "loading",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "error",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "revoked",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "empty",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "no-current",
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "scene": "many",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "collapsed",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "expanded",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "detail",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "due",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "ready",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "dirty",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "changed",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "loading",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "error",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "revoked",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "empty",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "no-current",
+      "overflow": false
+    },
+    {
+      "width": 360,
+      "scene": "many",
+      "overflow": false
+    }
+  ],
+  "interactions": "draft-preservation, collapse, guarded navigation, save, revocation, retry, paging passed"
+}

@@ -164,7 +164,7 @@ public interface AuditAppender {
                     if(!opportunityDisclosure(authorization))throw new IllegalArgumentException("Opportunity disclosure authority required");
                     yield Set.of(disclosedSource.type());
                 }
-                case "lead.lead","party.party","lead.lead_assignment","responsibility.task_occurrence","responsibility.decision_record","evidence.evidence_submission","evidence.evidence_binding" -> Set.of(disclosedSource.type());
+                case "responsibility.wait_receipt","lead.lead","party.party","lead.lead_assignment","responsibility.task_occurrence","responsibility.decision_record","evidence.evidence_submission","evidence.evidence_binding" -> Set.of(disclosedSource.type());
                 case "responsibility.action_draft" -> opportunityDisclosure(authorization)?Set.of("responsibility.action_draft"):Set.of("responsibility.task_occurrence");
                 case "lead.lead_contact_result" -> Set.of("lead.lead");
                 case "identity.appointment","identity.principal","identity.organization_unit" -> Set.of("responsibility.task_occurrence","lead.lead");

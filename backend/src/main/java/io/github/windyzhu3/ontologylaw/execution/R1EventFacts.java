@@ -37,7 +37,9 @@ public interface R1EventFacts {
     record Assignment(Subject selector, UUID leadId, UUID owner) {}
     record Opportunity(Subject selector, UUID leadId, UUID assignmentId, UUID contactId, UUID owner) {}
     record Decision(Subject selector, UUID taskId, Subject subject, String contract, int version, String code) {}
-    record Wait(Subject selector, UUID taskId, long taskRevision, String profile, int version, Instant resumeDue) {}
+    record Wait(Subject selector, UUID taskId, long taskRevision, String profile, int version, Instant resumeDue, Instant enteredAt, String reason) {
+        public Wait(Subject selector,UUID taskId,long taskRevision,String profile,int version,Instant resumeDue){this(selector,taskId,taskRevision,profile,version,resumeDue,null,null);}
+    }
     record Progress(Subject selector,UUID opportunityId,UUID taskId) {}
     default Progress progress(Connection c,UUID tenant,UUID id)throws SQLException{return null;}
     Subject lead(Connection c, UUID tenant, UUID id) throws SQLException;

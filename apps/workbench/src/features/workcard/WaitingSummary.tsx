@@ -1,36 +1,36 @@
-import { Clock } from "@phosphor-icons/react/Clock";
-import { Hourglass } from "@phosphor-icons/react/Hourglass";
-import type { Schema } from "./contract";
-export function WaitingSummary({
-  next,
-  count,
-}: {
-  next: Schema["NextSummary"][];
-  count: number;
-}) {
-  return (
-    <section className="waiting-strip" aria-label="后续责任与等待">
-      <div className="next-summaries">
-        {next.length === 0 ? (
-          <p className="muted">暂无后续责任</p>
-        ) : (
-          next.map((item) => (
-            <div className="next-summary" key={item.taskId}>
-              <Clock size={20} aria-hidden="true" />
-              <span>{item.timeHint}</span>
-              <span>{item.businessPurpose.label}</span>
-              {item.priority === "URGENT" && (
-                <span className="priority">优先</span>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-      <p className="waiting-count">
-        <Hourglass size={25} aria-hidden="true" />
-        <span>等待 {count}</span>
-        <span className="muted">当前无需操作</span>
-      </p>
-    </section>
-  );
+import {useEffect,useRef,useState,useId} from 'react';
+import {Hourglass} from '@phosphor-icons/react/Hourglass';
+import {Clock} from '@phosphor-icons/react/Clock';
+import type {Schema} from './contract';
+import type {WorkbenchSession} from '../../lib/sessionTransport';
+import type {PersonalWaitingTransport,WaitingRow,WaitingDetail,WaitingPage} from '../../lib/personalWaitingTransport';
+import {readWithDeadline} from '../../lib/readDeadline';
+import '../../styles/personalWaiting.css';
+export type WaitingSummaryProps={next:Schema['NextSummary'][];count:number;session?:WorkbenchSession|null;api?:PersonalWaitingTransport;blocked?:boolean;onNavigate?:(next:()=>void)=>void;onSelect?:(id:string)=>void;revision?:unknown;onChecking?:(checking:boolean)=>void};
+const labels={WAIT_FUTURE:'未到约定时间',WAIT_CONDITION:'等待条件满足',WAIT_DUE:'已到核对时间',READY:'已可办理'};
+const time=(s:string|null)=>s?new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(s))+'（北京时间）':'尚无约定核对时间';
+export function WaitingSummary(props:WaitingSummaryProps){return <WaitingSession key={`${props.session?.actorScopeKey}:${props.session?.identityEpoch}`} {...props}/>;}
+function WaitingSession({next,count,session,api,blocked=false,onNavigate,onSelect,revision,onChecking}:WaitingSummaryProps){
+ const region=useId();const [expanded,setExpanded]=useState(false),[page,setPage]=useState<WaitingPage|null>(null),[selected,setSelected]=useState<string|null>(null),[detail,setDetail]=useState<WaitingDetail|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[total,setTotal]=useState<number|null|undefined>(undefined);
+ const sequence=useRef(0),alive=useRef(true),controller=useRef<AbortController|null>(null),rows=useRef<WaitingRow[]>([]),selectedRef=useRef<string|null>(null),blockedRef=useRef(blocked);blockedRef.current=blocked;
+ const checking=useRef(false);
+ const current=()=>alive.current&&!!session?.isCurrent();
+ useEffect(()=>{alive.current=true;return()=>{alive.current=false;sequence.current++;controller.current?.abort();onChecking?.(false);};},[]);
+ function start(){controller.current?.abort();const c=new AbortController();controller.current=c;const token=++sequence.current;setBusy(true);setError('');return {c,valid:()=>current()&&sequence.current===token&&!c.signal.aborted};}
+ function failed(){setPage(null);rows.current=[];setDetail(null);setSelected(null);selectedRef.current=null;setTotal(null);setError('等待事项或权限已变化，暂时无法核对。当前工作卡填写已保留，请重新查询。');}
+ async function load(cursor:string|null=null){if(checking.current)return;if(!session||!api||!current())return;const {c,valid}=start();const keep=selectedRef.current;setDetail(null);
+  try{const value=await readWithDeadline(signal=>api.list(session,cursor,signal),c.signal);if(!valid())return;let items=value.waitingItems;if(cursor){if(value.totalCount!==page?.totalCount||items.some(r=>rows.current.some(old=>old.id===r.id)))throw Error('分页已变化');items=[...rows.current,...items];}rows.current=items;setPage({...value,waitingItems:items});setTotal(value.totalCount);
+   if(keep){try{const result=await readWithDeadline(signal=>api.detail(session,keep,signal),c.signal);if(!valid())return;setDetail(result.waitingDetail);setTotal(result.totalCount);}catch(e){if(valid())throw e;}}
+  }catch{if(valid())failed();}finally{if(valid())setBusy(false);}
+ }
+ async function select(id:string){if(selected===id){controller.current?.abort();sequence.current++;setBusy(false);setSelected(null);selectedRef.current=null;setDetail(null);return;}setSelected(id);selectedRef.current=id;setDetail(null);if(!session||!api)return;const {c,valid}=start();try{const result=await readWithDeadline(signal=>api.detail(session,id,signal),c.signal);if(valid()){setDetail(result.waitingDetail);setTotal(result.totalCount);}}catch{if(valid())failed();}finally{if(valid())setBusy(false);}}
+ async function handle(id:string){if(!session||!api||blockedRef.current||!current())return;checking.current=true;onChecking?.(true);const {c,valid}=start();try{const fresh=await readWithDeadline(signal=>api.detail(session,id,signal),c.signal);if(!valid()||blockedRef.current)return;if(!fresh.waitingDetail.canHandle)throw Error('办理条件已变化');setDetail(fresh.waitingDetail);setTotal(fresh.totalCount);onSelect?.(id);}catch{if(valid())failed();}finally{checking.current=false;onChecking?.(false);if(valid())setBusy(false);}}
+ useEffect(()=>{if(expanded)void load();else setTotal(undefined);},[count,revision]);
+ useEffect(()=>{if(!expanded)return;const refresh=()=>{if(document.visibilityState==='visible'&&current())void load();};const timer=window.setInterval(refresh,30000);window.addEventListener('focus',refresh);return()=>{window.clearInterval(timer);window.removeEventListener('focus',refresh);};},[expanded,session,api]);
+ if(session&&!session.isCurrent())return null;
+ function toggle(){const open=!expanded;setExpanded(open);if(open)void load();else{controller.current?.abort();sequence.current++;setBusy(false);setDetail(null);setSelected(null);selectedRef.current=null;}}
+ const shownCount=total===undefined?count:total===null?'—':total;
+ const list=page?.waitingItems??[];const visible=detail?.state==='READY'?list.filter(r=>r.id!==detail.id):list;
+ const drawDetail=(d:WaitingDetail)=><section className="personal-wait-detail" aria-label={`${d.customerLabel}等待详情`}><h3>{labels[d.state]}</h3><dl>{[['负责人',d.ownerLabel],['等待原因',d.reason],['约定 / 核对时间',time(d.resumeAt)],['下一步',d.nextAction]].map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl><details className="history"><summary>最近处理记录</summary>{d.history.map((h,i)=><p key={i}>{time(h.at)} · {h.label}</p>)}</details>{d.canHandle?<><p role="status">此项已从等待计数移出，详情暂时保留，便于前往办理。</p><div className="ledger-detail-actions"><button className="primary" disabled={busy||blocked||!onSelect||!onNavigate} onClick={()=>onNavigate?.(()=>void handle(d.id))}>前往办理</button></div></>:<p className="muted">当前仅可查看，尚不能提交本项业务。</p>}</section>;
+ return <><section className="waiting-strip" aria-label="后续责任"><div className="next-summaries">{next.length?next.map(item=><div className="next-summary" key={item.taskId}><Clock size={20} aria-hidden="true"/><span>{item.timeHint}</span><span>{item.businessPurpose.label}</span>{item.priority==='URGENT'&&<span className="priority">优先</span>}</div>):<p className="muted">暂无后续责任</p>}</div></section><section className="personal-waiting" aria-label="我的等待事项"><div className="personal-wait-heading"><div><h2>我的等待事项</h2><p>查看约定时间、等待原因和下一步。</p></div><button aria-expanded={expanded} aria-controls={region} onClick={toggle} disabled={!session||!api}><Hourglass size={20} aria-hidden="true"/>等待 {shownCount} 项 · {expanded?'收起':'查看等待事项'}</button></div>{expanded&&<div id={region} className="personal-wait-content" aria-busy={busy}>{busy&&<p role="status">正在核对等待事项…</p>}{error?<><p role="alert">{error}</p><button onClick={()=>void load()}>重新查询</button></>:<>{page&&list.length===0&&!detail&&!busy&&<p>当前任职没有等待事项。</p>}<ul className="personal-wait-list">{visible.map(row=><li key={row.id}><button className="personal-wait-row" aria-expanded={selected===row.id} onClick={()=>void select(row.id)}><strong>{row.customerLabel}</strong><span>{row.purposeLabel} · {time(row.resumeAt)}</span><span>{row.reason}</span><span className={`personal-wait-tag ${row.state==='WAIT_DUE'?'due':''}`}>{labels[row.state]}</span></button>{selected===row.id&&detail?.id===row.id&&drawDetail(detail)}</li>)}</ul>{detail?.state==='READY'&&<div className="personal-wait-ready"><h3>{detail.customerLabel} · {detail.purposeLabel}</h3>{drawDetail(detail)}</div>}{page?.nextCursor&&<button disabled={busy} onClick={()=>void load(page.nextCursor)}>加载更多等待事项</button>}{page&&<div className="personal-wait-tools"><button disabled={busy} onClick={()=>void load()}>重新核对状态</button><p>仅显示当前任职有权查看的本人等待事项。</p></div>}</>}</div>}</section></>;
 }
