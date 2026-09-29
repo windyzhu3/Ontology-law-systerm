@@ -1,0 +1,17 @@
+/* Shared live UI controls. Frozen review styles remain historical design evidence. */
+html body .session-controls.session-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px;min-width:0;font-size:14px;line-height:1.5;color:var(--graphite)}
+html body .session-controls .session-identity{max-width:420px;overflow-wrap:anywhere;white-space:normal}
+html body .session-controls .session-buttons{display:flex;align-items:center;gap:8px;flex-shrink:0}
+html body .session-controls .session-buttons button{min-height:44px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius,4px);background:var(--surface,#fff);color:var(--graphite);font-size:15px;font-weight:400;line-height:22px;white-space:nowrap}
+html body .business-management-entry{display:inline-flex;align-self:center;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 14px;font-size:15px;line-height:22px;white-space:nowrap}
+html body .business-management-entry svg{flex-shrink:0}
+/* Normalize footer controls by semantic role, independent of page CSS injection order. */
+html body :is(main,[role="dialog"]) :is(.action-area,.card-action-area,.ledger-detail-actions,.identity-form-actions,.dialog-actions,.recovery-actions,.card-secondary,.secondary-line) button{box-sizing:border-box;display:inline-flex;align-self:center;justify-content:center;align-items:center;gap:8px;min-height:44px;padding:10px 16px;border-radius:var(--radius,4px);font-size:15px;font-weight:400;line-height:22px;white-space:normal;max-width:100%}
+html body :is(main,[role="dialog"]) button:is(.primary,.primary-action,.identity-primary){box-sizing:border-box;display:inline-flex;align-self:center;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:12px 16px;border:1px solid var(--emerald);border-radius:var(--radius,4px);background:var(--emerald);color:#fff;font-size:16px;font-weight:500;line-height:22px;white-space:normal;max-width:100%}
+html body :is(main,[role="dialog"]) button:is(.link-button,.draft-action){display:inline-flex;align-self:center;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 8px;border:1px solid transparent;border-radius:var(--radius,4px);background:transparent;color:var(--emerald);font-size:15px;font-weight:400;line-height:22px;white-space:normal;max-width:100%}
+html body :is(main,[role="dialog"]) button:is(.primary,.primary-action,.identity-primary):hover:not(:disabled){background:var(--emerald-hover);border-color:var(--emerald-hover);color:#fff}
+html body :is(main,[role="dialog"]) button:is(.link-button,.draft-action):hover:not(:disabled){background:var(--mint);border-color:transparent;color:var(--emerald)}
+html body :is(main,[role="dialog"]) button:is(.primary,.primary-action,.identity-primary):disabled{background:#dce9e3;border-color:#dce9e3;color:#455d51;opacity:1;cursor:not-allowed}
+html body :is(main,[role="dialog"]) button:is(.link-button,.draft-action):disabled{opacity:.55;cursor:not-allowed}
+html body :is(.session-controls button,.business-management-entry):focus-visible{outline:2px solid var(--emerald);outline-offset:3px}
+@media(max-width:640px){html body .session-controls.session-actions{justify-content:flex-start;width:100%;gap:8px}html body .session-controls .session-identity{flex-basis:100%;max-width:100%}html body .workbench-header-actions{justify-content:flex-start;width:100%;gap:10px}}

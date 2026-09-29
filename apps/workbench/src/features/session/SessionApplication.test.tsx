@@ -1103,13 +1103,15 @@ it.each([true,false])('keeps all common navigation entries across leads, overvie
  await screen.findByRole('heading',{name:'客户与线索'});
  const labels=()=>Array.from(document.querySelectorAll('aside.sidebar button')).map(b=>b.textContent);
  expect(labels()).toEqual(names);
+ const identity=()=>document.querySelector('.session-identity')?.textContent;
+ expect(identity()).toBe('合成入口办理人 · 业务一组 · 线索专员');
  const push=vi.spyOn(history,'pushState');
  fireEvent.click(screen.getByRole('button',{name:'经营概览'}));await screen.findByRole('heading',{name:'经营概览'});
- expect(location.pathname).toBe('/management/overview');expect(labels()).toEqual(names);
- fireEvent.click(screen.getByRole('button',{name:'团队待办'}));await screen.findByRole('heading',{name:'团队待办'});expect(labels()).toEqual(names);
+ expect(location.pathname).toBe('/management/overview');expect(labels()).toEqual(names);expect(identity()).toBe('合成入口办理人 · 业务一组 · 线索专员');
+ fireEvent.click(screen.getByRole('button',{name:'团队待办'}));await screen.findByRole('heading',{name:'团队待办'});expect(labels()).toEqual(names);expect(identity()).toBe('合成入口办理人 · 业务一组 · 线索专员');
  expect(document.querySelector('aside.sidebar a[href="/workbench"]')).toBeNull();
  await waitFor(()=>expect(screen.getByRole('button',{name:'来源与责任'})).toBeEnabled());
  fireEvent.click(screen.getByRole('button',{name:'来源与责任'}));await screen.findByRole('heading',{name:'来源与责任'});expect(labels()).toEqual(names);
  expect(push).toHaveBeenCalled();push.mockRestore();
- act(()=>history.back());await waitFor(()=>expect(location.pathname).toBe('/management/team-tasks'));await screen.findByRole('heading',{name:'团队待办'});expect(labels()).toEqual(names);
+ act(()=>history.back());await waitFor(()=>expect(location.pathname).toBe('/management/team-tasks'));await screen.findByRole('heading',{name:'团队待办'});expect(labels()).toEqual(names);expect(identity()).toBe('合成入口办理人 · 业务一组 · 线索专员');
 });

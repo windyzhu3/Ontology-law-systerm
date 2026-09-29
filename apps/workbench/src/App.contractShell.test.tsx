@@ -21,7 +21,7 @@ it('contract task uses the workbench header, queue and dirty navigation protecti
  expect(screen.getAllByRole('banner')).toHaveLength(1);
  expect(screen.getByText('我的待办（0）').closest('summary')).toHaveClass('workbench-control');
  expect(screen.getByRole('button',{name:'刷新当前责任'})).toBeDisabled();
- fireEvent.click(screen.getByRole('button',{name:'商机台账'}));
+ fireEvent.click(screen.getByRole('button',{name:'业务管理'}));
  expect(await screen.findByRole('dialog',{name:'离开当前待办？'})).toBeVisible();
  fireEvent.click(screen.getByRole('button',{name:'继续填写'}));
  await waitFor(()=>expect(screen.getByLabelText('服务范围')).toHaveValue('未保存内容'));
@@ -58,7 +58,7 @@ it('opens authorized taskless contract revision in the shared shell and protects
  expect(screen.queryByText('暂时没有合格责任人，请由有权主管处理责任安排；原期限和业务来源保留。')).toBeNull();
  expect(contractsApi.write).not.toHaveBeenCalled();
  fireEvent.change(screen.getByLabelText('修订原因'),{target:{value:'签署配置需要修订'}});
- fireEvent.click(screen.getByRole('button',{name:'商机台账'}));
+ fireEvent.click(screen.getByRole('button',{name:'业务管理'}));
  expect(await screen.findByRole('dialog',{name:'离开当前待办？'})).toBeVisible();
  expect(screen.queryByRole('button',{name:/保存草稿后/})).toBeNull();
 });

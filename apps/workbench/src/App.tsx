@@ -1,3 +1,5 @@
+import {SquaresFour} from '@phosphor-icons/react/SquaresFour';
+import './styles/sharedControls.css';
 import {BusinessNavigationContext} from './features/workcard/BusinessNavigation';
 import {ClassificationCorrectionCard} from './features/transfers/ClassificationCorrectionCard';
 import {TransferRuntimeCard} from './features/transfers/TransferRuntimeCard';
@@ -96,6 +98,7 @@ function WorkbenchApp({
   const [leaveError, setLeaveError] = useState("");
   const leaveLock = useRef(false);
   const activeSession = useRef(session); activeSession.current = session;
+  const openBusinessManagement=onLeads??(session?.canReadOpportunityLedger?()=>navigateLedger(true):onBusinessManagement??onTeam??onOverview);
   const protectedWrite = contractLocked || (work.loading && !work.envelope) || work.busy || !!work.pending || !!work.recoveryMarker || work.recoveryBlocked;
   const {registerLeaveGuard}=useContext(BusinessNavigationContext);
   useEffect(()=>{
@@ -146,7 +149,7 @@ function WorkbenchApp({
           <Scales size={30} aria-hidden="true" />
           <span>律所工作助手</span>
         </div>
-        <div className="workbench-header-actions">{onTeam&&<button disabled={protectedWrite||!!intakeDiscard||taskDialogOpen} onClick={event=>{leaveDestination.current=onTeam;if(dirty){setLeaveError('');setIntakeDiscard(event.currentTarget);}else onTeam();}}>团队待办</button>}{onLeads&&<button disabled={protectedWrite||!!intakeDiscard||taskDialogOpen} onClick={event=>{leaveDestination.current=onLeads;if(dirty){setLeaveError('');setIntakeDiscard(event.currentTarget);}else onLeads();}}>客户与线索</button>}{onOverview&&<button disabled={protectedWrite||!!intakeDiscard||taskDialogOpen} onClick={event=>{leaveDestination.current=onOverview;if(dirty){setLeaveError('');setIntakeDiscard(event.currentTarget);}else onOverview();}}>经营概览</button>}{session?.canReadBusinessManagement&&!session.canReadOpportunityLedger&&onBusinessManagement&&<button disabled={protectedWrite||!!intakeDiscard||taskDialogOpen} onClick={event=>{leaveDestination.current=onBusinessManagement;if(dirty){setLeaveError('');setIntakeDiscard(event.currentTarget);}else onBusinessManagement();}}>合同台账</button>}{session?.canReadOpportunityLedger && <button disabled={protectedWrite || !!intakeDiscard || taskDialogOpen} onClick={event => {leaveDestination.current=()=>navigateLedger(true);if(dirty){setLeaveError('');setIntakeDiscard(event.currentTarget);}else navigateLedger(true);}}>商机台账</button>}{onIntake && <button className="intake-shortcut" disabled={protectedWrite || !!intakeDiscard || taskDialogOpen} onClick={event => { leaveDestination.current=onIntake ?? null; if (dirty) {setLeaveError("");setIntakeDiscard(event.currentTarget);} else onIntake(); }}>录入线索</button>}
+        <div className="workbench-header-actions">{openBusinessManagement&&<button className="business-management-entry" disabled={protectedWrite||!!intakeDiscard||taskDialogOpen} onClick={event=>{leaveDestination.current=openBusinessManagement;if(dirty){setLeaveError('');setIntakeDiscard(event.currentTarget);}else openBusinessManagement();}}><SquaresFour size={20} aria-hidden="true"/>业务管理</button>}{onIntake && <button className="intake-shortcut" disabled={protectedWrite || !!intakeDiscard || taskDialogOpen} onClick={event => { leaveDestination.current=onIntake ?? null; if (dirty) {setLeaveError("");setIntakeDiscard(event.currentTarget);} else onIntake(); }}>录入线索</button>}
         {sessionActions ??
           (session?.displayName && <span>{session.displayName}</span>)}</div>
       </header>
