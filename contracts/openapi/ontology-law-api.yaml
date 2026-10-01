@@ -26298,6 +26298,10 @@ components:
       - INTAKE_OPERATOR
       - ROUTING_SUPERVISOR
       - CONTACT_OPERATOR
+      - SALES_REPRESENTATIVE
+      - SALES_MANAGER
+      - FINANCE_OPERATOR
+      - CASE_ADMINISTRATOR
     IdentityAdminPageV1:
       type: string
       enum:
@@ -26679,6 +26683,10 @@ components:
           - ROUTING_SUPERVISOR
           - CONTACT_OPERATOR
           - IDENTITY_ADMIN
+          - SALES_REPRESENTATIVE
+          - SALES_MANAGER
+          - FINANCE_OPERATOR
+          - CASE_ADMINISTRATOR
         effectiveFrom:
           $ref: '#/components/schemas/Instant'
         effectiveUntil:
@@ -30807,6 +30815,7 @@ components:
       - STALE_TRANSFER_PARTY
       - STALE_TRANSFER_REVIEW_BASIS
       - TRANSFER_REVIEW_OUTCOME_UNAVAILABLE
+      - PAYMENT_ALREADY_RECORDED
     RetryPolicy:
       type: string
       enum:

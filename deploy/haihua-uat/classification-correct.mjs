@@ -1,0 +1,33 @@
+import {chromium} from '@playwright/test';
+import {login,save} from './browser.mjs';
+const [code]=process.argv.slice(2);
+if(code!=='HH-G05-20261001-R2')throw Error('approved G05 correction only');
+const browser=await chromium.launch({channel:'chrome',headless:true});let page;
+try{
+ ({page}=await login(browser,'case_admin01'));
+ page.on('response',async r=>{const path=new URL(r.url()).pathname;if(r.request().method()==='GET'&&path.startsWith('/api/v1/')&&path.includes('contract')&&r.ok()){try{save(code+'-correction-context-'+path.replace(/[^a-zA-Z0-9]/g,'_')+'.json',await r.json());}catch{}}});
+ await page.getByText('正在读取当前责任…',{exact:true}).waitFor({state:'hidden'});
+ await page.getByRole('button',{name:'业务管理',exact:true}).click();
+ await page.getByRole('button',{name:'合同台账',exact:true}).click();
+ await page.getByRole('heading',{name:'合同台账',exact:true}).waitFor();
+ await page.getByLabel('搜索客户',{exact:true}).fill(code);
+ await page.getByRole('button',{name:code+' 合成委托组织',exact:true}).click();
+ await page.getByRole('button',{name:'更正分类及承接',exact:true}).click();
+ await page.getByRole('heading',{name:'核对后更正分类及承接',exact:true}).waitFor();
+ if(await page.locator('select[name=classification]').inputValue()!=='ENFORCEMENT')throw Error('original category must be ENFORCEMENT');
+ save(code+'-classification-correction-before.txt',await page.locator('body').innerText());
+ await page.locator('select[name=classification]').selectOption('OTHER');
+ await page.locator('textarea[name=explanation]').fill('合成测试：复核业务性质后从执行更正为其他，保留原案件编号和分类承接历史。');
+ const response=page.waitForResponse(r=>r.request().method()==='POST'&&new URL(r.url()).pathname.includes('/transfers/'));
+ await page.getByRole('button',{name:'确认更正',exact:true}).click();
+ const r=await response,receipt=await r.json();save(code+'-classification-correction-receipt.json',{actor:'case_admin01',status:r.status(),receipt});
+ if(r.status()!==200||receipt.outcome!=='SUCCEEDED')throw Error('correction rejected');
+ await page.getByRole('heading',{name:'合同台账',exact:true}).waitFor();
+ await page.getByLabel('搜索客户',{exact:true}).fill(code);
+ await page.getByRole('button',{name:code+' 合成委托组织',exact:true}).click();
+ await page.getByRole('button',{name:'更正分类及承接',exact:true}).click();
+ await page.getByRole('heading',{name:'核对后更正分类及承接',exact:true}).waitFor();
+ if(await page.locator('select[name=classification]').inputValue()!=='OTHER')throw Error('correction not persisted');
+ save(code+'-classification-correction-after.txt',await page.locator('body').innerText());
+ console.log(code+' classification correction persisted through actual UI PASS; Matter uniqueness requires read-only fact check');
+}catch(e){if(page)save(code+'-classification-correction-failure.txt',await page.locator('body').innerText());throw e;}finally{await browser.close();}

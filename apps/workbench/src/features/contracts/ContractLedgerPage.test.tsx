@@ -5,7 +5,23 @@ import {RecoveryStore} from '../session/recoveryMarker';
 import type {ContractsTransport} from '../../lib/contractsTransport';
 import type {ContractContext} from './types';
 import {testSession,selectorId} from '../../test/fixtures';
+const correctionApi=vi.hoisted(()=>({classificationContext:vi.fn(),write:vi.fn(),receipt:vi.fn(),recovery:{read:vi.fn(()=>null)}}));
+vi.mock('../../lib/transfersTransport',async original=>({...await original<typeof import('../../lib/transfersTransport')>(),createTransfersTransport:()=>correctionApi}));
 const selector={id:selectorId,revision:0};
+it('opens classification correction from the standalone business ledger and returns to the same selection',async()=>{
+ const context={opportunity:selector,customerName:'已接收合成客户',readonly:true,contract:{selector,document:{commercial:{scope:'合成范围',lines:[],paymentTerms:'合成安排'},document:{}}},history:[],allowedActions:[],transfer:{stage:'COMPLETE',task:null,canHandle:false,canCorrectClassification:true}} as unknown as ContractContext;
+ const api={recovery:new RecoveryStore(sessionStorage),list:vi.fn().mockResolvedValue({items:[{id:selectorId,opportunityId:selectorId,customerLabel:context.customerName,versionLabel:'第1版',stateLabel:'分类完成',ownerLabel:'',canHandle:false}],nextCursor:null}),context:vi.fn().mockResolvedValue(context),taskContext:vi.fn(),write:vi.fn(),receipt:vi.fn(),download:vi.fn()} satisfies ContractsTransport;
+ correctionApi.classificationContext.mockResolvedValue({opportunityId:selectorId,expectedOpportunityRevision:4,expectedWorkflow:selector,customerName:context.customerName,matter:{id:selectorId,number:'原案件001'},category:'ENFORCEMENT',recipient:{id:selectorId,label:'案管'},receivers:[{id:selectorId,label:'案管'}]});
+ render(<ContractLedgerPage session={testSession()} api={api}/>);
+ fireEvent.click(await screen.findByRole('button',{name:context.customerName}));
+ fireEvent.click(await screen.findByRole('button',{name:'更正分类及承接'}));
+ await screen.findByRole('heading',{name:'核对后更正分类及承接'});
+ expect(screen.getByText('原案件001')).toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'取消更正'}));
+ await screen.findByRole('heading',{name:'合同台账'});
+ await screen.findByRole('button',{name:'更正分类及承接'});
+ expect(correctionApi.write).not.toHaveBeenCalled();
+});
 it('opens a completed ledger record in the existing read-only card and downloads its exact version',async()=>{
  const context:ContractContext={opportunity:selector,responsibilityBasis:selector,customerConfirmation:selector,customerName:'合成完成合同',readonly:false,contract:{selector,currentRevision:{id:'version',hash:'hash'},version:1,source:{kind:'DIRECT_AUTHORIZATION',selector},stage:'READY_FOR_SIGNATURE',document:{commercial:{currency:'CNY',scope:'合成范围',lines:[{description:'固定费用',amountMinor:100,discount:false}],conditionalFee:null,paymentTerms:'合成安排'},document:{evidenceVersionId:'file',bodySha256:'hash',templateVersionId:'template',clauseVersionIds:[]}}},draft:null,workflow:null,review:null,approvals:[],allowedActions:['FORM_CONTRACT'],blockers:[],history:[],receiptBoundary:null,documents:[{id:'file',label:'private-name.png',bodySha256:'hash'}]};
  const api={recovery:new RecoveryStore(sessionStorage),list:vi.fn().mockResolvedValue({items:[{id:selectorId,opportunityId:selectorId,customerLabel:context.customerName,versionLabel:'第 1 版',stateLabel:'签署准备已就绪',ownerLabel:'',canHandle:false}],nextCursor:null}),context:vi.fn().mockResolvedValue(context),taskContext:vi.fn(),write:vi.fn(),receipt:vi.fn(),download:vi.fn().mockResolvedValue(new Blob(['synthetic']))} satisfies ContractsTransport;

@@ -230,7 +230,7 @@ const readCases = [
       page: "APPOINTMENTS",
       optionKind: "ORGANIZATION",
       candidates: { items: [choice], nextCursor: null },
-      roleCodes: ["INTAKE_OPERATOR", "ROUTING_SUPERVISOR", "CONTACT_OPERATOR"],
+      roleCodes: ["INTAKE_OPERATOR", "ROUTING_SUPERVISOR", "CONTACT_OPERATOR", "SALES_REPRESENTATIVE", "SALES_MANAGER", "FINANCE_OPERATOR", "CASE_ADMINISTRATOR"],
       grantableAuthorityCodes: [],
     },
   },

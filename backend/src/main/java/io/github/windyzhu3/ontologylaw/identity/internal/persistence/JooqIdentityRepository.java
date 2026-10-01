@@ -119,7 +119,7 @@ public final class JooqIdentityRepository implements IdentityCommands.Port {
         var args=new ArrayList<Object>();args.add(actor.tenantId());args.add(access.scopes().toArray(UUID[]::new));args.add(actor.tenantId());args.add(actor.tenantId());
         String sql="with recursive visible(id,path) as (select organization_unit_id,array[organization_unit_id] from identity.organization_unit where tenant_id=? and organization_unit_id=any(?::uuid[]) union all select o.organization_unit_id,v.path||o.organization_unit_id from identity.organization_unit o join visible v on o.parent_organization_unit_id=v.id where o.tenant_id=? and not o.organization_unit_id=any(v.path) and cardinality(v.path)<256) select r.* from "+table(kind)+" r"+joins+" where r.tenant_id=?"+human;
         if(organization!=null)sql+=" and "+organization+" in (select id from visible)";
-        if(kind==Kind.APPOINTMENT)sql+=" and r.role_code in ('INTAKE_OPERATOR','ROUTING_SUPERVISOR','CONTACT_OPERATOR','IDENTITY_ADMIN')";
+        if(kind==Kind.APPOINTMENT)sql+=" and r.role_code in ('"+String.join("','",IdentityCommands.ROLES)+"','IDENTITY_ADMIN')";
         if(kind==Kind.AUTHORITY_GRANT)sql+=" and r.authority_code in ('"+String.join("','",IdentityCommands.GRANTABLE)+"','"+String.join("','",IdentityCommands.MANAGEMENT)+"')";
         if(candidates){sql+=" and r.state='ACTIVE'";if(kind==Kind.APPOINTMENT)sql+=" and p.state='ACTIVE' and r.effective_from<=clock_timestamp() and (r.effective_until is null or r.effective_until>clock_timestamp())";}
         if(after!=null){sql+=" and (r.created_at,r."+column+")>(?::timestamptz,?::uuid)";args.add(after.createdAt().toString());args.add(after.id());}

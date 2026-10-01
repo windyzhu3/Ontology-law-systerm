@@ -28,6 +28,10 @@ export const roleLabels: Record<S["AppointmentV1"]["roleCode"], string> = {
   INTAKE_OPERATOR: "线索接入经办",
   ROUTING_SUPERVISOR: "路由主管",
   CONTACT_OPERATOR: "首联经办",
+  SALES_REPRESENTATIVE: "销售",
+  SALES_MANAGER: "销售主管",
+  FINANCE_OPERATOR: "财务人员",
+  CASE_ADMINISTRATOR: "案管员",
   IDENTITY_ADMIN: "身份管理员",
 };
 

@@ -50,11 +50,11 @@ public final class CommandRuntime {
             AuthorizationSnapshot initial=policy.authorize(c,envelope,context,false);
             if(!initial.allowed())throw new CommandHandler.Rejected(initial.rejectionCode());
             R1BusinessFence.databaseBacked().exclusive(c,envelope.actor().tenantId());
-            // Owner observation writes business/audit facts, never identity. Reuse raw
+            // Internal maintenance writes business/audit facts, never identity. Reuse raw
             // identity rows under their shared lock instead of rereading them hundreds
             // of times while the tenant business fence blocks foreground queries.
             // Every authorization decision still evaluates the current database time.
-            try(AuthorizationService.ReadScope identityRead=envelope.type()==CommandEnvelope.Type.OBSERVE_OPPORTUNITY_OWNER_EXCEPTION
+            try(AuthorizationService.ReadScope identityRead=envelope.type().internalMaintenance()
                     ?authorization.lockedReadScope(c,envelope.actor().tenantId()):()->{}) {
             // The fence may have waited while identity or source facts changed. No roots or writes yet.
             var afterFence=policy.authorize(c,envelope,context,false);

@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import type { components } from "../../generated/api/schema";
 import type { WorkbenchSession } from "../../lib/sessionTransport";
 import type { IdentityApi } from "./identityApi";
+import { grantable } from "./identityContract";
 type S = components["schemas"];
-const roles: S["IdentityRoleCodeV1"][] = ["INTAKE_OPERATOR", "ROUTING_SUPERVISOR", "CONTACT_OPERATOR"];
-const authorities: S["GrantableAuthorityCodeV1"][] = ["CONTRACT_READ", "CONTRACT_PREPARE", "CONTRACT_PREPARATION_DECIDE", "CONTRACT_REVIEW", "CONTRACT_APPROVE", "LEAD_CAPTURE", "LEAD_INGRESS_RESOLVE", "LEAD_INGRESS_COMPLETE", "LEAD_ASSIGN", "LEAD_ROUTING_DECIDE", "SOURCE_INTAKE_REQUEST_ACK", "SALES_CONTACT_OWNER", "LEAD_VALIDITY_REVIEW", "SALES_OPPORTUNITY_OWNER", "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER", "OPPORTUNITY_OWNER_EXCEPTION_READ", "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE", "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ"];
+const roles: S["IdentityRoleCodeV1"][] = ["INTAKE_OPERATOR", "ROUTING_SUPERVISOR", "CONTACT_OPERATOR", "SALES_REPRESENTATIVE", "SALES_MANAGER", "FINANCE_OPERATOR", "CASE_ADMINISTRATOR"];
+const authorities: readonly S["GrantableAuthorityCodeV1"][] = grantable;
 
 /** One bounded, page-qualified selector. Each field owns independent cursor history. */
 export function useIdentityOptions(session: WorkbenchSession, api: IdentityApi, page: S["IdentityAdminPageV1"], optionKind: S["IdentityOptionKindV1"] | null) {

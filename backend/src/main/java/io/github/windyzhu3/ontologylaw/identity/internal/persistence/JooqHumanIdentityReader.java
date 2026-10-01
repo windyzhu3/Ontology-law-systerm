@@ -78,7 +78,7 @@ public final class JooqHumanIdentityReader implements HumanIdentityReader {
         return rows.stream().map(row->new DelegatedChoice(choice(row),row.get("principal_id",UUID.class))).toList();
     }
     private static Choice choice(org.jooq.Record row) {
-        String role=switch(row.get("role_code",String.class)){case "IDENTITY_ADMIN"->"身份管理员";case "INTAKE_OPERATOR"->"接入人员";case "ROUTING_SUPERVISOR"->"分配主管";case "CONTACT_OPERATOR"->"联系人员";default->"业务任职";};
+        String role=switch(row.get("role_code",String.class)){case "IDENTITY_ADMIN"->"身份管理员";case "INTAKE_OPERATOR"->"接入人员";case "ROUTING_SUPERVISOR"->"分配主管";case "CONTACT_OPERATOR"->"联系人员";case "SALES_REPRESENTATIVE"->"销售";case "SALES_MANAGER"->"销售主管";case "FINANCE_OPERATOR"->"财务人员";case "CASE_ADMINISTRATOR"->"案管员";default->"业务任职";};
         String label=row.get("display_name",String.class)+" · "+role;
         if(label.codePointCount(0,label.length())>200)label=label.substring(0,label.offsetByCodePoints(0,200));
         return new Choice(new Subject("identity.appointment",row.get("appointment_id",UUID.class),row.get("appointment_revision",Long.class),null),new Subject("identity.organization_unit",row.get("organization_unit_id",UUID.class),row.get("organization_revision",Long.class),null),label);

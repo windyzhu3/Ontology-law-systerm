@@ -34,6 +34,19 @@ class ContractPreparationRecoveryIT extends R2ContractQuoteSourceIT {
         assertTrue(candidates().isEmpty());assertCounts("1","1");
         assertEquals("1",scalar("select count(*) from audit.audit_entry_classified_v where tenant_id=? and command_id=? and command_type='RECONCILE_CONTRACT_PREPARATION' and result_code='SUCCEEDED'",seed.tenant(),envelope.commandId()));
     }
+    @Test void background_recovery_reuses_locked_identity_rows_instead_of_blocking_foreground_reads()throws Exception{
+        initializeRecovery(true);var envelope=next();
+        try(var c=database.apiConnection()){
+            var probe=new ReadConnectionProbe(c);var result=runtime.execute(probe.connection(),envelope);
+            var outcome=assertInstanceOf(CommandOutcome.class,result);assertEquals(CommandOutcome.Status.SUCCEEDED,outcome.status(),outcome.rejectionCode());
+            int businessFence=probe.statements.indexOf("select pg_advisory_xact_lock(?)");assertTrue(businessFence>=0);
+            // Preliminary authorization runs before the business fence; this bound
+            // measures only reads while foreground shared reads are blocked.
+            long principalReads=probe.statements.stream().skip(businessFence+1).filter(sql->sql.startsWith("select")&&sql.contains("\"identity\".\"principal\"")).count();
+            assertTrue(principalReads<=10,"One maintenance command must reuse identity rows under its shared lock; principal reads="+principalReads);
+        }
+        assertCounts("1","1");
+    }
     @Test void missing_owner_authority_has_no_fake_task_and_recovers_after_real_grant()throws Exception{
         initializeRecovery(false);var first=execute(next());assertEquals(CommandOutcome.Status.SUCCEEDED,first.status(),first.rejectionCode());
         assertCounts("1","0");assertTrue(candidates().isEmpty());

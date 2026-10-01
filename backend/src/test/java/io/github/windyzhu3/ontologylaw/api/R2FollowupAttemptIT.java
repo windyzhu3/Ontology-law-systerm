@@ -39,6 +39,23 @@ class R2FollowupAttemptIT extends R2QuoteWorkflowIT {
         assertEquals("1",scalar("select count(*) from responsibility.task_occurrence where tenant_id=? and subject_id=? and state='WAITING'",seed.tenant(),opportunity.id()));
     }
     @Test void attempt_without_customer_confirmation_has_one_waiting_successor_and_no_effective_progress()throws Exception{setup(true,true);verifyAttempt(false);}
+    @Test void team_history_keeps_hash_bound_followup_cancellation_and_exact_denial()throws Exception {
+        setup(true,true);verifyAttempt(false);
+        UUID prior=UUID.fromString(scalar("select task_occurrence_id::text from responsibility.task_occurrence where tenant_id=? and state='CANCELLED' and cancellation_reason_code='R2_FOLLOWUP_ATTEMPT_V1'",seed.tenant()));
+        try(var c=database.apiConnection()){
+            inTransaction(c,Capability.COMMAND,x->{grant(x,"TEAM_TASK_READ");return null;});
+            var cancellation=inTransaction(c,Capability.QUERY,x->CurrentTaskReader.databaseBacked().cancellation(x,seed.tenant(),prior));
+            assertNotNull(cancellation.hash());assertNull(cancellation.revision());
+            assertEquals(scalar("select rtrim(translate(encode(body_digest,'base64'),'+/','-_'),'=') from opportunity.followup_attempt where tenant_id=?",seed.tenant()),cancellation.hash());
+            var reader=new R2TeamManagementReadService(new byte[32],protection,cipher,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("HH007_TEAM_CANCEL"));
+            var page=reader.list(c,seed.request().actor(),"history",100,null,null,null);
+            assertTrue(((List<?>)page.get("items")).stream().anyMatch(row->prior.toString().equals(((Map<?,?>)row).get("id"))));
+            assertNull(reader.detail(c,seed.request().actor(),"history",prior).get("action"));
+            mutate("insert into identity.object_access_grant(tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,access_code,effect_code,valid_from,state,created_at,object_subject_type,object_subject_id,object_subject_hash) values(?,?,?,?,'TEAM_TASK_READ','DENY',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp(),?,?,?)",seed.tenant(),UUID.randomUUID(),seed.request().actor().principalId(),seed.appointment(),cancellation.type(),cancellation.id(),Base64.getUrlDecoder().decode(cancellation.hash()));
+            assertEquals(403,assertThrows(R1ServiceReadRuntime.Failure.class,()->reader.detail(c,seed.request().actor(),"history",prior)).status());
+            assertFalse(((List<?>)reader.list(c,seed.request().actor(),"history",100,null,null,null).get("items")).stream().anyMatch(row->prior.toString().equals(((Map<?,?>)row).get("id"))));
+        }
+    }
     @Test void ledger_discloses_followup_wait_basis_and_honors_exact_denial()throws Exception {
         setup(true,true);verifyAttempt(false);
         var reader=new R2OpportunityLedgerReadService(new byte[32],protection,cipher,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("R25_ATTEMPT_LEDGER_IT"));

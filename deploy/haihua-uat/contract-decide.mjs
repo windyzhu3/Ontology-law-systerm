@@ -1,0 +1,9 @@
+import { chromium } from '@playwright/test';import path from 'node:path';
+import { login,evidence,save } from './browser.mjs';import {selectTask} from './business-browser.mjs';
+const [actor,code,step,decision]=process.argv.slice(2);const suffix={review:'/contracts/review-decisions',approval:'/contracts/decisions'};if(!suffix[step])throw Error('explicit step required');
+const browser=await chromium.launch({channel:'chrome',headless:true});let page;
+try{({page}=await login(browser,actor));page.setDefaultTimeout(60000);await selectTask(page,code,'');await page.getByRole('heading',{name:'核对准确依据并作出决定',exact:true}).waitFor();
+ await page.getByLabel(/^本次决定/).selectOption(decision);await page.getByLabel(/^决定说明/).fill(decision==='NEED_INFO'?'合成审查补充要求：对方尚待核实，完整冲突审查范围未确认，不能直接记录通过。请补齐准确对方主体与资料后重新审查。':decision==='BLOCKED'?'合成冲突审查：本次对方复用 HH-G04 已有委托主体，完整审查范围中存在阻断候选；本次准确版本记录阻断，不豁免或删除既有关系。':decision==='RETURNED'?'合成审批退回：请核对准确正文与费用范围后修订新版，不沿用本版审批。':'合成独立核对：准确主体、完整范围、合同版本与材料已核对，当前没有阻断候选；仅对本次准确版本记录决定。');
+ const response=page.waitForResponse(r=>r.request().method()==='POST'&&new URL(r.url()).pathname.endsWith(suffix[step]));await page.getByRole('button',{name:'确认本次决定',exact:true}).click();const r=await response,receipt=await r.json();save(code+'-contract-'+step+'-'+decision+'-receipt.json',{actor,status:r.status(),receipt});if(r.status()!==200||receipt.outcome!=='SUCCEEDED')throw Error('decision rejected '+r.status());
+ await page.getByText('正在核对提交结果…',{exact:true}).waitFor({state:'hidden'});await page.screenshot({path:path.join(evidence,code+'-contract-'+step+'-'+decision+'.png'),fullPage:true});console.log(code+' '+actor+' '+step+' '+decision+' UI PASS');
+}catch(e){if(page)save(code+'-contract-decision-failure.txt',await page.locator('body').innerText());throw e;}finally{await browser.close();}

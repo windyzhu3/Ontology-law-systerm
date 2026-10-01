@@ -1,12 +1,37 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { IdentityAdminApplication } from "./IdentityAdminApplication";
-import { fixture, json, nextTag, principal, roles, rows } from "./identityWriteFixtures";
+import { fixture, json, nextTag, principal, roles, rows, authorities } from "./identityWriteFixtures";
 import { deferred, draftId, selectorId, taskId, testSession } from "../../test/fixtures";
 import type { IdentityAdminRoute } from "./identityRoutes";
 const principalPath = "/admin/identity/principals" as const;
 function mount(f: ReturnType<typeof fixture>, path: IdentityAdminRoute = principalPath, onNavigate = (_path: IdentityAdminRoute) => {}) { return render(<IdentityAdminApplication session={f.session} api={f.api} path={path} onNavigate={onNavigate} sessionActions={null} />); }
 const change = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
+
+it.each([
+  ["SALES_REPRESENTATIVE", "销售"], ["SALES_MANAGER", "销售主管"],
+  ["FINANCE_OPERATOR", "财务人员"], ["CASE_ADMINISTRATOR", "案管员"],
+])("creates an appointment using the server-approved business role %s", async (role, label) => {
+  const path = "/admin/identity/appointments" as const;
+  const f = fixture(path, { handle: async request => {
+    const url = new URL(request.url);
+    if (!url.pathname.endsWith("options")) return;
+    const optionKind = url.searchParams.get("optionKind");
+    return json({ page: "APPOINTMENTS", optionKind,
+      candidates: { items: [{ id: optionKind === "ORGANIZATION" ? draftId : selectorId,
+        label: optionKind === "ORGANIZATION" ? "海华销售一部" : "海华测试人员" }], nextCursor: null },
+      roleCodes: ["INTAKE_OPERATOR", "ROUTING_SUPERVISOR", "CONTACT_OPERATOR", "SALES_REPRESENTATIVE", "SALES_MANAGER", "FINANCE_OPERATOR", "CASE_ADMINISTRATOR"],
+      grantableAuthorityCodes: [] });
+  } });
+  mount(f, path); fireEvent.click(await screen.findByRole("button", { name: "新建任职" }));
+  await screen.findByRole("option", { name: label });
+  expect(screen.queryByRole("option", { name: "身份管理员" })).not.toBeInTheDocument();
+  change("身份主体", selectorId); change("所属组织", draftId); change("岗位", role);
+  change("生效时间", "2026-10-01T09:30");
+  fireEvent.click(screen.getByRole("button", { name: "确认创建" }));
+  await waitFor(() => expect(f.writes).toHaveLength(1));
+  expect(await f.writes[0].clone().json()).toMatchObject({ principalId: selectorId, organizationId: draftId, roleCode: role });
+});
 
 it("invalidates the precise provider choice on a username edit and ignores the late old lookup", async () => {
   const late = deferred<Response>(); let lookup = 0;
@@ -130,4 +155,14 @@ it("drops provider and form state on epoch change but preserves dirty inputs thr
   expect(screen.getByLabelText("显示名称")).toHaveValue("敏感草稿");
   view.rerender(<IdentityAdminApplication session={testSession(2)} api={f.api} path={principalPath} onNavigate={() => {}} sessionActions={null} />);
   expect(screen.queryByLabelText("完整用户名")).not.toBeInTheDocument(); expect(document.body.textContent).not.toContain("敏感草稿");
+});
+
+it("offers the complete server-approved business grant set for actual admin configuration", async () => {
+  const path = "/admin/identity/authority-grants" as const;
+  const f = fixture(path); mount(f, path);
+  fireEvent.click(await screen.findByRole("button", { name: "新增直接授权" }));
+  await screen.findByRole("option", { name: "首联处置" });
+  const offered = Array.from((screen.getByLabelText("权限") as HTMLSelectElement).options).map(o => o.value).filter(Boolean);
+  expect(offered.sort()).toEqual([...authorities].sort());
+  expect(offered).not.toContain("IDENTITY_AUTHORITY_MANAGE");
 });

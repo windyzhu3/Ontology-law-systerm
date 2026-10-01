@@ -32,7 +32,16 @@ class R2ContractPaymentHttpIT extends R2ContractExecutionHttpIT {
   var confirmation=new LinkedHashMap<String,Object>();confirmation.put("decision","CONFIRM");confirmation.put("explanation","Manually verified receipt attribution");confirmation.put("materialVersionId",proof.id().toString());confirmation.put("materialSha256",sha(pdf));confirmation.put("transactionReference","F10-HTTP-RECEIPT-1");confirmation.put("amountMinor",100L);confirmation.put("currency","CNY");confirmation.put("receivedAt",Instant.now().minusSeconds(60).toString());confirmation.put("attributionChecked",true);
   paymentStep(financial,"receipt-reviews",confirmation);assertEquals("COMPLETE",payment(context(financial)).get("stage"));afterInitialPayment(http);
   var later=acceptedMaterial(context(sales),pdf,"F10-later-receipt.pdf");paymentStep(sales,"receipt-review-requests",Map.of("materialVersionId",later.id().toString(),"materialSha256",sha(pdf),"explanation","A later independent receipt"));
-  confirmation.put("materialVersionId",later.id().toString());confirmation.put("transactionReference","F10-HTTP-RECEIPT-2");paymentStep(financial,"receipt-reviews",confirmation);
+  confirmation.put("materialVersionId",later.id().toString());
+  var duplicateKey=UUID.randomUUID();var duplicateValues=new LinkedHashMap<>(confirmation);duplicateValues.put("expectedPaymentWorkflow",payment(context(financial)).get("selector"));
+  var duplicateBody=contractBody(context(financial),duplicateValues);
+  var duplicate=financial.request("POST",base+"/receipt-reviews",duplicateBody,Map.of("Idempotency-Key",duplicateKey.toString()));
+  assertEquals(409,duplicate.statusCode(),duplicate.body());assertEquals("PAYMENT_ALREADY_RECORDED",financial.body(duplicate).get("code"));
+  var recovered=financial.request("GET","/api/v1/commands/"+duplicateKey+"/receipt",null,Map.of());assertEquals(200,recovered.statusCode(),recovered.body());
+  assertEquals("REJECTED",financial.body(recovered).get("outcome"));assertEquals("PAYMENT_ALREADY_RECORDED",financial.body(recovered).get("rejectionCode"));assertEquals(duplicateKey.toString(),financial.body(recovered).get("commandId"));
+  assertEquals("1",scalar("select count(*) from contract.payment_confirmation where tenant_id=?",seed.tenant()));
+  var deniedReceipt=sales.request("GET","/api/v1/commands/"+duplicateKey+"/receipt",null,Map.of());assertEquals(404,deniedReceipt.statusCode(),deniedReceipt.body());assertFalse(deniedReceipt.body().contains("receiptId"));
+  confirmation.put("transactionReference","F10-HTTP-RECEIPT-2");paymentStep(financial,"receipt-reviews",confirmation);
   assertEquals("2",scalar("select count(*) from contract.payment_confirmation where tenant_id=?",seed.tenant()));assertEquals("2",scalar("select count(*) from contract.payment_request where tenant_id=?",seed.tenant()));assertEquals("1",scalar("select count(*) from contract.contract_execution where tenant_id=?",seed.tenant()));assertEquals("0",scalar("select count(*) from responsibility.task_occurrence where tenant_id=? and business_purpose_code in ('CHECK_CONTRACT_RECEIPT','SUPPLEMENT_CONTRACT_RECEIPT') and state='OPEN'",seed.tenant()));
  }
 }

@@ -1235,7 +1235,8 @@ public class OpenApiContractTest {
                         "COMMERCIAL_AUTHORIZATION_REQUIRED", "CONTRACT_APPROVAL_POLICY_CHANGED", "CONTRACT_APPROVAL_POLICY_REQUIRED",
                         "CONTRACT_REVIEW_REQUIRED", "CONTRACT_SOURCE_AMBIGUOUS", "CONTRACT_VERSION_BASIS_CHANGED",
                         "RECIPIENT_UNAVAILABLE", "STALE_CUSTOMER_BASIS", "STALE_REVIEW",
-                        "STALE_TRANSFER_PARTY", "STALE_TRANSFER_REVIEW_BASIS", "TRANSFER_REVIEW_OUTCOME_UNAVAILABLE"
+                        "STALE_TRANSFER_PARTY", "STALE_TRANSFER_REVIEW_BASIS", "TRANSFER_REVIEW_OUTCOME_UNAVAILABLE",
+                        "PAYMENT_ALREADY_RECORDED"
                 ),
                 stringSet(schema("TerminalRejectionCode").path("enum")),
                 "Terminal rejection codes must exclude pre-slot, conflict, rate-limit, and technical failures"

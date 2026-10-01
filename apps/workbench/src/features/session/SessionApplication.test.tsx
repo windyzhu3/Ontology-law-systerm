@@ -1049,6 +1049,18 @@ it('admits an independent management reader without workbench or contract body r
  act(()=>f.controller.invalidate('EXPIRED'));expect(screen.queryByRole('heading',{name:'合同台账'})).toBeNull();
 });
 
+it('opens the authorized contract view when returning from overview to the contract ledger',async()=>{
+ history.replaceState(null,'','/management/overview');
+ const reads=vi.fn().mockImplementation(async url=>jsonResponse(String(url)==='/api/v1/business-overview'?{month:'2026-10',asOf:'2026-10-01T00:00:00Z',metrics:[]}:{items:[],nextCursor:null}));vi.stubGlobal('fetch',reads);
+ const f=fixture({context:{...context,canEnterWorkbench:false,canReadBusinessOverview:true,canReadBusinessManagement:true,businessManagementViews:['contracts','payments','transfer']}});
+ render(<SessionApplication controller={f.controller} api={f.api}/>);
+ const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ await screen.findByRole('heading',{name:'经营概览'});fireEvent.click(screen.getByRole('button',{name:'合同台账'}));
+ await screen.findByRole('heading',{name:'合同台账'});await waitFor(()=>expect(reads.mock.calls.some(args=>String(args[0]).startsWith('/api/v1/contracts'))).toBe(true));
+ expect(reads.mock.calls.some(args=>String(args[0]).startsWith('/api/v1/business-management/payments'))).toBe(false);
+ expect(location.pathname).toBe('/management/contracts');expect(f.requests).toHaveLength(0);
+});
+
 it('opens transfer directly for a transfer-only reader without probing payment or contract data',async()=>{
  history.replaceState(null,'','/management/contracts');const reads=vi.fn().mockResolvedValue(jsonResponse({items:[],nextCursor:null}));vi.stubGlobal('fetch',reads);
  const f=fixture({context:{...context,canEnterWorkbench:false,canReadBusinessManagement:true,businessManagementViews:['transfer']}});render(<SessionApplication controller={f.controller} api={f.api}/>);
