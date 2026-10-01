@@ -1,3 +1,4 @@
+import {guardedRouteContinue,guardedRouteFetch} from './browser.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';
@@ -12,9 +13,9 @@ try{
  await page.getByLabel(/^本次决定/).selectOption('NEED_INFO');
  await page.getByLabel(/^决定说明/).fill('纯合成负面分支：准确对方主体尚未核实，审查范围不完整。要求补齐独立主体与材料后重新审查，不记录通过。');
  await page.route('**/contracts/review-decisions',async route=>{
-  if(route.request().method()!=='POST'){await route.continue();return;}
+  if(route.request().method()!=='POST'){await guardedRouteContinue(route);return;}
   posts++;assert.equal(posts,1);
-  let result;try{result=await route.fetch();}catch{throw Error('Trusted contract request failed before response loss');}
+  let result;try{result=await guardedRouteFetch(route);}catch{throw Error('Trusted contract request failed before response loss');}
   const receipt=await result.json();
   save('contract-unknown-original.json',{commandId:route.request().headers()['idempotency-key'],status:result.status(),receipt});
   assert.equal(receipt.outcome,'SUCCEEDED');await route.abort('failed');

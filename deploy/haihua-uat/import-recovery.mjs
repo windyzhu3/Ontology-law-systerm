@@ -1,3 +1,4 @@
+import {guardedRouteContinue,guardedRouteFetch} from './browser.mjs';
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,9 +24,9 @@ try{
  save(tag+'-preview.txt',await page.locator('body').innerText());
  await page.screenshot({path:path.join(evidence,tag+'-preview.png'),fullPage:true});
  await page.route('**/api/v1/leads',async route=>{
-  if(route.request().method()!=='POST'||dropped){await route.continue();return;}
+  if(route.request().method()!=='POST'||dropped){await guardedRouteContinue(route);return;}
   dropped=true;
-  let response;try{response=await route.fetch();}catch{throw Error('Trusted isolated server request failed before deliberate response loss');}
+  let response;try{response=await guardedRouteFetch(route);}catch{throw Error('Trusted isolated server request failed before deliberate response loss');}
   const receipt=await response.json();save(tag+'-original-committed.json',{status:response.status(),commandId:route.request().headers()['idempotency-key'],receipt});
   assert.equal(receipt.outcome,'SUCCEEDED');await route.abort('failed');
  });

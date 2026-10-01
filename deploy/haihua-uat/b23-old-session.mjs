@@ -1,3 +1,4 @@
+import {guardedApiPost} from './browser.mjs';
 import {chromium} from '@playwright/test';import assert from 'node:assert/strict';
 import fs from 'node:fs';import path from 'node:path';import {execFile} from 'node:child_process';import {promisify} from 'node:util';import {randomUUID} from 'node:crypto';
 import {login,save,runtime} from './browser.mjs';
@@ -18,7 +19,7 @@ try{
  await admin('suspend');paused=true;
  const staleRead=await actor.page.request.get(endpoint,{headers:actor.apiHeaders()});assert.ok([401,403].includes(staleRead.status()));
  const commandId=randomUUID();save('B23-old-session-original.json',{commandId,endpoint:endpoint+'/start',body,phase:'REQUESTED'});
- const denied=await actor.page.request.post(endpoint+'/start',{headers:{...actor.apiHeaders(),'Idempotency-Key':commandId},data:body});const rejection=await denied.json();save('B23-old-session-original.json',{commandId,status:denied.status(),rejection});assert.ok([401,403].includes(denied.status()));
+ const denied=await guardedApiPost(actor.page.request,endpoint+'/start',{headers:{...actor.apiHeaders(),'Idempotency-Key':commandId},data:body});const rejection=await denied.json();save('B23-old-session-original.json',{commandId,status:denied.status(),rejection});assert.ok([401,403].includes(denied.status()));
  await actor.page.getByRole('button',{name:'刷新当前责任',exact:true}).click();await actor.page.getByText('正在读取当前责任…',{exact:true}).waitFor({state:'hidden'});
  const ui=await actor.page.locator('body').innerText();save('B23-old-session-revoked-UI.txt',ui);assert.equal(await actor.page.locator('.current-card .subject-title:visible,.work-card .subject:visible').filter({hasText:code}).count(),0);
  await admin('resume');paused=false;

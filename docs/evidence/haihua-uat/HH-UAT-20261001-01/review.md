@@ -15,3 +15,6 @@
 ## 仓库检查
 
 初始PR #21源码构建、前端、类型、拓扑和scaffold汇总通过；schema/preflight失败。原main与本分支各运行116项schema测试，同样10项失败、0错误，schema路径未变化。两边verify_baseline.py同为退出1，诊断逐行相同、无新增或删除项。未改历史基线、未降低门槛，失败门禁不改绿。最新PR轮次结果另以GitHub检查为准。
+
+
+同席复核补充：Playwright的route.fetch与APIRequestContext.post会绕过context.route。恢复/并发/重放工具已改用共同守卫，在这两类直接发送及route.continue前核对物理实例。独立临时回环服务器/实际Chrome验证实例改变后两路径均拒绝、零POST；允许路径可以200写入该临时服务器，排除“服务器不可用”假通过。源扫描确认所有现有直接变更与路由转发使用共同守卫；此测试没有请求任何UAT实例。最终工具Node9项、Python3项通过。原性能值属于之前实际测量轮次，不被此工具加固追溯修改。

@@ -1,3 +1,4 @@
+import {guardedApiPost,guardedRouteContinue,guardedRouteFetch} from './browser.mjs';
 import {chromium} from '@playwright/test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,12 +17,12 @@ try{
  await selectTask(page,code,'接收');await page.getByRole('heading',{name:'核对准确版本和材料完整性',exact:true}).waitFor();
  await page.locator('input[name=checked]').check();await page.locator('textarea[name=explanation]').fill('纯合成首次并发接收：同一准确已审查版本、完整主体及签署材料，只允许接收一次并产生一个案件。');
  await page.route('**/transfers/intake-decisions',async route=>{
-  if(route.request().method()!=='POST'){await route.continue();return;}
+  if(route.request().method()!=='POST'){await guardedRouteContinue(route);return;}
   posts++;assert.equal(posts,1);routed=route;
   const commandId=route.request().headers()['idempotency-key'],secondKey=randomUUID(),requestBody=route.request().postDataJSON(),endpoint=new URL(route.request().url()).pathname,startedAt=new Date().toISOString();
   save(tag+'-original.json',{phase:'REQUESTED',commandId,secondKey,requestBody,endpoint,startedAt});
   try{
-   const [first,second]=await Promise.all([route.fetch({timeout:120000}),page.request.post(route.request().url(),{headers:{...actor.apiHeaders(),'Idempotency-Key':secondKey},data:requestBody,timeout:120000})]);
+   const [first,second]=await Promise.all([guardedRouteFetch(route,{timeout:120000}),guardedApiPost(page.request,route.request().url(),{headers:{...actor.apiHeaders(),'Idempotency-Key':secondKey},data:requestBody,timeout:120000})]);
    const results=[{commandId,status:first.status(),body:await first.json()},{commandId:secondKey,status:second.status(),body:await second.json()}];
    save(tag+'-results.json',{startedAt,finishedAt:new Date().toISOString(),results});
    await route.fulfill({response:first});routed=null;resolve(results);
