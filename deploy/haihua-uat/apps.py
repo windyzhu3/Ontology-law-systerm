@@ -10,11 +10,17 @@ import hashlib
 
 def start(names):
     registry=json.loads((RUNTIME/'processes.json').read_text()) if (RUNTIME/'processes.json').exists() else {}
+    if len(names)!=len(set(names)) or any(name in registry for name in names):
+        raise RuntimeError('requested process already registered or repeated; refuse partial start')
     if hashlib.sha256(JAR.read_bytes()).hexdigest()!=deployment()['releaseDigest']:raise RuntimeError('runtime artifact digest changed')
     if 'spa' in names:
-        if (RUNTIME/'dist').exists():raise RuntimeError('dist already exists; preserve initial artifact and explicitly redeploy')
-        shutil.copytree(ROOT/'apps/workbench/dist',RUNTIME/'dist')
-        shutil.copyfile(ROOT/'deploy/haihua-uat/server.mjs',RUNTIME/'server.mjs')
+        if (RUNTIME/'dist').exists():
+            if not (RUNTIME/'dist/index.html').is_file() or not (RUNTIME/'server.mjs').is_file():
+                raise RuntimeError('retained SPA artifact incomplete; refuse start')
+            # A normal restart must reuse the exact deployed SPA, not the latest build.
+        else:
+            shutil.copytree(ROOT/'apps/workbench/dist',RUNTIME/'dist')
+            shutil.copyfile(ROOT/'deploy/haihua-uat/server.mjs',RUNTIME/'server.mjs')
     commands={'api':[JAVA,'-Xmx768m','-jar',JAR,'--spring.config.additional-location='+(RUNTIME/'application.properties').as_uri()],
               'worker':[JAVA,'-Xmx384m','-jar',JAR,'--spring.config.location='+(RUNTIME/'worker.properties').as_uri(),'--ols.runtime-role=worker','--spring.main.web-application-type=none'],
               'spa':[NODE,RUNTIME/'server.mjs',RUNTIME]}

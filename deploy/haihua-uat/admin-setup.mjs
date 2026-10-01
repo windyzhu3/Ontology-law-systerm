@@ -2,6 +2,12 @@ import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { login,runtime,evidence,save } from './browser.mjs';
+import { reserveAttempt } from './command-attempt.mjs';
+// Initial setup is one-shot. A failure requires reconciliation of original keys,
+// not a second pass through forms that generate fresh create commands.
+const setupFile=path.join(runtime,'admin-setup-result.json');
+if(fs.existsSync(setupFile))throw Error('Existing completed setup preserved; do not rerun initialization');
+reserveAttempt(runtime,'admin-setup',{operation:'initial identity setup'});
 const file=path.join(runtime,'account-map.json');
 const map=fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')):{organizations:{},users:{},grants:[],uiCommands:[]};
 const browser=await chromium.launch({channel:'chrome',headless:true});
@@ -19,10 +25,22 @@ async function create(section,button,fill) {
   await page.getByRole('link',{name:section,exact:true}).click();
   await page.getByRole('button',{name:button,exact:true}).click();
   await fill();
+  let dispatched;
+  await page.route('**/api/v1/admin/identity/**',async route=>{
+    if(route.request().method()!=='POST'){await route.fallback();return;}
+    const request=route.request();const headers=request.headers();
+    if(dispatched||!headers['idempotency-key']){await route.abort('blockedbyclient');return;}
+    dispatched={state:'DISPATCHED',url:new URL(request.url()).pathname,
+      commandId:headers['idempotency-key'],body:request.postDataJSON()};
+    map.uiCommands.push(dispatched);persist();
+    await route.fallback();
+  });
   const response=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().includes('/api/v1/admin/identity/'));
   await page.getByRole('button',{name:'确认创建',exact:true}).click();
   const r=await response;const receipt=await r.json();
-  map.uiCommands.push({url:new URL(r.url()).pathname,status:r.status(),commandId:r.request().headers()['idempotency-key'],receipt});persist();
+  if(!dispatched)throw Error('Original admin command not captured');
+  Object.assign(dispatched,{state:'OBSERVED',status:r.status(),receipt});persist();
+  await page.unroute('**/api/v1/admin/identity/**');
   if(r.status()!==201||receipt.outcome!=='SUCCEEDED')throw Error('admin create rejected '+r.status()+' '+JSON.stringify(receipt));
   await page.getByText(/结果已记录，当前页已重新读取/).waitFor();
   await page.getByRole('button',{name:button,exact:true}).waitFor();

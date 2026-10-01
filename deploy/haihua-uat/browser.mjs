@@ -1,6 +1,7 @@
 import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { assertRuntimeActive } from './runtime-ownership.mjs';
 const directory=process.env.HAIHUA_UAT_RUNTIME??'.superpowers/haihua-uat-runtime';
 if(!['.superpowers/haihua-uat-runtime','.superpowers/haihua-restore-e1','.superpowers/haihua-restore-g_completed','.superpowers/haihua-restore-perf_e1'].includes(directory.replaceAll('\\','/')))throw Error('explicit approved isolated runtime only');
 export const runtime = path.resolve(directory);
@@ -13,7 +14,14 @@ export function save(name,value){ fs.writeFileSync(path.join(runtime,name),typeo
 // forward that raw error to a terminal; retain only safe locations and first line.
 process.on('uncaughtException',error=>{const message=String(error?.message??error).split('\n')[0];save('safe-browser-failure-'+Date.now()+'.json',{name:error?.name,message,locations:String(error?.stack??'').split('\n').filter(line=>line.trim().startsWith('at '))});console.error((error?.name??'Error')+': '+message);process.exit(1);});
 export async function login(browser,username) {
+  assertRuntimeActive(runtime);
   const context=await browser.newContext({viewport:{width:1440,height:1000},timezoneId:'Asia/Shanghai'});
+  await context.route('**/api/**', async route => {
+    if (['POST','PUT','PATCH','DELETE'].includes(route.request().method())) {
+      try { assertRuntimeActive(runtime); } catch { await route.abort('blockedbyclient'); return; }
+    }
+    await route.fallback();
+  });
   const page=await context.newPage();page.setDefaultTimeout(60000);
   if(directory.endsWith('haihua-restore-perf_e1')){
     const traceFile=path.join(runtime,username+'-business-protocol.json');
