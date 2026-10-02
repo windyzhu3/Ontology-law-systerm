@@ -102,3 +102,6 @@ B15 对方复用原 G04 委托主体，独立案管决定 BLOCKED；销售形成
 当前 [工作台](https://localhost:20544/workbench)、[系统管理](https://localhost:20544/admin/identity/principals) 保留。十账号密码位于执行工作树忽略目录 `.superpowers/haihua-uat-runtime/browser-credentials.json`，不进入本目录或 GitHub。测试环境已含本轮案例与原失败事实；E0/E1 和完成主链的备份检查点保留，不删除事实重置为“干净”。
 
 运行与账号定位见 [操作说明](../../../../deploy/haihua-uat/README.md)。完整回执、实际 UI 截图、日志、时间线、材料、制品历史及检查点在本地私有忽略目录，公共文档仅保存去秘密索引。
+
+
+2026-10-02补充：前端HH011修复管理员退出后销售主管继承管理路由；81项相关回归、类型检查/构建与实际同浏览器账号切换通过。后端仍HH010，权限与业务数据未变。详见[账号切换记录](account-switch.md)。原整体验收FAIL及未覆盖范围不改变。
