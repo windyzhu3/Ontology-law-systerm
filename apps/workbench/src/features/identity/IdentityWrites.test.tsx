@@ -94,7 +94,7 @@ it.each([
     } else {
       await screen.findByRole("option", { name: "陈晓" });
       change(kind === "appointments" ? "身份主体" : "授权任职", selectorId);
-      change(kind === "appointments" ? "岗位" : "权限", kind === "appointments" ? "CONTACT_OPERATOR" : "SALES_CONTACT_OWNER");
+      change(kind === "appointments" ? "岗位" : "权限", kind === "appointments" ? taskId : "SALES_CONTACT_OWNER");
       change("生效时间", "2026-09-10T09:30");
       expect(screen.getByText(/本机时区/)).toBeVisible();
       const start = new Date(2026, 8, 10, 9, 30).toISOString();

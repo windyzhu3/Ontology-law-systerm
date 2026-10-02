@@ -1,0 +1,281 @@
+{
+  "AppointmentV1": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "principal",
+      "organization",
+      "roleCode",
+      "effectiveFrom",
+      "effectiveUntil",
+      "state",
+      "etag"
+    ],
+    "properties": {
+      "id": {
+        "$ref": "#/components/schemas/Uuid"
+      },
+      "principal": {
+        "$ref": "#/components/schemas/IdentityChoiceV1"
+      },
+      "organization": {
+        "$ref": "#/components/schemas/IdentityChoiceV1"
+      },
+      "roleCode": {
+        "type": "string",
+        "enum": [
+          "INTAKE_OPERATOR",
+          "ROUTING_SUPERVISOR",
+          "CONTACT_OPERATOR",
+          "IDENTITY_ADMIN",
+          "SALES_REPRESENTATIVE",
+          "SALES_MANAGER",
+          "FINANCE_OPERATOR",
+          "CASE_ADMINISTRATOR"
+        ]
+      },
+      "effectiveFrom": {
+        "$ref": "#/components/schemas/Instant"
+      },
+      "effectiveUntil": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date-time"
+      },
+      "state": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "SUSPENDED",
+          "ENDED"
+        ]
+      },
+      "etag": {
+        "$ref": "#/components/schemas/IdentityETag"
+      }
+    }
+  },
+  "IdentityAdminPageV1": {
+    "type": "string",
+    "enum": [
+      "PRINCIPALS",
+      "ORGANIZATIONS",
+      "APPOINTMENTS",
+      "AUTHORITY_GRANTS"
+    ]
+  },
+  "IdentityChoiceV1": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "label"
+    ],
+    "properties": {
+      "id": {
+        "$ref": "#/components/schemas/Uuid"
+      },
+      "label": {
+        "$ref": "#/components/schemas/SafeText200"
+      }
+    }
+  },
+  "IdentityOptionKindV1": {
+    "type": "string",
+    "enum": [
+      "PRINCIPAL",
+      "ORGANIZATION",
+      "APPOINTMENT"
+    ]
+  },
+  "IdentityRoleCodeV1": {
+    "type": "string",
+    "enum": [
+      "INTAKE_OPERATOR",
+      "ROUTING_SUPERVISOR",
+      "CONTACT_OPERATOR",
+      "SALES_REPRESENTATIVE",
+      "SALES_MANAGER",
+      "FINANCE_OPERATOR",
+      "CASE_ADMINISTRATOR"
+    ]
+  },
+  "PublicFactRef": {
+    "oneOf": [
+      {
+        "$ref": "#/components/schemas/R2ContractPreparationRequestFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractPreparationDecisionFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractDraftFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractRevisionFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractReviewRequestFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractReviewDecisionFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractApprovalRequestFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractApprovalDecisionFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/OpportunityMaterialUploadFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/OpportunityMaterialVersionFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/OpportunityCustomerDraftFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/OpportunityCustomerConfirmationFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/OpportunityClosureFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/OwnerExceptionFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/OwnerExceptionValidationFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/IdentityPrincipalFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/OrganizationUnitFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/AppointmentFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/AuthorityGrantFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/LeadFactRef"
+      },
+      {
+        "$ref": "#/components/schemas/ActionDraftFactRef"
+      },
+      {
+        "$ref": "#/components/schemas/TaskOccurrenceFactRef"
+      },
+      {
+        "$ref": "#/components/schemas/DecisionRecordFactRef"
+      },
+      {
+        "$ref": "#/components/schemas/LeadAssignmentFactRef"
+      },
+      {
+        "$ref": "#/components/schemas/LeadContactResultFactRef"
+      },
+      {
+        "$ref": "#/components/schemas/OpportunityProgressFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2QuoteDraftFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2QuoteRevisionFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2QuoteApprovalRequestFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2QuoteApprovalDecisionFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2QuoteIssueFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2QuoteResponseFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/ContractPreparationWorkflowFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractSignatureDraftFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractSignatureArrangementFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractSignatureSubmissionFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractSignatureVerificationFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractSignatureArchiveFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractSignatureRevisionReturnFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractSignatureWorkflowFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/ContractExecutionWorkflowFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/ContractPaymentWorkflowFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2ContractSignatureHandoffFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2QuotePreparationIntentFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/FollowupAttemptFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/R2QuoteTerminationFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/ContractNegotiationDispositionFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/ContractTerminationReviewAssignmentFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/ContractExecutionVerificationFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/ContractPaymentRequestFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/ContractPaymentReviewFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/TransferSubmissionFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/TransferConflictReviewFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/TransferIntakeFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/MatterClassificationFactRefV1"
+      },
+      {
+        "$ref": "#/components/schemas/TransferWorkflowFactRefV1"
+      }
+    ]
+  }
+}

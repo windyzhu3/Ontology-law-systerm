@@ -17,6 +17,12 @@ def canonical_hash(manifest):
         ensure_ascii=False,sort_keys=True,separators=(',',':')).encode('utf-8')).hexdigest()
 
 def historical_projection(generated, manifest):
+    if manifest.get('contractVersion') == '52-plus-2-r2-v21':
+        try:
+            from scripts.baseline.configurable_roles_schema_contract import historical_projection as roles_projection
+        except ModuleNotFoundError:
+            from configurable_roles_schema_contract import historical_projection as roles_projection
+        return roles_projection(generated, manifest)
     if manifest.get("contractVersion")=="52-plus-2-r2-v20":
         try:
             from scripts.baseline.r25_contract_recovery_schema_contract import historical_projection as recovery_projection

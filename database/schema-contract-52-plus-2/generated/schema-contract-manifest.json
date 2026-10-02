@@ -1,9 +1,9 @@
 {
-  "contractVersion": "52-plus-2-r2-v20",
-  "applicationTableCount": 119,
+  "contractVersion": "52-plus-2-r2-v21",
+  "applicationTableCount": 120,
   "selfManagedPlatformTableCount": 2,
   "flywayManagedTable": "platform_meta.flyway_schema_history",
-  "physicalTableCountAfterFlywayBootstrap": 122,
+  "physicalTableCountAfterFlywayBootstrap": 123,
   "generatedArtifactSha256": {
     "db/migration/V001__bootstrap_schemas.sql": "5f0b866c7f9f4adcfc1e658053859b068b88cca6f476f376deec50f283c816e7",
     "db/migration/V002__deployment_state.sql": "66fee9505dc4f5a0e9d4d180d0979867e00321af57c37c76376fbe49df635833",
@@ -24,6 +24,7 @@
     "db/migration/V1040__r2_execution_conditions.sql": "03e88eb5770d3418d724387abd4d0257ed98e6b6b0366c3c9f6f2291695be509",
     "db/migration/V1050__r2_transfer_workflow.sql": "c512c3a4241a4a50743aa94c8e82edbcbbf187f1f24aaeb39fa252eb84ccd930",
     "db/migration/V1060__r25_contract_responsibility_recovery.sql": "b5c1393a7a3ec9fc1e8c6b1acf343d89ceeee36f8c0bc77366f99aef325d37be",
+    "db/migration/V1070__configurable_appointment_roles.sql": "2c0f80127ee9c27374d2e26f82c9e8107a394cac77357c1351460ef4ec066f04",
     "db/migration/V110__contract_tables.sql": "8badb97821333736aea2dfff16a7fc95de9d5df9136d4f0064052bc4626c23b4",
     "db/migration/V120__transfer_tables.sql": "9ee22813c4e71312f94a0762084989a5e0aea9a78ae47168a677e762bd325128",
     "db/migration/V800__cross_domain_foreign_keys.sql": "6e4d2b23c33179e03b801cf17a5b83be3709be55d0047cde9e8c48cad4a14cde",
@@ -47,13 +48,13 @@
     "db/migration/V980__r2_contract_versions.sql": "1c94aa2822d8408f5b1574471535d44d70ec4ec94edc2d54d4846df6f98ab2b7",
     "db/migration/V990__r2_manual_signature.sql": "68ece31dbd7326c5c91230e2c01b5e0f91357e5436eee064a325fd3ac2366a4a"
   },
-  "fieldContractSha256": "743eb8832f132235d123d123c658fb04a492d4de7c0e618a922db30791d1f485",
+  "fieldContractSha256": "d1cad52f5e7fe312c2355fc192e3420bbb6142610cfcccb21bf64573827d7538",
   "schemas": [
     {
       "name": "identity",
       "comment": "身份域：保存租户、身份、组织、任职及授权锚点；不保存凭据，也不替代命令时动态授权复验。",
       "owner": "IdentityRuntime",
-      "tableCount": 7,
+      "tableCount": 8,
       "tables": [
         {
           "qualifiedName": "identity.tenant",
@@ -648,7 +649,7 @@
               "nullable": false,
               "default": null,
               "byteLength": null,
-              "comment": "岗位代码：来自静态应用注册表，创建后不可修改，不直接授予业务权限。"
+              "comment": "岗位代码：关联同租户可配置目录，创建后不变，不授予权限。"
             },
             {
               "name": "effective_from",
@@ -780,6 +781,23 @@
               "deferrable": false,
               "initiallyDeferred": false,
               "comment": "任职组织单元必须是同租户已存在的组织节点。"
+            },
+            {
+              "name": "fk_appointment__role",
+              "columns": [
+                "tenant_id",
+                "role_code"
+              ],
+              "parentTable": "identity.appointment_role",
+              "parentColumns": [
+                "tenant_id",
+                "role_code"
+              ],
+              "onUpdate": "NO ACTION",
+              "onDelete": "NO ACTION",
+              "deferrable": false,
+              "initiallyDeferred": false,
+              "comment": "任职关联同租户岗位；停用不改变旧任职。"
             }
           ],
           "typedReferences": [],
@@ -1733,6 +1751,146 @@
               "comment": "按准确业务Subject查找对象访问授予。"
             }
           ]
+        },
+        {
+          "qualifiedName": "identity.appointment_role",
+          "name": "appointment_role",
+          "owner": "IdentityRuntime",
+          "comment": "租户岗位目录；名称和状态可CAS修改，代码不变，不自动授予权限。",
+          "idColumn": "appointment_role_id",
+          "primaryKey": [
+            "tenant_id",
+            "appointment_role_id"
+          ],
+          "primaryKeyComment": "主键：在租户内唯一标识一条appointment_role记录。",
+          "updatePolicy": "CONTROLLED",
+          "mutableColumns": [
+            "display_name",
+            "state",
+            "revision"
+          ],
+          "writeOnceColumns": [],
+          "stateColumn": "state",
+          "initialState": "ACTIVE",
+          "stateTransitions": [
+            [
+              "ACTIVE",
+              "INACTIVE"
+            ],
+            [
+              "INACTIVE",
+              "ACTIVE"
+            ]
+          ],
+          "columns": [
+            {
+              "name": "tenant_id",
+              "sqlType": "uuid",
+              "nullable": false,
+              "default": null,
+              "byteLength": null,
+              "comment": "租户标识：复合主键和所有租户内关联的第一列。"
+            },
+            {
+              "name": "appointment_role_id",
+              "sqlType": "uuid",
+              "nullable": false,
+              "default": null,
+              "byteLength": null,
+              "comment": "租户岗位目录；名称和状态可CAS修改，代码不变，不自动授予权限。标识：由应用生成的UUIDv7。"
+            },
+            {
+              "name": "role_code",
+              "sqlType": "varchar(64)",
+              "nullable": false,
+              "default": null,
+              "byteLength": null,
+              "comment": "租户内唯一稳定岗位代码。"
+            },
+            {
+              "name": "display_name",
+              "sqlType": "text",
+              "nullable": false,
+              "default": null,
+              "byteLength": null,
+              "comment": "岗位显示名称。"
+            },
+            {
+              "name": "state",
+              "sqlType": "varchar(64)",
+              "nullable": false,
+              "default": null,
+              "byteLength": null,
+              "comment": "ACTIVE或INACTIVE；停用仅禁止新增任职。"
+            },
+            {
+              "name": "created_at",
+              "sqlType": "timestamptz(6)",
+              "nullable": false,
+              "default": null,
+              "byteLength": null,
+              "comment": "目录创建时间。"
+            },
+            {
+              "name": "revision",
+              "sqlType": "bigint",
+              "nullable": false,
+              "default": "0",
+              "byteLength": null,
+              "comment": "CAS修订号：每次受控更新必须精确递增一，初始为零。"
+            }
+          ],
+          "constraints": [
+            {
+              "name": "uq_appointment_role__code",
+              "kind": "UNIQUE",
+              "expression": "tenant_id, role_code",
+              "comment": "代码在租户内唯一。"
+            },
+            {
+              "name": "ck_appointment_role__state",
+              "kind": "CHECK",
+              "expression": "state IN ('ACTIVE', 'INACTIVE')",
+              "comment": "岗位可停用和恢复。"
+            },
+            {
+              "name": "ck_appointment_role__code_format",
+              "kind": "CHECK",
+              "expression": "role_code ~ '^[A-Z][A-Z0-9_]{0,63}$'",
+              "comment": "受约束岗位代码。"
+            },
+            {
+              "name": "ck_appointment_role__name",
+              "kind": "CHECK",
+              "expression": "char_length(btrim(display_name)) BETWEEN 1 AND 200 AND display_name !~ '[[:cntrl:]]'",
+              "comment": "安全显示名称。"
+            },
+            {
+              "name": "ck_appointment_role__revision",
+              "kind": "CHECK",
+              "expression": "revision BETWEEN 0 AND 9007199254740991",
+              "comment": "JSON安全修订号。"
+            }
+          ],
+          "foreignKeys": [
+            {
+              "name": "fk_appointment_role__tenant",
+              "columns": [
+                "tenant_id"
+              ],
+              "parentTable": "identity.tenant",
+              "parentColumns": [
+                "tenant_id"
+              ],
+              "onUpdate": "NO ACTION",
+              "onDelete": "NO ACTION",
+              "deferrable": false,
+              "initiallyDeferred": false,
+              "comment": "租户边界：该记录必须属于一个已存在的租户。"
+            }
+          ],
+          "typedReferences": [],
+          "indexes": []
         }
       ]
     },
@@ -2429,7 +2587,8 @@
                 "transfer.review",
                 "transfer.review_return_item",
                 "transfer.intake",
-                "transfer.classification"
+                "transfer.classification",
+                "identity.appointment_role"
               ],
               "comment": "本条审计所针对的准确业务Subject"
             },
@@ -4883,7 +5042,8 @@
                 "transfer.review",
                 "transfer.review_return_item",
                 "transfer.intake",
-                "transfer.classification"
+                "transfer.classification",
+                "identity.appointment_role"
               ],
               "comment": "命令成功或无变化时产生或确认的结果事实"
             }
@@ -33777,6 +33937,7 @@
     "identity.authority_grant",
     "identity.delegation_grant",
     "identity.object_access_grant",
+    "identity.appointment_role",
     "audit.audit_entry",
     "responsibility.task_occurrence",
     "responsibility.decision_record",
@@ -33988,6 +34149,23 @@
       "initiallyDeferred": false
     },
     {
+      "name": "fk_appointment__role",
+      "childTable": "identity.appointment",
+      "childColumns": [
+        "tenant_id",
+        "role_code"
+      ],
+      "parentTable": "identity.appointment_role",
+      "parentColumns": [
+        "tenant_id",
+        "role_code"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "deferrable": false,
+      "initiallyDeferred": false
+    },
+    {
       "name": "fk_authority_grant__tenant",
       "childTable": "identity.authority_grant",
       "childColumns": [
@@ -34181,6 +34359,21 @@
       "parentColumns": [
         "tenant_id",
         "appointment_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "deferrable": false,
+      "initiallyDeferred": false
+    },
+    {
+      "name": "fk_appointment_role__tenant",
+      "childTable": "identity.appointment_role",
+      "childColumns": [
+        "tenant_id"
+      ],
+      "parentTable": "identity.tenant",
+      "parentColumns": [
+        "tenant_id"
       ],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
@@ -43797,7 +43990,8 @@
         "transfer.review",
         "transfer.review_return_item",
         "transfer.intake",
-        "transfer.classification"
+        "transfer.classification",
+        "identity.appointment_role"
       ]
     },
     "conflict.conflict_finding.matched_fact": {
@@ -44002,7 +44196,8 @@
         "transfer.review",
         "transfer.review_return_item",
         "transfer.intake",
-        "transfer.classification"
+        "transfer.classification",
+        "identity.appointment_role"
       ]
     },
     "execution.domain_event.source_fact": {
@@ -44616,5 +44811,5 @@
     "two NOINHERIT startup LOGIN roles receive only direct target-database CONNECT from IaC: API selects one exact NOLOGIN Command, Query or Audit capability with SET LOCAL ROLE per statement path; Worker selects Worker capability only",
     "IaC-protected migration owner is used only by the release job as DeploymentRuntime; artifact, manifest and schema contract digests match before CAS to ACTIVE, while V840 validates only the four application roles"
   ],
-  "contractSha256": "623ac761849f24e9aed4b05fa2760827010711e2233a6fe36692ea856e3d2d53"
+  "contractSha256": "c73031d295efa105a17fdaf114ce35ef393f7746efa67234eec014c425b38508"
 }

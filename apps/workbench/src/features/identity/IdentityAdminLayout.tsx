@@ -9,6 +9,7 @@ const navigation: Array<{
 }> = [
   { path: "/admin/identity/principals", label: "身份主体", icon: User },
   { path: "/admin/identity/organizations", label: "组织架构", icon: TreeStructure },
+  { path: "/admin/identity/roles", label: "岗位管理", icon: Briefcase },
   { path: "/admin/identity/appointments", label: "任职管理", icon: Briefcase },
   { path: "/admin/identity/authority-grants", label: "直接授权", icon: ShieldCheck },
 ];

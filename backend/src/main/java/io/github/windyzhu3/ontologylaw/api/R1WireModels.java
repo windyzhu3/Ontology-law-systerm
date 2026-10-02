@@ -67,7 +67,7 @@ final class R1WireModels {
             case "OPPORTUNITY_PROGRESS"->OpportunityProgressFactRefV1.class;
             case "OPPORTUNITY_OWNER_EXCEPTION"->OwnerExceptionFactRefV1.class;case "OPPORTUNITY_OWNER_VALIDATION"->OwnerExceptionValidationFactRefV1.class;
             case "LEAD_ASSIGNMENT"->LeadAssignmentFactRef.class;case "LEAD_CONTACT_RESULT"->LeadContactResultFactRef.class;
-            case "IDENTITY_PRINCIPAL"->IdentityPrincipalFactRefV1.class;case "ORGANIZATION_UNIT"->OrganizationUnitFactRefV1.class;case "APPOINTMENT"->AppointmentFactRefV1.class;case "AUTHORITY_GRANT"->AuthorityGrantFactRefV1.class;
+            case "APPOINTMENT_ROLE"->AppointmentRoleFactRefV1.class;case "IDENTITY_PRINCIPAL"->IdentityPrincipalFactRefV1.class;case "ORGANIZATION_UNIT"->OrganizationUnitFactRefV1.class;case "APPOINTMENT"->AppointmentFactRefV1.class;case "AUTHORITY_GRANT"->AuthorityGrantFactRefV1.class;
             default->throw new IllegalArgumentException("Invalid receipt projection");
         };
         return MAPPER.convertValue(body,type);

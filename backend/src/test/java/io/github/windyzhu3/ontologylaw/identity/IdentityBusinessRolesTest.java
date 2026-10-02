@@ -18,14 +18,14 @@ class IdentityBusinessRolesTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings={"SALES_REPRESENTATIVE","SALES_MANAGER","FINANCE_OPERATOR","CASE_ADMINISTRATOR","INTAKE_OPERATOR","ROUTING_SUPERVISOR","CONTACT_OPERATOR"})
+    @ValueSource(strings={"SALES_REPRESENTATIVE","SALES_MANAGER","FINANCE_OPERATOR","CASE_ADMINISTRATOR","INTAKE_OPERATOR","ROUTING_SUPERVISOR","CONTACT_OPERATOR","CUSTOM_ADVISOR","IDENTITY_ADMIN","SERVICE_OPERATOR"})
     void creates_a_valid_appointment_with_each_supported_business_role(String role) {
         var result = IdentityCommands.validate(IdentityCommands.handler("CREATE_APPOINTMENT"), appointment(role));
         assertEquals(role, result.get("roleCode"));
     }
 
     @ParameterizedTest
-    @ValueSource(strings={"IDENTITY_ADMIN","SERVICE_OPERATOR","UNKNOWN_ROLE","sales_manager",""})
+    @ValueSource(strings={"sales_manager","","BAD-ROLE","AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"})
     void ordinary_appointment_creation_rejects_platform_and_unknown_roles(String role) {
         var failure = assertThrows(IdentityCommands.Failure.class,
             () -> IdentityCommands.validate(IdentityCommands.handler("CREATE_APPOINTMENT"), appointment(role)));

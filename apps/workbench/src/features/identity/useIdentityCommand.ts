@@ -8,7 +8,7 @@ export type IdentityWriteDraft = WithoutKey<IdentityOriginalWrite>;
 export type IdentityCreatePage = components["schemas"]["IdentityAdminPageV1"];
 export type IdentityLifecycleType = Exclude<IdentityOriginalWrite["commandType"], `CREATE_${string}` | `RENAME_${string}`>;
 export type IdentityAction = { commandType: IdentityLifecycleType; targetId: string; ifMatch: string; targetName: string; label: string; verb: string; impact: string };
-export type IdentityEditor = { kind: "create"; page: IdentityCreatePage } | { kind: "rename"; commandType: "RENAME_IDENTITY_PRINCIPAL" | "RENAME_ORGANIZATION_UNIT"; targetId: string; ifMatch: string; displayName: string } | ({ kind: "action" } & IdentityAction);
+export type IdentityEditor = { kind: "create"; page: IdentityCreatePage } | { kind: "rename"; commandType: "RENAME_APPOINTMENT_ROLE" | "RENAME_IDENTITY_PRINCIPAL" | "RENAME_ORGANIZATION_UNIT"; targetId: string; ifMatch: string; displayName: string } | ({ kind: "action" } & IdentityAction);
 type Phase = "idle" | "sending" | "unknown" | "proven" | "complete";
 
 export function identityRejectionMessage(code?: string) {

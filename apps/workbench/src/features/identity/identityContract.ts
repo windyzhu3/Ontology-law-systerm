@@ -21,6 +21,10 @@ type UpdateIdentityWrite<
 };
 
 export type IdentityOriginalWrite =
+  | CreateIdentityWrite<"CREATE_APPOINTMENT_ROLE", S["CreateAppointmentRoleV1"]>
+  | UpdateIdentityWrite<"RENAME_APPOINTMENT_ROLE", S["RenameAppointmentRoleV1"]>
+  | UpdateIdentityWrite<"DEACTIVATE_APPOINTMENT_ROLE", S["DeactivateAppointmentRoleV1"]>
+  | UpdateIdentityWrite<"REACTIVATE_APPOINTMENT_ROLE", S["ReactivateAppointmentRoleV1"]>
   | CreateIdentityWrite<"CREATE_IDENTITY_PRINCIPAL", S["CreateIdentityPrincipalV1"]>
   | UpdateIdentityWrite<"RENAME_IDENTITY_PRINCIPAL", S["RenameIdentityPrincipalV1"]>
   | UpdateIdentityWrite<"SUSPEND_IDENTITY_PRINCIPAL", S["SuspendIdentityPrincipalV1"]>
@@ -37,6 +41,7 @@ export type IdentityOriginalWrite =
   | UpdateIdentityWrite<"REVOKE_AUTHORITY_GRANT", S["RevokeAuthorityGrantV1"]>;
 
 export type IdentityReadOperation =
+  | "listAppointmentRoles"
   | "listIdentityProviderUsers"
   | "getIdentityAdminOptions"
   | "listIdentityPrincipals"
@@ -45,6 +50,7 @@ export type IdentityReadOperation =
   | "listAuthorityGrants";
 
 type IdentityReadData = {
+  listAppointmentRoles: S["AppointmentRolePageV1"];
   listIdentityProviderUsers: S["ProviderUserPageV1"];
   getIdentityAdminOptions: S["IdentityAdminOptionsV1"];
   listIdentityPrincipals: S["IdentityPrincipalPageV1"];
@@ -81,8 +87,7 @@ const page = (value: unknown, item: (entry: unknown) => boolean, maximum = 50) =
   value.items.every(item) &&
   cursor(value.nextCursor);
 
-const roles = ["INTAKE_OPERATOR", "ROUTING_SUPERVISOR", "CONTACT_OPERATOR", "SALES_REPRESENTATIVE", "SALES_MANAGER", "FINANCE_OPERATOR", "CASE_ADMINISTRATOR"] as const;
-const projectedRoles = [...roles, "IDENTITY_ADMIN"] as const;
+const roleCode = (value: unknown) => typeof value === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(value);
 export const grantable = [
   "CONTRACT_SIGNATURE_VERIFY","CONTRACT_EXECUTION_VERIFY","CONTRACT_TERMINATION_REVIEW","PAYMENT_SUBMIT","PAYMENT_CONFIRM","TRANSFER_SUBMIT","TRANSFER_REVIEW","TRANSFER_ACCEPT","MATTER_CLASSIFY","MATTER_RECEIVE",
   "LEAD_MANAGEMENT_READ", "TEAM_TASK_READ", "PAYMENT_LEDGER_READ", "TRANSFER_LEDGER_READ", "CONTRACT_READ", "CONTRACT_PREPARE", "CONTRACT_PREPARATION_DECIDE", "CONTRACT_REVIEW", "CONTRACT_APPROVE",
@@ -140,9 +145,12 @@ export function validIdentityOriginal(value: unknown): value is IdentityOriginal
         /^[A-Za-z0-9_-]{1,2048}$/.test(value.body.providerUserSelector) &&
         safeText(value.body.displayName, 200)
       );
+    case "RENAME_APPOINTMENT_ROLE":
     case "RENAME_IDENTITY_PRINCIPAL":
     case "RENAME_ORGANIZATION_UNIT":
       return displayName(value.body);
+    case "DEACTIVATE_APPOINTMENT_ROLE":
+    case "REACTIVATE_APPOINTMENT_ROLE":
     case "SUSPEND_IDENTITY_PRINCIPAL":
     case "RESUME_IDENTITY_PRINCIPAL":
     case "DISABLE_IDENTITY_PRINCIPAL":
@@ -152,6 +160,8 @@ export function validIdentityOriginal(value: unknown): value is IdentityOriginal
     case "END_APPOINTMENT":
     case "REVOKE_AUTHORITY_GRANT":
       return reason(value.body);
+    case "CREATE_APPOINTMENT_ROLE":
+      return isObject(value.body) && exactKeys(value.body,["code","displayName"]) && roleCode(value.body.code) && safeText(value.body.displayName,200);
     case "CREATE_ORGANIZATION_UNIT":
       return (
         isObject(value.body) &&
@@ -167,7 +177,7 @@ export function validIdentityOriginal(value: unknown): value is IdentityOriginal
         exactKeys(value.body, ["principalId", "organizationId", "roleCode", "effectiveFrom", "effectiveUntil"]) &&
         uuid(value.body.principalId) &&
         uuid(value.body.organizationId) &&
-        oneOf(value.body.roleCode, roles) &&
+        roleCode(value.body.roleCode) &&
         validWindow(value.body.effectiveFrom, value.body.effectiveUntil)
       );
     case "CREATE_AUTHORITY_GRANT":
@@ -218,6 +228,7 @@ export function validIdentityQuery(
       "ORGANIZATIONS:ORGANIZATION",
       "APPOINTMENTS:PRINCIPAL",
       "APPOINTMENTS:ORGANIZATION",
+      "APPOINTMENTS:ROLE",
       "AUTHORITY_GRANTS:APPOINTMENT",
       "AUTHORITY_GRANTS:ORGANIZATION",
     ].includes(pair);
@@ -248,13 +259,15 @@ const organization = (value: unknown) =>
   safeText(value.displayName, 200) &&
   oneOf(value.state, ["ACTIVE", "CLOSED"]) &&
   identityTag.test(String(value.etag));
+const appointmentRole = (value: unknown) => isObject(value) && exactKeys(value,["id","code","displayName","state","etag"]) && uuid(value.id) && roleCode(value.code) && safeText(value.displayName,200) && oneOf(value.state,["ACTIVE","INACTIVE"]) && identityTag.test(String(value.etag));
+const roleChoice = (value: unknown) => isObject(value) && exactKeys(value,["id","label","code"]) && uuid(value.id) && safeText(value.label,200) && roleCode(value.code);
 const appointment = (value: unknown) =>
   isObject(value) &&
-  exactKeys(value, ["id", "principal", "organization", "roleCode", "effectiveFrom", "effectiveUntil", "state", "etag"]) &&
+  exactKeys(value, ["id", "principal", "organization", "roleCode", "roleName", "effectiveFrom", "effectiveUntil", "state", "etag"]) &&
   uuid(value.id) &&
   choice(value.principal) &&
   choice(value.organization) &&
-  oneOf(value.roleCode, projectedRoles) &&
+  roleCode(value.roleCode) && safeText(value.roleName,200) &&
   instant(value.effectiveFrom) &&
   (value.effectiveUntil === null || instant(value.effectiveUntil)) &&
   oneOf(value.state, ["ACTIVE", "SUSPENDED", "ENDED"]) &&
@@ -280,6 +293,7 @@ export function validIdentityRead<Operation extends IdentityReadOperation>(
     return page(value, providerUser, 1) && isObject(value) && value.nextCursor === null;
   if (operation === "listIdentityPrincipals") return page(value, principal);
   if (operation === "listOrganizationUnits") return page(value, organization);
+  if (operation === "listAppointmentRoles") return page(value, appointmentRole);
   if (operation === "listAppointments") return page(value, appointment);
   if (operation === "listAuthorityGrants") return page(value, authorityGrant);
   if (
@@ -287,7 +301,7 @@ export function validIdentityRead<Operation extends IdentityReadOperation>(
     !exactKeys(value, ["page", "optionKind", "candidates", "roleCodes", "grantableAuthorityCodes"]) ||
     value.page !== query.page ||
     value.optionKind !== query.optionKind ||
-    !page(value.candidates, choice)
+    !page(value.candidates, query.optionKind === "ROLE" ? roleChoice : choice)
   )
     return false;
   const adminPage = String(value.page);
@@ -302,7 +316,7 @@ export function validIdentityRead<Operation extends IdentityReadOperation>(
   if (adminPage === "ORGANIZATIONS")
     return exactArray(value.roleCodes, []) && exactArray(value.grantableAuthorityCodes, []);
   if (adminPage === "APPOINTMENTS")
-    return exactArray(value.roleCodes, roles) && exactArray(value.grantableAuthorityCodes, []);
+    return exactArray(value.roleCodes, []) && exactArray(value.grantableAuthorityCodes, []);
   if (adminPage === "AUTHORITY_GRANTS")
     return exactArray(value.roleCodes, []) && exactArray(value.grantableAuthorityCodes, grantable);
   return false;

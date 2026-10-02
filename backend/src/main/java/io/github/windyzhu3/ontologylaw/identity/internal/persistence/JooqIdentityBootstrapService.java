@@ -23,6 +23,7 @@ public final class JooqIdentityBootstrapService implements IdentityBootstrapServ
         if(m.effectiveFrom().isAfter(now.toInstant())||hmac.length!=32||initialized(c,tenant,m.tenantCode()))throw invalid();
         UUID root=UUID.randomUUID(),principal=UUID.randomUUID(),appointment=UUID.randomUUID();var grants=new ArrayList<UUID>();
         var t=TENANT;d.insertInto(t).set(t.TENANT_ID,tenant).set(t.TENANT_CODE,m.tenantCode()).set(t.DISPLAY_NAME,m.tenantDisplayName()).set(t.STATE,"ACTIVE").set(t.REVISION,0L).set(t.CREATED_AT,now).execute();
+        d.execute("select identity.seed_appointment_roles(?)",tenant);
         var p=PRINCIPAL;d.insertInto(p).set(p.TENANT_ID,tenant).set(p.PRINCIPAL_ID,principal).set(p.PRINCIPAL_KIND,"HUMAN").set(p.IDENTITY_PROVIDER_CODE,m.identityProviderCode()).set(p.EXTERNAL_SUBJECT_HMAC,hmac).set(p.DISPLAY_NAME,m.principalDisplayName()).set(p.STATE,"ACTIVE").set(p.REVISION,0L).set(p.CREATED_AT,now).execute();
         var o=ORGANIZATION_UNIT;d.insertInto(o).set(o.TENANT_ID,tenant).set(o.ORGANIZATION_UNIT_ID,root).set(o.UNIT_CODE,m.rootCode()).set(o.DISPLAY_NAME,m.rootDisplayName()).set(o.STATE,"ACTIVE").set(o.REVISION,0L).set(o.CREATED_AT,now).execute();
         var a=APPOINTMENT;var effective=OffsetDateTime.ofInstant(m.effectiveFrom(),ZoneOffset.UTC);

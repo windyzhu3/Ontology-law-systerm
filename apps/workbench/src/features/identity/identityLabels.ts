@@ -24,16 +24,6 @@ export const authorityStateLabels: Record<S["AuthorityGrantV1"]["state"], string
   REVOKED: "已撤销",
 };
 
-export const roleLabels: Record<S["AppointmentV1"]["roleCode"], string> = {
-  INTAKE_OPERATOR: "线索接入经办",
-  ROUTING_SUPERVISOR: "路由主管",
-  CONTACT_OPERATOR: "首联经办",
-  SALES_REPRESENTATIVE: "销售",
-  SALES_MANAGER: "销售主管",
-  FINANCE_OPERATOR: "财务人员",
-  CASE_ADMINISTRATOR: "案管员",
-  IDENTITY_ADMIN: "身份管理员",
-};
 
 export const authorityLabels: Record<S["AuthorityGrantV1"]["authorityCode"] | S["GrantableAuthorityCodeV1"] | "QUOTE_READ" | "QUOTE_PREPARE" | "QUOTE_APPROVE" | "QUOTE_SELF_AUTHORIZE" | "QUOTE_DELIVER" | "QUOTE_RESPONSE", string> = {
   CONTRACT_TERMINATION_REVIEW:'终止签约请求核对', PAYMENT_SUBMIT:'收款凭证提交与补正', PAYMENT_CONFIRM:'逐笔到账核对', TRANSFER_SUBMIT:'转案资料提交与补正', TRANSFER_REVIEW:'转案前独立冲突审查', TRANSFER_ACCEPT:'案管审核接收', MATTER_CLASSIFY:'案件分类及承接确认', MATTER_RECEIVE:'案件承接',

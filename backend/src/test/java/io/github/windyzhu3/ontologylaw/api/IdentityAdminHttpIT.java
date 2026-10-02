@@ -151,6 +151,20 @@ class IdentityAdminHttpIT extends PostgresIntegrationTest {
         principalTag=findTag("principals",principalId);write("POST","principals/"+principalId+"/disable",reason(),principalTag,200);
         orgTag=findTag("organizations",org);write("POST","organizations/"+org+"/close",reason(),orgTag,200);
     }
+    @Test void configurable_role_commands_and_candidates_have_typed_http_receipts()throws Exception {
+        var created=create("roles",Map.of("code","CUSTOM_ADVISOR","displayName","Custom advisor"));
+        String id=factId(created),tag=etag(created);
+        assertEquals("APPOINTMENT_ROLE",json(created.body()).path("resultFact").path("factType").asString());
+        tag=etag(write("PATCH","roles/"+id+"/display-name",Map.of("displayName","Renamed advisor"),tag,200));
+        tag=etag(write("POST","roles/"+id+"/deactivate",reason(),tag,200));
+        var disabled=request("GET","options?page=APPOINTMENTS&optionKind=ROLE",null,Map.of());
+        assertEquals(200,disabled.statusCode());assertFalse(disabled.body().contains("CUSTOM_ADVISOR"));
+        write("POST","roles/"+id+"/reactivate",reason(),tag,200);
+        var candidates=request("GET","options?page=APPOINTMENTS&optionKind=ROLE",null,Map.of());
+        assertEquals(200,candidates.statusCode());assertTrue(candidates.body().contains("CUSTOM_ADVISOR"));
+        assertTrue(candidates.body().contains("Renamed advisor"));
+        assertEquals(200,request("GET","roles",null,Map.of()).statusCode());
+    }
     @Test void every_management_operation_rejects_supplied_on_behalf_without_any_command_or_disclosure_delta()throws Exception {
         UUID represented=validBusinessDelegation();
         var paths=List.of("GET principals","GET organizations","GET appointments","GET authority-grants","GET provider-users?search=synthetic-user","GET options?page=APPOINTMENTS&optionKind=PRINCIPAL","POST principals","PATCH principals/ID/display-name","POST principals/ID/suspend","POST principals/ID/resume","POST principals/ID/disable","POST organizations","PATCH organizations/ID/display-name","POST organizations/ID/close","POST appointments","POST appointments/ID/suspend","POST appointments/ID/resume","POST appointments/ID/end","POST authority-grants","POST authority-grants/ID/revoke");
@@ -187,7 +201,7 @@ class IdentityAdminHttpIT extends PostgresIntegrationTest {
         var body=json(response.body());UUID command=UUID.fromString(body.path("commandId").asString());
         try(var c=database.migratorConnection();var p=c.prepareStatement("select r.command_receipt_id,r.result_fact_type,r.result_fact_id,r.result_fact_revision from execution.command_execution_slot s join execution.command_receipt r on r.tenant_id=s.tenant_id and r.command_execution_slot_id=s.command_execution_slot_id where s.tenant_id=? and s.command_id=?")) {
             p.setObject(1,tenant);p.setObject(2,command);try(var rows=p.executeQuery()){assertTrue(rows.next(),"Missing original receipt");UUID receipt=rows.getObject(1,UUID.class),fact=rows.getObject(3,UUID.class);String type=rows.getString(2);Long revision=rows.getObject(4,Long.class);assertFalse(rows.next(),"Ambiguous original receipt");
-                assertEquals(receipt.toString(),body.path("receiptId").asString());var projection=body.path("resultFact");assertEquals(switch(type){case "identity.principal"->"IDENTITY_PRINCIPAL";case "identity.organization_unit"->"ORGANIZATION_UNIT";case "identity.appointment"->"APPOINTMENT";case "identity.authority_grant"->"AUTHORITY_GRANT";default->throw new AssertionError("Unexpected Identity result Fact type: "+type);},projection.path("factType").asString());assertEquals(revision.longValue(),projection.path("revision").asLong());assertFalse(projection.path("factRef").asString().isBlank());return fact.toString();}
+                assertEquals(receipt.toString(),body.path("receiptId").asString());var projection=body.path("resultFact");assertEquals(switch(type){case "identity.appointment_role"->"APPOINTMENT_ROLE";case "identity.principal"->"IDENTITY_PRINCIPAL";case "identity.organization_unit"->"ORGANIZATION_UNIT";case "identity.appointment"->"APPOINTMENT";case "identity.authority_grant"->"AUTHORITY_GRANT";default->throw new AssertionError("Unexpected Identity result Fact type: "+type);},projection.path("factType").asString());assertEquals(revision.longValue(),projection.path("revision").asLong());assertFalse(projection.path("factRef").asString().isBlank());return fact.toString();}
         }
     }
     static String etag(HttpResponse<String> r){return r.headers().firstValue("ETag").orElseThrow();}

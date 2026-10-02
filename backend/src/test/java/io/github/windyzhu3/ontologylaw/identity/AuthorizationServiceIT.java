@@ -31,6 +31,12 @@ public class AuthorizationServiceIT extends PostgresIntegrationTest {
         try (var c = database.apiConnection()) {
             inTransaction(c, Capability.COMMAND, x -> {
                 sql(x, "insert into identity.tenant (tenant_id,tenant_code,display_name,state,created_at) values (?,?,'fixture','ACTIVE',clock_timestamp())", s.tenant, s.tenant.toString());
+                if (database.migrations(null).info().current().getVersion().compareTo(org.flywaydb.core.api.MigrationVersion.fromVersion("1070"))>=0) {
+                    try (var roles=x.prepareStatement("select identity.seed_appointment_roles(?)")) {
+                        roles.setObject(1,s.tenant);roles.execute();
+                    }
+                    sql(x,"insert into identity.appointment_role(tenant_id,appointment_role_id,role_code,display_name,state,created_at) values (?,uuidv7(),'OWNER','Fixture owner','ACTIVE',clock_timestamp())",s.tenant);
+                }
                 sql(x, "insert into identity.principal (tenant_id,principal_id,principal_kind,identity_provider_code,external_subject_hmac,display_name,state,created_at) values (?,?,?,'FIXTURE',?,'fixture','ACTIVE',clock_timestamp())", s.tenant,s.principal,kind,credentialHmac.apply(s.tenant));
                 sql(x, "insert into identity.organization_unit (tenant_id,organization_unit_id,unit_code,display_name,state,created_at) values (?,?,'ROOT','fixture','ACTIVE',clock_timestamp())",s.tenant,s.org);
                 sql(x, "insert into identity.appointment (tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) values (?,?,?,?,'OWNER',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",s.tenant,s.appointment,s.principal,s.org);

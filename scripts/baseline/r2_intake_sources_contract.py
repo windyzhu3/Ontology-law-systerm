@@ -67,6 +67,11 @@ def exact(actual, expected):
 
 
 def intake_transport_projection(document):
+    try:
+        from scripts.baseline.configurable_roles_transport_contract import configurable_roles_projection
+    except ModuleNotFoundError:
+        from configurable_roles_transport_contract import configurable_roles_projection
+    document = configurable_roles_projection(document)
     """Remove only the complete, exactly approved intake metadata addition."""
     result = capture_names_projection(receipt_transport_projection(internal_opportunity_projection(owner_exception_projection(document))))
     schemas = result['components']['schemas']

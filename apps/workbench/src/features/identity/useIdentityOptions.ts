@@ -4,7 +4,6 @@ import type { WorkbenchSession } from "../../lib/sessionTransport";
 import type { IdentityApi } from "./identityApi";
 import { grantable } from "./identityContract";
 type S = components["schemas"];
-const roles: S["IdentityRoleCodeV1"][] = ["INTAKE_OPERATOR", "ROUTING_SUPERVISOR", "CONTACT_OPERATOR", "SALES_REPRESENTATIVE", "SALES_MANAGER", "FINANCE_OPERATOR", "CASE_ADMINISTRATOR"];
 const authorities: readonly S["GrantableAuthorityCodeV1"][] = grantable;
 
 /** One bounded, page-qualified selector. Each field owns independent cursor history. */
@@ -43,7 +42,7 @@ export function useIdentityOptions(session: WorkbenchSession, api: IdentityApi, 
   return {
     items: active?.candidates.items ?? [], selected: active ? selected : "", loading, error,
     select: (id: string) => setSelected(active?.candidates.items.some(item => item.id === id) ? id : ""),
-    roleCodes: active?.roleCodes.filter(code => roles.includes(code)) ?? [],
+    roleCodes: active?.roleCodes ?? [],
     authorityCodes: active?.grantableAuthorityCodes.filter(code => authorities.includes(code)) ?? [],
     canPrevious: navigation.index > 0 && !loading,
     canNext: !!active?.candidates.nextCursor && !loading,

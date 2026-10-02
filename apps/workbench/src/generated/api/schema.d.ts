@@ -283,6 +283,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/identity/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** list Appointment Roles */
+        get: operations["listAppointmentRoles"];
+        put?: never;
+        /** create Appointment Role */
+        post: operations["createAppointmentRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/roles/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** close Appointment Role */
+        post: operations["deactivateAppointmentRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity/roles/{id}/display-name": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** rename Appointment Role */
+        patch: operations["renameAppointmentRole"];
+        trace?: never;
+    };
+    "/api/v1/admin/identity/roles/{id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** close Appointment Role */
+        post: operations["reactivateAppointmentRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/business-management/{view}": {
         parameters: {
             query?: never;
@@ -2452,6 +2521,32 @@ export interface components {
             items: components["schemas"]["AppointmentV1"][];
             nextCursor: string | null;
         };
+        AppointmentRoleCommandReceiptV1: {
+            commandId: components["schemas"]["Uuid"];
+            completedAt: components["schemas"]["Instant"];
+            /** @enum {string} */
+            outcome: "SUCCEEDED" | "NO_CHANGE";
+            receiptId: components["schemas"]["Uuid"];
+            resultFact: components["schemas"]["AppointmentRoleFactRefV1"];
+        };
+        AppointmentRoleFactRefV1: {
+            factRef: components["schemas"]["OpaqueRef"];
+            /** @constant */
+            factType: "APPOINTMENT_ROLE";
+            revision: components["schemas"]["Revision"];
+        };
+        AppointmentRolePageV1: {
+            items: components["schemas"]["AppointmentRoleV1"][];
+            nextCursor: string | null;
+        };
+        AppointmentRoleV1: {
+            code: string;
+            displayName: components["schemas"]["SafeText200"];
+            etag: components["schemas"]["IdentityETag"];
+            id: components["schemas"]["Uuid"];
+            /** @enum {string} */
+            state: "ACTIVE" | "INACTIVE";
+        };
         AppointmentV1: {
             effectiveFrom: components["schemas"]["Instant"];
             /** Format: date-time */
@@ -2460,8 +2555,8 @@ export interface components {
             id: components["schemas"]["Uuid"];
             organization: components["schemas"]["IdentityChoiceV1"];
             principal: components["schemas"]["IdentityChoiceV1"];
-            /** @enum {string} */
-            roleCode: "INTAKE_OPERATOR" | "ROUTING_SUPERVISOR" | "CONTACT_OPERATOR" | "IDENTITY_ADMIN" | "SALES_REPRESENTATIVE" | "SALES_MANAGER" | "FINANCE_OPERATOR" | "CASE_ADMINISTRATOR";
+            roleCode: components["schemas"]["IdentityRoleCodeV1"];
+            roleName: components["schemas"]["SafeText200"];
             /** @enum {string} */
             state: "ACTIVE" | "SUSPENDED" | "ENDED";
         };
@@ -3304,6 +3399,10 @@ export interface components {
                 requirements: string;
             };
         };
+        CreateAppointmentRoleV1: {
+            code: string;
+            displayName: components["schemas"]["SafeText200"];
+        };
         CreateAppointmentV1: {
             effectiveFrom: components["schemas"]["Instant"];
             /** Format: date-time */
@@ -3360,6 +3459,10 @@ export interface components {
             todaySummary: components["schemas"]["SafeText500"];
             waitingCount: number;
         } & unknown;
+        DeactivateAppointmentRoleV1: {
+            /** @enum {string} */
+            reasonCode: "ADMINISTRATIVE_ACTION" | "SECURITY_RESPONSE";
+        };
         DecisionRecordCommandReceipt: {
             commandId: components["schemas"]["Uuid"];
             completedAt: components["schemas"]["Instant"];
@@ -3526,19 +3629,20 @@ export interface components {
             roleCodes: components["schemas"]["IdentityRoleCodeV1"][] & unknown;
         };
         /** @enum {string} */
-        IdentityAdminPageV1: "PRINCIPALS" | "ORGANIZATIONS" | "APPOINTMENTS" | "AUTHORITY_GRANTS";
+        IdentityAdminPageV1: "PRINCIPALS" | "ORGANIZATIONS" | "APPOINTMENTS" | "AUTHORITY_GRANTS" | "ROLES";
         IdentityChoicePageV1: {
             items: components["schemas"]["IdentityChoiceV1"][];
             nextCursor: string | null;
         };
         IdentityChoiceV1: {
+            code?: components["schemas"]["IdentityRoleCodeV1"];
             id: components["schemas"]["Uuid"];
             label: components["schemas"]["SafeText200"];
         };
         IdentityCursorV1: string;
         IdentityETag: string;
         /** @enum {string} */
-        IdentityOptionKindV1: "PRINCIPAL" | "ORGANIZATION" | "APPOINTMENT";
+        IdentityOptionKindV1: "PRINCIPAL" | "ORGANIZATION" | "APPOINTMENT" | "ROLE";
         IdentityPrincipalCommandReceiptV1: {
             commandId: components["schemas"]["Uuid"];
             completedAt: components["schemas"]["Instant"];
@@ -3587,8 +3691,7 @@ export interface components {
             receiptId: components["schemas"]["Uuid"];
             rejectionCode: components["schemas"]["IdentityTerminalRejectionCodeV1"];
         };
-        /** @enum {string} */
-        IdentityRoleCodeV1: "INTAKE_OPERATOR" | "ROUTING_SUPERVISOR" | "CONTACT_OPERATOR" | "SALES_REPRESENTATIVE" | "SALES_MANAGER" | "FINANCE_OPERATOR" | "CASE_ADMINISTRATOR";
+        IdentityRoleCodeV1: string;
         /** @enum {string} */
         IdentityTerminalRejectionCodeV1: "NOT_AUTHORIZED" | "APPOINTMENT_INACTIVE" | "NOT_FOUND" | "IDENTITY_BINDING_CONFLICT" | "IDENTITY_STATE_CONFLICT" | "IDENTITY_SELF_LOCKOUT" | "IDENTITY_LAST_ADMIN" | "IDENTITY_ORGANIZATION_DEPENDENCY" | "IDENTITY_RESPONSIBILITY_DEPENDENCY" | "STALE_IDENTITY";
         /** Format: date-time */
@@ -4433,7 +4536,7 @@ export interface components {
             items: components["schemas"]["ProviderUserChoiceV1"][];
             nextCursor: string | null;
         };
-        PublicFactRef: components["schemas"]["R2ContractPreparationRequestFactRefV1"] | components["schemas"]["R2ContractPreparationDecisionFactRefV1"] | components["schemas"]["R2ContractFactRefV1"] | components["schemas"]["R2ContractDraftFactRefV1"] | components["schemas"]["R2ContractRevisionFactRefV1"] | components["schemas"]["R2ContractReviewRequestFactRefV1"] | components["schemas"]["R2ContractReviewDecisionFactRefV1"] | components["schemas"]["R2ContractApprovalRequestFactRefV1"] | components["schemas"]["R2ContractApprovalDecisionFactRefV1"] | components["schemas"]["OpportunityMaterialUploadFactRefV1"] | components["schemas"]["OpportunityMaterialVersionFactRefV1"] | components["schemas"]["OpportunityCustomerDraftFactRefV1"] | components["schemas"]["OpportunityCustomerConfirmationFactRefV1"] | components["schemas"]["OpportunityClosureFactRefV1"] | components["schemas"]["OwnerExceptionFactRefV1"] | components["schemas"]["OwnerExceptionValidationFactRefV1"] | components["schemas"]["IdentityPrincipalFactRefV1"] | components["schemas"]["OrganizationUnitFactRefV1"] | components["schemas"]["AppointmentFactRefV1"] | components["schemas"]["AuthorityGrantFactRefV1"] | components["schemas"]["LeadFactRef"] | components["schemas"]["ActionDraftFactRef"] | components["schemas"]["TaskOccurrenceFactRef"] | components["schemas"]["DecisionRecordFactRef"] | components["schemas"]["LeadAssignmentFactRef"] | components["schemas"]["LeadContactResultFactRef"] | components["schemas"]["OpportunityProgressFactRefV1"] | components["schemas"]["R2QuoteDraftFactRefV1"] | components["schemas"]["R2QuoteRevisionFactRefV1"] | components["schemas"]["R2QuoteApprovalRequestFactRefV1"] | components["schemas"]["R2QuoteApprovalDecisionFactRefV1"] | components["schemas"]["R2QuoteIssueFactRefV1"] | components["schemas"]["R2QuoteResponseFactRefV1"] | components["schemas"]["ContractPreparationWorkflowFactRefV1"] | components["schemas"]["R2ContractSignatureDraftFactRefV1"] | components["schemas"]["R2ContractSignatureArrangementFactRefV1"] | components["schemas"]["R2ContractSignatureSubmissionFactRefV1"] | components["schemas"]["R2ContractSignatureVerificationFactRefV1"] | components["schemas"]["R2ContractSignatureArchiveFactRefV1"] | components["schemas"]["R2ContractSignatureRevisionReturnFactRefV1"] | components["schemas"]["R2ContractSignatureWorkflowFactRefV1"] | components["schemas"]["ContractExecutionWorkflowFactRefV1"] | components["schemas"]["ContractPaymentWorkflowFactRefV1"] | components["schemas"]["R2ContractSignatureHandoffFactRefV1"] | components["schemas"]["R2QuotePreparationIntentFactRefV1"] | components["schemas"]["FollowupAttemptFactRefV1"] | components["schemas"]["R2QuoteTerminationFactRefV1"] | components["schemas"]["ContractNegotiationDispositionFactRefV1"] | components["schemas"]["ContractTerminationReviewAssignmentFactRefV1"] | components["schemas"]["ContractExecutionVerificationFactRefV1"] | components["schemas"]["ContractPaymentRequestFactRefV1"] | components["schemas"]["ContractPaymentReviewFactRefV1"] | components["schemas"]["TransferSubmissionFactRefV1"] | components["schemas"]["TransferConflictReviewFactRefV1"] | components["schemas"]["TransferIntakeFactRefV1"] | components["schemas"]["MatterClassificationFactRefV1"] | components["schemas"]["TransferWorkflowFactRefV1"];
+        PublicFactRef: components["schemas"]["R2ContractPreparationRequestFactRefV1"] | components["schemas"]["R2ContractPreparationDecisionFactRefV1"] | components["schemas"]["R2ContractFactRefV1"] | components["schemas"]["R2ContractDraftFactRefV1"] | components["schemas"]["R2ContractRevisionFactRefV1"] | components["schemas"]["R2ContractReviewRequestFactRefV1"] | components["schemas"]["R2ContractReviewDecisionFactRefV1"] | components["schemas"]["R2ContractApprovalRequestFactRefV1"] | components["schemas"]["R2ContractApprovalDecisionFactRefV1"] | components["schemas"]["OpportunityMaterialUploadFactRefV1"] | components["schemas"]["OpportunityMaterialVersionFactRefV1"] | components["schemas"]["OpportunityCustomerDraftFactRefV1"] | components["schemas"]["OpportunityCustomerConfirmationFactRefV1"] | components["schemas"]["OpportunityClosureFactRefV1"] | components["schemas"]["OwnerExceptionFactRefV1"] | components["schemas"]["OwnerExceptionValidationFactRefV1"] | components["schemas"]["IdentityPrincipalFactRefV1"] | components["schemas"]["OrganizationUnitFactRefV1"] | components["schemas"]["AppointmentRoleFactRefV1"] | components["schemas"]["AppointmentFactRefV1"] | components["schemas"]["AuthorityGrantFactRefV1"] | components["schemas"]["LeadFactRef"] | components["schemas"]["ActionDraftFactRef"] | components["schemas"]["TaskOccurrenceFactRef"] | components["schemas"]["DecisionRecordFactRef"] | components["schemas"]["LeadAssignmentFactRef"] | components["schemas"]["LeadContactResultFactRef"] | components["schemas"]["OpportunityProgressFactRefV1"] | components["schemas"]["R2QuoteDraftFactRefV1"] | components["schemas"]["R2QuoteRevisionFactRefV1"] | components["schemas"]["R2QuoteApprovalRequestFactRefV1"] | components["schemas"]["R2QuoteApprovalDecisionFactRefV1"] | components["schemas"]["R2QuoteIssueFactRefV1"] | components["schemas"]["R2QuoteResponseFactRefV1"] | components["schemas"]["ContractPreparationWorkflowFactRefV1"] | components["schemas"]["R2ContractSignatureDraftFactRefV1"] | components["schemas"]["R2ContractSignatureArrangementFactRefV1"] | components["schemas"]["R2ContractSignatureSubmissionFactRefV1"] | components["schemas"]["R2ContractSignatureVerificationFactRefV1"] | components["schemas"]["R2ContractSignatureArchiveFactRefV1"] | components["schemas"]["R2ContractSignatureRevisionReturnFactRefV1"] | components["schemas"]["R2ContractSignatureWorkflowFactRefV1"] | components["schemas"]["ContractExecutionWorkflowFactRefV1"] | components["schemas"]["ContractPaymentWorkflowFactRefV1"] | components["schemas"]["R2ContractSignatureHandoffFactRefV1"] | components["schemas"]["R2QuotePreparationIntentFactRefV1"] | components["schemas"]["FollowupAttemptFactRefV1"] | components["schemas"]["R2QuoteTerminationFactRefV1"] | components["schemas"]["ContractNegotiationDispositionFactRefV1"] | components["schemas"]["ContractTerminationReviewAssignmentFactRefV1"] | components["schemas"]["ContractExecutionVerificationFactRefV1"] | components["schemas"]["ContractPaymentRequestFactRefV1"] | components["schemas"]["ContractPaymentReviewFactRefV1"] | components["schemas"]["TransferSubmissionFactRefV1"] | components["schemas"]["TransferConflictReviewFactRefV1"] | components["schemas"]["TransferIntakeFactRefV1"] | components["schemas"]["MatterClassificationFactRefV1"] | components["schemas"]["TransferWorkflowFactRefV1"];
         /** @enum {string} */
         PublicFactType: "LEAD" | "ACTION_DRAFT" | "TASK_OCCURRENCE" | "DECISION_RECORD" | "LEAD_ASSIGNMENT" | "LEAD_CONTACT_RESULT";
         QuoteCommandReceiptV1: {
@@ -5541,6 +5644,10 @@ export interface components {
                 expectedTermination?: components["schemas"]["OpportunityCustomerSelectorV1"] | null;
             };
         };
+        ReactivateAppointmentRoleV1: {
+            /** @enum {string} */
+            reasonCode: "ADMINISTRATIVE_ACTION" | "SECURITY_RESPONSE";
+        };
         ReceiptRef: {
             commandId: components["schemas"]["Uuid"];
             href: string;
@@ -5791,6 +5898,9 @@ export interface components {
             outcome: "REJECTED";
             receiptId: components["schemas"]["Uuid"];
             rejectionCode: components["schemas"]["TerminalRejectionCode"];
+        };
+        RenameAppointmentRoleV1: {
+            displayName: components["schemas"]["SafeText200"];
         };
         RenameIdentityPrincipalV1: {
             displayName: components["schemas"]["SafeText200"];
@@ -7659,6 +7769,221 @@ export interface operations {
             401: components["responses"]["Identity401Problem"];
             403: components["responses"]["Identity403Problem"];
             404: components["responses"]["Identity404Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    listAppointmentRoles: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["IdentityCursor"];
+                limit?: components["parameters"]["IdentityLimit"];
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. The original business operations, personal waiting reads and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Audited bounded disclosure; no-store and no 304. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentRolePageV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    createAppointmentRole: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. The original business operations, personal waiting reads and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAppointmentRoleV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            201: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentRoleCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    deactivateAppointmentRole: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. The original business operations, personal waiting reads and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeactivateAppointmentRoleV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentRoleCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    renameAppointmentRole: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. The original business operations, personal waiting reads and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameAppointmentRoleV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentRoleCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    reactivateAppointmentRole: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "If-Match": components["parameters"]["IdentityIfMatch"];
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. The original business operations, personal waiting reads and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                id: components["parameters"]["IdentityIdPath"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactivateAppointmentRoleV1"];
+            };
+        };
+        responses: {
+            /** @description Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    ETag: components["headers"]["IdentityETagHeader"];
+                    Location: components["headers"]["ReceiptLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentRoleCommandReceiptV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            409: components["responses"]["Identity409Problem"];
+            412: components["responses"]["Identity412Problem"];
+            428: components["responses"]["Identity428Problem"];
             429: components["responses"]["Identity429Problem"];
             500: components["responses"]["Identity500Problem"];
             503: components["responses"]["Identity503Problem"];

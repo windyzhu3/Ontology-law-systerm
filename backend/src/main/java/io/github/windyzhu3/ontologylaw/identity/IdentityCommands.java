@@ -8,12 +8,11 @@ import java.util.*;
 /** Closed HUMAN/DIRECT command registry; no dependency on Execution or business owners. */
 public final class IdentityCommands {
     private IdentityCommands(){}
-    public static final List<String> ROLES=List.of("INTAKE_OPERATOR","ROUTING_SUPERVISOR","CONTACT_OPERATOR","SALES_REPRESENTATIVE","SALES_MANAGER","FINANCE_OPERATOR","CASE_ADMINISTRATOR");
     public static final List<String> GRANTABLE=List.of("LEAD_MANAGEMENT_READ","TEAM_TASK_READ","LEAD_CAPTURE","LEAD_INGRESS_RESOLVE","LEAD_INGRESS_COMPLETE","LEAD_ASSIGN","LEAD_ROUTING_DECIDE","SOURCE_INTAKE_REQUEST_ACK","SALES_CONTACT_OWNER","LEAD_VALIDITY_REVIEW","SALES_OPPORTUNITY_OWNER","OPPORTUNITY_OWNER_EXCEPTION_DISCOVER","OPPORTUNITY_OWNER_EXCEPTION_READ","OPPORTUNITY_OWNER_EXCEPTION_RESOLVE","OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ","OPPORTUNITY_LEDGER_READ","OPPORTUNITY_CLOSE","CUSTOMER_REQUIREMENTS_MANAGE","PARTY_PROFILE_MANAGE","MATERIALS_MANAGE","MATERIALS_READ","QUOTE_READ","QUOTE_PREPARE","QUOTE_APPROVE","QUOTE_SELF_AUTHORIZE","QUOTE_DELIVER","QUOTE_RESPONSE","PAYMENT_LEDGER_READ","TRANSFER_LEDGER_READ","CONTRACT_READ","CONTRACT_PREPARE","CONTRACT_PREPARATION_DECIDE","CONTRACT_REVIEW","CONTRACT_APPROVE","CONTRACT_SIGNATURE_VERIFY","CONTRACT_EXECUTION_VERIFY","PAYMENT_CONFIRM","PAYMENT_SUBMIT","CONTRACT_TERMINATION_REVIEW","TRANSFER_SUBMIT","TRANSFER_REVIEW","TRANSFER_ACCEPT","MATTER_CLASSIFY","MATTER_RECEIVE");
     public static final List<String> MANAGEMENT=List.of("IDENTITY_PRINCIPAL_MANAGE","IDENTITY_ORGANIZATION_MANAGE","IDENTITY_APPOINTMENT_MANAGE","IDENTITY_AUTHORITY_MANAGE");
     public record Handler(String command,Kind kind,String action,String authority) {
         public boolean create(){return action.equals("CREATE");}
-        public boolean rootRequired(){return kind==Kind.PRINCIPAL||command.equals("CREATE_APPOINTMENT");}
+        public boolean rootRequired(){return kind==Kind.PRINCIPAL||kind==Kind.ROLE||command.equals("CREATE_APPOINTMENT");}
     }
     private static Handler h(String command,Kind kind,String action,int authority){return new Handler(command,kind,action,MANAGEMENT.get(authority));}
     private static final List<Handler> HANDLERS=List.of(
@@ -21,6 +20,7 @@ public final class IdentityCommands {
         h("SUSPEND_IDENTITY_PRINCIPAL",Kind.PRINCIPAL,"SUSPENDED",0),h("RESUME_IDENTITY_PRINCIPAL",Kind.PRINCIPAL,"ACTIVE",0),h("DISABLE_IDENTITY_PRINCIPAL",Kind.PRINCIPAL,"DISABLED",0),
         h("CREATE_ORGANIZATION_UNIT",Kind.ORGANIZATION,"CREATE",1),h("RENAME_ORGANIZATION_UNIT",Kind.ORGANIZATION,"RENAME",1),h("CLOSE_ORGANIZATION_UNIT",Kind.ORGANIZATION,"CLOSED",1),
         h("CREATE_APPOINTMENT",Kind.APPOINTMENT,"CREATE",2),h("SUSPEND_APPOINTMENT",Kind.APPOINTMENT,"SUSPENDED",2),h("RESUME_APPOINTMENT",Kind.APPOINTMENT,"ACTIVE",2),h("END_APPOINTMENT",Kind.APPOINTMENT,"ENDED",2),
+        h("CREATE_APPOINTMENT_ROLE",Kind.ROLE,"CREATE",2),h("RENAME_APPOINTMENT_ROLE",Kind.ROLE,"RENAME",2),h("DEACTIVATE_APPOINTMENT_ROLE",Kind.ROLE,"INACTIVE",2),h("REACTIVATE_APPOINTMENT_ROLE",Kind.ROLE,"ACTIVE",2),
         h("CREATE_AUTHORITY_GRANT",Kind.AUTHORITY_GRANT,"CREATE",3),h("REVOKE_AUTHORITY_GRANT",Kind.AUTHORITY_GRANT,"REVOKED",3));
     public static List<Handler> handlers(){return HANDLERS;}
     public static Handler handler(String command){return HANDLERS.stream().filter(h->h.command().equals(command)).findFirst().orElseThrow(()->new Failure("VALIDATION_FAILED"));}
@@ -28,7 +28,7 @@ public final class IdentityCommands {
     public static Map<String,Object> validate(Handler h,Object payload) {
         if(!(payload instanceof Map<?,?> raw))throw new Failure("VALIDATION_FAILED");
         Set<String> fields=h.create()?switch(h.kind()){
-            case PRINCIPAL->Set.of("providerUserSelector","displayName");case ORGANIZATION->Set.of("parentOrganizationId","code","displayName");
+            case ROLE->Set.of("code","displayName");case PRINCIPAL->Set.of("providerUserSelector","displayName");case ORGANIZATION->Set.of("parentOrganizationId","code","displayName");
             case APPOINTMENT->Set.of("principalId","organizationId","roleCode","effectiveFrom","effectiveUntil");case AUTHORITY_GRANT->Set.of("appointmentId","authorityCode","scopeOrganizationId","validFrom","validUntil");
         }:h.action().equals("RENAME")?Set.of("displayName"):Set.of("reasonCode");
         if(!raw.keySet().equals(fields))throw new Failure("VALIDATION_FAILED");var values=new LinkedHashMap<String,Object>();
@@ -41,7 +41,7 @@ public final class IdentityCommands {
                 else if(field.equals("displayName")){if(text.codePoints().anyMatch(Character::isISOControl))throw new IllegalArgumentException();text=text.strip();if(text.isEmpty()||text.codePointCount(0,text.length())>200)throw new IllegalArgumentException();}
                 else if(field.equals("providerUserSelector")){if(!text.matches("[A-Za-z0-9_-]{1,2048}"))throw new IllegalArgumentException();}
                 else if(field.equals("code")){if(!text.matches("[A-Z][A-Z0-9_]{0,63}"))throw new IllegalArgumentException();}
-                else if(field.equals("roleCode")){if(!ROLES.contains(text))throw new IllegalArgumentException();}
+                else if(field.equals("roleCode")){if(!text.matches("[A-Z][A-Z0-9_]{0,63}"))throw new IllegalArgumentException();}
                 else if(field.equals("authorityCode")){if(!GRANTABLE.contains(text))throw new IllegalArgumentException();}
                 else if(field.equals("reasonCode")&&!Set.of("ADMINISTRATIVE_ACTION","SECURITY_RESPONSE").contains(text))throw new IllegalArgumentException();
                 values.put(field,text);

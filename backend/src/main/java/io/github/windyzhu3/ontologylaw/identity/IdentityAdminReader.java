@@ -9,7 +9,7 @@ import java.util.*;
 public interface IdentityAdminReader {
     enum Kind {
         PRINCIPAL("identity.principal"), ORGANIZATION("identity.organization_unit"),
-        APPOINTMENT("identity.appointment"), AUTHORITY_GRANT("identity.authority_grant");
+        APPOINTMENT("identity.appointment"), AUTHORITY_GRANT("identity.authority_grant"), ROLE("identity.appointment_role");
         public final String factType;
         Kind(String factType){this.factType=factType;}
         public static Kind of(String type){return Arrays.stream(values()).filter(k->k.factType.equals(type)).findFirst().orElseThrow();}
@@ -37,7 +37,7 @@ public interface IdentityAdminReader {
             var parent=find(c,actor.tenantId(),Kind.ORGANIZATION,UUID.fromString((String)target.values().get("parentOrganizationId")));
             try{return authorizeResource(c,actor,authority,parent,target);}catch(IdentityCommands.Failure denied){if(!"NOT_AUTHORIZED".equals(denied.code()))throw denied;}
         }
-        var anchor=kind==Kind.PRINCIPAL?root(c,actor.tenantId()):find(c,actor.tenantId(),Kind.ORGANIZATION,target.organization());
+        var anchor=(kind==Kind.PRINCIPAL||kind==Kind.ROLE)?root(c,actor.tenantId()):find(c,actor.tenantId(),Kind.ORGANIZATION,target.organization());
         return authorizeResource(c,actor,authority,anchor,target);
     }
     /** Add required evidence without replacing the original anchor or making a wider authorization choice. */

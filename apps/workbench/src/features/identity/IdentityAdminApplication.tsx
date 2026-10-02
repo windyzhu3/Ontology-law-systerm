@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { WorkbenchSession } from "../../lib/api";
 import type { IdentityApi } from "./identityApi";
+import { RolePage } from "./RolePage";
 import { AppointmentPage } from "./AppointmentPage";
 import { AuthorityGrantPage } from "./AuthorityGrantPage";
 import { IdentityAdminLayout } from "./IdentityAdminLayout";
@@ -57,6 +58,9 @@ function IdentityAdminWorkspace({ session, api, path, onNavigate, sessionActions
       break;
     case "/admin/identity/organizations":
       page = <OrganizationPage session={session} api={api} command={command} />;
+      break;
+    case "/admin/identity/roles":
+      page = <RolePage session={session} api={api} command={command} />;
       break;
     case "/admin/identity/appointments":
       page = <AppointmentPage session={session} api={api} command={command} />;

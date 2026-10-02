@@ -18,15 +18,15 @@ it.each([
     if (!url.pathname.endsWith("options")) return;
     const optionKind = url.searchParams.get("optionKind");
     return json({ page: "APPOINTMENTS", optionKind,
-      candidates: { items: [{ id: optionKind === "ORGANIZATION" ? draftId : selectorId,
+      candidates: { items: optionKind === "ROLE" ? [{id:taskId,label,code:role}] : [{ id: optionKind === "ORGANIZATION" ? draftId : selectorId,
         label: optionKind === "ORGANIZATION" ? "海华销售一部" : "海华测试人员" }], nextCursor: null },
-      roleCodes: ["INTAKE_OPERATOR", "ROUTING_SUPERVISOR", "CONTACT_OPERATOR", "SALES_REPRESENTATIVE", "SALES_MANAGER", "FINANCE_OPERATOR", "CASE_ADMINISTRATOR"],
+      roleCodes: [],
       grantableAuthorityCodes: [] });
   } });
   mount(f, path); fireEvent.click(await screen.findByRole("button", { name: "新建任职" }));
-  await screen.findByRole("option", { name: label });
+  await screen.findByRole("option", { name: `${label} · ${role}` });
   expect(screen.queryByRole("option", { name: "身份管理员" })).not.toBeInTheDocument();
-  change("身份主体", selectorId); change("所属组织", draftId); change("岗位", role);
+  change("身份主体", selectorId); change("所属组织", draftId); change("岗位", taskId);
   change("生效时间", "2026-10-01T09:30");
   fireEvent.click(screen.getByRole("button", { name: "确认创建" }));
   await waitFor(() => expect(f.writes).toHaveLength(1));
@@ -64,25 +64,25 @@ it("keeps option kinds independently paged with exact ids even when labels repea
   const path = "/admin/identity/appointments" as const;
   const f = fixture(path, { handle: async r => {
     const url = new URL(r.url); if (!url.pathname.endsWith("options")) return;
-    const kind = url.searchParams.get("optionKind");
-    return json({ page: "APPOINTMENTS", optionKind: kind, candidates: { items: kind === "PRINCIPAL" ? [{ id: url.searchParams.has("cursor") ? taskId : selectorId, label: "同名人员" }] : [{ id: draftId, label: "同名组织" }], nextCursor: kind === "PRINCIPAL" && !url.searchParams.has("cursor") ? "person-next" : null }, roleCodes: roles, grantableAuthorityCodes: [] });
+    const kind = url.searchParams.get("optionKind"); if (kind === "ROLE") return;
+    return json({ page: "APPOINTMENTS", optionKind: kind, candidates: { items: kind === "PRINCIPAL" ? [{ id: url.searchParams.has("cursor") ? taskId : selectorId, label: "同名人员" }] : [{ id: draftId, label: "同名组织" }], nextCursor: kind === "PRINCIPAL" && !url.searchParams.has("cursor") ? "person-next" : null }, roleCodes: [], grantableAuthorityCodes: [] });
   } });
   mount(f, path); fireEvent.click(await screen.findByRole("button", { name: "新建任职" }));
   await screen.findByRole("option", { name: "同名人员" }); change("身份主体", selectorId); change("所属组织", draftId);
   const pagination = screen.getByLabelText("身份主体候选分页"); fireEvent.click(within(pagination).getByRole("button", { name: "下一页候选" }));
   await screen.findByRole("option", { name: "同名人员" }); expect(screen.getByLabelText("身份主体")).toHaveValue(""); expect(screen.getByLabelText("所属组织")).toHaveValue(draftId);
-  change("身份主体", taskId); change("岗位", "CONTACT_OPERATOR"); change("生效时间", "2026-09-10T09:30");
+  change("身份主体", taskId); change("岗位", taskId); change("生效时间", "2026-09-10T09:30");
   fireEvent.click(screen.getByRole("button", { name: "确认创建" })); await waitFor(() => expect(f.writes).toHaveLength(1));
   expect((await f.writes[0].clone().json()).principalId).toBe(taskId);
   const options = f.requests.filter(r => r.url.includes("options"));
-  expect(options).toHaveLength(3); expect(options[2].url).toContain("optionKind=PRINCIPAL&limit=20&cursor=person-next");
+  expect(options).toHaveLength(4); expect(options[3].url).toContain("optionKind=PRINCIPAL&limit=20&cursor=person-next");
   expect(screen.queryByRole("option", { name: "身份管理员" })).not.toBeInTheDocument();
 });
 
 it("associates field errors and rejects backwards windows", async () => {
   const path = "/admin/identity/appointments" as const, f = fixture(path); mount(f, path);
   fireEvent.click(await screen.findByRole("button", { name: "新建任职" })); await screen.findByRole("option", { name: "陈晓" });
-  change("身份主体", selectorId); change("所属组织", draftId); change("岗位", "CONTACT_OPERATOR");
+  change("身份主体", selectorId); change("所属组织", draftId); change("岗位", taskId);
   change("生效时间", "2026-09-10T09:30"); change("结束时间（可留空）", "2026-09-10T09:00");
   fireEvent.click(screen.getByRole("button", { name: "确认创建" }));
   const end = screen.getByLabelText("结束时间（可留空）"); expect(end).toHaveAttribute("aria-invalid", "true");

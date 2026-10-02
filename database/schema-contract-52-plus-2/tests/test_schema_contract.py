@@ -46,7 +46,7 @@ EXPECTED_LEDGER = {
 
 EXPECTED_MUTABLE = {
     "identity.tenant", "identity.principal", "identity.organization_unit",
-    "identity.appointment", "identity.authority_grant",
+    "identity.appointment", "identity.authority_grant", "identity.appointment_role",
     "identity.delegation_grant", "identity.object_access_grant",
     "responsibility.task_occurrence", "responsibility.action_draft",
     "execution.domain_event_outbox",
