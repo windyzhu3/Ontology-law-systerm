@@ -12,8 +12,8 @@ permissions:
 jobs:
   preflight:
     runs-on: ubuntu-latest
-    # The full approved R2 regression now exceeds the original R1 time budget.
-    timeout-minutes: 120
+    # Preserve the full R2 regression plus baseline/runtime/frontend checks.
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
