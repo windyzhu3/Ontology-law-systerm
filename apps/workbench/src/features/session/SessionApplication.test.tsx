@@ -1128,7 +1128,7 @@ it.each([true,false])('keeps all common navigation entries across leads, overvie
  act(()=>history.back());await waitFor(()=>expect(location.pathname).toBe('/management/team-tasks'));await screen.findByRole('heading',{name:'团队待办'});expect(labels()).toEqual(names);expect(identity()).toBe('合成入口办理人 · 业务一组 · 线索专员');
 });
 
-it("explicit admin logout must not send the next ordinary account back to identity administration", async () => {
+it.each(["button", "broadcast"] as const)("explicit admin logout via %s must not send the next ordinary account back to identity administration", async action => {
   history.replaceState(null, "", "/admin/identity/principals");
   sessionStorage.setItem('ols.login-destination.v1', JSON.stringify({path:'/admin/identity/organizations',savedAt:Date.now()}));
   const admin = fixture({context:{...context,canEnterWorkbench:false,canEnterIdentityAdmin:true}});
@@ -1136,8 +1136,14 @@ it("explicit admin logout must not send the next ordinary account back to identi
   const first = render(<SessionApplication controller={admin.controller} api={admin.api} identityApi={identity.api}/>);
   const confirm = await screen.findByRole('button',{name:'确认本次身份'});
   await waitFor(()=>expect(confirm).toBeEnabled()); fireEvent.click(confirm);
-  await screen.findByRole('button',{name:'新增身份主体',exact:true});
-  fireEvent.click(screen.getByRole('button',{name:'退出',exact:true}));
+  await screen.findByRole('button',{name:'新增身份主体'});
+  if(action==='button') fireEvent.click(screen.getByRole('button',{name:'退出'}));
+  else {
+    const channel=new BroadcastChannel('r1.session-logout');
+    channel.postMessage('LOGOUT');
+    await screen.findByText('已退出本页面，请重新登录。');
+    channel.close();
+  }
   await waitFor(()=>expect(location.pathname).toBe('/login'));
   expect(sessionStorage.getItem('ols.login-destination.v1')).toBeNull();
   first.unmount();

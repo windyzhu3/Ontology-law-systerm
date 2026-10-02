@@ -128,6 +128,7 @@ function SessionRoutes({
   const context = state.context;
   const loginDestination = useRef<ReturnType<typeof consumeLoginDestination> | null>(null);
   const explicitLogout = useRef(false);
+  const hadAuthenticatedSession = useRef(false);
   const overviewIntent = path === "/management/overview";
   const overviewTransport=useMemo(()=>createBusinessOverviewTransport(),[]);
   const leadIntent = path === "/management/leads";
@@ -150,12 +151,18 @@ function SessionRoutes({
     if (!setup || state.status === "INITIALIZING") return;
     if (state.status === "READY" || state.status === "SELECTING") {
       explicitLogout.current = false;
+      hadAuthenticatedSession.current = true;
       if (path !== "/workbench" && !isIdentityAdminRoute(path) && path !== leadIntakeRoute && !managementIntent && !ledgerIntent && !businessIntent && !leadIntent && !overviewIntent) {
         loginDestination.current ??= consumeLoginDestination();
         navigate(loginDestination.current);
       }
     } else if (path !== "/login") {
-      if (state.status === 'SIGNED_OUT' && !explicitLogout.current) rememberLoginDestination(path);
+      if (state.status === 'SIGNED_OUT') {
+        if (explicitLogout.current || hadAuthenticatedSession.current) {
+          clearLoginDestination();
+          loginDestination.current = null;
+        } else rememberLoginDestination(path);
+      }
       navigate("/login");
     }
   }, [setup, state.status, path]);

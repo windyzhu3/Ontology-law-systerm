@@ -9,7 +9,7 @@ import apps
 if p.RUNTIME != p.ROOT / '.superpowers/haihua-uat-runtime':
     raise RuntimeError('Original approved runtime required')
 log = (p.RUNTIME / 'account-switch-green.log').read_text(encoding='utf-8')
-if '80 passed' not in log or 'failed' in log.lower():
+if '81 passed' not in log or 'failed' in log.lower():
     raise RuntimeError('Affected session and OIDC regressions must pass')
 if 'built in' not in (p.RUNTIME / 'spa-build.log').read_text(encoding='utf-8'):
     raise RuntimeError('Own configured SPA build required')
