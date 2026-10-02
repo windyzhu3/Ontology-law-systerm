@@ -14,6 +14,7 @@ public class R1JsonConfiguration {
             .withCoercionConfig(tools.jackson.databind.type.LogicalType.Textual,config->{for(var shape:java.util.List.of(tools.jackson.databind.cfg.CoercionInputShape.Integer,tools.jackson.databind.cfg.CoercionInputShape.Float,tools.jackson.databind.cfg.CoercionInputShape.Boolean))config.setCoercion(shape,tools.jackson.databind.cfg.CoercionAction.Fail);});}
     static SimpleModule oneOfModule(){
         var module=new SimpleModule("R1 closed ingress oneOf");
+        module.setMixInAnnotation(AuditRecordPageV1.class,AbsentOptionalFields.class);
         module.setMixInAnnotation(CurrentWorkCardEnvelope.class,OptionalSelectionNotice.class);
         module.setMixInAnnotation(NextSummary.class,OptionalSummaryMetadata.class);
         module.setMixInAnnotation(IdentityChoiceV1.class,OptionalRoleCode.class);

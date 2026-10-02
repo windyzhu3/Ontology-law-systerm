@@ -180,3 +180,12 @@
   .identity-detail-rows > div { grid-template-columns: 90px minmax(0, 1fr); }
   .principal-detail-content .identity-info { margin-top: 80px; }
 }
+
+/* Audit columns remain readable beside the detail panel; smaller screens scroll the table inside its panel. */
+.identity-page-grid.audit-record-grid.authority-detail { grid-template-columns: minmax(0, 1fr) 320px; }
+.audit-record-grid .identity-list-scroll { overflow-x: auto; }
+.audit-record-grid .audit-table { min-width: 740px; table-layout: auto; }
+.audit-record-grid .audit-table th, .audit-record-grid .audit-table td { padding: 14px 10px; }
+.audit-record-grid .audit-table th, .audit-record-grid .audit-table td:first-child { white-space: nowrap; }
+.audit-record-grid .audit-table td:nth-child(3) { overflow-wrap: normal; }
+@media (max-width: 1150px) { .identity-page-grid.audit-record-grid.authority-detail { grid-template-columns: minmax(0, 1fr); } }
