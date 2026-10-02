@@ -215,7 +215,7 @@ public final class AuditRecordSummary {
  public static boolean classified(String scope,String path,String source){return Set.of("TENANT","ORGANIZATION","OBJECT","SECURITY").contains(scope)&&Set.of("DIRECT","DELEGATED","OBJECT","SYSTEM").contains(path)&&SOURCES.contains(source);}
  public static String project(String schema,int version,String raw,byte[] expected){
   var parsed=ReceiptAuditJson.object(ReceiptAuditJson.parse(raw));
-  if(expected==null||!MessageDigest.isEqual(expected,ReceiptAuditJson.digest(ReceiptAuditJson.encode(parsed))))throw new IllegalArgumentException("Invalid audit summary integrity");
+  if(expected==null||!MessageDigest.isEqual(expected,ReceiptAuditJson.digest(integrityEncoding(schema,version,parsed))))throw new IllegalArgumentException("Invalid audit summary integrity");
   if(!SCHEMAS.contains(schema)||version!=(schema.endsWith("_V2")?2:1))return "未识别的摘要版本；仅展示操作及结果。";
   if(schema.equals("R1_IDENTITY_COMMAND_AUDIT_V1")||schema.startsWith("R1_COMMAND_AUDIT_V")){
    String domain=schema.equals("R1_IDENTITY_COMMAND_AUDIT_V1")?"身份与授权操作":"业务操作";
@@ -225,8 +225,23 @@ public final class AuditRecordSummary {
   if(schema.equals("R1_IDENTITY_SELF_DISCLOSURE_V1"))return "已核验当前办理身份及本人任职。";
   if(schema.equals("R1_IDENTITY_BOOTSTRAP_V1"))return "已按审核清单初始化人员、任职及管理授权。";
   if(schema.equals("ADM07_AUDIT_DISCLOSURE_V1"))return "已在当前获权范围内完成审计查询并记录披露审计。";
-  Object mode=parsed.get("responseMode");if(mode instanceof String text)return switch(text){case "BODY"->"已按当前权限读取允许展示的资料。";case "REVALIDATION_ONLY","NOT_MODIFIED","NO_BODY"->"已复核当前读取权限；本次未返回业务正文。";case "HISTORY"->"已按当前权限读取允许展示的历史版本。";default->"已核验本次操作摘要；原始业务内容不在此页展示。";};
+  Object mode=parsed.get("responseMode");if(mode instanceof String text)return switch(text){case "BODY"->"已按当前权限读取允许展示的资料。";case "REVALIDATION_ONLY","NOT_MODIFIED","NO_BODY","CACHE_REVALIDATED"->"已复核当前读取权限；本次未返回业务正文。";case "HISTORY"->"已按当前权限读取允许展示的历史版本。";default->"已核验本次操作摘要；原始业务内容不在此页展示。";};
   return "已核验本次操作摘要；原始业务内容不在此页展示。";
+ }
+ // These two frozen writers hash their fixed field order, not JCS. Rebuild that exact protocol after JSONB reorders keys.
+ private static String integrityEncoding(String schema,int version,Map<String,Object> parsed){
+  if(version!=1||!Set.of("R1_CURRENT_WORKCARD_DISCLOSURE_AUDIT_V1","R2_CURRENT_WORKCARD_DISCLOSURE_AUDIT_V1").contains(schema))return ReceiptAuditJson.encode(parsed);
+  ReceiptAuditJson.fields(parsed,"profile","version","responseMode","fieldGroups","disclosedSource","authorizationAnchor");
+  String profile=schema.startsWith("R2_")?"R2_CURRENT_WORKCARD_DISCLOSURE_V1":"R1_CURRENT_WORKCARD_DISCLOSURE_V1";
+  if(!profile.equals(parsed.get("profile"))||!Long.valueOf(1).equals(parsed.get("version"))||!Set.of("BODY","CACHE_REVALIDATED").contains(parsed.get("responseMode"))||!java.util.List.of("CURRENT_WORKCARD").equals(parsed.get("fieldGroups")))throw new IllegalArgumentException("Invalid frozen workcard summary");
+  return "{\"profile\":"+ReceiptAuditJson.encode(profile)+",\"version\":1,\"responseMode\":"+ReceiptAuditJson.encode(parsed.get("responseMode"))+",\"fieldGroups\":[\"CURRENT_WORKCARD\"],\"disclosedSource\":"+legacySelector(parsed.get("disclosedSource"))+",\"authorizationAnchor\":"+legacySelector(parsed.get("authorizationAnchor"))+"}";
+ }
+ private static String legacySelector(Object value){
+  var selector=ReceiptAuditJson.object(value);ReceiptAuditJson.fields(selector,"type","id","revision","hash");
+  if(!(selector.get("type") instanceof String type)||!SOURCES.contains(type)||!(selector.get("id") instanceof String id))throw new IllegalArgumentException("Invalid frozen workcard selector");
+  java.util.UUID.fromString(id);Object revision=selector.get("revision"),hash=selector.get("hash");
+  if(revision!=null&&(!(revision instanceof Long number)||number<0)||hash!=null&&(!(hash instanceof String text)||java.util.Base64.getUrlDecoder().decode(text).length!=32))throw new IllegalArgumentException("Invalid frozen workcard selector");
+  return "{\"type\":"+ReceiptAuditJson.encode(type)+",\"id\":"+ReceiptAuditJson.encode(id)+",\"revision\":"+ReceiptAuditJson.encode(revision)+",\"hash\":"+ReceiptAuditJson.encode(hash)+"}";
  }
  private static String safeOutcome(Object value){if(!(value instanceof String text))return null;return switch(text){case "SUCCEEDED"->"成功";case "NO_CHANGE"->"无变更";case "REJECTED"->"已拒绝";case "FAILED"->"失败";default->null;};}
  public static String name(String name){if(name==null||name.isBlank()||name.codePoints().anyMatch(c->Character.isISOControl(c)||Character.getType(c)==Character.FORMAT)||name.codePointCount(0,name.length())>200)return "未提供显示名称";return name;}

@@ -10,6 +10,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.*;
 import java.time.*;
 public class AuditRecordReaderIT extends PostgresIntegrationTest {
+ @Test void original_workcard_disclosure_writer_is_readable_without_rewriting_its_digest()throws Exception{
+  var s=seed(database,"HUMAN","AUDIT_READ");UUID id=UUID.randomUUID();var actor=new Actor(s.tenant(),s.principal(),s.appointment(),null,null);
+  try(var c=database.apiConnection()){inTransaction(c,Capability.AUDIT,x->{var snapshot=new AuthorizationSnapshot(s.request(),Instant.now(),true,null,new Subject("identity.authority_grant",s.grant(),0L,null),"fixture",ReceiptAuditJson.digest("fixture"));AuditAppender.databaseBacked("AUDIT_IT").append(x,new AuditAppender.ReadDisclosureEntry(id,UUID.randomUUID(),s.request().subject(),s.request().subject(),snapshot,AuditAppender.ResponseMode.BODY));return null;});}
+  try(var c=database.apiConnection()){inTransaction(c,Capability.QUERY,x->{var record=AuditRecordReader.databaseBacked().find(x,actor,id);assertNotNull(record);assertTrue(((String)record.values().get("summary")).contains("读取"));return null;});}
+ }
  @Test void unknown_scope_path_and_source_types_fail_closed_before_any_projection()throws Exception{
   var s=seed(database,"HUMAN","AUDIT_READ");UUID original=append(database,s,UUID.randomUUID());var actor=new Actor(s.tenant(),s.principal(),s.appointment(),null,null);
   for(String kind:List.of("SCOPE","PATH","SUBJECT")){

@@ -18,7 +18,7 @@ function handle(req, res) {
   }
   let file;
   if (/^\/assets\/[A-Za-z0-9_.-]+$/.test(url.pathname)) file = path.join(runtime, 'dist', url.pathname);
-  else if (['/', '/login', '/auth/callback', '/workbench'].includes(url.pathname) || /^\/(admin\/identity|management|business)\/[a-z/-]+$/.test(url.pathname)) file = path.join(runtime, 'dist/index.html');
+  else if (['/', '/login', '/auth/callback', '/workbench', '/admin/audit-records'].includes(url.pathname) || /^\/(admin\/identity|management|business)\/[a-z/-]+$/.test(url.pathname)) file = path.join(runtime, 'dist/index.html');
   if (!file || !existsSync(file)) { res.writeHead(404).end(); return; }
   const types = { '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.html': 'text/html; charset=utf-8' };
   res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
