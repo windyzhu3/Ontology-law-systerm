@@ -29,6 +29,14 @@ public final class JooqAuthorizationService implements AuthorizationService {
     static <T>T lockedFacts(Connection connection,UUID tenant,Object key,java.util.function.Supplier<T> load) {
         return cached(facts(connection,tenant),key,load);
     }
+    /** Final authorization must see exact object denials written after the first read,
+     * including newly created subjects and rows discarded by a business rollback.
+     * Keep locked appointment, principal, organization and authority facts cached. */
+    private static void refreshObjectAccess(Connection connection,UUID tenant) {
+        var current=facts(connection,tenant);if(current==null)return;
+        current.queries.keySet().removeIf(key->key instanceof DenialCatalog||key instanceof Denials);
+        current.rows.keySet().removeIf(key->"object_access_grant".equals(key.table()));
+    }
     private static final ThreadLocal<ReadFacts> READ_FACTS=new ThreadLocal<>();
     public ReadScope lockedReadScope(Connection connection,UUID tenantId)throws SQLException {
         if(READ_FACTS.get()!=null)throw new SQLException("Nested identity read scope","25001");
@@ -39,12 +47,13 @@ public final class JooqAuthorizationService implements AuthorizationService {
 
     public AuthorizationSnapshot evaluate(Connection connection, Request request, boolean finalCheck) throws SQLException {
         requireTransaction(connection);
-        if(finalCheck) lock(connection,request.actor().tenantId(),true);
+        if(finalCheck) {lock(connection,request.actor().tenantId(),true);refreshObjectAccess(connection,request.actor().tenantId());}
         return checked(connection,request,databaseTime(connection)).value();
     }
     public List<AuthorizationSnapshot> evaluateAll(Connection connection,List<Request> requests,boolean finalCheck)throws SQLException {
         requireTransaction(connection);if(requests.isEmpty())return List.of();
         UUID tenant=requests.getFirst().actor().tenantId();
+        if(finalCheck) {lock(connection,tenant,true);refreshObjectAccess(connection,tenant);}
         if(facts(connection,tenant)==null||requests.stream().anyMatch(r->!tenant.equals(r.actor().tenantId())))return AuthorizationService.super.evaluateAll(connection,requests,finalCheck);
         return stableBatch(connection,requests);
     }

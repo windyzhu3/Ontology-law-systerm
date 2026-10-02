@@ -38,7 +38,7 @@ public class AuthorizationServiceIT extends PostgresIntegrationTest {
                     sql(x,"insert into identity.appointment_role(tenant_id,appointment_role_id,role_code,display_name,state,created_at) values (?,uuidv7(),'OWNER','Fixture owner','ACTIVE',clock_timestamp())",s.tenant);
                     // Historical business fixtures explicitly configure their synthetic
                     // role data before inserting appointments. Roles grant no authority.
-                    for (String role : List.of("APPROVER", "CONTRACT_TEST", "DELEGATE", "HTTP_FIXTURE", "INTAKE", "LEGAL_REVIEW", "OTHER", "RECOVERY", "REVIEWER", "SALES", "SUPERVISOR", "TEST")) {
+                    for (String role : List.of("APPROVER", "CONTRACT_TEST", "DELEGATE", "HTTP_FIXTURE", "INTAKE", "LEGAL_REVIEW", "OTHER", "RECOVERY", "REVIEWER", "SALES", "SERVICE", "SUPERVISOR", "TEST")) {
                         sql(x,"insert into identity.appointment_role(tenant_id,appointment_role_id,role_code,display_name,state,created_at) values (?,uuidv7(),?,?,'ACTIVE',clock_timestamp())",s.tenant,role,"Fixture " + role);
                     }
                 }
@@ -179,6 +179,31 @@ public class AuthorizationServiceIT extends PostgresIntegrationTest {
                 var next=new AuthorizationService.Subject(subject.type(),subject.id(),null,Base64.getUrlEncoder().withoutPadding().encodeToString(other));
                 assertTrue(service.evaluate(x,new AuthorizationService.Request(request.actor(),next,s.org,request.requirement()),true).allowed());
                 assertTrue(service.evaluate(x,s.request(),true).allowed());
+            }return null;});
+        }
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"0,false,false","0,false,true","0,true,false","0,true,true","257,false,false","257,false,true","257,true,false","257,true,true"})
+    void final_checks_refresh_exact_denials_and_discard_rolled_back_rows(int catalogSize,boolean hashSelector,boolean batch)throws Exception {
+        Seed s=seed();
+        var subject=hashSelector?new AuthorizationService.Subject("contract.contract_revision",s.subject,null,Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32])):s.request().subject();
+        var request=new AuthorizationService.Request(s.request().actor(),subject,s.org,s.request().requirement());
+        try(var c=database.apiConnection()) {
+            inTransaction(c,Capability.COMMAND,x->{
+                sql(x,"insert into identity.object_access_grant(tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,access_code,effect_code,valid_from,state,created_at,object_subject_type,object_subject_id,object_subject_revision) select ?,gen_random_uuid(),?,?,'LEAD_INGRESS_COMPLETE','DENY',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp(),'lead.lead',gen_random_uuid(),0 from generate_series(1,?)",s.tenant,s.principal,s.appointment,catalogSize);return null;
+            });
+            inTransaction(c,Capability.QUERY,x->{try(var scope=service.lockedReadScope(x,s.tenant)) {
+                assertTrue(service.evaluate(x,request,false).allowed());
+                var business=x.setSavepoint();
+                // Deliberately bypass the Identity mutation API to probe the final runtime defense.
+                setLocalRole(x,Capability.COMMAND);
+                sql(x,"insert into identity.object_access_grant(tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,access_code,effect_code,valid_from,state,created_at,object_subject_type,object_subject_id,object_subject_revision,object_subject_hash) values(?,?,?,?,'LEAD_INGRESS_COMPLETE','DENY',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp(),?,?,?,?)",s.tenant,UUID.randomUUID(),s.principal,s.appointment,subject.type(),subject.id(),subject.revision(),hashSelector?new byte[32]:null);
+                setLocalRole(x,Capability.QUERY);
+                var denied=batch?service.evaluateAll(x,List.of(request),true).getFirst():service.evaluate(x,request,true);
+                assertFalse(denied.allowed());assertEquals("NOT_AUTHORIZED",denied.rejectionCode());
+                x.rollback(business);setLocalRole(x,Capability.QUERY);
+                var restored=batch?service.evaluateAll(x,List.of(request),true).getFirst():service.evaluate(x,request,true);
+                assertTrue(restored.allowed());
             }return null;});
         }
     }

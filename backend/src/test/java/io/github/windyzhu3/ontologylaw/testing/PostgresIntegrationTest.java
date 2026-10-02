@@ -26,6 +26,21 @@ public abstract class PostgresIntegrationTest {
     @AfterAll
     void stopDatabase() { if (database != null) database.close(); }
 
+    /** Wait for the real database clock; do not rewrite immutable wait deadlines. */
+    protected void awaitDatabaseTime(java.time.Instant due) throws Exception {
+        long deadline=System.nanoTime()+java.time.Duration.ofSeconds(10).toNanos();
+        try(var c=database.apiConnection()) {
+            while(true) {
+                var observed=io.github.windyzhu3.ontologylaw.execution.internal.persistence.CapabilityRoleExecutor.inTransaction(c,io.github.windyzhu3.ontologylaw.execution.internal.persistence.CapabilityRoleExecutor.Capability.QUERY,x->{
+                    try(var statement=x.createStatement();var rows=statement.executeQuery("select clock_timestamp()")){rows.next();return rows.getObject(1,java.time.OffsetDateTime.class).toInstant();}
+                });
+                if(!observed.isBefore(due))return;
+                org.junit.jupiter.api.Assertions.assertTrue(System.nanoTime()<deadline,"Database clock did not reach the fixture deadline");
+                Thread.sleep(25);
+            }
+        }
+    }
+
     public static Path repositoryRoot() {
         Path path = Path.of("").toAbsolutePath();
         while (path != null && !Files.exists(path.resolve("database/schema-contract-52-plus-2/runtime/toolchain.lock.json"))) {

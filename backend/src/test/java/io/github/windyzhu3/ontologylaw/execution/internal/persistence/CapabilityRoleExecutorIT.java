@@ -117,9 +117,17 @@ class CapabilityRoleExecutorIT extends PostgresIntegrationTest {
         }
     }
 
-    @Test void migrations_retain_all_59_tables_owned_by_migrator_and_restricted_logins() throws Exception {
+    @Test void migrations_retain_exact_manifest_tables_owned_by_migrator_and_restricted_logins() throws Exception {
         try (var c = database.adminConnection()) {
-            assertEquals("59", scalar(c, "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and n.nspname not in ('pg_catalog','information_schema') and n.nspname not like 'pg_toast%'"));
+            var manifest=tools.jackson.databind.json.JsonMapper.builder().build().readTree(java.nio.file.Files.readString(repositoryRoot().resolve("database/schema-contract-52-plus-2/generated/schema-contract-manifest.json")));
+            var expected=new java.util.TreeSet<String>();
+            for(var schema:manifest.path("schemas"))for(var table:schema.path("tables"))assertTrue(expected.add(table.path("qualifiedName").asString()));
+            assertEquals(manifest.path("applicationTableCount").asInt()+manifest.path("selfManagedPlatformTableCount").asInt(),expected.size());
+            assertTrue(expected.add(manifest.path("flywayManagedTable").asString()));
+            assertEquals(manifest.path("physicalTableCountAfterFlywayBootstrap").asInt(),expected.size());
+            var actual=new java.util.TreeSet<String>();
+            try(var statement=c.createStatement();var rows=statement.executeQuery("select n.nspname||'.'||c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and n.nspname not in ('pg_catalog','information_schema') and n.nspname not like 'pg_toast%'")){while(rows.next())assertTrue(actual.add(rows.getString(1)));}
+            assertEquals(expected,actual);
             assertEquals("4", scalar(c, "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where c.relkind='r' and (n.nspname||'.'||c.relname) in ('platform_meta.r2_opportunity_checkpoint','opportunity.owner_exception','opportunity.owner_exception_disposition','opportunity.responsibility_handoff')"));
             assertEquals("0", scalar(c, "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace join pg_roles r on r.oid=c.relowner where c.relkind='r' and n.nspname not in ('pg_catalog','information_schema') and n.nspname not like 'pg_toast%' and r.rolname <> 'law_schema_migrator'"));
             assertEquals("0", scalar(c, "select count(*) from pg_roles where rolname in ('law_api_login','law_worker_login') and (rolinherit or rolsuper or rolcreaterole or rolcreatedb or rolreplication or rolbypassrls)"));

@@ -128,6 +128,9 @@ class R2FollowupAttemptIT extends R2QuoteWorkflowIT {
         Map<String,Object> ctx;try(var c=database.apiConnection()){ctx=new R2FollowupAttemptReadService(cipher,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("ATTEMPT_HANDOFF_IT")).read(c,actor,opportunity.id());}
         assertEquals(quote?"RECORD_QUOTE_FOLLOWUP_ATTEMPT":"RECORD_OPPORTUNITY_FOLLOWUP_ATTEMPT",ctx.get("command"));var nextTask=(Map<?,?>)ctx.get("task");assertEquals("WAITING",ctx.get("taskState"));assertEquals(deadline,scalar("select original_sla_due_at::text from responsibility.task_occurrence where tenant_id=? and task_occurrence_id=?",seed.tenant(),UUID.fromString((String)nextTask.get("id"))));
         if(recoverInherited){
+            java.time.Instant due;
+            try(var c=database.apiConnection()){due=inTransaction(c,Capability.QUERY,x->{try(var statement=x.prepareStatement("select resume_due_at from responsibility.wait_receipt where tenant_id=? and task_occurrence_id=? order by wait_sequence desc limit 1")){statement.setObject(1,seed.tenant());statement.setObject(2,UUID.fromString((String)nextTask.get("id")));try(var rows=statement.executeQuery()){assertTrue(rows.next());return rows.getObject(1,java.time.OffsetDateTime.class).toInstant();}}});}
+            awaitDatabaseTime(due);
             var recoveryActor=service("OPPORTUNITY_TASK_RECOVER");var discovery=new R2OpportunityDiscoveryService(new byte[32]);R2OpportunityDiscoveryService.Response candidates;
             try(var c=database.apiConnection()){candidates=discovery.list(c,recoveryActor,R2OpportunityDiscoveryService.Kind.DUE,100,null);}assertEquals(1,candidates.page().candidates().size());
             var command=R2OpportunityCommandRuntime.recovery(recoveryActor,candidates.page().candidates().getFirst(),UUID.randomUUID());

@@ -30,6 +30,7 @@ class R1ContractClosureIT extends PostgresIntegrationTest {
             contactHash=Base64.getUrlEncoder().withoutPadding().encodeToString(MessageDigest.getInstance("SHA-256").digest(json.getBytes(StandardCharsets.UTF_8)));
             try(var c=database.apiConnection()){inTransaction(c,Capability.COMMAND,x->{
                 sql(x,"insert into identity.tenant (tenant_id,tenant_code,display_name,state,created_at) values (?,?,'closure','ACTIVE',clock_timestamp())",tenant,tenant.toString());
+                for(String role:List.of("OWNER","OTHER"))sql(x,"insert into identity.appointment_role (tenant_id,appointment_role_id,role_code,display_name,state,created_at) values (?,?,?,?,'ACTIVE',clock_timestamp())",tenant,UUID.randomUUID(),role,role);
                 sql(x,"insert into identity.principal (tenant_id,principal_id,principal_kind,identity_provider_code,external_subject_hmac,display_name,state,created_at) values (?,?,'HUMAN','FIXTURE',decode(repeat('00',32),'hex'),'fixture','ACTIVE',clock_timestamp())",tenant,principal);
                 sql(x,"insert into identity.organization_unit (tenant_id,organization_unit_id,unit_code,display_name,state,created_at) values (?,?,'ROOT','fixture','ACTIVE',clock_timestamp())",tenant,org);
                 sql(x,"insert into identity.appointment (tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) values (?,?,?,?,'OWNER',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",tenant,owner,principal,org);
