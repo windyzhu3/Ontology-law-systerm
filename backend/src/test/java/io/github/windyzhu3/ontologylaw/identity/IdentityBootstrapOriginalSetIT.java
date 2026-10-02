@@ -229,7 +229,7 @@ class IdentityBootstrapOriginalSetIT extends PostgresIntegrationTest {
                             "insert into identity.organization_unit (tenant_id,organization_unit_id,unit_code,display_name,parent_organization_unit_id,state,created_at) values (?,?,?,'Later organization',?,'ACTIVE',clock_timestamp())",
                             tenant, UUID.randomUUID(), "LATER_" + UUID.randomUUID().toString().replace("-", ""), original.root());
                     case "APPOINTMENT" -> AuthorizationServiceIT.sql(transaction,
-                            "insert into identity.appointment (tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) values (?,?,?,?,'SERVICE',clock_timestamp()-interval '1 hour','ACTIVE',clock_timestamp())",
+                            "insert into identity.appointment (tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) values (?,?,?,?,'CONTACT_OPERATOR',clock_timestamp()-interval '1 hour','ACTIVE',clock_timestamp())",
                             tenant, UUID.randomUUID(), original.principal(), original.root());
                     case "BUSINESS_AUTHORITY_GRANT" -> AuthorizationServiceIT.sql(transaction,
                             "insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values (?,?,?,?,?,'LEAD_CAPTURE',clock_timestamp()-interval '1 hour','ACTIVE',clock_timestamp())",
@@ -250,7 +250,7 @@ class IdentityBootstrapOriginalSetIT extends PostgresIntegrationTest {
             throws SQLException {
         UUID delegateAppointment = UUID.randomUUID();
         AuthorizationServiceIT.sql(connection,
-                "insert into identity.appointment (tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) values (?,?,?,?,'DELEGATE',clock_timestamp()-interval '1 hour','ACTIVE',clock_timestamp())",
+                "insert into identity.appointment (tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) values (?,?,?,?,'CONTACT_OPERATOR',clock_timestamp()-interval '1 hour','ACTIVE',clock_timestamp())",
                 tenant, delegateAppointment, original.principal(), original.root());
         AuthorizationServiceIT.sql(connection,
                 "insert into identity.delegation_grant (tenant_id,delegation_grant_id,source_authority_grant_id,delegator_appointment_id,delegate_appointment_id,scope_organization_unit_id,valid_from,state,created_at) values (?,?,?,?,?,?,clock_timestamp()-interval '1 hour','ACTIVE',clock_timestamp())",

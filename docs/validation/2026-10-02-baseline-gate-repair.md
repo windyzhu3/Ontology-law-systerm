@@ -28,6 +28,8 @@ GitHub commit a430b28 的 PostgreSQL 18 历史运行门禁已通过：两次干�
 
 完整回归发现旧合同分页断言未同步 R25-CONTRACT-RESPONSIBILITY-RECOVERY-CONTRACT 已批准的 PREPARE 失权扫描；仅修正测试为当前页空结果可以续查、下一页必须结束，生产代码不变。真实 PostgreSQL 单项回归通过。
 
+独立 bootstrap 原始事实校验夹具原先直接写入未配置的 SERVICE / DELEGATE 岗位，8 项目标测试复现 2 项拒绝。夹具改用租户已配置的 CONTACT_OPERATOR；完整原始事实校验 15 项通过，不新增岗位或授权，生产未知岗位拒绝规则保持有效。
+
 ## 尚需完成
 
 完整集成重新回归和 GitHub CI 正在验证。Windows 原 R1 runtime 因 Docker Compose wait 返回 no containers 整体失败；首次历史 schema 断言通过不能替代完整结果。main 合并必须等待全部必要门禁通过。
