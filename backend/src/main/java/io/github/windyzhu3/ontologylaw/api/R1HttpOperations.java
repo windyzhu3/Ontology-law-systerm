@@ -13,6 +13,7 @@ final class R1HttpOperations {
     private static final Set<String> READ=codes(COMMON,"NOT_FOUND VALIDATION_FAILED");
     private R1HttpOperations(){}
     static Operation find(String method,String path){
+        if(method.equals("GET")&&path.matches("/api/v1/admin/audit-records(?:/[^/]+(?:/related)?)?"))return new Operation(null,codes(COMMON,"VALIDATION_FAILED APPOINTMENT_INACTIVE NOT_FOUND"));
         if(method.equals("GET")&&path.matches("/api/v1/workbench/waiting(?:/[^/]+)?"))return new Operation(null,codes(COMMON,"VALIDATION_FAILED NOT_FOUND STALE_SUBJECT"));
         if(method.equals("GET")&&path.matches("/api/v1/business-overview(?:/[^/]+)?"))return new Operation(null,codes(COMMON,"VALIDATION_FAILED NOT_FOUND STALE_SUBJECT"));
         if(method.equals("GET")&&path.matches("/api/v1/lead-management/(?:sources|leads(?:/[^/]+)?)"))return new Operation(null,codes(COMMON,"VALIDATION_FAILED NOT_FOUND STALE_SUBJECT"));
