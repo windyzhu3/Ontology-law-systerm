@@ -72,7 +72,13 @@ class ContractPreparationRecoveryIT extends R2ContractQuoteSourceIT {
         assertTrue(((List<?>)filtered.get("candidates")).isEmpty());assertNotNull(filtered.get("nextCursor"));
         try(var c=database.apiConnection()){var tail=discovery.list(c,worker,1,(String)filtered.get("nextCursor"));assertTrue(((List<?>)tail.get("candidates")).isEmpty());assertNull(tail.get("nextCursor"));}
         qualify();assertEquals(1,candidates().size());assertEquals(CommandOutcome.Status.SUCCEEDED,execute(next()).status());
-        try(var c=database.apiConnection()){var done=discovery.list(c,worker,1,null);assertTrue(((List<?>)done.get("candidates")).isEmpty());assertNull(done.get("nextCursor"),"a historical OWNER_EXCEPTION must not rescan a current PREPARE head");}
+        try(var c=database.apiConnection()){
+            var done=discovery.list(c,worker,1,null);assertTrue(((List<?>)done.get("candidates")).isEmpty());
+            assertNotNull(done.get("nextCursor"),"Current PREPARE heads remain scanned for authority loss recovery");
+            var tail=discovery.list(c,worker,1,(String)done.get("nextCursor"));
+            assertTrue(((List<?>)tail.get("candidates")).isEmpty());
+            assertNull(tail.get("nextCursor"),"Historical OWNER_EXCEPTION must not duplicate the current PREPARE head");
+        }
     }
     void assertCounts(String workflow,String task)throws Exception{
         assertEquals(workflow,scalar("select count(*) from contract.preparation_workflow where tenant_id=?",seed.tenant()));

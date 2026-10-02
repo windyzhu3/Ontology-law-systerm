@@ -22,6 +22,12 @@
 - 运行环境事实只读复核通过，继续保留 v21、现有两管理员及八个接案事项。
 - 独立整分支复核完成，未发现 Critical / Important 问题。
 
+## 后续验证
+
+GitHub commit a430b28 的 PostgreSQL 18 历史运行门禁已通过：两次干净迁移及全部反例完成。见 https://github.com/windyzhu3/Ontology-law-systerm/actions/runs/37014004874 。
+
+完整回归发现旧合同分页断言未同步 R25-CONTRACT-RESPONSIBILITY-RECOVERY-CONTRACT 已批准的 PREPARE 失权扫描；仅修正测试为当前页空结果可以续查、下一页必须结束，生产代码不变。真实 PostgreSQL 单项回归通过。
+
 ## 尚需完成
 
 完整集成重新回归和 GitHub CI 正在验证。Windows 原 R1 runtime 因 Docker Compose wait 返回 no containers 整体失败；首次历史 schema 断言通过不能替代完整结果。main 合并必须等待全部必要门禁通过。
