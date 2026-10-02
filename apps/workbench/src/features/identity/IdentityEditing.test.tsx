@@ -161,8 +161,8 @@ it("offers the complete server-approved business grant set for actual admin conf
   const path = "/admin/identity/authority-grants" as const;
   const f = fixture(path); mount(f, path);
   fireEvent.click(await screen.findByRole("button", { name: "新增直接授权" }));
-  await screen.findByRole("option", { name: "首联处置" });
-  const offered = Array.from((screen.getByLabelText("权限") as HTMLSelectElement).options).map(o => o.value).filter(Boolean);
+  await screen.findByRole("checkbox", { name: "首联处置" });
+  const offered = Array.from(document.querySelectorAll<HTMLInputElement>("input[data-authority-code]")).map(o => o.value);
   expect(offered.sort()).toEqual([...authorities].sort());
   expect(offered).not.toContain("IDENTITY_AUTHORITY_MANAGE");
 });

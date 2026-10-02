@@ -13,6 +13,7 @@ import "../../styles/workbench.css";
 import "../../styles/identity-admin.css";
 import { useIdentityCommand } from "./useIdentityCommand";
 import { IdentityActionConfirmation, IdentityDiscardConfirmation, IdentityRecoveryConfirmation } from "./IdentityActionConfirmation";
+import { IdentityBatchConfirmation } from "./IdentityBatchGrant";
 
 export type IdentityLeaveGuard = (next: () => void) => void;
 
@@ -70,11 +71,12 @@ function IdentityAdminWorkspace({ session, api, path, onNavigate, sessionActions
       break;
   }
   return (
-    <><div inert={!!command.discard || command.editor?.kind === "action" || command.recoveryConfirmation}>
+    <><div inert={!!command.discard || command.editor?.kind === "action" || command.recoveryConfirmation || !!command.batchPreview}>
     <IdentityAdminLayout path={path} onNavigate={next => command.leave(() => onNavigate(next))} sessionActions={sessionActions}>
       {page}
     </IdentityAdminLayout>
     </div>
+    <IdentityBatchConfirmation command={command}/>
     {command.editor?.kind === "action" && !command.recoveryConfirmation && <IdentityActionConfirmation key={`${command.editor.commandType}:${command.editor.targetId}`} command={command} />}
     <IdentityDiscardConfirmation command={command} /><IdentityRecoveryConfirmation command={command} /></>
   );

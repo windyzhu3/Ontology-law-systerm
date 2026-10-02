@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { components } from "../../generated/api/schema";
 import { TransportError, type WorkbenchSession } from "../../lib/sessionTransport";
 import type { IdentityApi, IdentityOriginalWrite } from "./identityApi";
+import { grantable, validIdentityOriginal } from "./identityContract";
 
 type WithoutKey<T> = T extends unknown ? Omit<T, "key"> : never;
 export type IdentityWriteDraft = WithoutKey<IdentityOriginalWrite>;
@@ -10,6 +11,12 @@ export type IdentityLifecycleType = Exclude<IdentityOriginalWrite["commandType"]
 export type IdentityAction = { commandType: IdentityLifecycleType; targetId: string; ifMatch: string; targetName: string; label: string; verb: string; impact: string };
 export type IdentityEditor = { kind: "create"; page: IdentityCreatePage } | { kind: "rename"; commandType: "RENAME_APPOINTMENT_ROLE" | "RENAME_IDENTITY_PRINCIPAL" | "RENAME_ORGANIZATION_UNIT"; targetId: string; ifMatch: string; displayName: string } | ({ kind: "action" } & IdentityAction);
 type Phase = "idle" | "sending" | "unknown" | "proven" | "complete";
+export type GrantDraft = Extract<IdentityWriteDraft, { commandType: "CREATE_AUTHORITY_GRANT" }>;
+export type GrantBatchSummary = { appointment: string; organization: string; validFrom: string; validUntil: string | null };
+type BatchState = "PENDING" | "SENDING" | "SUCCEEDED" | "REJECTED" | "UNKNOWN" | "NOT_SUBMITTED";
+type BatchItem = { authorityCode: GrantDraft["body"]["authorityCode"]; state: BatchState };
+type BatchJob = { drafts: GrantDraft[]; summary: GrantBatchSummary; entries: BatchItem[]; owner: string; index: number; stopped: boolean };
+const batchOwner = (actor: WorkbenchSession) => `${actor.identityEpoch}:${actor.actorScopeKey}:${actor.selectedAppointmentId}:${actor.selectedOnBehalfAppointmentId}`;
 
 export function identityRejectionMessage(code?: string) {
   switch (code) {
@@ -47,6 +54,11 @@ export function useIdentityCommand(session: WorkbenchSession, api: IdentityApi) 
   const refresh = useRef<() => Promise<boolean>>(async () => false);
   const recoveryEntry = useRef<(() => void) | undefined>(undefined);
   const dialogTrigger = useRef<HTMLElement | null>(null);
+  const [batchPreview, setBatchPreview] = useState<{ drafts: GrantDraft[]; summary: GrantBatchSummary } | null>(null);
+  const [batch, setBatch] = useState<{ summary: GrantBatchSummary; entries: BatchItem[]; paused: boolean; running: boolean } | null>(null);
+  const batchJob = useRef<BatchJob | null>(null);
+  const batchRunning = useRef(false);
+  const publishBatch = () => { const job=batchJob.current; if(job&&mounted.current)setBatch({summary:job.summary,entries:job.entries.map(item=>({...item})),paused:job.stopped,running:batchRunning.current}); };
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; request.current?.abort(); }; }, []);
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
@@ -55,8 +67,9 @@ export function useIdentityCommand(session: WorkbenchSession, api: IdentityApi) 
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty, phase]);
-  const reset = () => { setEditor(null); setDirty(false); original.current = null; setPhase("idle"); setMessage(null); setPolicy(undefined); setRefreshFailed(false); };
+  const reset = () => { setEditor(null); setDirty(false); original.current = null; setPhase("idle"); setMessage(null); setPolicy(undefined); setRefreshFailed(false); setBatchPreview(null);setBatch(null);batchJob.current=null; };
   const leave = (next: () => void) => {
+    if (batchRunning.current || batchPreview) return;
     if (busy.current && phase === "complete") return;
     if (busy.current || phase === "unknown") { setMessage("结果尚未确认，请先重试原请求或查询原回执。"); return; }
     if (phase === "proven" && (policy === "NEW_KEY_AFTER_REFRESH" || policy === "NEW_KEY_AFTER_ADMIN_FIX")) return;
@@ -68,6 +81,15 @@ export function useIdentityCommand(session: WorkbenchSession, api: IdentityApi) 
     leave(() => { dialogTrigger.current = trigger; setEditor(next); });
   };
   const finish = async (outcome: "SUCCEEDED" | "NO_CHANGE" | "REJECTED", rejectionCode?: string) => {
+    const job=batchJob.current;
+    if(job){
+      original.current=null;job.entries[job.index].state=outcome==="REJECTED"?"REJECTED":"SUCCEEDED";
+      setPhase(outcome==="REJECTED"?"proven":"complete");setPolicy(outcome==="REJECTED"?(rejectionCode === "STALE_IDENTITY" || rejectionCode === "IDENTITY_STATE_CONFLICT" ? "NEW_KEY_AFTER_REFRESH" : rejectionCode === "IDENTITY_ORGANIZATION_DEPENDENCY" || rejectionCode === "IDENTITY_RESPONSIBILITY_DEPENDENCY" ? "NEW_KEY_AFTER_ADMIN_FIX" : "NO"):undefined);
+      setMessage(outcome==="REJECTED"?`操作已拒绝。${identityRejectionMessage(rejectionCode)}`:"结果已记录，已保留逐项办理结果。");
+      publishBatch();
+      if(job.stopped){try{const ok=await refresh.current();if(mounted.current&&currentSession.current.isCurrent())setRefreshFailed(!ok);}catch{if(mounted.current)setRefreshFailed(true);}}
+      return;
+    }
     original.current = null;
     setEditor(null); setDirty(false); setPolicy(undefined); setPhase("complete");
     if (outcome === "REJECTED") {
@@ -88,11 +110,12 @@ export function useIdentityCommand(session: WorkbenchSession, api: IdentityApi) 
     const actor = currentSession.current;
     try {
       const result = receiptOnly ? await api.receipt(actor, value.key, controller.signal) : await api.write(actor, value, controller.signal);
-      if (!mounted.current || controller.signal.aborted || !actor.isCurrent()) return;
+      if (!mounted.current || controller.signal.aborted || !actor.isCurrent() || (batchJob.current&&batchJob.current.owner!==batchOwner(currentSession.current))) return;
       await finish(result.data.outcome, result.data.outcome === "REJECTED" ? result.data.rejectionCode : undefined);
     } catch (error) {
       if (!mounted.current || controller.signal.aborted || !actor.isCurrent()) return;
       const transport = error instanceof TransportError ? error : null;
+      if(batchJob.current){batchJob.current.entries[batchJob.current.index].state=!receiptOnly&&transport?.provenOutcome?"REJECTED":"UNKNOWN";publishBatch();}
       // A receipt 404 or failed query never proves the original write was absent.
       if (!receiptOnly && transport?.provenOutcome) {
         setPhase("proven"); setPolicy(transport.retryPolicy);
@@ -108,14 +131,42 @@ export function useIdentityCommand(session: WorkbenchSession, api: IdentityApi) 
     } finally { busy.current = false; }
   };
   const submit = (draft: IdentityWriteDraft) => {
+    if (batchRunning.current || batchPreview) return;
     if (busy.current || (phase !== "idle" && !(phase === "proven" && policy === "SAME_KEY_AFTER_FIX"))) return;
     // Only a fully proven non-submission may edit a body with its previous key.
     const value = { ...draft, key: original.current?.key ?? crypto.randomUUID() } as IdentityOriginalWrite;
     original.current = value;
     void dispatch(value);
   };
+  const prepareBatch = (drafts: GrantDraft[], summary: GrantBatchSummary) => {
+    if(busy.current||batchRunning.current||phase!=="idle"||batchPreview)return;
+    const first=drafts[0]?.body;
+    if(!first||drafts.length>grantable.length||new Set(drafts.map(d=>d.body.authorityCode)).size!==drafts.length||drafts.some(d=>!validIdentityOriginal({...d,key:session.selectedAppointmentId})||d.body.appointmentId!==first.appointmentId||d.body.scopeOrganizationId!==first.scopeOrganizationId||d.body.validFrom!==first.validFrom||d.body.validUntil!==first.validUntil))return;
+    dialogTrigger.current=document.activeElement as HTMLElement;
+    setBatchPreview({drafts:drafts.map(d=>({...d,body:{...d.body}})),summary:{...summary}});
+  };
+  const startBatch = async () => {
+    if(!batchPreview||batchRunning.current||busy.current||phase!=="idle"||!currentSession.current.isCurrent())return;
+    const job:BatchJob={...batchPreview,entries:batchPreview.drafts.map(d=>({authorityCode:d.body.authorityCode,state:"PENDING"})),owner:batchOwner(currentSession.current),index:0,stopped:false};
+    batchJob.current=job;batchRunning.current=true;setBatchPreview(null);setEditor(null);setDirty(false);publishBatch();
+    try{
+      for(let index=0;index<job.drafts.length;index++){
+        if(!mounted.current||!currentSession.current.isCurrent()||job.owner!==batchOwner(currentSession.current)){job.stopped=true;break;}
+        job.index=index;job.entries[index].state="SENDING";publishBatch();
+        const value={...job.drafts[index],key:crypto.randomUUID()} as IdentityOriginalWrite;
+        original.current=value;await dispatch(value);
+        if(job.entries[index].state!=="SUCCEEDED"){if(job.entries[index].state==="SENDING")job.entries[index].state="UNKNOWN";job.stopped=true;break;}
+      }
+    } finally {
+      for(const item of job.entries)if(item.state==="PENDING")item.state="NOT_SUBMITTED";publishBatch();
+      if(mounted.current&&currentSession.current.isCurrent()&&job.owner===batchOwner(currentSession.current)){
+        try{const ok=await refresh.current();if(mounted.current&&currentSession.current.isCurrent())setRefreshFailed(!ok);}catch{if(mounted.current)setRefreshFailed(true);}
+      }
+      batchRunning.current=false;publishBatch();
+    }
+  };
   const recheck = async () => {
-    if (busy.current) return;
+    if (busy.current || batchRunning.current || phase === "unknown" || phase === "sending") return;
     busy.current = true;
     const ok = await refresh.current();
     busy.current = false;
@@ -124,22 +175,23 @@ export function useIdentityCommand(session: WorkbenchSession, api: IdentityApi) 
     else setMessage(refreshFailed ? "结果已记录，列表刷新失败。请重读列表，无需再次提交。" : "重新读取失败，不能开始新请求。请稍后重读。");
   };
   return {
-    editor, dirty, phase, message, policy, discard, refreshFailed, recoveryConfirmation, dialogTrigger: dialogTrigger.current,
+    editor, dirty, phase, message, policy, discard, refreshFailed, recoveryConfirmation, batch, batchPreview, dialogTrigger: dialogTrigger.current,
+    prepareBatch, startBatch, cancelBatchPreview: () => setBatchPreview(null),
     setDirty, open, leave, submit,
     bindRefresh: (load: () => Promise<boolean>) => { refresh.current = load; },
     bindRecovery: (enter: (() => void) | undefined) => { recoveryEntry.current = enter; },
     canRecover: !!recoveryEntry.current,
-    requestRecovery: () => { if (!busy.current && phase === "unknown" && recoveryEntry.current) { dialogTrigger.current = document.activeElement as HTMLElement; setRecoveryConfirmation(true); } },
+    requestRecovery: () => { if (!busy.current && !batchRunning.current && phase === "unknown" && recoveryEntry.current) { dialogTrigger.current = document.activeElement as HTMLElement; setRecoveryConfirmation(true); } },
     cancelRecovery: () => setRecoveryConfirmation(false),
     confirmRecovery: () => { if (!busy.current && recoveryConfirmation && currentSession.current.isCurrent()) recoveryEntry.current?.(); },
     cancel: () => leave(() => {}),
     confirmDiscard: () => { const next = discard; setDiscard(null); next?.(); },
     cancelDiscard: () => setDiscard(null),
-    retry: () => { if (original.current && phase === "unknown" && policy !== "NO") void dispatch(original.current); },
-    receipt: () => { if (original.current && phase === "unknown") void dispatch(original.current, true); },
+    retry: () => { if (!batchRunning.current && original.current && phase === "unknown" && policy !== "NO") void dispatch(original.current); },
+    receipt: () => { if (!batchRunning.current && original.current && phase === "unknown") void dispatch(original.current, true); },
     recheck,
-    canSubmit: phase === "idle" || (phase === "proven" && policy === "SAME_KEY_AFTER_FIX"),
-    locked: phase === "sending" || phase === "unknown",
+    canSubmit: !batchRunning.current && !batchPreview && (phase === "idle" || (phase === "proven" && policy === "SAME_KEY_AFTER_FIX")),
+    locked: batchRunning.current || phase === "sending" || phase === "unknown",
   };
 }
 export type IdentityCommand = ReturnType<typeof useIdentityCommand>;

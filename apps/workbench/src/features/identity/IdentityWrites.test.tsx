@@ -94,14 +94,18 @@ it.each([
     } else {
       await screen.findByRole("option", { name: "陈晓" });
       change(kind === "appointments" ? "身份主体" : "授权任职", selectorId);
-      change(kind === "appointments" ? "岗位" : "权限", kind === "appointments" ? taskId : "SALES_CONTACT_OWNER");
+      if (kind === "appointments") change("岗位", taskId);
+      else fireEvent.click(await screen.findByRole("checkbox", { name: "首联处置" }));
       change("生效时间", "2026-09-10T09:30");
       expect(screen.getByText(/本机时区/)).toBeVisible();
       const start = new Date(2026, 8, 10, 9, 30).toISOString();
       body = kind === "appointments" ? { principalId: selectorId, organizationId: draftId, roleCode: "CONTACT_OPERATOR", effectiveFrom: start, effectiveUntil: null } : { appointmentId: selectorId, authorityCode: "SALES_CONTACT_OWNER", scopeOrganizationId: draftId, validFrom: start, validUntil: null };
     }
   }
-  fireEvent.click(screen.getByRole("button", { name: "确认创建" }));
+  if (kind === "authority-grants") {
+    fireEvent.click(screen.getByRole("button", { name: "核对授权清单" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "确认授予 1 项权限" }));
+  } else fireEvent.click(screen.getByRole("button", { name: "确认创建" }));
   await waitFor(() => expect(f.writes).toHaveLength(1));
   const request = f.writes[0];
   expect(new URL(request.url).pathname).toBe(`/api/v1${path}`);
