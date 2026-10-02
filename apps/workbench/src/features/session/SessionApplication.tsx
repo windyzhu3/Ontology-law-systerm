@@ -14,7 +14,7 @@ const isOwnerManagementRoute = (path: string) => ["/management/team-tasks", "/ma
 import { LeadIntakeApplication, leadIntakeRoute } from "../lead-intake/LeadIntakeApplication";
 import { createLeadIntakeApi } from "../lead-intake/leadIntakeApi";
 import { LoginPage } from "./LoginPage";
-import { consumeLoginDestination, rememberLoginDestination } from './loginDestination';
+import { clearLoginDestination, consumeLoginDestination, rememberLoginDestination } from './loginDestination';
 import type { SessionRuntime } from "./sessionConfiguration";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -127,6 +127,7 @@ function SessionRoutes({
   const [admission, setAdmission] = useState<Admission | null>(null);
   const context = state.context;
   const loginDestination = useRef<ReturnType<typeof consumeLoginDestination> | null>(null);
+  const explicitLogout = useRef(false);
   const overviewIntent = path === "/management/overview";
   const overviewTransport=useMemo(()=>createBusinessOverviewTransport(),[]);
   const leadIntent = path === "/management/leads";
@@ -148,12 +149,13 @@ function SessionRoutes({
   useEffect(() => {
     if (!setup || state.status === "INITIALIZING") return;
     if (state.status === "READY" || state.status === "SELECTING") {
+      explicitLogout.current = false;
       if (path !== "/workbench" && !isIdentityAdminRoute(path) && path !== leadIntakeRoute && !managementIntent && !ledgerIntent && !businessIntent && !leadIntent && !overviewIntent) {
         loginDestination.current ??= consumeLoginDestination();
         navigate(loginDestination.current);
       }
     } else if (path !== "/login") {
-      if (state.status === 'SIGNED_OUT') rememberLoginDestination(path);
+      if (state.status === 'SIGNED_OUT' && !explicitLogout.current) rememberLoginDestination(path);
       navigate("/login");
     }
   }, [setup, state.status, path]);
@@ -255,7 +257,13 @@ function SessionRoutes({
     if(target && target!==stage) confirmed(context);
   },[path]);
   const leaveSession=(action:()=>void)=>stage==='admin'||stage==='intake'?guardedLeave(action):action();
-  const sessionActions=context?<SessionActions context={context} onSwitch={()=>leaveSession(()=>selectStage('choosing'))} onLogout={()=>leaveSession(()=>void controller.logout())}/>:undefined;
+  const sessionActions=context?<SessionActions context={context} onSwitch={()=>leaveSession(()=>selectStage('choosing'))} onLogout={()=>leaveSession(()=>{
+    explicitLogout.current = true;
+    loginDestination.current = null;
+    clearLoginDestination();
+    navigate('/login');
+    void controller.logout();
+  })}/>:undefined;
   if (!setup || !["READY", "SELECTING"].includes(state.status))
     return <LoginEntry controller={controller} />;
   if (

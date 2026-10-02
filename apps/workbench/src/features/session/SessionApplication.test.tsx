@@ -1127,3 +1127,28 @@ it.each([true,false])('keeps all common navigation entries across leads, overvie
  expect(push).toHaveBeenCalled();push.mockRestore();
  act(()=>history.back());await waitFor(()=>expect(location.pathname).toBe('/management/team-tasks'));await screen.findByRole('heading',{name:'团队待办'});expect(labels()).toEqual(names);expect(identity()).toBe('合成入口办理人 · 业务一组 · 线索专员');
 });
+
+it("explicit admin logout must not send the next ordinary account back to identity administration", async () => {
+  history.replaceState(null, "", "/admin/identity/principals");
+  sessionStorage.setItem('ols.login-destination.v1', JSON.stringify({path:'/admin/identity/organizations',savedAt:Date.now()}));
+  const admin = fixture({context:{...context,canEnterWorkbench:false,canEnterIdentityAdmin:true}});
+  const identity = identityFixture('/admin/identity/principals',{recovery:admin.controller.recovery});
+  const first = render(<SessionApplication controller={admin.controller} api={admin.api} identityApi={identity.api}/>);
+  const confirm = await screen.findByRole('button',{name:'确认本次身份'});
+  await waitFor(()=>expect(confirm).toBeEnabled()); fireEvent.click(confirm);
+  await screen.findByRole('button',{name:'新增身份主体',exact:true});
+  fireEvent.click(screen.getByRole('button',{name:'退出',exact:true}));
+  await waitFor(()=>expect(location.pathname).toBe('/login'));
+  expect(sessionStorage.getItem('ols.login-destination.v1')).toBeNull();
+  first.unmount();
+  history.replaceState(null,'','/auth/callback');
+  const manager=fixture();
+  render(<SessionApplication controller={manager.controller} api={manager.api}/>);
+  const nextConfirm=await screen.findByRole('button',{name:'确认本次身份'});
+  await waitFor(()=>expect(nextConfirm).toBeEnabled());
+  expect(location.pathname).toBe('/workbench');
+  expect(manager.requests).toHaveLength(0);
+  fireEvent.click(nextConfirm);
+  await screen.findByRole('main',{name:'责任工作台'});
+  expect(screen.queryByText('当前任职不能进入身份管理；请确认本人任职具备管理资格。')).toBeNull();
+});
