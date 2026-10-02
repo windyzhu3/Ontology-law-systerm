@@ -39,3 +39,5 @@
 - 披露审计未保存搜索词、原请求或原响应。升级前检查点 ADM07_BEFORE 已保存并核验摘要，未进行恢复演练；旧制品及原始事实保留。私有请求、回执、制品摘要、截图及检查点位于忽略目录，不进入 Git。
 
 审计访问需要通过既有身份管理对本人任职另行授予 AUDIT_READ 及明确组织范围；仅系统管理员身份不能进入审计查询。
+
+叠加草稿 PR：[PR #24](https://github.com/windyzhu3/Ontology-law-systerm/pull/24)，基于 codex/bulk-authority-grants；已推送并附着当前任务，未合并 main。
