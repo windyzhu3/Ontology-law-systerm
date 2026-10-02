@@ -20,6 +20,7 @@ public final class JooqAuditRecordReader implements AuditRecordReader {
  public SafeRecord find(Connection c,Actor actor,UUID id)throws SQLException{var row=db(c).fetchOne(SELECT+" and a.audit_entry_id=?",actor.tenantId(),id);return row==null?null:authorizedProjection(c,actor,row);}
  private UUID scope(Record row){return Set.of("TENANT","SECURITY").contains(row.get("audit_scope_code",String.class))||"SYSTEM".equals(row.get("authorization_path_code",String.class))?null:row.get("authorization_scope_organization_unit_id",UUID.class);}
  private SafeRecord authorizedProjection(Connection c,Actor actor,Record row)throws SQLException{
+  if(!AuditRecordSummary.classified(row.get("audit_scope_code",String.class),row.get("authorization_path_code",String.class),row.get("subject_type",String.class)))return null;
   var fact=new Subject("audit.audit_entry",row.get("audit_entry_id",UUID.class),null,Base64.getUrlEncoder().withoutPadding().encodeToString(row.get("change_summary_digest",byte[].class)));
   try{authorization.authorize(c,actor,fact,subject(row,"subject_"),scope(row));return project(row);}catch(Failure denied){if(denied.code().equals("NOT_AUTHORIZED"))return null;throw denied;}
  }
@@ -59,22 +60,22 @@ public final class JooqAuditRecordReader implements AuditRecordReader {
    }
    if(rows.size()<100)break;
   }
-  boolean more=result.size()>q.limit();if(more)result.removeLast();return new Page(result,more);
+  SafeRecord lookahead=result.size()>q.limit()?result.removeLast():null;return new Page(result,lookahead);
  }
  private boolean matches(SafeRecord row,Query q){return (q.scope()==null||AuditRecordSummary.scopeLabel(q.scope()).equals(row.values().get("scopeLabel")))&&(q.result()==null||AuditRecordSummary.resultLabel(q.result()).equals(row.values().get("resultLabel")))&&(q.search()==null||List.of("actorLabel","appointmentLabel","objectLabel","actionLabel","scopeLabel","resultLabel").stream().anyMatch(k->((String)row.values().get(k)).toLowerCase(Locale.ROOT).contains(q.search().toLowerCase(Locale.ROOT))));}
  public Page related(Connection c,Actor actor,SafeRecord seed,Relation relation,Query q,Position position)throws SQLException{
   if(!allowed(c,actor,seed))throw new Failure("NOT_AUTHORIZED");
-  if(relation==Relation.CORRELATION)return seed.correlation()==null?new Page(List.of(),false):scan(c,actor,q,position,seed.correlation());
+  if(relation==Relation.CORRELATION)return seed.correlation()==null?new Page(List.of(),null):scan(c,actor,q,position,seed.correlation());
   var visited=new HashSet<UUID>();var queue=new ArrayDeque<SafeRecord>();var found=new ArrayList<SafeRecord>();queue.add(seed);
   long deadline=System.nanoTime()+5_000_000_000L;
-  while(!queue.isEmpty()&&visited.size()<50){budget(deadline);var current=queue.removeFirst();if(current.trustedAt().isAfter(position.watermark())||!visited.add(current.fact().id()))continue;if(!allowed(c,actor,current))continue;found.add(current);
-   if(current.correction()!=null&&current.correction().type().equals("audit.audit_entry")){var parent=find(c,actor,current.correction().id());if(parent!=null&&!parent.trustedAt().isAfter(position.watermark())&&parent.fact().equals(current.correction())&&allowed(c,actor,parent))queue.add(parent);}
+  while(!queue.isEmpty()){budget(deadline);var current=queue.removeFirst();if(current.trustedAt().isAfter(position.watermark())||visited.contains(current.fact().id()))continue;if(visited.size()>=1000)throw new SQLException("Audit correction traversal budget exceeded","57014");visited.add(current.fact().id());found.add(current);
+   if(current.correction()!=null&&current.correction().type().equals("audit.audit_entry")&&!visited.contains(current.correction().id())){var parent=find(c,actor,current.correction().id());if(parent!=null&&!parent.trustedAt().isAfter(position.watermark())&&parent.fact().equals(current.correction()))queue.add(parent);}
    // The frozen correction-target unique index permits one exact successor.
    var children=db(c).fetch(SELECT+" and a.correction_target_type='audit.audit_entry' and a.correction_target_id=? and a.correction_target_hash=? and a.trusted_at<=?::timestamptz",actor.tenantId(),current.fact().id(),Base64.getUrlDecoder().decode(current.fact().hash()),position.watermark().toString());
    for(var child:children){var safe=authorizedProjection(c,actor,child);if(safe!=null)queue.add(safe);}
   }
   var order=Comparator.comparing(SafeRecord::trustedAt).thenComparing(r->r.fact().id().toString());var visible=found.stream().filter(r->!r.trustedAt().isBefore(q.start())&&!r.trustedAt().isAfter(q.end())&&!r.trustedAt().isAfter(position.watermark())).filter(r->position.trustedAt()==null||r.trustedAt().isBefore(position.trustedAt())||r.trustedAt().equals(position.trustedAt())&&r.fact().id().toString().compareTo(position.id().toString())<0).filter(r->matches(r,q)).sorted(order.reversed()).toList();
-  return new Page(visible.stream().limit(q.limit()).toList(),visible.size()>q.limit());
+  return new Page(visible.stream().limit(q.limit()).toList(),visible.size()>q.limit()?visible.get(q.limit()):null);
  }
 }
 

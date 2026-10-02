@@ -10,6 +10,25 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.*;
 import java.time.*;
 public class AuditRecordReaderIT extends PostgresIntegrationTest {
+ @Test void unknown_scope_path_and_source_types_fail_closed_before_any_projection()throws Exception{
+  var s=seed(database,"HUMAN","AUDIT_READ");UUID original=append(database,s,UUID.randomUUID());var actor=new Actor(s.tenant(),s.principal(),s.appointment(),null,null);
+  for(String kind:List.of("SCOPE","PATH","SUBJECT")){
+   UUID id=UUID.randomUUID();copy(s,original,id,null,kind);
+   try(var c=database.apiConnection()){inTransaction(c,Capability.QUERY,x->{assertNull(AuditRecordReader.databaseBacked().find(x,actor,id),kind+" must not disclose unclassified record metadata");return null;});}
+  }
+ }
+ @Test void a_long_correction_chain_continues_after_the_first_fifty_nodes()throws Exception{
+  var s=seed(database,"HUMAN","AUDIT_READ");UUID original=append(database,s,UUID.randomUUID()),parent=original;
+  for(int i=0;i<50;i++){UUID id=UUID.randomUUID();copy(s,parent,id,parent,null);parent=id;}
+  var actor=new Actor(s.tenant(),s.principal(),s.appointment(),null,null);
+  try(var c=database.apiConnection()){inTransaction(c,Capability.QUERY,x->{var reader=AuditRecordReader.databaseBacked();var seed=reader.find(x,actor,original);Instant now=Instant.now().plusSeconds(1);var query=new AuditRecordReader.Query(now.minusSeconds(86400),now,null,null,null,20,null);var position=new AuditRecordReader.Position(null,null,now);var ids=new HashSet<UUID>();int pages=0;
+   while(true){var page=reader.related(x,actor,seed,AuditRecordReader.Relation.CORRECTION,query,position);assertTrue(page.items().size()<=20);for(var item:page.items())assertTrue(ids.add(item.fact().id()));pages++;if(!page.hasMore())break;assertTrue(pages<4);var last=page.items().getLast();position=new AuditRecordReader.Position(last.trustedAt(),last.fact().id(),now);}
+   assertEquals(51,ids.size());assertEquals(3,pages);return null;});}
+ }
+ private void copy(AuthorizationServiceIT.Seed s,UUID original,UUID id,UUID parent,String unknown)throws Exception{
+  String scope="SCOPE".equals(unknown)?"'UNREGISTERED_SCOPE'":"audit_scope_code",path="PATH".equals(unknown)?"'UNREGISTERED_PATH'":"authorization_path_code",source="SUBJECT".equals(unknown)?"'future.private_source'":"subject_type";
+  try(var c=database.migratorConnection()){sql(c,"insert into audit.audit_entry (tenant_id,audit_entry_id,entry_type,audit_scope_code,trusted_at,action_code,result_code,actor_principal_id,actor_appointment_id,correlation_id,authorization_slot_code,authorization_path_code,authorization_scope_organization_unit_id,authorization_snapshot_digest,trace_id,service_role_code,execution_node_code,summary_schema_code,summary_schema_version,change_summary,change_summary_digest,subject_type,subject_id,subject_revision,subject_hash,correction_target_type,correction_target_id,correction_target_hash) select tenant_id,?,? ,"+scope+",clock_timestamp(),action_code,result_code,actor_principal_id,actor_appointment_id,correlation_id,authorization_slot_code,"+path+",authorization_scope_organization_unit_id,authorization_snapshot_digest,trace_id,service_role_code,execution_node_code,summary_schema_code,summary_schema_version,change_summary,change_summary_digest,"+source+",subject_id,subject_revision,subject_hash,?,?,? from audit.audit_entry where tenant_id=? and audit_entry_id=?",id,parent==null?"EVENT":"CORRECTION",parent==null?null:"audit.audit_entry",parent,parent==null?null:ReceiptAuditJson.digest("{\"secret\":\"HMAC_TOKEN_CONTACT\"}"),s.tenant(),original);}
+ }
  @Test void correction_chain_only_follows_existing_exact_audit_hash_edges()throws Exception{
   var s=seed(database,"HUMAN","AUDIT_READ");UUID original=append(database,s,UUID.randomUUID()),correction=UUID.randomUUID();
   try(var c=database.migratorConnection()){sql(c,"insert into audit.audit_entry (tenant_id,audit_entry_id,entry_type,audit_scope_code,trusted_at,action_code,result_code,actor_principal_id,actor_appointment_id,correlation_id,authorization_slot_code,authorization_path_code,authorization_scope_organization_unit_id,authorization_snapshot_digest,trace_id,service_role_code,execution_node_code,summary_schema_code,summary_schema_version,change_summary,change_summary_digest,subject_type,subject_id,subject_revision,subject_hash,correction_target_type,correction_target_id,correction_target_hash) select tenant_id,?,'CORRECTION',audit_scope_code,clock_timestamp(),action_code,result_code,actor_principal_id,actor_appointment_id,correlation_id,authorization_slot_code,authorization_path_code,authorization_scope_organization_unit_id,authorization_snapshot_digest,trace_id,service_role_code,execution_node_code,summary_schema_code,summary_schema_version,change_summary,change_summary_digest,subject_type,subject_id,subject_revision,subject_hash,'audit.audit_entry',audit_entry_id,change_summary_digest from audit.audit_entry where tenant_id=? and audit_entry_id=?",correction,s.tenant(),original);}

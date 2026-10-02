@@ -199,14 +199,17 @@ function SessionRoutes({
       stage: next,
     });
   }
+  function defaultAuditEntry(selected: SessionContext) {
+    return !adminIntent && !selected.canEnterWorkbench && selected.canReadAuditRecords===true && selected.selectedOnBehalfAppointmentId===null && !overviewIntent && !leadIntent && !businessIntent && !ledgerIntent && !managementIntent && !intakeIntent;
+  }
   function confirmed(selected: SessionContext) {
-    if(!adminIntent && !selected.canEnterWorkbench && selected.canReadAuditRecords===true && selected.selectedOnBehalfAppointmentId===null && !overviewIntent && !leadIntent && !businessIntent && !ledgerIntent && !managementIntent && !intakeIntent){navigate("/admin/audit-records");selectStage("admin",selected);return;}
     let pending = true;
     try {
       pending = !!api.recovery.read();
     } catch {
       /* Recovery page owns explicit invalid-clue cleanup. */
     }
+    if(!pending && defaultAuditEntry(selected)){navigate("/admin/audit-records");selectStage("admin",selected);return;}
     selectStage(
       pending
         ? "recovery"
@@ -386,6 +389,7 @@ function SessionRoutes({
           } catch {
             return;
           }
+          if(stage === "recovery" && defaultAuditEntry(context)){navigate("/admin/audit-records");selectStage("admin",context);return;}
           selectStage(
             stage === "recovery"
               ? overviewIntent

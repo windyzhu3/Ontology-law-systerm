@@ -10,6 +10,15 @@ import java.util.*;
 import java.sql.*;
 import java.lang.reflect.*;
 class AuditReadRuntimeIT extends PostgresIntegrationTest {
+ @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(strings={"LIST","CORRELATION"})
+ void pagination_existence_is_reauthorized_after_a_future_object_deny_becomes_effective(String operation)throws Exception{
+  var s=seed(database,"HUMAN","AUDIT_READ");UUID correlation=UUID.randomUUID(),older=AuditRecordReaderIT.append(database,s,correlation),newer=AuditRecordReaderIT.append(database,s,correlation);var actor=new Actor(s.tenant(),s.principal(),s.appointment(),null,null);
+  try(var c=database.apiConnection()){
+   io.github.windyzhu3.ontologylaw.execution.internal.persistence.CapabilityRoleExecutor.inTransaction(c,io.github.windyzhu3.ontologylaw.execution.internal.persistence.CapabilityRoleExecutor.Capability.COMMAND,x->{sql(x,"insert into identity.object_access_grant (tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,object_subject_type,object_subject_id,object_subject_hash,access_code,effect_code,valid_from,state,created_at) values (?,?,?,?,'audit.audit_entry',?,?,'AUDIT_READ','DENY',clock_timestamp()+interval '3 seconds','ACTIVE',clock_timestamp())",s.tenant(),UUID.randomUUID(),s.principal(),s.appointment(),older,io.github.windyzhu3.ontologylaw.audit.internal.ReceiptAuditJson.digest("{\"secret\":\"HMAC_TOKEN_CONTACT\"}"));return null;});
+   var delegate=AuditAppender.databaseBacked("AUDIT_IT");AuditAppender delayed=new AuditAppender(){public void append(Connection x,Entry e)throws SQLException{delegate.append(x,e);}public void append(Connection x,AuditRecordDisclosureEntry e)throws SQLException{delegate.append(x,e);try{Thread.sleep(3200);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new SQLException(interrupted);}}};
+   var query=new AuditRecordReader.Query(null,null,null,null,null,1,null);assertThrows(IdentityCommands.Failure.class,()->{if(operation.equals("LIST"))runtime(delayed).read(c,actor,query);else runtime(delayed).related(c,actor,newer,AuditRecordReader.Relation.CORRELATION,query);},"A next cursor must not disclose a now-denied lookahead node");
+  }
+ }
  @Test void cursors_bind_filters_actor_and_watermark_and_time_bounds_are_closed()throws Exception{
   var s=seed(database,"HUMAN","AUDIT_READ");for(int i=0;i<3;i++)AuditRecordReaderIT.append(database,s,UUID.randomUUID());var actor=new Actor(s.tenant(),s.principal(),s.appointment(),null,null);var runtime=runtime(AuditAppender.databaseBacked("AUDIT_IT"));
   try(var c=database.apiConnection()){

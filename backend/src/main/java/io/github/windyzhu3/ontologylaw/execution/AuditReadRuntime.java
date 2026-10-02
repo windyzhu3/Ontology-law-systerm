@@ -31,8 +31,8 @@ public final class AuditReadRuntime {
     Instant end=input.end()==null?position.watermark():input.end(),start=input.start()==null?end.minus(Duration.ofDays(7)):input.start();if(!start.isBefore(end)||Duration.between(start,end).compareTo(Duration.ofDays(31))>0||end.isAfter(now)||position.watermark().isAfter(now))throw new Failure("VALIDATION_FAILED");
     var query=new Query(start,end,input.scope(),input.result(),input.search()==null||input.search().isBlank()?null:input.search(),input.limit(),input.cursor());
     try(var statement=c.createStatement()){statement.execute("SET LOCAL statement_timeout='5s'");}
-    Page page=id==null?reader.list(c,actor,query,position):relation==null?new Page(List.of(seed),false):reader.related(c,actor,seed,relation,query,position);
-    var selected=new ArrayList<>(page.items());if(seed!=null&&!selected.contains(seed))selected.add(seed);
+    Page page=id==null?reader.list(c,actor,query,position):relation==null?new Page(List.of(seed),null):reader.related(c,actor,seed,relation,query,position);
+    var selected=new ArrayList<>(page.items());if(seed!=null&&!selected.contains(seed))selected.add(seed);if(page.lookahead()!=null&&!selected.contains(page.lookahead()))selected.add(page.lookahead());
     AuthorizationSnapshot snapshot=access.authorization();
     if(!access.binding().equals(authorization.scopes(c,actor).binding()))throw new Failure("NOT_AUTHORIZED");
     for(var row:selected){var current=reader.find(c,actor,row.fact().id());if(current==null||!current.fact().equals(row.fact())||!current.source().equals(row.source())||!Objects.equals(current.organization(),row.organization()))throw new Failure("NOT_AUTHORIZED");snapshot=authorization.authorize(c,actor,current.fact(),current.source(),current.organization());}

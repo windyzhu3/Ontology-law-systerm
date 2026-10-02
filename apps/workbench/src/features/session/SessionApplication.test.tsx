@@ -27,6 +27,14 @@ import {
   tags,
 } from "../../test/fixtures";
 const scope = "ask1.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+it('recovers an original command before the audit-only default entry and returns to audit afterwards',async()=>{
+ history.replaceState(null,'','/login');const marker={commandId:selectorId,commandType:'CREATE_IDENTITY_PRINCIPAL',actorScopeKey:scope,recordedAt:new Date().toISOString()};sessionStorage.setItem(markerKey,JSON.stringify(marker));
+ const reads:Request[]=[];vi.stubGlobal('fetch',async(request:Request)=>{reads.push(request);return jsonResponse({items:[]});});
+ const f=fixture({context:{...context,canEnterWorkbench:false,canEnterIdentityAdmin:false,canReadAuditRecords:true},respond:async()=>jsonResponse({...receipt(selectorId),resultFact:{factType:'IDENTITY_PRINCIPAL',factRef:'safe-identity-result',revision:1}})});
+ render(<SessionApplication controller={f.controller} api={f.api}/>);const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ expect(await screen.findByRole('heading',{name:'核对原操作结果'})).toBeVisible();expect(f.controller.recovery.read()).toEqual(marker);expect(reads).toHaveLength(0);
+ const query=await screen.findByRole('button',{name:'查询原操作结果'});await waitFor(()=>expect(query).toBeEnabled());fireEvent.click(query);fireEvent.click(await screen.findByRole('button',{name:'继续'}));expect(await screen.findByRole('heading',{name:'审计记录'})).toBeVisible();expect(location.pathname).toBe('/admin/audit-records');expect(f.requests).toHaveLength(1);
+});
 it.each(['/admin/audit-records','/login'])('enters the audit-only page from %s without identity directory access',async path=>{
  history.replaceState(null,'',path);
  vi.stubGlobal('fetch',async()=>new Response(JSON.stringify({items:[]}),{status:200,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}}));

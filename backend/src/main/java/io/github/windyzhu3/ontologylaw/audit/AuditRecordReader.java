@@ -11,7 +11,7 @@ public interface AuditRecordReader {
  record Query(Instant start,Instant end,String scope,String result,String search,int limit,String cursor){}
  record Position(Instant trustedAt,UUID id,Instant watermark){}
  record SafeRecord(Subject fact,Subject source,UUID organization,Instant trustedAt,UUID correlation,Subject correction,Map<String,Object> values){public SafeRecord{values=Map.copyOf(values);}}
- record Page(List<SafeRecord> items,boolean hasMore){public Page{items=List.copyOf(items);}}
+ record Page(List<SafeRecord> items,SafeRecord lookahead){public Page{items=List.copyOf(items);}public boolean hasMore(){return lookahead!=null;}}
  SafeRecord find(Connection c,Actor actor,UUID id)throws SQLException;
  Page list(Connection c,Actor actor,Query query,Position position)throws SQLException;
  Page related(Connection c,Actor actor,SafeRecord seed,Relation relation,Query query,Position position)throws SQLException;
