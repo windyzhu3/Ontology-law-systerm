@@ -46,7 +46,12 @@ public final class JooqAuthorizationService implements AuthorizationService {
         requireTransaction(connection);if(requests.isEmpty())return List.of();
         UUID tenant=requests.getFirst().actor().tenantId();
         if(facts(connection,tenant)==null||requests.stream().anyMatch(r->!tenant.equals(r.actor().tenantId())))return AuthorizationService.super.evaluateAll(connection,requests,finalCheck);
-        // The scope already owns the identity lock. Re-evaluate all time conditions and
+        return stableBatch(connection,requests);
+    }
+    /** Identity management holds the tenant fence even outside an optional cached read scope. */
+    List<AuthorizationSnapshot> stableBatch(Connection connection,List<Request> requests)throws SQLException {
+        requireTransaction(connection);
+        // The caller already owns the identity lock. Re-evaluate all time conditions and
         // reject/retry if any boundary is crossed while assembling this exact batch.
         return StableAuthorizationBatch.evaluate(()->databaseTime(connection),at->{
             var snapshots=new ArrayList<AuthorizationSnapshot>();Instant boundary=null;

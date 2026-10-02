@@ -10,6 +10,11 @@ PREVIOUS_PIN='38287abef581fd622c793d6875c04669daeee60f11bf929a535f267042797ff0'
 def digest(value):
  return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=True).encode()).hexdigest()
 def audit_query_projection(document):
+ try:
+  from scripts.baseline.secondary_admin_contract import secondary_admin_projection
+ except ModuleNotFoundError:
+  from secondary_admin_contract import secondary_admin_projection
+ document=secondary_admin_projection(document)
  schemas=document['components']['schemas'];paths=document['paths']
  if not any(k in schemas for k in ADDED) and not any(k in paths for k in PATHS):return deepcopy(document)
  fragment={'paths':{k:paths.get(k) for k in PATHS},'schemas':{k:schemas.get(k) for k in ADDED+CHANGED}}

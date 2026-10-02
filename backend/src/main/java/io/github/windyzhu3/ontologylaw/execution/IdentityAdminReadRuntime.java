@@ -43,7 +43,7 @@ public final class IdentityAdminReadRuntime {
                 }
                 String next=result.hasMore()?protection.cursor(binding,new Position(result.items().getLast().createdAt(),result.items().getLast().fact().id())):null;
                 response=page(items,next);count=items.size();
-                if(options)response=Map.of("page",page,"optionKind",option,"roleCodes",List.of(),"grantableAuthorityCodes",page.equals("AUTHORITY_GRANTS")?IdentityCommands.GRANTABLE:List.of(),"candidates",response);
+                if(options)response=Map.of("page",page,"optionKind",option,"roleCodes",List.of(),"grantableAuthorityCodes",page.equals("AUTHORITY_GRANTS")?reader.grantableAuthorities(c,actor):List.of(),"candidates",response);
             }
             // Final fresh DB-clock authorization includes current expiry after external work and projection.
             var finalAccess=reader.listAccess(c,actor,code,rootRequired);
@@ -58,6 +58,11 @@ public final class IdentityAdminReadRuntime {
                 }
             }
             access=finalAccess;
+            if(options&&page.equals("AUTHORITY_GRANTS")) {
+                var currentCodes=reader.grantableAuthorities(c,actor);
+                if(!currentCodes.equals(response.get("grantableAuthorityCodes")))throw new Failure("NOT_AUTHORIZED");
+                if(currentCodes.containsAll(IdentityCommands.MANAGEMENT))access=IdentityAdminReader.combine(access,reader.managementGrantAccess(c,actor,null));
+            }
             setLocalRole(c,Capability.AUDIT);audit.append(c,new AuditAppender.IdentityDisclosureEntry(UUID.randomUUID(),UUID.randomUUID(),operation,access.authorization(),count,sources));
             return response;
         });

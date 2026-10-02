@@ -42,7 +42,7 @@ public final class IdentityCommands {
                 else if(field.equals("providerUserSelector")){if(!text.matches("[A-Za-z0-9_-]{1,2048}"))throw new IllegalArgumentException();}
                 else if(field.equals("code")){if(!text.matches("[A-Z][A-Z0-9_]{0,63}"))throw new IllegalArgumentException();}
                 else if(field.equals("roleCode")){if(!text.matches("[A-Z][A-Z0-9_]{0,63}"))throw new IllegalArgumentException();}
-                else if(field.equals("authorityCode")){if(!GRANTABLE.contains(text))throw new IllegalArgumentException();}
+                else if(field.equals("authorityCode")){if(!GRANTABLE.contains(text)&&!MANAGEMENT.contains(text))throw new IllegalArgumentException();}
                 else if(field.equals("reasonCode")&&!Set.of("ADMINISTRATIVE_ACTION","SECURITY_RESPONSE").contains(text))throw new IllegalArgumentException();
                 values.put(field,text);
             }

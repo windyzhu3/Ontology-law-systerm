@@ -16,7 +16,7 @@ import org.jooq.impl.DSL;
 
 /** All online Identity SQL stays in its Owner. No business locks or business tables. */
 public final class JooqIdentityRepository implements IdentityCommands.Port {
-    private final AuthorizationService authorization=AuthorizationService.databaseBacked();
+    private final JooqAuthorizationService authorization=new JooqAuthorizationService();
     private static DSLContext db(Connection c){return DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false));}
     private static String table(Kind kind){return kind.factType;}
     private static String idColumn(Kind kind){return switch(kind){case ROLE->"appointment_role_id";case PRINCIPAL->"principal_id";case ORGANIZATION->"organization_unit_id";case APPOINTMENT->"appointment_id";case AUTHORITY_GRANT->"authority_grant_id";};}
@@ -78,6 +78,33 @@ public final class JooqIdentityRepository implements IdentityCommands.Port {
         selected=new AuthorizationSnapshot(selected.request(),selected.checkedAt(),true,null,selected.authorityFact(),retained,digest(retained),selected.stableDependencies());
         return new Access(selected,setDigest,List.of(anchor.fact().id()));
     }
+    @Override public Access managementGrantAccess(Connection c,Actor actor,Resource target)throws SQLException {
+        require(actor.principalKind()==PrincipalKind.HUMAN&&actor.onBehalfAppointmentId()==null,"NOT_AUTHORIZED");
+        var anchor=root(c,actor.tenantId());var requests=new ArrayList<Request>();
+        boolean paired=target!=null&&!target.fact().equals(anchor.fact());
+        for(String code:IdentityCommands.MANAGEMENT) {
+            var grants=db(c).fetch("select authority_grant_id from identity.authority_grant where tenant_id=? and grantee_appointment_id=? and authority_code=? order by authority_grant_id",actor.tenantId(),actor.appointmentId(),code);
+            for(var grant:grants) {
+                var requirement=new Requirement(code,"IDENTITY_ADMIN",Path.DIRECT,grant.get(0,UUID.class));
+                requests.add(new Request(actor,anchor.fact(),anchor.fact().id(),requirement));
+                if(paired)requests.add(new Request(actor,target.fact(),anchor.fact().id(),requirement));
+            }
+        }
+        // One DB instant for the entire exact set, with a final boundary guard/retry.
+        var snapshots=authorization.stableBatch(c,requests);Access combined=null;
+        for(String code:IdentityCommands.MANAGEMENT) {
+            AuthorizationSnapshot selected=null;var evidence=new StringBuilder();
+            for(int index=0;index<snapshots.size();index+=paired?2:1) {
+                var snapshot=snapshots.get(index);if(!code.equals(snapshot.request().requirement().authorityCode()))continue;
+                evidence.append(snapshot.stableDependencies()).append('\n');boolean allowed=snapshot.allowed();
+                if(paired){var exact=snapshots.get(index+1);evidence.append(exact.stableDependencies()).append('\n');allowed&=exact.allowed();}
+                if(allowed&&selected==null)selected=snapshot;
+            }
+            require(selected!=null,"NOT_AUTHORIZED");var access=new Access(selected,digest(evidence.toString()),List.of(anchor.fact().id()));
+            combined=combined==null?access:IdentityAdminReader.combine(combined,access);
+        }
+        return IdentityAdminReader.compactManagementAccess(combined);
+    }
     public Access listAccess(Connection c,Actor actor,String code,boolean rootRequired)throws SQLException {
         if(rootRequired)return authorize(c,actor,code,root(c,actor.tenantId()),null);
         require(actor.principalKind()==PrincipalKind.HUMAN&&actor.onBehalfAppointmentId()==null,"NOT_AUTHORIZED");
@@ -109,6 +136,11 @@ public final class JooqIdentityRepository implements IdentityCommands.Port {
             require(appointment!=null&&organization!=null,"NOT_FOUND");
             access=IdentityAdminReader.combine(access,authorize(c,actor,h.authority(),anchor,appointment));
             access=IdentityAdminReader.combine(access,authorize(c,actor,h.authority(),organization,null));
+            if(IdentityCommands.MANAGEMENT.contains(attempted.get("authorityCode"))) {
+                var root=root(c,actor.tenantId());
+                require(root.fact().id().equals(organization.fact().id())&&root.fact().id().equals(appointment.organization()),"NOT_AUTHORIZED");
+                access=IdentityAdminReader.combine(access,managementGrantAccess(c,actor,appointment));
+            }
         }
         return access;
     }

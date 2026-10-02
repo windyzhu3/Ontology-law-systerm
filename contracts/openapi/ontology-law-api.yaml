@@ -26942,6 +26942,10 @@ components:
     GrantableAuthorityCodeV1:
       type: string
       enum:
+      - IDENTITY_PRINCIPAL_MANAGE
+      - IDENTITY_ORGANIZATION_MANAGE
+      - IDENTITY_APPOINTMENT_MANAGE
+      - IDENTITY_AUTHORITY_MANAGE
       - AUDIT_READ
       - LEAD_CAPTURE
       - LEAD_INGRESS_RESOLVE

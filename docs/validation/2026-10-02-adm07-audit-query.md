@@ -40,4 +40,6 @@
 
 审计访问需要通过既有身份管理对本人任职另行授予 AUDIT_READ 及明确组织范围；仅系统管理员身份不能进入审计查询。
 
+后续已执行用户确认的第二管理员方案：由 `sys_manager01` 建立 `sys_manager02` 并显式授予四项根管理权限，再由第二位管理员为原管理员任职授予永久根范围 `AUDIT_READ`，已实际登录并查询验证。上文零项 ACTIVE 审计授权为此前 ADM-07 临时验收结束时的状态；后续事实与精确范围见[第二管理员验证记录](2026-10-02-secondary-administrator.md)。
+
 叠加草稿 PR：[PR #24](https://github.com/windyzhu3/Ontology-law-systerm/pull/24)，基于 codex/bulk-authority-grants；已推送并附着当前任务，未合并 main。

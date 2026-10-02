@@ -1414,7 +1414,8 @@ public class OpenApiContractTest {
                 "PAYMENT_LEDGER_READ", "TRANSFER_LEDGER_READ", "CONTRACT_EXECUTION_VERIFY",
                 "CONTRACT_TERMINATION_REVIEW", "PAYMENT_SUBMIT", "PAYMENT_CONFIRM", "TRANSFER_SUBMIT",
                 "TRANSFER_REVIEW", "TRANSFER_ACCEPT", "MATTER_CLASSIFY", "MATTER_RECEIVE",
-                "TEAM_TASK_READ", "LEAD_MANAGEMENT_READ", "AUDIT_READ"),
+                "TEAM_TASK_READ", "LEAD_MANAGEMENT_READ", "AUDIT_READ",
+                "IDENTITY_PRINCIPAL_MANAGE", "IDENTITY_ORGANIZATION_MANAGE", "IDENTITY_APPOINTMENT_MANAGE", "IDENTITY_AUTHORITY_MANAGE"),
                 stringSet(schema("GrantableAuthorityCodeV1").path("enum")));
         assertEquals(20L, document.at("/components/parameters/IdentityLimit/schema/default").asLong());
         assertEquals(50L, document.at("/components/parameters/IdentityLimit/schema/maximum").asLong());

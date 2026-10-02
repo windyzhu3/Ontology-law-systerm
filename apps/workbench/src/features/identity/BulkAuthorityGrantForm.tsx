@@ -37,6 +37,7 @@ export function BulkAuthorityGrantForm({session,api,command}:{session:WorkbenchS
  }
  return <form ref={form} className="identity-edit-form" noValidate onSubmit={event=>{event.preventDefault();review();}}>
   <h2>建立直接授权</h2><p className="identity-form-help">选择一个任职及多项权限，统一填写组织范围和有效期，再核对完整清单。</p>
+  {choices.some(code=>code.startsWith("IDENTITY_"))&&<p className="identity-form-help">建立管理员时，请选择律所根组织的另一人任职及四项系统管理权限。管理权限不会自动授予业务或审计查询资格。</p>}
   <fieldset disabled={!command.canSubmit}>
    <IdentityOptionField label="授权任职" options={person} error={errors.person} onDirty={dirty}/>
    <IdentityOptionField label="组织范围" options={organization} error={errors.organization} onDirty={dirty}/>

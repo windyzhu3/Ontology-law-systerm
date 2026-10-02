@@ -606,7 +606,7 @@ describe("identity writes", () => {
     ["missing update target", { ...writes[1].original, targetId: undefined }],
     ["weak update ETag", { ...writes[1].original, ifMatch: `W/${identityETag}` }],
     ["extra body property", { ...writes[0].original, body: { ...writes[0].original.body, bearer: "secret" } }],
-    ["management authority grant", { ...writes[12].original, body: { ...writes[12].original.body, authorityCode: "IDENTITY_PRINCIPAL_MANAGE" } }],
+    ["unregistered management authority grant", { ...writes[12].original, body: { ...writes[12].original.body, authorityCode: "IDENTITY_ARBITRARY_MANAGE" } }],
   ])("rejects a closed original request with %s before credentials or dispatch", async (_name, malformed) => {
     const requests: Request[] = [];
     const getValidAccessToken = vi.fn(async () => "must-not-be-read");

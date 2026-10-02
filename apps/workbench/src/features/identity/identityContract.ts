@@ -88,7 +88,7 @@ const page = (value: unknown, item: (entry: unknown) => boolean, maximum = 50) =
   cursor(value.nextCursor);
 
 const roleCode = (value: unknown) => typeof value === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(value);
-export const grantable = [
+export const businessGrantable = [
   "CONTRACT_SIGNATURE_VERIFY","CONTRACT_EXECUTION_VERIFY","CONTRACT_TERMINATION_REVIEW","PAYMENT_SUBMIT","PAYMENT_CONFIRM","TRANSFER_SUBMIT","TRANSFER_REVIEW","TRANSFER_ACCEPT","MATTER_CLASSIFY","MATTER_RECEIVE",
   "LEAD_MANAGEMENT_READ", "TEAM_TASK_READ", "PAYMENT_LEDGER_READ", "TRANSFER_LEDGER_READ", "CONTRACT_READ", "CONTRACT_PREPARE", "CONTRACT_PREPARATION_DECIDE", "CONTRACT_REVIEW", "CONTRACT_APPROVE",
   "OPPORTUNITY_CLOSE", "CUSTOMER_REQUIREMENTS_MANAGE", "PARTY_PROFILE_MANAGE", "MATERIALS_MANAGE", "MATERIALS_READ", "QUOTE_READ", "QUOTE_PREPARE", "QUOTE_APPROVE", "QUOTE_SELF_AUTHORIZE", "QUOTE_DELIVER", "QUOTE_RESPONSE",
@@ -103,13 +103,14 @@ export const grantable = [
   "LEAD_VALIDITY_REVIEW",
   "SALES_OPPORTUNITY_OWNER", "OPPORTUNITY_LEDGER_READ", "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER", "OPPORTUNITY_OWNER_EXCEPTION_READ", "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE", "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ",
 ] as const;
-const projectedAuthorities = [
-  ...grantable,
+export const managementAuthorities = [
   "IDENTITY_PRINCIPAL_MANAGE",
   "IDENTITY_ORGANIZATION_MANAGE",
   "IDENTITY_APPOINTMENT_MANAGE",
   "IDENTITY_AUTHORITY_MANAGE",
 ] as const;
+export const grantable = [...businessGrantable, ...managementAuthorities] as const;
+const projectedAuthorities = grantable;
 
 const reason = (value: unknown) =>
   isObject(value) &&
@@ -319,7 +320,7 @@ export function validIdentityRead<Operation extends IdentityReadOperation>(
   if (adminPage === "APPOINTMENTS")
     return exactArray(value.roleCodes, []) && exactArray(value.grantableAuthorityCodes, []);
   if (adminPage === "AUTHORITY_GRANTS")
-    return exactArray(value.roleCodes, []) && exactArray(value.grantableAuthorityCodes, grantable);
+    return exactArray(value.roleCodes, []) && (exactArray(value.grantableAuthorityCodes, businessGrantable) || exactArray(value.grantableAuthorityCodes, grantable));
   return false;
 }
 
