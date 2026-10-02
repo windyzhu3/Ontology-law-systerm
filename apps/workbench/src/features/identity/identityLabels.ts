@@ -26,6 +26,7 @@ export const authorityStateLabels: Record<S["AuthorityGrantV1"]["state"], string
 
 
 export const authorityLabels: Record<S["AuthorityGrantV1"]["authorityCode"] | S["GrantableAuthorityCodeV1"] | "QUOTE_READ" | "QUOTE_PREPARE" | "QUOTE_APPROVE" | "QUOTE_SELF_AUTHORIZE" | "QUOTE_DELIVER" | "QUOTE_RESPONSE", string> = {
+  AUDIT_READ: "审计记录查询",
   CONTRACT_TERMINATION_REVIEW:'终止签约请求核对', PAYMENT_SUBMIT:'收款凭证提交与补正', PAYMENT_CONFIRM:'逐笔到账核对', TRANSFER_SUBMIT:'转案资料提交与补正', TRANSFER_REVIEW:'转案前独立冲突审查', TRANSFER_ACCEPT:'案管审核接收', MATTER_CLASSIFY:'案件分类及承接确认', MATTER_RECEIVE:'案件承接',
   LEAD_MANAGEMENT_READ:'客户线索与来源查询', TEAM_TASK_READ:'团队待办与处理记录查询', PAYMENT_LEDGER_READ:'收款管理查询', TRANSFER_LEDGER_READ:'转案与案件管理查询', CONTRACT_READ:'合同查看', CONTRACT_PREPARE:'合同准备', CONTRACT_PREPARATION_DECIDE:'直接合同准备授权', CONTRACT_REVIEW:'签约前合同审查', CONTRACT_SIGNATURE_VERIFY: '合同签署核验与归档', CONTRACT_EXECUTION_VERIFY: '合同执行条件核验', CONTRACT_APPROVE:'合同审批',
   QUOTE_READ: '报价查看',

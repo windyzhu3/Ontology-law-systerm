@@ -22,6 +22,7 @@ export interface WorkbenchSession {
   readonly canReadBusinessManagement?: boolean;
   readonly canReadTeamTasks?: boolean;
   readonly canReadBusinessOverview?: boolean;
+  readonly canReadAuditRecords?: boolean;
   readonly canReadLeadManagement?: boolean;
   readonly canManageOwnerExceptions?: boolean;
   readonly businessManagementViews?: readonly ('contracts'|'payments'|'transfer')[];

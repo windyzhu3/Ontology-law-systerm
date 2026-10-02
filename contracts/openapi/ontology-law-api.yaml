@@ -13,6 +13,250 @@ tags:
 - name: InternalTaskCommands
 - name: InternalOpportunityTasks
 paths:
+  /api/v1/admin/audit-records:
+    get:
+      tags:
+      - AuditRecords
+      operationId: listAuditRecords
+      security:
+      - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-authority-code: AUDIT_READ
+      x-authority-path: DIRECT
+      x-error-codes:
+      - VALIDATION_FAILED
+      - UNAUTHENTICATED
+      - NOT_AUTHORIZED
+      - APPOINTMENT_INACTIVE
+      - NOT_FOUND
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - SERVICE_UNAVAILABLE
+      x-on-behalf-selection: REJECT
+      parameters:
+      - $ref: '#/components/parameters/AppointmentSelection'
+      - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
+      - name: start
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: end
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: scope
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - TENANT
+          - ORGANIZATION
+          - OBJECT
+          - SECURITY
+      - name: result
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - SUCCEEDED
+          - NO_CHANGE
+          - REJECTED
+          - FAILED
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - $ref: '#/components/parameters/IdentityLimit'
+      - $ref: '#/components/parameters/IdentityCursor'
+      responses:
+        '200':
+          description: Authorized read-only audit disclosure, returned only after its
+            disclosure audit commits.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/IdentityNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecordPageV1'
+        '400':
+          $ref: '#/components/responses/Identity400Problem'
+        '401':
+          $ref: '#/components/responses/Identity401Problem'
+        '403':
+          $ref: '#/components/responses/Identity403Problem'
+        '404':
+          $ref: '#/components/responses/Identity404Problem'
+        '429':
+          $ref: '#/components/responses/Identity429Problem'
+        '500':
+          $ref: '#/components/responses/Identity500Problem'
+        '503':
+          $ref: '#/components/responses/Identity503Problem'
+  /api/v1/admin/audit-records/{auditRecordId}:
+    get:
+      tags:
+      - AuditRecords
+      operationId: getAuditRecord
+      security:
+      - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-authority-code: AUDIT_READ
+      x-authority-path: DIRECT
+      x-error-codes:
+      - VALIDATION_FAILED
+      - UNAUTHENTICATED
+      - NOT_AUTHORIZED
+      - APPOINTMENT_INACTIVE
+      - NOT_FOUND
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - SERVICE_UNAVAILABLE
+      x-on-behalf-selection: REJECT
+      parameters:
+      - $ref: '#/components/parameters/AppointmentSelection'
+      - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
+      - name: auditRecordId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Authorized read-only audit disclosure, returned only after its
+            disclosure audit commits.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/IdentityNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecordV1'
+        '400':
+          $ref: '#/components/responses/Identity400Problem'
+        '401':
+          $ref: '#/components/responses/Identity401Problem'
+        '403':
+          $ref: '#/components/responses/Identity403Problem'
+        '404':
+          $ref: '#/components/responses/Identity404Problem'
+        '429':
+          $ref: '#/components/responses/Identity429Problem'
+        '500':
+          $ref: '#/components/responses/Identity500Problem'
+        '503':
+          $ref: '#/components/responses/Identity503Problem'
+  /api/v1/admin/audit-records/{auditRecordId}/related:
+    get:
+      tags:
+      - AuditRecords
+      operationId: listRelatedAuditRecords
+      security:
+      - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-authority-code: AUDIT_READ
+      x-authority-path: DIRECT
+      x-error-codes:
+      - VALIDATION_FAILED
+      - UNAUTHENTICATED
+      - NOT_AUTHORIZED
+      - APPOINTMENT_INACTIVE
+      - NOT_FOUND
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - SERVICE_UNAVAILABLE
+      x-on-behalf-selection: REJECT
+      parameters:
+      - $ref: '#/components/parameters/AppointmentSelection'
+      - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
+      - name: auditRecordId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: relation
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - CORRELATION
+          - CORRECTION
+      - name: start
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: end
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: scope
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - TENANT
+          - ORGANIZATION
+          - OBJECT
+          - SECURITY
+      - name: result
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - SUCCEEDED
+          - NO_CHANGE
+          - REJECTED
+          - FAILED
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - $ref: '#/components/parameters/IdentityLimit'
+      - $ref: '#/components/parameters/IdentityCursor'
+      responses:
+        '200':
+          description: Authorized read-only audit disclosure, returned only after its
+            disclosure audit commits.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/IdentityNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecordPageV1'
+        '400':
+          $ref: '#/components/responses/Identity400Problem'
+        '401':
+          $ref: '#/components/responses/Identity401Problem'
+        '403':
+          $ref: '#/components/responses/Identity403Problem'
+        '404':
+          $ref: '#/components/responses/Identity404Problem'
+        '429':
+          $ref: '#/components/responses/Identity429Problem'
+        '500':
+          $ref: '#/components/responses/Identity500Problem'
+        '503':
+          $ref: '#/components/responses/Identity503Problem'
   /api/v1/workbench/waiting:
     get:
       tags:
@@ -17209,6 +17453,70 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
+    AuditRecordV1:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - trustedAt
+      - actorLabel
+      - appointmentLabel
+      - objectLabel
+      - actionLabel
+      - scopeLabel
+      - resultLabel
+      - summary
+      - verificationLabel
+      - hasCorrelation
+      - hasCorrection
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        trustedAt:
+          type: string
+          format: date-time
+        actorLabel:
+          type: string
+          maxLength: 200
+        appointmentLabel:
+          type: string
+          maxLength: 200
+        objectLabel:
+          type: string
+          maxLength: 200
+        actionLabel:
+          type: string
+          maxLength: 200
+        scopeLabel:
+          type: string
+          maxLength: 200
+        resultLabel:
+          type: string
+          maxLength: 200
+        summary:
+          type: string
+          maxLength: 200
+        verificationLabel:
+          type: string
+          maxLength: 200
+        hasCorrelation:
+          type: boolean
+        hasCorrection:
+          type: boolean
+    AuditRecordPageV1:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/AuditRecordV1'
+        nextCursor:
+          type: string
+          maxLength: 4096
     PersonalWaitingRowV1:
       type: object
       additionalProperties: false
@@ -26622,6 +26930,7 @@ components:
     GrantableAuthorityCodeV1:
       type: string
       enum:
+      - AUDIT_READ
       - LEAD_CAPTURE
       - LEAD_INGRESS_RESOLVE
       - LEAD_INGRESS_COMPLETE
@@ -26701,6 +27010,8 @@ components:
       - delegatedAppointmentChoices
       - selectedOnBehalfAppointmentId
       properties:
+        canReadAuditRecords:
+          type: boolean
         delegatedAppointmentChoices:
           type: array
           maxItems: 50
@@ -27087,6 +27398,7 @@ components:
         authorityCode:
           type: string
           enum:
+          - AUDIT_READ
           - LEAD_CAPTURE
           - LEAD_INGRESS_RESOLVE
           - LEAD_INGRESS_COMPLETE

@@ -1,0 +1,446 @@
+{
+  "GrantableAuthorityCodeV1": {
+    "type": "string",
+    "enum": [
+      "LEAD_CAPTURE",
+      "LEAD_INGRESS_RESOLVE",
+      "LEAD_INGRESS_COMPLETE",
+      "LEAD_ASSIGN",
+      "LEAD_ROUTING_DECIDE",
+      "SOURCE_INTAKE_REQUEST_ACK",
+      "SALES_CONTACT_OWNER",
+      "LEAD_VALIDITY_REVIEW",
+      "SALES_OPPORTUNITY_OWNER",
+      "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER",
+      "OPPORTUNITY_OWNER_EXCEPTION_READ",
+      "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE",
+      "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ",
+      "OPPORTUNITY_LEDGER_READ",
+      "OPPORTUNITY_CLOSE",
+      "CUSTOMER_REQUIREMENTS_MANAGE",
+      "PARTY_PROFILE_MANAGE",
+      "MATERIALS_READ",
+      "MATERIALS_MANAGE",
+      "QUOTE_READ",
+      "QUOTE_PREPARE",
+      "QUOTE_APPROVE",
+      "QUOTE_SELF_AUTHORIZE",
+      "QUOTE_DELIVER",
+      "QUOTE_RESPONSE",
+      "PAYMENT_LEDGER_READ",
+      "TRANSFER_LEDGER_READ",
+      "CONTRACT_READ",
+      "CONTRACT_PREPARE",
+      "CONTRACT_PREPARATION_DECIDE",
+      "CONTRACT_REVIEW",
+      "CONTRACT_APPROVE",
+      "CONTRACT_SIGNATURE_VERIFY",
+      "CONTRACT_EXECUTION_VERIFY",
+      "CONTRACT_TERMINATION_REVIEW",
+      "PAYMENT_SUBMIT",
+      "PAYMENT_CONFIRM",
+      "TRANSFER_SUBMIT",
+      "TRANSFER_REVIEW",
+      "TRANSFER_ACCEPT",
+      "MATTER_CLASSIFY",
+      "MATTER_RECEIVE",
+      "TEAM_TASK_READ",
+      "LEAD_MANAGEMENT_READ"
+    ]
+  },
+  "SessionContextV1": {
+    "description": "Nine required fields. Selected IDs must match exactly one corresponding candidate; choices are UUID sorted and deduplicated. Cross-array membership, current qualification, bounded query overflow and fresh entry permission checks are explicit runtime obligations under Identity V1.1; generated types do not guarantee them.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "displayName",
+      "state",
+      "appointmentChoices",
+      "selectedAppointmentId",
+      "actorScopeKey",
+      "canEnterWorkbench",
+      "canEnterIdentityAdmin",
+      "delegatedAppointmentChoices",
+      "selectedOnBehalfAppointmentId"
+    ],
+    "properties": {
+      "delegatedAppointmentChoices": {
+        "type": "array",
+        "maxItems": 50,
+        "items": {
+          "$ref": "#/components/schemas/IdentityChoiceV1"
+        }
+      },
+      "selectedOnBehalfAppointmentId": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "uuid"
+      },
+      "displayName": {
+        "$ref": "#/components/schemas/SafeText200"
+      },
+      "state": {
+        "type": "string",
+        "enum": [
+          "NO_APPOINTMENT",
+          "APPOINTMENT_SELECTION_REQUIRED",
+          "READY"
+        ]
+      },
+      "appointmentChoices": {
+        "type": "array",
+        "maxItems": 50,
+        "items": {
+          "$ref": "#/components/schemas/IdentityChoiceV1"
+        }
+      },
+      "selectedAppointmentId": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "uuid"
+      },
+      "actorScopeKey": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "pattern": "^ask1\\.[A-Za-z0-9_-]{43}$",
+        "maxLength": 48
+      },
+      "canManageOwnerExceptions": {
+        "type": "boolean",
+        "description": "Current selected HUMAN appointment has a named exception READ or OPERATIONS_READ entry grant. Each request independently rechecks object scope."
+      },
+      "canEnterWorkbench": {
+        "type": "boolean"
+      },
+      "canEnterIdentityAdmin": {
+        "type": "boolean"
+      },
+      "businessManagementViews": {
+        "type": "array",
+        "maxItems": 3,
+        "items": {
+          "type": "string",
+          "enum": [
+            "contracts",
+            "payments",
+            "transfer"
+          ]
+        },
+        "description": "Current direct HUMAN view entry hints; every data request rechecks exact scope."
+      },
+      "canReadBusinessManagement": {
+        "type": "boolean",
+        "description": "Direct HUMAN management entry hint; each read rechecks exact scope."
+      },
+      "canReadOpportunityLedger": {
+        "type": "boolean",
+        "description": "Current direct HUMAN appointment has SALES_OPPORTUNITY_OWNER or an explicit OPPORTUNITY_LEDGER_READ grant. Entry hint only; each read rechecks exact object and organization scope."
+      },
+      "canReadTeamTasks": {
+        "type": "boolean",
+        "description": "Direct HUMAN team metadata entry hint; never confers another owner command authority."
+      },
+      "canReadBusinessOverview": {
+        "type": "boolean",
+        "description": "Direct HUMAN overview entry hint; each metric retains its own exact read authority and source audit."
+      },
+      "canReadLeadManagement": {
+        "type": "boolean",
+        "description": "Direct HUMAN lead management entry hint; each exact source is freshly authorized and audited."
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "state": {
+              "const": "NO_APPOINTMENT"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        "then": {
+          "properties": {
+            "appointmentChoices": {
+              "maxItems": 0
+            },
+            "delegatedAppointmentChoices": {
+              "maxItems": 0
+            },
+            "selectedOnBehalfAppointmentId": {
+              "type": "null"
+            },
+            "selectedAppointmentId": {
+              "type": "null"
+            },
+            "actorScopeKey": {
+              "type": "null"
+            },
+            "canEnterWorkbench": {
+              "const": false
+            },
+            "canEnterIdentityAdmin": {
+              "const": false
+            },
+            "canManageOwnerExceptions": {
+              "const": false
+            },
+            "businessManagementViews": {
+              "maxItems": 0
+            },
+            "canReadBusinessManagement": {
+              "const": false
+            },
+            "canReadOpportunityLedger": {
+              "const": false
+            },
+            "canReadTeamTasks": {
+              "const": false
+            },
+            "canReadBusinessOverview": {
+              "const": false
+            },
+            "canReadLeadManagement": {
+              "const": false
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "state": {
+              "const": "APPOINTMENT_SELECTION_REQUIRED"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        "then": {
+          "properties": {
+            "appointmentChoices": {
+              "minItems": 2
+            },
+            "delegatedAppointmentChoices": {
+              "maxItems": 0
+            },
+            "selectedOnBehalfAppointmentId": {
+              "type": "null"
+            },
+            "selectedAppointmentId": {
+              "type": "null"
+            },
+            "actorScopeKey": {
+              "type": "null"
+            },
+            "canEnterWorkbench": {
+              "const": false
+            },
+            "canEnterIdentityAdmin": {
+              "const": false
+            },
+            "canManageOwnerExceptions": {
+              "const": false
+            },
+            "businessManagementViews": {
+              "maxItems": 0
+            },
+            "canReadBusinessManagement": {
+              "const": false
+            },
+            "canReadOpportunityLedger": {
+              "const": false
+            },
+            "canReadTeamTasks": {
+              "const": false
+            },
+            "canReadBusinessOverview": {
+              "const": false
+            },
+            "canReadLeadManagement": {
+              "const": false
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "state": {
+              "const": "READY"
+            }
+          },
+          "required": [
+            "state"
+          ]
+        },
+        "then": {
+          "properties": {
+            "appointmentChoices": {
+              "minItems": 1
+            },
+            "selectedAppointmentId": {
+              "type": "string"
+            },
+            "actorScopeKey": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "selectedOnBehalfAppointmentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "selectedOnBehalfAppointmentId"
+          ]
+        },
+        "then": {
+          "properties": {
+            "state": {
+              "const": "READY"
+            },
+            "delegatedAppointmentChoices": {
+              "minItems": 1
+            },
+            "canEnterIdentityAdmin": {
+              "const": false
+            },
+            "canManageOwnerExceptions": {
+              "const": false
+            },
+            "businessManagementViews": {
+              "maxItems": 0
+            },
+            "canReadBusinessManagement": {
+              "const": false
+            },
+            "canReadOpportunityLedger": {
+              "const": false
+            },
+            "canReadTeamTasks": {
+              "const": false
+            },
+            "canReadBusinessOverview": {
+              "const": false
+            },
+            "canReadLeadManagement": {
+              "const": false
+            }
+          }
+        }
+      }
+    ]
+  },
+  "AuthorityGrantV1": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "appointment",
+      "authorityCode",
+      "scopeOrganization",
+      "validFrom",
+      "validUntil",
+      "state",
+      "etag"
+    ],
+    "properties": {
+      "id": {
+        "$ref": "#/components/schemas/Uuid"
+      },
+      "appointment": {
+        "$ref": "#/components/schemas/IdentityChoiceV1"
+      },
+      "authorityCode": {
+        "type": "string",
+        "enum": [
+          "LEAD_CAPTURE",
+          "LEAD_INGRESS_RESOLVE",
+          "LEAD_INGRESS_COMPLETE",
+          "LEAD_ASSIGN",
+          "LEAD_ROUTING_DECIDE",
+          "SOURCE_INTAKE_REQUEST_ACK",
+          "SALES_CONTACT_OWNER",
+          "LEAD_VALIDITY_REVIEW",
+          "IDENTITY_PRINCIPAL_MANAGE",
+          "IDENTITY_ORGANIZATION_MANAGE",
+          "IDENTITY_APPOINTMENT_MANAGE",
+          "IDENTITY_AUTHORITY_MANAGE",
+          "SALES_OPPORTUNITY_OWNER",
+          "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER",
+          "OPPORTUNITY_OWNER_EXCEPTION_READ",
+          "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE",
+          "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ",
+          "OPPORTUNITY_LEDGER_READ",
+          "OPPORTUNITY_CLOSE",
+          "CUSTOMER_REQUIREMENTS_MANAGE",
+          "PARTY_PROFILE_MANAGE",
+          "MATERIALS_READ",
+          "MATERIALS_MANAGE",
+          "QUOTE_READ",
+          "QUOTE_PREPARE",
+          "QUOTE_APPROVE",
+          "QUOTE_SELF_AUTHORIZE",
+          "QUOTE_DELIVER",
+          "QUOTE_RESPONSE",
+          "PAYMENT_LEDGER_READ",
+          "TRANSFER_LEDGER_READ",
+          "CONTRACT_READ",
+          "CONTRACT_PREPARE",
+          "CONTRACT_PREPARATION_DECIDE",
+          "CONTRACT_REVIEW",
+          "CONTRACT_APPROVE",
+          "CONTRACT_SIGNATURE_VERIFY",
+          "CONTRACT_EXECUTION_VERIFY",
+          "CONTRACT_TERMINATION_REVIEW",
+          "PAYMENT_SUBMIT",
+          "PAYMENT_CONFIRM",
+          "TRANSFER_SUBMIT",
+          "TRANSFER_REVIEW",
+          "TRANSFER_ACCEPT",
+          "MATTER_CLASSIFY",
+          "MATTER_RECEIVE",
+          "TEAM_TASK_READ",
+          "LEAD_MANAGEMENT_READ"
+        ]
+      },
+      "scopeOrganization": {
+        "$ref": "#/components/schemas/IdentityChoiceV1"
+      },
+      "validFrom": {
+        "$ref": "#/components/schemas/Instant"
+      },
+      "validUntil": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "format": "date-time"
+      },
+      "state": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "REVOKED"
+        ]
+      },
+      "etag": {
+        "$ref": "#/components/schemas/IdentityETag"
+      }
+    }
+  }
+}

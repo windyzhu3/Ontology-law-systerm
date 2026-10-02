@@ -4,6 +4,54 @@
  */
 
 export interface paths {
+    "/api/v1/admin/audit-records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAuditRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/audit-records/{auditRecordId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAuditRecord"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/audit-records/{auditRecordId}/related": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listRelatedAuditRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/identity/appointments": {
         parameters: {
             query?: never;
@@ -2634,6 +2682,25 @@ export interface components {
         AssignLeadValuesV1: {
             ownerAppointmentId: components["schemas"]["Uuid"];
         };
+        AuditRecordPageV1: {
+            items: components["schemas"]["AuditRecordV1"][];
+            nextCursor?: string;
+        };
+        AuditRecordV1: {
+            actionLabel: string;
+            actorLabel: string;
+            appointmentLabel: string;
+            hasCorrection: boolean;
+            hasCorrelation: boolean;
+            id: components["schemas"]["Uuid"];
+            objectLabel: string;
+            resultLabel: string;
+            scopeLabel: string;
+            summary: string;
+            /** Format: date-time */
+            trustedAt: string;
+            verificationLabel: string;
+        };
         AuthorityGrantCommandReceiptV1: {
             commandId: components["schemas"]["Uuid"];
             completedAt: components["schemas"]["Instant"];
@@ -2655,7 +2722,7 @@ export interface components {
         AuthorityGrantV1: {
             appointment: components["schemas"]["IdentityChoiceV1"];
             /** @enum {string} */
-            authorityCode: "LEAD_CAPTURE" | "LEAD_INGRESS_RESOLVE" | "LEAD_INGRESS_COMPLETE" | "LEAD_ASSIGN" | "LEAD_ROUTING_DECIDE" | "SOURCE_INTAKE_REQUEST_ACK" | "SALES_CONTACT_OWNER" | "LEAD_VALIDITY_REVIEW" | "IDENTITY_PRINCIPAL_MANAGE" | "IDENTITY_ORGANIZATION_MANAGE" | "IDENTITY_APPOINTMENT_MANAGE" | "IDENTITY_AUTHORITY_MANAGE" | "SALES_OPPORTUNITY_OWNER" | "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER" | "OPPORTUNITY_OWNER_EXCEPTION_READ" | "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE" | "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ" | "OPPORTUNITY_LEDGER_READ" | "OPPORTUNITY_CLOSE" | "CUSTOMER_REQUIREMENTS_MANAGE" | "PARTY_PROFILE_MANAGE" | "MATERIALS_READ" | "MATERIALS_MANAGE" | "QUOTE_READ" | "QUOTE_PREPARE" | "QUOTE_APPROVE" | "QUOTE_SELF_AUTHORIZE" | "QUOTE_DELIVER" | "QUOTE_RESPONSE" | "PAYMENT_LEDGER_READ" | "TRANSFER_LEDGER_READ" | "CONTRACT_READ" | "CONTRACT_PREPARE" | "CONTRACT_PREPARATION_DECIDE" | "CONTRACT_REVIEW" | "CONTRACT_APPROVE" | "CONTRACT_SIGNATURE_VERIFY" | "CONTRACT_EXECUTION_VERIFY" | "CONTRACT_TERMINATION_REVIEW" | "PAYMENT_SUBMIT" | "PAYMENT_CONFIRM" | "TRANSFER_SUBMIT" | "TRANSFER_REVIEW" | "TRANSFER_ACCEPT" | "MATTER_CLASSIFY" | "MATTER_RECEIVE" | "TEAM_TASK_READ" | "LEAD_MANAGEMENT_READ";
+            authorityCode: "AUDIT_READ" | "LEAD_CAPTURE" | "LEAD_INGRESS_RESOLVE" | "LEAD_INGRESS_COMPLETE" | "LEAD_ASSIGN" | "LEAD_ROUTING_DECIDE" | "SOURCE_INTAKE_REQUEST_ACK" | "SALES_CONTACT_OWNER" | "LEAD_VALIDITY_REVIEW" | "IDENTITY_PRINCIPAL_MANAGE" | "IDENTITY_ORGANIZATION_MANAGE" | "IDENTITY_APPOINTMENT_MANAGE" | "IDENTITY_AUTHORITY_MANAGE" | "SALES_OPPORTUNITY_OWNER" | "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER" | "OPPORTUNITY_OWNER_EXCEPTION_READ" | "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE" | "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ" | "OPPORTUNITY_LEDGER_READ" | "OPPORTUNITY_CLOSE" | "CUSTOMER_REQUIREMENTS_MANAGE" | "PARTY_PROFILE_MANAGE" | "MATERIALS_READ" | "MATERIALS_MANAGE" | "QUOTE_READ" | "QUOTE_PREPARE" | "QUOTE_APPROVE" | "QUOTE_SELF_AUTHORIZE" | "QUOTE_DELIVER" | "QUOTE_RESPONSE" | "PAYMENT_LEDGER_READ" | "TRANSFER_LEDGER_READ" | "CONTRACT_READ" | "CONTRACT_PREPARE" | "CONTRACT_PREPARATION_DECIDE" | "CONTRACT_REVIEW" | "CONTRACT_APPROVE" | "CONTRACT_SIGNATURE_VERIFY" | "CONTRACT_EXECUTION_VERIFY" | "CONTRACT_TERMINATION_REVIEW" | "PAYMENT_SUBMIT" | "PAYMENT_CONFIRM" | "TRANSFER_SUBMIT" | "TRANSFER_REVIEW" | "TRANSFER_ACCEPT" | "MATTER_CLASSIFY" | "MATTER_RECEIVE" | "TEAM_TASK_READ" | "LEAD_MANAGEMENT_READ";
             etag: components["schemas"]["IdentityETag"];
             id: components["schemas"]["Uuid"];
             scopeOrganization: components["schemas"]["IdentityChoiceV1"];
@@ -3620,7 +3687,7 @@ export interface components {
             value: string;
         };
         /** @enum {string} */
-        GrantableAuthorityCodeV1: "LEAD_CAPTURE" | "LEAD_INGRESS_RESOLVE" | "LEAD_INGRESS_COMPLETE" | "LEAD_ASSIGN" | "LEAD_ROUTING_DECIDE" | "SOURCE_INTAKE_REQUEST_ACK" | "SALES_CONTACT_OWNER" | "LEAD_VALIDITY_REVIEW" | "SALES_OPPORTUNITY_OWNER" | "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER" | "OPPORTUNITY_OWNER_EXCEPTION_READ" | "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE" | "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ" | "OPPORTUNITY_LEDGER_READ" | "OPPORTUNITY_CLOSE" | "CUSTOMER_REQUIREMENTS_MANAGE" | "PARTY_PROFILE_MANAGE" | "MATERIALS_READ" | "MATERIALS_MANAGE" | "QUOTE_READ" | "QUOTE_PREPARE" | "QUOTE_APPROVE" | "QUOTE_SELF_AUTHORIZE" | "QUOTE_DELIVER" | "QUOTE_RESPONSE" | "PAYMENT_LEDGER_READ" | "TRANSFER_LEDGER_READ" | "CONTRACT_READ" | "CONTRACT_PREPARE" | "CONTRACT_PREPARATION_DECIDE" | "CONTRACT_REVIEW" | "CONTRACT_APPROVE" | "CONTRACT_SIGNATURE_VERIFY" | "CONTRACT_EXECUTION_VERIFY" | "CONTRACT_TERMINATION_REVIEW" | "PAYMENT_SUBMIT" | "PAYMENT_CONFIRM" | "TRANSFER_SUBMIT" | "TRANSFER_REVIEW" | "TRANSFER_ACCEPT" | "MATTER_CLASSIFY" | "MATTER_RECEIVE" | "TEAM_TASK_READ" | "LEAD_MANAGEMENT_READ";
+        GrantableAuthorityCodeV1: "AUDIT_READ" | "LEAD_CAPTURE" | "LEAD_INGRESS_RESOLVE" | "LEAD_INGRESS_COMPLETE" | "LEAD_ASSIGN" | "LEAD_ROUTING_DECIDE" | "SOURCE_INTAKE_REQUEST_ACK" | "SALES_CONTACT_OWNER" | "LEAD_VALIDITY_REVIEW" | "SALES_OPPORTUNITY_OWNER" | "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER" | "OPPORTUNITY_OWNER_EXCEPTION_READ" | "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE" | "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ" | "OPPORTUNITY_LEDGER_READ" | "OPPORTUNITY_CLOSE" | "CUSTOMER_REQUIREMENTS_MANAGE" | "PARTY_PROFILE_MANAGE" | "MATERIALS_READ" | "MATERIALS_MANAGE" | "QUOTE_READ" | "QUOTE_PREPARE" | "QUOTE_APPROVE" | "QUOTE_SELF_AUTHORIZE" | "QUOTE_DELIVER" | "QUOTE_RESPONSE" | "PAYMENT_LEDGER_READ" | "TRANSFER_LEDGER_READ" | "CONTRACT_READ" | "CONTRACT_PREPARE" | "CONTRACT_PREPARATION_DECIDE" | "CONTRACT_REVIEW" | "CONTRACT_APPROVE" | "CONTRACT_SIGNATURE_VERIFY" | "CONTRACT_EXECUTION_VERIFY" | "CONTRACT_TERMINATION_REVIEW" | "PAYMENT_SUBMIT" | "PAYMENT_CONFIRM" | "TRANSFER_SUBMIT" | "TRANSFER_REVIEW" | "TRANSFER_ACCEPT" | "MATTER_CLASSIFY" | "MATTER_RECEIVE" | "TEAM_TASK_READ" | "LEAD_MANAGEMENT_READ";
         IdentityAdminOptionsV1: {
             candidates: components["schemas"]["IdentityChoicePageV1"];
             grantableAuthorityCodes: components["schemas"]["GrantableAuthorityCodeV1"][] & unknown;
@@ -6238,6 +6305,7 @@ export interface components {
             canEnterWorkbench: boolean;
             /** @description Current selected HUMAN appointment has a named exception READ or OPERATIONS_READ entry grant. Each request independently rechecks object scope. */
             canManageOwnerExceptions?: boolean;
+            canReadAuditRecords?: boolean;
             /** @description Direct HUMAN management entry hint; each read rechecks exact scope. */
             canReadBusinessManagement?: boolean;
             /** @description Direct HUMAN overview entry hint; each metric retains its own exact read authority and source audit. */
@@ -6930,6 +6998,126 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listAuditRecords: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["IdentityCursor"];
+                end?: string;
+                limit?: components["parameters"]["IdentityLimit"];
+                result?: "SUCCEEDED" | "NO_CHANGE" | "REJECTED" | "FAILED";
+                scope?: "TENANT" | "ORGANIZATION" | "OBJECT" | "SECURITY";
+                search?: string;
+                start?: string;
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. The original business operations, personal waiting reads and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized read-only audit disclosure, returned only after its disclosure audit commits. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditRecordPageV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    getAuditRecord: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. The original business operations, personal waiting reads and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                auditRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized read-only audit disclosure, returned only after its disclosure audit commits. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditRecordV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
+    listRelatedAuditRecords: {
+        parameters: {
+            query: {
+                cursor?: components["parameters"]["IdentityCursor"];
+                end?: string;
+                limit?: components["parameters"]["IdentityLimit"];
+                relation: "CORRELATION" | "CORRECTION";
+                result?: "SUCCEEDED" | "NO_CHANGE" | "REJECTED" | "FAILED";
+                scope?: "TENANT" | "ORGANIZATION" | "OBJECT" | "SECURITY";
+                search?: string;
+                start?: string;
+            };
+            header?: {
+                /** @description Own server-provided selection only; omitted with multiple appointments safely requires explicit selection. */
+                "X-Appointment-Id"?: components["parameters"]["AppointmentSelection"];
+                /** @description Optional single UUID of an existing eligible on-behalf Appointment; requires explicit paired X-Appointment-Id. Missing means own identity, never automatic delegation. Empty, repeated, comma-list, non-UUID or unpaired values fail400 VALIDATION_FAILED before slot admission; safe field names only, never values. Unknown, cross-Tenant, unrelated or expired/inactive choices uniformly fail403 NOT_AUTHORIZED without existence disclosure or own-identity fallback. The original business operations, personal waiting reads and getSessionContext accept valid HUMAN delegation; all20 Identity management operations and SERVICE reject this selector. Internal mTLS does not consume it or alter its static Actor. Invalid credentials remain401; unavailable IdP/database remains503. */
+                "X-On-Behalf-Appointment-Id"?: components["parameters"]["OnBehalfAppointmentSelection"];
+            };
+            path: {
+                auditRecordId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized read-only audit disclosure, returned only after its disclosure audit commits. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["IdentityNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditRecordPageV1"];
+                };
+            };
+            400: components["responses"]["Identity400Problem"];
+            401: components["responses"]["Identity401Problem"];
+            403: components["responses"]["Identity403Problem"];
+            404: components["responses"]["Identity404Problem"];
+            429: components["responses"]["Identity429Problem"];
+            500: components["responses"]["Identity500Problem"];
+            503: components["responses"]["Identity503Problem"];
+        };
+    };
     listAppointments: {
         parameters: {
             query?: {

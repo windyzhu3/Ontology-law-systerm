@@ -12,6 +12,7 @@ export function authorityGroup(code:Code){
  if(code.startsWith("CONTRACT_"))return "合同";
  if(code.startsWith("PAYMENT_"))return "财务";
  if(/^(TRANSFER_|MATTER_)/.test(code))return "案管";
+ if(code.startsWith("AUDIT_"))return "审计查询";
  if(code.startsWith("IDENTITY_"))return "系统管理";
  if(code.startsWith("TEAM_"))return "团队查询";
  return "商机";
