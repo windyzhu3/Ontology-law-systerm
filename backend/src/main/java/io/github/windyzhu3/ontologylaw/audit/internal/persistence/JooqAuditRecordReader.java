@@ -99,4 +99,3 @@ public final class JooqAuditRecordReader implements AuditRecordReader {
   return new Page(visible.stream().limit(q.limit()).toList(),visible.size()>q.limit()?visible.get(q.limit()):null);
  }
 }
-
