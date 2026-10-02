@@ -24,6 +24,13 @@ def historical_projection(generated,manifest):
   if hashlib.sha256((generated/path).read_bytes()).hexdigest()!=digest:raise ValueError('CONFIGURABLE_ROLES_V1: migration bytes changed')
  if manifest.get('fieldContractSha256')!=FIELD_HASH or hashlib.sha256((generated/'field-contract.md').read_bytes()).hexdigest()!=FIELD_HASH:
   raise ValueError('CONFIGURABLE_ROLES_V1: field contract changed')
+ return project_validated_v21(manifest)
+
+def project_validated_v21(manifest):
+ """Historical continuation after the caller has validated all current bytes."""
+ if manifest.get('contractSha256')!=CONTRACT_HASH or canonical_hash(manifest)!=CONTRACT_HASH:
+  raise ValueError('CONFIGURABLE_ROLES_V1: exact historical manifest required')
+ inventory=manifest['generatedArtifactSha256']
  source=Path(__file__).resolve().parents[2]/'database/schema-contract-52-plus-2';sys.path.insert(0,str(source))
  try:
   from contract.schema_contract import BASE_SCHEMAS,EVOLUTIONS

@@ -10,7 +10,7 @@ class R2QuoteWorkflowIT extends R2CustomerRequirementsIT {
  QuoteWorkflowService quotes(){return preContractMigrationFixture?V950QuoteWorkflowFixture.create(cipher):R2QuoteServices.create(cipher);}
 
  Map<String,Object> commercial(){return Map.of("currency","CNY","scope","保密服务范围","lines",List.of(Map.of("description","服务费","amountMinor",10000L,"discount",false)),"paymentTerms","先付全部服务费","validUntil",Instant.now().plusSeconds(86400).truncatedTo(java.time.temporal.ChronoUnit.MICROS).toString());}
- void confirmed()throws Exception{var d=save(doc());assertEquals(CommandOutcome.Status.SUCCEEDED,execute(command(true,d.resultFact(),null,null)).status());}
+ void confirmed()throws Exception{if(preContractMigrationFixture){try(var c=database.apiConnection()){inTransaction(c,Capability.COMMAND,x->{V950QuoteWorkflowFixture.confirmCustomer(x,seed.tenant(),seed.appointment(),opportunity,cipher,doc());return null;});}return;}var d=save(doc());assertEquals(CommandOutcome.Status.SUCCEEDED,execute(command(true,d.resultFact(),null,null)).status());}
  Map<String,Object> context()throws Exception{try(var c=database.apiConnection()){return inTransaction(c,Capability.QUERY,x->quotes().context(x,seed.request().actor(),opportunity.id()));}}
  Subject quoteCommand(String type,Map<String,Object> values)throws Exception{return quoteCommand(type,values,seed.request().actor());}
  Subject quoteCommand(String type,Map<String,Object> values,Actor actor)throws Exception{var p=quotePayload(values);try(var c=database.apiConnection()){return inTransaction(c,Capability.COMMAND,x->quotes().execute(x,type,actor,p));}}

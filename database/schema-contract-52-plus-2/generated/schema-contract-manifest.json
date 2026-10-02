@@ -1,5 +1,5 @@
 {
-  "contractVersion": "52-plus-2-r2-v21",
+  "contractVersion": "52-plus-2-r2-v22",
   "applicationTableCount": 120,
   "selfManagedPlatformTableCount": 2,
   "flywayManagedTable": "platform_meta.flyway_schema_history",
@@ -25,6 +25,7 @@
     "db/migration/V1050__r2_transfer_workflow.sql": "c512c3a4241a4a50743aa94c8e82edbcbbf187f1f24aaeb39fa252eb84ccd930",
     "db/migration/V1060__r25_contract_responsibility_recovery.sql": "b5c1393a7a3ec9fc1e8c6b1acf343d89ceeee36f8c0bc77366f99aef325d37be",
     "db/migration/V1070__configurable_appointment_roles.sql": "2c0f80127ee9c27374d2e26f82c9e8107a394cac77357c1351460ef4ec066f04",
+    "db/migration/V1080__metadata_comments.sql": "819f4d73cdd46dcb4a844a7870a7c996a6b2e7e2cbae63f217d24c69fcb7b4fe",
     "db/migration/V110__contract_tables.sql": "8badb97821333736aea2dfff16a7fc95de9d5df9136d4f0064052bc4626c23b4",
     "db/migration/V120__transfer_tables.sql": "9ee22813c4e71312f94a0762084989a5e0aea9a78ae47168a677e762bd325128",
     "db/migration/V800__cross_domain_foreign_keys.sql": "6e4d2b23c33179e03b801cf17a5b83be3709be55d0047cde9e8c48cad4a14cde",
@@ -48,7 +49,7 @@
     "db/migration/V980__r2_contract_versions.sql": "1c94aa2822d8408f5b1574471535d44d70ec4ec94edc2d54d4846df6f98ab2b7",
     "db/migration/V990__r2_manual_signature.sql": "68ece31dbd7326c5c91230e2c01b5e0f91357e5436eee064a325fd3ac2366a4a"
   },
-  "fieldContractSha256": "d1cad52f5e7fe312c2355fc192e3420bbb6142610cfcccb21bf64573827d7538",
+  "fieldContractSha256": "54da0227b662aa7767ed4ebb2d8eddf7ef023fa651024a46259556db5a95cc32",
   "schemas": [
     {
       "name": "identity",
@@ -28145,7 +28146,7 @@
               "nullable": false,
               "default": null,
               "byteLength": null,
-              "comment": "STOP_UNSIGNED/REQUEST_REVIEW/STOP_REVIEWED/CONTINUE。"
+              "comment": "协商处置类型：未签终止、请求复核、复核后终止或继续协商。"
             },
             {
               "name": "contract_id",
@@ -44811,5 +44812,5 @@
     "two NOINHERIT startup LOGIN roles receive only direct target-database CONNECT from IaC: API selects one exact NOLOGIN Command, Query or Audit capability with SET LOCAL ROLE per statement path; Worker selects Worker capability only",
     "IaC-protected migration owner is used only by the release job as DeploymentRuntime; artifact, manifest and schema contract digests match before CAS to ACTIVE, while V840 validates only the four application roles"
   ],
-  "contractSha256": "c73031d295efa105a17fdaf114ce35ef393f7746efa67234eec014c425b38508"
+  "contractSha256": "4d9be0583bc73d9fab24ef1f98f08a5059574cbc68923958299cd4da89fe237a"
 }

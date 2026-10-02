@@ -36,6 +36,11 @@ public class AuthorizationServiceIT extends PostgresIntegrationTest {
                         roles.setObject(1,s.tenant);roles.execute();
                     }
                     sql(x,"insert into identity.appointment_role(tenant_id,appointment_role_id,role_code,display_name,state,created_at) values (?,uuidv7(),'OWNER','Fixture owner','ACTIVE',clock_timestamp())",s.tenant);
+                    // Historical business fixtures explicitly configure their synthetic
+                    // role data before inserting appointments. Roles grant no authority.
+                    for (String role : List.of("APPROVER", "CONTRACT_TEST", "DELEGATE", "HTTP_FIXTURE", "INTAKE", "LEGAL_REVIEW", "OTHER", "RECOVERY", "REVIEWER", "SALES", "SUPERVISOR", "TEST")) {
+                        sql(x,"insert into identity.appointment_role(tenant_id,appointment_role_id,role_code,display_name,state,created_at) values (?,uuidv7(),?,?,'ACTIVE',clock_timestamp())",s.tenant,role,"Fixture " + role);
+                    }
                 }
                 sql(x, "insert into identity.principal (tenant_id,principal_id,principal_kind,identity_provider_code,external_subject_hmac,display_name,state,created_at) values (?,?,?,'FIXTURE',?,'fixture','ACTIVE',clock_timestamp())", s.tenant,s.principal,kind,credentialHmac.apply(s.tenant));
                 sql(x, "insert into identity.organization_unit (tenant_id,organization_unit_id,unit_code,display_name,state,created_at) values (?,?,'ROOT','fixture','ACTIVE',clock_timestamp())",s.tenant,s.org);

@@ -84,7 +84,8 @@ class Task9IdentityContractTest(unittest.TestCase):
                     'Identity400Problem' if path.startswith('/api/v1/admin/identity/') or path == '/api/v1/session/context'
                     else 'BadRequestProblem')}, operation['responses'].get('400'))
                 for missing in ('response', 'code'):
-                    document = copy.deepcopy(self.api)
+                    from scripts.baseline.r2_task_selection_contract import r1_transport_projection
+                    document = r1_transport_projection(self.api)
                     target = document['paths'][path][method]
                     if missing == 'response':
                         target['responses'].pop('400')

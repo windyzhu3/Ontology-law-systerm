@@ -34,7 +34,7 @@ class R1WorkerDeploymentTest {
         assertFalse(settings.opportunityTaskSchedulingEnabled());
     }
     @Test void normal_opportunity_scheduling_accepts_only_registered_checkpoint_schemas() {
-        for(String schema:java.util.List.of("52-plus-2-r2-v3","52-plus-2-r2-v4","52-plus-2-r2-v5","52-plus-2-r2-v6","52-plus-2-r2-v7","52-plus-2-r2-v8","52-plus-2-r2-v9","52-plus-2-r2-v10","52-plus-2-r2-v11","52-plus-2-r2-v12","52-plus-2-r2-v13","52-plus-2-r2-v14","52-plus-2-r2-v15","52-plus-2-r2-v16","52-plus-2-r2-v17","52-plus-2-r2-v18","52-plus-2-r2-v19","52-plus-2-r2-v20","52-plus-2-r2-v21")) {
+        for(String schema:java.util.List.of("52-plus-2-r2-v3","52-plus-2-r2-v4","52-plus-2-r2-v5","52-plus-2-r2-v6","52-plus-2-r2-v7","52-plus-2-r2-v8","52-plus-2-r2-v9","52-plus-2-r2-v10","52-plus-2-r2-v11","52-plus-2-r2-v12","52-plus-2-r2-v13","52-plus-2-r2-v14","52-plus-2-r2-v15","52-plus-2-r2-v16","52-plus-2-r2-v17","52-plus-2-r2-v18","52-plus-2-r2-v19","52-plus-2-r2-v20","52-plus-2-r2-v21","52-plus-2-r2-v22")) {
             var source=new MapConfigurationPropertySource(Map.of("ols.worker.node","worker-test","ols.worker.opportunity-task-scheduling-enabled","true","ols.worker.database.schema-version",schema));
             var settings=new Binder(source).bind("ols.worker",R1WorkerDeployment.Settings.class).orElseThrow(IllegalStateException::new);
             assertTrue(settings.opportunityTaskSchedulingEnabled());
@@ -42,7 +42,7 @@ class R1WorkerDeploymentTest {
         }
     }
     @Test void normal_opportunity_scheduling_rejects_missing_old_and_unknown_schemas() {
-        for(String schema:java.util.List.of("52-plus-2","52-plus-2-r2-v1","52-plus-2-r2-v2","52-plus-2-r2-v22","52-plus-2-r2-v5-extra","52-plus-2-r2-v3-extra")) {
+        for(String schema:java.util.List.of("52-plus-2","52-plus-2-r2-v1","52-plus-2-r2-v2","52-plus-2-r2-v23","52-plus-2-r2-v5-extra","52-plus-2-r2-v3-extra")) {
             var source=new MapConfigurationPropertySource(Map.of("ols.worker.node","worker-test","ols.worker.opportunity-task-scheduling-enabled","true","ols.worker.database.schema-version",schema));
             assertThrows(RuntimeException.class,()->new Binder(source).bind("ols.worker",R1WorkerDeployment.Settings.class),schema);
         }

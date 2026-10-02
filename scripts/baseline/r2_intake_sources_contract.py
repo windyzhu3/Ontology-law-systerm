@@ -77,6 +77,16 @@ def intake_transport_projection(document):
     except ModuleNotFoundError:
         from configurable_roles_transport_contract import configurable_roles_projection
     document = configurable_roles_projection(document)
+    try:
+        from scripts.baseline.haihua_roles_transport_contract import haihua_roles_projection
+    except ModuleNotFoundError:
+        from haihua_roles_transport_contract import haihua_roles_projection
+    document = haihua_roles_projection(document)
+    try:
+        from scripts.baseline.personal_waiting_transport_contract import personal_waiting_projection
+    except ModuleNotFoundError:
+        from personal_waiting_transport_contract import personal_waiting_projection
+    document = personal_waiting_projection(document)
     """Remove only the complete, exactly approved intake metadata addition."""
     result = capture_names_projection(receipt_transport_projection(internal_opportunity_projection(owner_exception_projection(document))))
     schemas = result['components']['schemas']

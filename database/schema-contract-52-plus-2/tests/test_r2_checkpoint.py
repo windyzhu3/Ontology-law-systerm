@@ -31,10 +31,10 @@ class R2CheckpointContractTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             generated = Path(directory); generate_all(generated)
             manifest = json.loads((generated/'schema-contract-manifest.json').read_text(encoding='utf-8'))
-            self.assertEqual('52-plus-2-r2-v13', manifest['contractVersion'])
-            self.assertEqual(100, manifest['applicationTableCount'])
+            self.assertEqual('52-plus-2-r2-v22', manifest['contractVersion'])
+            self.assertEqual(120, manifest['applicationTableCount'])
             self.assertEqual(2, manifest['selfManagedPlatformTableCount'])
-            self.assertEqual(103, manifest['physicalTableCountAfterFlywayBootstrap'])
+            self.assertEqual(123, manifest['physicalTableCountAfterFlywayBootstrap'])
             checked = Path(__file__).resolve().parents[1]/'generated/db/migration'
             for old in checked.glob('*.sql'):
-                if int(old.name[1:4]) < 890: self.assertEqual(old.read_bytes(), (generated/'db/migration'/old.name).read_bytes(), old.name)
+                if int(old.name[1:].split("__")[0]) < 890: self.assertEqual(old.read_bytes(), (generated/'db/migration'/old.name).read_bytes(), old.name)

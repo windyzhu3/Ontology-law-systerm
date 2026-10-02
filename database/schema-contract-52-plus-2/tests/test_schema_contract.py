@@ -44,6 +44,25 @@ EXPECTED_LEDGER = {
     "transfer": ("transfer_request", "transfer_snapshot", "transfer_return_item"),
 }
 
+APPROVED_SUCCESSOR_TABLES = {'contract': ('negotiation_disposition',
+              'termination_review_assignment',
+              'negotiation_cancelled_task',
+              'execution_verification',
+              'execution_workflow',
+              'payment_request',
+              'payment_workflow',
+              'payment_review'),
+ 'identity': ('appointment_role',),
+ 'opportunity': ('quote_preparation_intent',
+                 'followup_attempt',
+                 'quote_termination',
+                 'quote_termination_task'),
+ 'responsibility': ('contract_task_resumption',),
+ 'transfer': ('workflow', 'submission', 'review', 'review_return_item', 'intake', 'classification')}
+for domain, names in APPROVED_SUCCESSOR_TABLES.items():
+    EXPECTED_LEDGER[domain] = (*EXPECTED_LEDGER[domain], *names)
+
+
 EXPECTED_MUTABLE = {
     "identity.tenant", "identity.principal", "identity.organization_unit",
     "identity.appointment", "identity.authority_grant", "identity.appointment_role",
@@ -77,7 +96,7 @@ class SchemaContractTest(unittest.TestCase):
             for name in EXPECTED_LEDGER
         }
         self.assertEqual(EXPECTED_LEDGER, actual)
-        self.assertEqual(100, sum(len(names) for names in actual.values()))
+        self.assertEqual(120, sum(len(names) for names in actual.values()))
         self.assertEqual(("deployment_state", "r2_opportunity_checkpoint"), tuple(
             table.name for table in self.by_name["platform_meta"].tables
         ))
@@ -137,7 +156,7 @@ class SchemaContractTest(unittest.TestCase):
             for schema in self.schemas if schema.name != "platform_meta"
             for table in schema.tables
         }
-        self.assertEqual(actual_fact_types, set(APPLICATION_FACT_TYPES))
+        self.assertEqual(actual_fact_types, set(APPLICATION_FACT_TYPES) | {'opportunity.quote_termination', 'contract.termination_review_assignment', 'opportunity.followup_attempt', 'contract.execution_workflow', 'contract.payment_review', 'contract.payment_workflow', 'opportunity.quote_termination_task', 'responsibility.contract_task_resumption', 'contract.negotiation_disposition', 'contract.payment_request', 'contract.execution_verification', 'opportunity.quote_preparation_intent', 'contract.negotiation_cancelled_task'})
         typed_refs = [
             (f"{schema.name}.{table.name}.{ref.prefix}", ref)
             for schema in self.schemas

@@ -364,6 +364,11 @@ public class OpenApiContractTest {
         registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/transfers/intake-decisions"), "recordTransferIntake");
         registered.put(new OperationKey("POST", "/api/v1/opportunities/{opportunityId}/transfers/classifications"), "classifyMatter");
         // Approved U personal waiting reads add no business mutation surface.
+        registered.put(new OperationKey("GET", "/api/v1/admin/identity/roles"), "listAppointmentRoles");
+        registered.put(new OperationKey("POST", "/api/v1/admin/identity/roles"), "createAppointmentRole");
+        registered.put(new OperationKey("PATCH", "/api/v1/admin/identity/roles/{id}/display-name"), "renameAppointmentRole");
+        registered.put(new OperationKey("POST", "/api/v1/admin/identity/roles/{id}/deactivate"), "deactivateAppointmentRole");
+        registered.put(new OperationKey("POST", "/api/v1/admin/identity/roles/{id}/reactivate"), "reactivateAppointmentRole");
         registered.put(new OperationKey("GET", "/api/v1/workbench/waiting"), "listPersonalWaiting");
         registered.put(new OperationKey("GET", "/api/v1/workbench/waiting/{taskId}"), "getPersonalWaiting");
         registered.put(new OperationKey("GET", "/api/v1/admin/audit-records"), "listAuditRecords");
@@ -371,7 +376,7 @@ public class OpenApiContractTest {
         registered.put(new OperationKey("GET", "/api/v1/admin/audit-records/{auditRecordId}/related"), "listRelatedAuditRecords");
         assertEquals(registered, actual, "R1 plus registered R2 and R2.5 operations must remain closed and exact");
         assertEquals(
-                134,
+                138,
                 paths.size(),
                 "Four Identity collection paths share GET and POST; all operation pairs stay exact"
         );
@@ -1249,6 +1254,7 @@ public class OpenApiContractTest {
                 schemaRef("OrganizationUnitFactRefV1"), schemaRef("AppointmentFactRefV1"), schemaRef("AuthorityGrantFactRefV1")));
         contracts.values().forEach(contract -> publicFactRefs.add(schemaRef(contract.factSchema())));
         publicFactRefs.add(schemaRef("OpportunityProgressFactRefV1"));
+        publicFactRefs.add(schemaRef("AppointmentRoleFactRefV1"));
         publicFactRefs.add(schemaRef("OpportunityClosureFactRefV1"));
         publicFactRefs.add(schemaRef("OpportunityMaterialUploadFactRefV1"));
         publicFactRefs.add(schemaRef("OpportunityMaterialVersionFactRefV1"));

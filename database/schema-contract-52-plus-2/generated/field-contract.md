@@ -4730,7 +4730,7 @@ T08准确不可变事实；不是签署或执行事实。
 | `opportunity_revision` | `bigint` | 否 | `—` | 准确商机修订。 |
 | `previous_disposition_id` | `uuid` | 是 | `—` | 直接前序处置，单链。 |
 | `request_disposition_id` | `uuid` | 是 | `—` | 主管处置所核对的准确请求。 |
-| `kind` | `varchar(64)` | 否 | `—` | STOP_UNSIGNED/REQUEST_REVIEW/STOP_REVIEWED/CONTINUE。 |
+| `kind` | `varchar(64)` | 否 | `—` | 协商处置类型：未签终止、请求复核、复核后终止或继续协商。 |
 | `contract_id` | `uuid` | 是 | `—` | 当前合同身份；直接授权申请阶段可空。 |
 | `contract_revision` | `bigint` | 是 | `—` | 合同身份准确修订。 |
 | `contract_version_id` | `uuid` | 是 | `—` | 准确合同正文版本。 |

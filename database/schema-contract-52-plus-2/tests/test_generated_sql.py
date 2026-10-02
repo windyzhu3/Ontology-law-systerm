@@ -37,7 +37,7 @@ class GeneratedSqlTest(unittest.TestCase):
             self.render(root)
             actual = {str(p.relative_to(root)).replace('\\', '/'): hashlib.sha256(p.read_bytes()).hexdigest()
                       for p in (root / 'db/migration').glob('*.sql')}
-            self.assertEqual(set(HISTORICAL_MIGRATION_SHA256) | {'db/migration/V860__lead_ingress_query_read_capability.sql', 'db/migration/V870__r2_lead_independent_names.sql', 'db/migration/V880__r2_opportunity_progress.sql', 'db/migration/V890__r2_opportunity_checkpoint.sql', 'db/migration/V900__r2_owner_exception.sql', 'db/migration/V910__r2_opportunity_closure.sql', 'db/migration/V920__r2_customer_requirements.sql', 'db/migration/V930__r2_materials.sql', 'db/migration/V940__r2_quotes.sql', 'db/migration/V950__r2_quote_runtime.sql', 'db/migration/V960__r2_quote_transaction.sql', 'db/migration/V970__r2_contract_preparation.sql', 'db/migration/V980__r2_contract_versions.sql', 'db/migration/V990__r2_manual_signature.sql'}, set(actual))
+            self.assertEqual(set(HISTORICAL_MIGRATION_SHA256) | {'db/migration/V860__lead_ingress_query_read_capability.sql', 'db/migration/V870__r2_lead_independent_names.sql', 'db/migration/V880__r2_opportunity_progress.sql', 'db/migration/V890__r2_opportunity_checkpoint.sql', 'db/migration/V900__r2_owner_exception.sql', 'db/migration/V910__r2_opportunity_closure.sql', 'db/migration/V920__r2_customer_requirements.sql', 'db/migration/V930__r2_materials.sql', 'db/migration/V940__r2_quotes.sql', 'db/migration/V950__r2_quote_runtime.sql', 'db/migration/V960__r2_quote_transaction.sql', 'db/migration/V970__r2_contract_preparation.sql', 'db/migration/V980__r2_contract_versions.sql', 'db/migration/V990__r2_manual_signature.sql', 'db/migration/V1000__r2_quote_preparation_intent.sql', 'db/migration/V1010__r2_followup_attempt.sql', 'db/migration/V1020__r2_quote_termination.sql', 'db/migration/V1030__r2_contract_negotiation.sql', 'db/migration/V1040__r2_execution_conditions.sql', 'db/migration/V1050__r2_transfer_workflow.sql', 'db/migration/V1060__r25_contract_responsibility_recovery.sql', 'db/migration/V1070__configurable_appointment_roles.sql', 'db/migration/V1080__metadata_comments.sql'}, set(actual))
             for name, digest in HISTORICAL_MIGRATION_SHA256.items():
                 self.assertEqual(digest, actual[name], name)
 
@@ -197,7 +197,7 @@ class GeneratedSqlTest(unittest.TestCase):
             sql = "\n".join(path.read_text(encoding="utf-8") for path in sorted(root.rglob("*.sql")))
             created = re.findall(r"CREATE TABLE ([a-z0-9_]+\.[a-z0-9_]+)", sql)
             app_tables = [name for name in created if not name.startswith("platform_meta.")]
-            self.assertEqual(100, len(app_tables))
+            self.assertEqual(120, len(app_tables))
             self.assertEqual(["platform_meta.deployment_state", "platform_meta.r2_opportunity_checkpoint"], [name for name in created if name.startswith("platform_meta.")])
             self.assertNotIn("CREATE TABLE platform_meta.flyway_schema_history", sql)
 
@@ -394,17 +394,18 @@ class GeneratedSqlTest(unittest.TestCase):
             self.render(root)
             manifest = json.loads((root / "schema-contract-manifest.json").read_text(encoding="utf-8"))
             self.assertRegex(manifest["contractSha256"], r"^[0-9a-f]{64}$")
-            self.assertEqual("52-plus-2-r2-v13", manifest["contractVersion"])
-            self.assertEqual(34, len(manifest["generatedArtifactSha256"]))
+            self.assertEqual("52-plus-2-r2-v22", manifest["contractVersion"])
+            self.assertEqual("4d9be0583bc73d9fab24ef1f98f08a5059574cbc68923958299cd4da89fe237a", manifest["contractSha256"])
+            self.assertEqual(43, len(manifest["generatedArtifactSha256"]))
             for digest in manifest["generatedArtifactSha256"].values():
                 self.assertRegex(digest, r"^[0-9a-f]{64}$")
-            self.assertEqual(100, manifest["applicationTableCount"])
+            self.assertEqual(120, manifest["applicationTableCount"])
             self.assertGreater(len(manifest["physicalForeignKeyWhitelist"]), 52)
             self.assertEqual(24, len(manifest["typedReferenceRegistry"]))
             for slot, entry in manifest["typedReferenceRegistry"].items():
                 self.assertTrue(entry["allowedTargetTypes"], slot)
             tables = [table for schema in manifest["schemas"] for table in schema["tables"]]
-            self.assertEqual(102, len(tables))
+            self.assertEqual(122, len(tables))
             sample = next(table for table in tables if table["qualifiedName"] == "evidence.evidence_binding")
             self.assertIn("columns", sample)
             self.assertIn("constraints", sample)
@@ -421,7 +422,7 @@ class GeneratedSqlTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.render(root)
-            names = sorted(path.name for path in (root / "db" / "migration").glob("*.sql"))
+            names = sorted((path.name for path in (root / "db" / "migration").glob("*.sql")), key=lambda name: int(name[1:].split("__")[0]))
             self.assertEqual([
                 "V001__bootstrap_schemas.sql",
                 "V002__deployment_state.sql",
@@ -457,6 +458,15 @@ class GeneratedSqlTest(unittest.TestCase):
         "V970__r2_contract_preparation.sql",
         "V980__r2_contract_versions.sql",
         "V990__r2_manual_signature.sql",
+                'V1000__r2_quote_preparation_intent.sql',
+                'V1010__r2_followup_attempt.sql',
+                'V1020__r2_quote_termination.sql',
+                'V1030__r2_contract_negotiation.sql',
+                'V1040__r2_execution_conditions.sql',
+                'V1050__r2_transfer_workflow.sql',
+                'V1060__r25_contract_responsibility_recovery.sql',
+                'V1070__configurable_appointment_roles.sql',
+                'V1080__metadata_comments.sql',
             ], names)
 
 

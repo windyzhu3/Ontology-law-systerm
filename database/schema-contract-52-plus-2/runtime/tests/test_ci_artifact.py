@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from r1_manifest_fixture import r1_manifest
 from unittest import mock
 
 import yaml
@@ -304,7 +305,7 @@ class CiArtifactTests(unittest.TestCase):
         self.assertEqual(current, verify_runtime._validate_ci_runtime_summary(current))
         historical = _current_v1_1_passed_summary()
         self.assertEqual(historical, verify_runtime._validate_ci_runtime_summary(historical))
-        manifest = json.loads((Path(__file__).resolve().parents[2] / "generated/schema-contract-manifest.json").read_text(encoding="utf-8"))
+        manifest = r1_manifest()
         self.assertEqual(current["contractSummary"], verify_runtime._ci_verified_contract_summary(manifest))
         for fault in ("version", "hash", "omitted_v860", "unauthorized_grant"):
             with self.subTest(fault=fault):
@@ -907,9 +908,7 @@ class CiArtifactTests(unittest.TestCase):
         from runtime import verify_runtime
 
         builder = self._public("build_ci_runtime_summary")
-        manifest = json.loads(
-            (PROJECT_ROOT / "generated" / "schema-contract-manifest.json").read_text(encoding="utf-8")
-        )
+        manifest = r1_manifest()
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             raw_directory = root / "schema-runtime"
@@ -1419,7 +1418,7 @@ class HostedCiOnlyVerificationTests(unittest.TestCase):
             encoding="utf-8",
         )
         (generated_directory / "schema-contract-manifest.json").write_text(
-            (Path(__file__).resolve().parents[2] / "generated/schema-contract-manifest.json").read_text(encoding="utf-8"),
+            json.dumps(r1_manifest(), ensure_ascii=False),
             encoding="utf-8",
         )
         for arguments in (
@@ -2406,13 +2405,13 @@ class WorkflowCiArtifactContractTests(unittest.TestCase):
         )
         runtime_script = next(step["run"] for step in steps if step.get("id") == "runtime")
         commands = (
-            "python3 scripts/baseline/verify_baseline.py",
+            "python3 scripts/baseline/verify_baseline.py --r2-development",
             "python3 generate.py --check",
             "python3 -m unittest discover -s tests -v",
             "python3 scripts/verify_generated_sql.py",
             "python3 -m unittest discover -s runtime/tests -v",
             "python3 runtime/verify_runtime.py validate-promoted-evidence",
-            "python3 runtime/verify_runtime.py verify --ci-only --runs 2 --evidence-dir ../../.artifacts/schema-runtime",
+            "python3 ../../scripts/ci/verify_r1_schema_projection.py",
         )
         positions = [runtime_script.index(command) for command in commands]
         self.assertEqual(positions, sorted(positions))
