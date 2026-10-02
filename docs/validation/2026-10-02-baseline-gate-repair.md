@@ -30,6 +30,10 @@ GitHub commit a430b28 的 PostgreSQL 18 历史运行门禁已通过：两次干�
 
 独立 bootstrap 原始事实校验夹具原先直接写入未配置的 SERVICE / DELEGATE 岗位，8 项目标测试复现 2 项拒绝。夹具改用租户已配置的 CONTACT_OPERATOR；完整原始事实校验 15 项通过，不新增岗位或授权，生产未知岗位拒绝规则保持有效。
 
+R1 兼容夹具继续保留原十四条投影路线，同时精确验证当前队列等于十四条加四个具名后续事件；离线 CLI 使用当前 v22 栅栏。目标 15 项通过。原两种到期恢复保持独立夹具，新来源复查使用其已有真实 HTTP 链路，合计 2 项通过，完整枚举仍精确拒绝未知类型。
+
+完整 baseline verifier 在 GitHub 通过 205 项反例，另有 schema 118 项通过（commit a430b28，run 37014004574）。本地 Linux 同一套 205 项及 successor 17 项亦通过。当前业务集成时长接近原 R1 一小时预算，preflight 预算增加至 120 分钟，全部检查、断言与验收边界保持不变。
+
 ## 尚需完成
 
 完整集成重新回归和 GitHub CI 正在验证。Windows 原 R1 runtime 因 Docker Compose wait 返回 no containers 整体失败；首次历史 schema 断言通过不能替代完整结果。main 合并必须等待全部必要门禁通过。

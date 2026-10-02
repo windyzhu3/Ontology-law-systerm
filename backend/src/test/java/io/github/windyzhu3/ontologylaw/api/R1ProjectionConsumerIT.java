@@ -113,10 +113,22 @@ class R1ProjectionConsumerIT extends ContactFlowFixture {
             try(var statement=c.prepareStatement("select coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text),'[]'::jsonb)::text from "+table+" t where tenant_id=?")){statement.setObject(1,seed.tenant());try(var rows=statement.executeQuery()){rows.next();result.add(HexFormat.of().formatHex(CanonicalJson.digest(rows.getString(1))));}}}return result;
     }
     static java.util.stream.Stream<CommandHandler.Event> r1ProjectionEvents() {
-        var events=Arrays.stream(CommandHandler.Event.values())
-                .filter(event->event.queueOwners().contains(CommandHandler.QueueOwner.R1_PROJECTION)).toList();
-        assertEquals(14,events.size(),"Frozen R1 projection event inventory");
-        return events.stream();
+        var frozen=EnumSet.of(CommandHandler.Event.LeadCapturedV1,CommandHandler.Event.ActionDraftSavedV1,
+                CommandHandler.Event.ContactTaskReopenedV1,CommandHandler.Event.RoutingReviewTaskReopenedV1,
+                CommandHandler.Event.LeadDuplicateResolutionRecordedV1,CommandHandler.Event.LeadIngressCompletedV1,
+                CommandHandler.Event.LeadAssignedV1,CommandHandler.Event.LeadRoutingDispositionRecordedV1,
+                CommandHandler.Event.SourceIntakeStopRequestedV1,CommandHandler.Event.SourceIntakeStopRequestAcknowledgedV1,
+                CommandHandler.Event.LeadContactResultRecordedV1,CommandHandler.Event.LeadContactRetryExhaustedV1,
+                CommandHandler.Event.LeadValidityReviewedV1,CommandHandler.Event.OpportunityOpened);
+        var current=EnumSet.copyOf(frozen);
+        current.addAll(EnumSet.of(CommandHandler.Event.SourceRequestTaskRestoredV1,
+                CommandHandler.Event.SourceRequestContinuationRecordedV1,CommandHandler.Event.SourceRequestReviewReopenedV1,
+                CommandHandler.Event.SalesFollowupAttemptRecordedV1));
+        var actual=EnumSet.noneOf(CommandHandler.Event.class);
+        Arrays.stream(CommandHandler.Event.values()).filter(event->event.queueOwners().contains(CommandHandler.QueueOwner.R1_PROJECTION)).forEach(actual::add);
+        assertEquals(current,actual,"Only the frozen events and four named approved successors may use this queue");
+        assertEquals(14,frozen.size(),"Frozen R1 projection event inventory");
+        return frozen.stream();
     }
     @ParameterizedTest @MethodSource("r1ProjectionEvents")
     void all_fourteen_routes_read_real_current_facts_with_zero_business_delta(CommandHandler.Event event)throws Exception {

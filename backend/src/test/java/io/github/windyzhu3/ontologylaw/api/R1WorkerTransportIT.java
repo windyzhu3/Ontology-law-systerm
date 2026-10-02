@@ -161,7 +161,8 @@ class R1WorkerTransportIT extends ContactFlowFixture {
         }
     }
     @Test void due_scheduler_uses_exact_single_task_http_request_and_stable_key_for_both_types()throws Exception{
-        for(var type:InternalApiClient.RecoveryType.values()){
+        assertEquals(java.util.EnumSet.of(InternalApiClient.RecoveryType.CONTACT_TASK,InternalApiClient.RecoveryType.ROUTING_REVIEW_TASK,InternalApiClient.RecoveryType.SOURCE_REQUEST_REVIEW_TASK),java.util.EnumSet.allOf(InternalApiClient.RecoveryType.class));
+        for(var type:List.of(InternalApiClient.RecoveryType.CONTACT_TASK,InternalApiClient.RecoveryType.ROUTING_REVIEW_TASK)){
             setupFlow(type==InternalApiClient.RecoveryType.CONTACT_TASK?io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.CONTACT_LEAD:io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.RESOLVE_LEAD_ROUTING_GAP);
             try(var c=database.apiConnection()){inTransaction(c,Capability.COMMAND,x->{io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.databaseBacked().waitUntil(x,seed.tenant(),current,seed.appointment(),businessAt.plusSeconds(3600),businessAt);return null;});}
             try(var h=new Harness();var scheduler=new DueTaskScheduler(h.registry,h.client,java.time.Clock.systemUTC())){
