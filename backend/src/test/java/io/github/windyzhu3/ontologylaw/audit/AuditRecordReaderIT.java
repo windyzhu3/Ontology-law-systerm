@@ -10,6 +10,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.*;
 import java.time.*;
 public class AuditRecordReaderIT extends PostgresIntegrationTest {
+ @Test void safe_search_matches_display_categories_and_unicode_fallbacks_without_searching_raw_summary()throws Exception{
+  var s=seed(database,"HUMAN","AUDIT_READ");append(database,s,UUID.randomUUID());var actor=new Actor(s.tenant(),s.principal(),s.appointment(),null,null);
+  try(var c=database.apiConnection()){inTransaction(c,Capability.QUERY,x->{var reader=AuditRecordReader.databaseBacked();var now=Instant.now().plusSeconds(1);for(String search:List.of("FIxTURE","线索","对象","执行操作","成功"))assertEquals(1,reader.list(x,actor,new AuditRecordReader.Query(now.minusSeconds(86400),now,null,null,search,20,null),new AuditRecordReader.Position(null,null,now)).items().size(),search);assertTrue(reader.list(x,actor,new AuditRecordReader.Query(now.minusSeconds(86400),now,null,null,"HMAC_TOKEN_CONTACT",20,null),new AuditRecordReader.Position(null,null,now)).items().isEmpty());return null;});}
+  for(String name:List.of("private-name\u200B","İpek","A%B_C\\D")){
+   try(var c=database.migratorConnection()){sql(c,"update identity.principal set display_name=?,revision=revision+1 where tenant_id=? and principal_id=?",name,s.tenant(),s.principal());}
+   String search=name.startsWith("private")?"未提供显示名称":name.equals("İpek")?"i\u0307pek":name;
+   try(var c=database.apiConnection()){inTransaction(c,Capability.QUERY,x->{var now=Instant.now().plusSeconds(1);assertEquals(1,AuditRecordReader.databaseBacked().list(x,actor,new AuditRecordReader.Query(now.minusSeconds(86400),now,null,null,search,20,null),new AuditRecordReader.Position(null,null,now)).items().size());return null;});}
+  }
+ }
  @Test void original_workcard_disclosure_writer_is_readable_without_rewriting_its_digest()throws Exception{
   var s=seed(database,"HUMAN","AUDIT_READ");UUID id=UUID.randomUUID();var actor=new Actor(s.tenant(),s.principal(),s.appointment(),null,null);
   try(var c=database.apiConnection()){inTransaction(c,Capability.AUDIT,x->{var snapshot=new AuthorizationSnapshot(s.request(),Instant.now(),true,null,new Subject("identity.authority_grant",s.grant(),0L,null),"fixture",ReceiptAuditJson.digest("fixture"));AuditAppender.databaseBacked("AUDIT_IT").append(x,new AuditAppender.ReadDisclosureEntry(id,UUID.randomUUID(),s.request().subject(),s.request().subject(),snapshot,AuditAppender.ResponseMode.BODY));return null;});}

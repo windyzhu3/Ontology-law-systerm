@@ -46,6 +46,7 @@ public final class JooqAuditRecordReader implements AuditRecordReader {
   sql+=" and exists (with recursive visible(organization_unit_id) as (select organization_unit_id from identity.organization_unit where tenant_id=? and organization_unit_id in ("+roots+") union select o.organization_unit_id from identity.organization_unit o join visible v on o.parent_organization_unit_id=v.organization_unit_id where o.tenant_id=?) select 1 from visible where organization_unit_id=coalesce(case when a.audit_scope_code in ('TENANT','SECURITY') or a.authorization_path_code='SYSTEM' then null else a.authorization_scope_organization_unit_id end,?::uuid))";
   args.add(actor.tenantId());args.addAll(access.scopes());args.add(actor.tenantId());args.add(HumanIdentityReader.databaseBacked().rootOrganization(c,actor.tenantId()).id());
   if(q.scope()!=null){sql+=" and a.audit_scope_code=?";args.add(q.scope());}if(q.result()!=null){sql+=" and a.result_code=?";args.add(q.result());}if(correlation!=null){sql+=" and a.correlation_id=?";args.add(correlation);}
+  if(q.search()!=null)sql+=" and "+searchCandidates(q.search(),args);
   Position after=position;
   long deadline=System.nanoTime()+5_000_000_000L;
   while(result.size()<=q.limit()){
@@ -61,6 +62,26 @@ public final class JooqAuditRecordReader implements AuditRecordReader {
    if(rows.size()<100)break;
   }
   SafeRecord lookahead=result.size()>q.limit()?result.removeLast():null;return new Page(result,lookahead);
+ }
+ // Conservative filtering on allowed display fields only. Exact authorization and Java safe-label matching still follow.
+ private static String searchCandidates(String search,List<Object> args){
+  String term=search.toLowerCase(Locale.ROOT),pattern="%"+term.replace("\\","\\\\").replace("%","\\%").replace("_","\\_")+"%";
+  var clauses=new ArrayList<String>();
+  clauses.add("coalesce(p.display_name,'未提供显示名称') ilike ?");args.add(pattern);
+  clauses.add("(coalesce(o.display_name,'未提供显示名称')||' · '||coalesce(r.display_name,'未提供显示名称')) ilike ?");args.add(pattern);
+  // Unsafe, long and non-basic Unicode names may have a Java fallback/case expansion; keep those candidates rather than omit them.
+  for(String column:List.of("p.display_name","o.display_name","r.display_name")){clauses.add("(char_length("+column+")>200 or btrim("+column+")='' or "+column+" ~ ?)");args.add("[^ -~一-龿]");}
+  clauses.add("char_length(coalesce(o.display_name,'未提供显示名称')||' · '||coalesce(r.display_name,'未提供显示名称'))>200");
+  codes(clauses,args,"a.action_code",AuditRecordSummary.registeredActions().entrySet().stream().filter(e->e.getValue().toLowerCase(Locale.ROOT).contains(term)).map(Map.Entry::getKey).sorted().toList(),false);
+  if("执行操作".contains(term))codes(clauses,args,"a.action_code",AuditRecordSummary.registeredActions().keySet().stream().sorted().toList(),true);
+  codes(clauses,args,"a.subject_type",AuditRecordSummary.registeredSources().stream().filter(t->AuditRecordSummary.objectLabel(t).contains(term)).sorted().toList(),false);
+  codes(clauses,args,"a.audit_scope_code",List.of("TENANT","ORGANIZATION","OBJECT","SECURITY").stream().filter(t->AuditRecordSummary.scopeLabel(t).contains(term)).toList(),false);
+  var results=List.of("SUCCEEDED","COMPLETED","NO_CHANGE","REJECTED","FAILED");codes(clauses,args,"a.result_code",results.stream().filter(t->AuditRecordSummary.resultLabel(t).contains(term)).toList(),false);
+  if("未识别结果".contains(term))codes(clauses,args,"a.result_code",results,true);
+  return "("+String.join(" or ",clauses)+")";
+ }
+ private static void codes(List<String> clauses,List<Object> args,String column,List<String> codes,boolean exclude){
+  if(codes.isEmpty())return;clauses.add(column+(exclude?" not":"")+" in ("+String.join(",",Collections.nCopies(codes.size(),"?"))+")");args.addAll(codes);
  }
  private boolean matches(SafeRecord row,Query q){return (q.scope()==null||AuditRecordSummary.scopeLabel(q.scope()).equals(row.values().get("scopeLabel")))&&(q.result()==null||AuditRecordSummary.resultLabel(q.result()).equals(row.values().get("resultLabel")))&&(q.search()==null||List.of("actorLabel","appointmentLabel","objectLabel","actionLabel","scopeLabel","resultLabel").stream().anyMatch(k->((String)row.values().get(k)).toLowerCase(Locale.ROOT).contains(q.search().toLowerCase(Locale.ROOT))));}
  public Page related(Connection c,Actor actor,SafeRecord seed,Relation relation,Query q,Position position)throws SQLException{

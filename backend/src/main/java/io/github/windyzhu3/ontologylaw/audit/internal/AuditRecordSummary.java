@@ -212,6 +212,8 @@ public final class AuditRecordSummary {
   Map.entry("SUSPEND_IDENTITY_PRINCIPAL","挂起人员主体"),
   Map.entry("TRANSFER_OPPORTUNITY_RESPONSIBILITY","商机责任交接"),
   Map.entry("VERIFY_CONTRACT_EXECUTION_CONDITIONS","核对合同执行条件"));
+ public static Map<String,String> registeredActions(){return ACTIONS;}
+ public static Set<String> registeredSources(){return SOURCES;}
  public static boolean classified(String scope,String path,String source){return Set.of("TENANT","ORGANIZATION","OBJECT","SECURITY").contains(scope)&&Set.of("DIRECT","DELEGATED","OBJECT","SYSTEM").contains(path)&&SOURCES.contains(source);}
  public static String project(String schema,int version,String raw,byte[] expected){
   var parsed=ReceiptAuditJson.object(ReceiptAuditJson.parse(raw));
