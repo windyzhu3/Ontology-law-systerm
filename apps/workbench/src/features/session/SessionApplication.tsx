@@ -200,6 +200,7 @@ function SessionRoutes({
     });
   }
   function confirmed(selected: SessionContext) {
+    if(!adminIntent && !selected.canEnterWorkbench && selected.canReadAuditRecords===true && selected.selectedOnBehalfAppointmentId===null && !overviewIntent && !leadIntent && !businessIntent && !ledgerIntent && !managementIntent && !intakeIntent){navigate("/admin/audit-records");selectStage("admin",selected);return;}
     let pending = true;
     try {
       pending = !!api.recovery.read();
@@ -222,7 +223,7 @@ function SessionRoutes({
         : intakeIntent
           ? selected.selectedOnBehalfAppointmentId === null ? "intake" : "unqualified"
           : adminIntent
-          ? selected.canEnterIdentityAdmin && selected.selectedOnBehalfAppointmentId === null
+          ? (path === "/admin/audit-records" ? selected.canReadAuditRecords === true : selected.canEnterIdentityAdmin) && selected.selectedOnBehalfAppointmentId === null
             ? "admin"
             : "unqualified"
           : selected.canEnterWorkbench
@@ -247,7 +248,7 @@ function SessionRoutes({
       !selected.actorScopeKey ||
       !selected.selectedAppointmentId ||
       selected.selectedOnBehalfAppointmentId !== null ||
-      !selected.canEnterIdentityAdmin
+      !(selected.canEnterIdentityAdmin || selected.canReadAuditRecords === true)
     )
       return;
     setAdmission({
@@ -256,7 +257,7 @@ function SessionRoutes({
       scope: selected.actorScopeKey,
       stage: "choosing",
     });
-    navigate("/admin/identity/principals");
+    navigate(selected.canEnterIdentityAdmin ? "/admin/identity/principals" : "/admin/audit-records");
   }
   useEffect(() => {
     if (!current || !context || ["choosing","recovery","unqualified"].includes(stage)) return;
@@ -276,13 +277,15 @@ function SessionRoutes({
   if (
     stage === "admin" &&
     adminIntent &&
-    context?.canEnterIdentityAdmin &&
+    context !== null &&
+    (path === "/admin/audit-records" ? context?.canReadAuditRecords === true : context?.canEnterIdentityAdmin) &&
     context.selectedOnBehalfAppointmentId === null &&
     actor
   ) {
     return (
       <IdentityAdminApplication
         session={actor}
+        canManageIdentity={context.canEnterIdentityAdmin}
         api={identityApi}
         path={path}
         onNavigate={navigate}
@@ -398,7 +401,7 @@ function SessionRoutes({
               : intakeIntent
                 ? context.selectedOnBehalfAppointmentId === null ? "intake" : "unqualified"
                 : adminIntent
-                ? context.canEnterIdentityAdmin && context.selectedOnBehalfAppointmentId === null
+                ? (path === "/admin/audit-records" ? context.canReadAuditRecords === true : context.canEnterIdentityAdmin) && context.selectedOnBehalfAppointmentId === null
                   ? "admin"
                   : "unqualified"
                 : context.canEnterWorkbench

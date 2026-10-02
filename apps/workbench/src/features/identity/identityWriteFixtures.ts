@@ -1,4 +1,5 @@
 import type { IdentityAdminRoute } from "./identityRoutes";
+type IdentityWriteRoute=Exclude<IdentityAdminRoute,'/admin/audit-records'>;
 import { taskId, selectorId, draftId, testSession } from "../../test/fixtures";
 import { RecoveryStore } from "../session/recoveryMarker";
 import { createIdentityApi } from "./identityApi";
@@ -7,10 +8,10 @@ import { createIdentityApi } from "./identityApi";
 export const tag = `"identity.${"a".repeat(43)}"`;
 export const nextTag = `"identity.${"b".repeat(43)}"`;
 export const roles = ["INTAKE_OPERATOR", "ROUTING_SUPERVISOR", "CONTACT_OPERATOR", "SALES_REPRESENTATIVE", "SALES_MANAGER", "FINANCE_OPERATOR", "CASE_ADMINISTRATOR"];
-export const authorities = ["LEAD_MANAGEMENT_READ", "TEAM_TASK_READ","PAYMENT_LEDGER_READ","TRANSFER_LEDGER_READ","CONTRACT_SIGNATURE_VERIFY","CONTRACT_EXECUTION_VERIFY","CONTRACT_TERMINATION_REVIEW","PAYMENT_SUBMIT","PAYMENT_CONFIRM","TRANSFER_SUBMIT","TRANSFER_REVIEW","TRANSFER_ACCEPT","MATTER_CLASSIFY","MATTER_RECEIVE","CONTRACT_READ", "CONTRACT_PREPARE", "CONTRACT_PREPARATION_DECIDE", "CONTRACT_REVIEW", "CONTRACT_APPROVE", "OPPORTUNITY_CLOSE", "CUSTOMER_REQUIREMENTS_MANAGE", "PARTY_PROFILE_MANAGE", "MATERIALS_MANAGE", "MATERIALS_READ", "QUOTE_READ", "QUOTE_PREPARE", "QUOTE_APPROVE", "QUOTE_SELF_AUTHORIZE", "QUOTE_DELIVER", "QUOTE_RESPONSE","LEAD_CAPTURE", "LEAD_INGRESS_RESOLVE", "LEAD_INGRESS_COMPLETE", "LEAD_ASSIGN", "LEAD_ROUTING_DECIDE", "SOURCE_INTAKE_REQUEST_ACK", "SALES_CONTACT_OWNER", "LEAD_VALIDITY_REVIEW", "SALES_OPPORTUNITY_OWNER", "OPPORTUNITY_LEDGER_READ", "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER", "OPPORTUNITY_OWNER_EXCEPTION_READ", "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE", "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ"];
+export const authorities = ["AUDIT_READ","LEAD_MANAGEMENT_READ", "TEAM_TASK_READ","PAYMENT_LEDGER_READ","TRANSFER_LEDGER_READ","CONTRACT_SIGNATURE_VERIFY","CONTRACT_EXECUTION_VERIFY","CONTRACT_TERMINATION_REVIEW","PAYMENT_SUBMIT","PAYMENT_CONFIRM","TRANSFER_SUBMIT","TRANSFER_REVIEW","TRANSFER_ACCEPT","MATTER_CLASSIFY","MATTER_RECEIVE","CONTRACT_READ", "CONTRACT_PREPARE", "CONTRACT_PREPARATION_DECIDE", "CONTRACT_REVIEW", "CONTRACT_APPROVE", "OPPORTUNITY_CLOSE", "CUSTOMER_REQUIREMENTS_MANAGE", "PARTY_PROFILE_MANAGE", "MATERIALS_MANAGE", "MATERIALS_READ", "QUOTE_READ", "QUOTE_PREPARE", "QUOTE_APPROVE", "QUOTE_SELF_AUTHORIZE", "QUOTE_DELIVER", "QUOTE_RESPONSE","LEAD_CAPTURE", "LEAD_INGRESS_RESOLVE", "LEAD_INGRESS_COMPLETE", "LEAD_ASSIGN", "LEAD_ROUTING_DECIDE", "SOURCE_INTAKE_REQUEST_ACK", "SALES_CONTACT_OWNER", "LEAD_VALIDITY_REVIEW", "SALES_OPPORTUNITY_OWNER", "OPPORTUNITY_LEDGER_READ", "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER", "OPPORTUNITY_OWNER_EXCEPTION_READ", "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE", "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ"];
 export const json = (data: unknown, status = 200, extra: HeadersInit = {}) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...extra } });
 export const principal = { id: taskId, displayName: "陈晓", state: "ACTIVE", etag: tag };
-export const rows: Record<IdentityAdminRoute, Record<string, unknown>> = {
+export const rows: Record<IdentityWriteRoute, Record<string, unknown>> = {
   "/admin/identity/roles": {id: taskId,code:"CUSTOM_ADVISOR",displayName:"业务顾问",state:"ACTIVE",etag:tag},
   "/admin/identity/principals": principal,
   "/admin/identity/organizations": { id: taskId, parentOrganizationId: selectorId, code: "SALES", displayName: "销售二组", state: "ACTIVE", etag: tag },
@@ -23,7 +24,7 @@ export function success(request: Request, outcome = "SUCCEEDED") {
   const key = request.headers.get("Idempotency-Key");
   return json({ commandId: key, receiptId: draftId, outcome, completedAt: "2026-09-09T01:00:00Z", resultFact: { factType, factRef: "safe-reference", revision: 1 } }, path.split("/").length === 6 ? 201 : 200, { ETag: nextTag, Location: `/api/v1/commands/${key}/receipt` });
 }
-export function fixture(path: IdentityAdminRoute, overrides: { row?: Record<string, unknown>; handle?: (request: Request) => Promise<Response | undefined>; recovery?: RecoveryStore } = {}) {
+export function fixture(path: IdentityWriteRoute, overrides: { row?: Record<string, unknown>; handle?: (request: Request) => Promise<Response | undefined>; recovery?: RecoveryStore } = {}) {
   const requests: Request[] = [];
   const writes: Request[] = [];
   const api = createIdentityApi(overrides.recovery ?? new RecoveryStore(sessionStorage), async request => {
@@ -42,4 +43,3 @@ export function fixture(path: IdentityAdminRoute, overrides: { row?: Record<stri
   }, location.origin);
   return { api, requests, writes, session: testSession() };
 }
-

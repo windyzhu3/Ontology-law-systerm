@@ -9,7 +9,7 @@ export function mount(f: ReturnType<typeof fixture>, path: IdentityAdminRoute) {
   return render(<IdentityAdminApplication session={f.session} api={f.api} path={path} onNavigate={() => {}} sessionActions={null} />);
 }
 const change = (label: string, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } });
-const lifecycle: Array<[IdentityAdminRoute, string, string, string, string]> = [
+const lifecycle: Array<[Exclude<IdentityAdminRoute,'/admin/audit-records'>, string, string, string, string]> = [
   ["/admin/identity/principals", "ACTIVE", "暂停使用", "暂停", "suspend"],
   ["/admin/identity/principals", "SUSPENDED", "恢复使用", "恢复", "resume"],
   ["/admin/identity/principals", "ACTIVE", "禁用身份", "禁用", "disable"],

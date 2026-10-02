@@ -2,6 +2,14 @@
   min-height: 100vh;
   background: #fbfbfa;
 }
+.audit-filters { display:flex;align-items:end;gap:14px;flex-wrap:wrap;margin-top:26px; }
+.audit-filters label { display:grid;gap:6px;color:var(--muted);font-size:14px; }
+.audit-filters input,.audit-filters select { min-height:42px;border:1px solid var(--border);border-radius:var(--radius);padding:8px 12px;background:var(--surface);color:var(--graphite); }
+.audit-table { min-width:850px; }
+.audit-chain { padding-left:20px; }
+.audit-chain li { display:grid;gap:4px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px; }
+.audit-record-grid { margin-top:20px; }
+@media(max-width:1150px){.audit-record-grid.authority-detail{grid-template-columns:minmax(0,1fr);}.audit-filters label:first-child{flex:1;min-width:180px;}}
 .identity-admin-header {
   min-height: 83px;
   display: flex;

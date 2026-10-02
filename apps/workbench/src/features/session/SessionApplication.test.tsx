@@ -27,6 +27,15 @@ import {
   tags,
 } from "../../test/fixtures";
 const scope = "ask1.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+it.each(['/admin/audit-records','/login'])('enters the audit-only page from %s without identity directory access',async path=>{
+ history.replaceState(null,'',path);
+ vi.stubGlobal('fetch',async()=>new Response(JSON.stringify({items:[]}),{status:200,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}}));
+ const f=fixture({context:{...context,canEnterWorkbench:false,canEnterIdentityAdmin:false,canReadAuditRecords:true}});
+ render(<SessionApplication controller={f.controller} api={f.api}/>);
+ const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ expect(await screen.findByRole('heading',{name:'审计记录'})).toBeVisible();
+ expect(screen.queryByRole('link',{name:'身份主体'})).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:/导出/})).not.toBeInTheDocument();
+});
 
 it.each(["switch", "popstate", "logout"] as const)("guards a dirty identity editor before explicit %s but immediately clears on expiry", async action => {
   history.replaceState(null, "", "/admin/identity/principals");
