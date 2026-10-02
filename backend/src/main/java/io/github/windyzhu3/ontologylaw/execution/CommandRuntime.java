@@ -64,6 +64,7 @@ public final class CommandRuntime {
             var existing=store.existingOrValidateNew(envelope,context.scope(),payload,x->{handler.recoveryEligibility(x,envelope,context);return null;});
             if(existing!=null) {
                 setLocalRole(c,Capability.QUERY);
+                identityRead.discardObjectAccessFacts();
                 var current=policy.authorize(c,envelope,context,true);
                 if(!current.allowed())throw new CommandHandler.Rejected(current.rejectionCode());
                 return projection.project(c,existing);
@@ -73,7 +74,7 @@ public final class CommandRuntime {
             AuditAppender.OwnerValidationEntry observationEvidence=null;
             if(envelope.type()==CommandEnvelope.Type.OBSERVE_OPPORTUNITY_OWNER_EXCEPTION){
                 if(!(handler instanceof OpportunityOwnerObservationCommand observation))throw new CommandHandler.Rejected("VALIDATION_FAILED");
-                setLocalRole(c,Capability.QUERY);var authorized=policy.authorize(c,envelope,context,true);if(!authorized.allowed())throw new CommandHandler.Rejected(authorized.rejectionCode());
+                setLocalRole(c,Capability.QUERY);identityRead.discardObjectAccessFacts();var authorized=policy.authorize(c,envelope,context,true);if(!authorized.allowed())throw new CommandHandler.Rejected(authorized.rejectionCode());
                 observationEvidence=observation.prepareObservation(c,envelope,context,authorized);
                 setLocalRole(c,Capability.AUDIT);audit.append(c,observationEvidence);setLocalRole(c,Capability.COMMAND);
             }
@@ -88,14 +89,17 @@ public final class CommandRuntime {
                 setLocalRole(c,Capability.QUERY);
                 // Capture denials on newly written exact selectors before rollback restores old
                 // revisions. The shared identity lock also precedes all final Owner reads.
+                identityRead.discardObjectAccessFacts();
                 terminal=policy.authorize(c,envelope,context,true);
                 if(!terminal.allowed())throw new CommandHandler.Rejected(terminal.rejectionCode());
                 handler.validateBeforeCommit(c,envelope,context,result);
                 eventPolicy.validate(c,envelope,context,result);
+                identityRead.discardObjectAccessFacts();
                 terminal=policy.authorize(c,envelope,context,true);
                 if(!terminal.allowed())throw new CommandHandler.Rejected(terminal.rejectionCode());
             } catch(CommandHandler.Rejected denied) {
                 c.rollback(business);setLocalRole(c,Capability.QUERY);result=null;rejection=denied.code();
+                identityRead.discardObjectAccessFacts();
                 var current=policy.authorize(c,envelope,context,true);
                 // Never erase the denying evidence after rollback makes a later read allowed again.
                 if(terminal==null || terminal.allowed())terminal=current;

@@ -12,7 +12,10 @@ class R2OpportunityCommandHttpIT extends R1HttpFixture {
         setupContact();var contact=execute(prepare(contact("CONNECTED_VALID")));
         try(var c=database.apiConnection()){inTransaction(c,Capability.COMMAND,x->{var opp=EventOpportunityReader.databaseBacked().forContact(x,seed.tenant(),contact.resultFact().id()).selector();grant(x,"SALES_OPPORTUNITY_OWNER");current=TaskFactory.databaseBacked().createInitialOpportunity(x,seed.tenant(),seed.appointment(),opp,ZoneId.of("Asia/Shanghai"),businessAt);return null;});}
         opportunityProtection=OpportunityProgressProtection.aesGcm(t->new SecretKeySpec(new byte[32],"AES"));
-        var values=Map.<String,Object>of("progressTypeCode","PHONE_CONNECTED","progressSummary","Client confirmed scope","occurredAt",businessAt.toString(),"nextCheckAt",Instant.now().plusSeconds(86400).truncatedTo(java.time.temporal.ChronoUnit.MICROS).toString());
+        var nextCheckAt=Instant.now().plusSeconds(86400).truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plusNanos(953390000);
+        var values=Map.<String,Object>of("progressTypeCode","PHONE_CONNECTED","progressSummary","Client confirmed scope","occurredAt",businessAt.toString(),"nextCheckAt",nextCheckAt.toString());
+        var canonicalValues=new TreeMap<String,Object>(values);
+        canonicalValues.put("nextCheckAt",java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(nextCheckAt.atOffset(ZoneOffset.UTC)));
         try(var http=new HttpHarness()){
             var currentResponse=http.request("GET","/api/v1/workcards/current",null,Map.of());
             assertEquals(200,currentResponse.statusCode(),currentResponse.body());
@@ -22,11 +25,11 @@ class R2OpportunityCommandHttpIT extends R1HttpFixture {
             var draftBody=Map.of("actionCode","RECORD_OPPORTUNITY_PROGRESS","schemaVersion",1,"values",values);
             var saved=http.request("PUT",base+"/opportunity-progress-draft",draftBody,Map.of("Idempotency-Key",save.toString(),"If-None-Match","*"));
             assertEquals(201,saved.statusCode(),saved.body());var response=http.body(saved);var draft=(Map<?,?>)response.get("draft");var tags=(Map<?,?>)response.get("preconditions");
-            assertEquals("RECORD_OPPORTUNITY_PROGRESS",draft.get("actionCode"));assertEquals(values,draft.get("values"));assertEquals("OPEN",scalar("select state from responsibility.task_occurrence where tenant_id=? and task_occurrence_id=?",seed.tenant(),current.selector().id()));
+            assertEquals("RECORD_OPPORTUNITY_PROGRESS",draft.get("actionCode"));assertEquals(canonicalValues,draft.get("values"));assertEquals("OPEN",scalar("select state from responsibility.task_occurrence where tenant_id=? and task_occurrence_id=?",seed.tenant(),current.selector().id()));
             var savedCardResponse=http.request("GET","/api/v1/workcards/current",null,Map.of());
             assertEquals(200,savedCardResponse.statusCode(),savedCardResponse.body());
             var savedCard=(Map<?,?>)http.body(savedCardResponse).get("currentCard");
-            assertEquals(values,((Map<?,?>)savedCard.get("commandForm")).get("values"));
+            assertEquals(canonicalValues,((Map<?,?>)savedCard.get("commandForm")).get("values"));
             assertEquals(draft.get("draftId"),((Map<?,?>)savedCard.get("actionDraft")).get("draftId"));
             var body=new TreeMap<String,Object>(values);body.put("draftId",draft.get("draftId"));body.put("expectedDraftRevision",draft.get("draftRevision"));body.put("draftDigest",draft.get("digest"));UUID key=UUID.randomUUID();
             var headers=Map.of("Idempotency-Key",key.toString(),"If-Match",(String)tags.get("taskETag"));

@@ -199,9 +199,11 @@ public class AuthorizationServiceIT extends PostgresIntegrationTest {
                 setLocalRole(x,Capability.COMMAND);
                 sql(x,"insert into identity.object_access_grant(tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,access_code,effect_code,valid_from,state,created_at,object_subject_type,object_subject_id,object_subject_revision,object_subject_hash) values(?,?,?,?,'LEAD_INGRESS_COMPLETE','DENY',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp(),?,?,?,?)",s.tenant,UUID.randomUUID(),s.principal,s.appointment,subject.type(),subject.id(),subject.revision(),hashSelector?new byte[32]:null);
                 setLocalRole(x,Capability.QUERY);
+                scope.discardObjectAccessFacts();
                 var denied=batch?service.evaluateAll(x,List.of(request),true).getFirst():service.evaluate(x,request,true);
                 assertFalse(denied.allowed());assertEquals("NOT_AUTHORIZED",denied.rejectionCode());
                 x.rollback(business);setLocalRole(x,Capability.QUERY);
+                scope.discardObjectAccessFacts();
                 var restored=batch?service.evaluateAll(x,List.of(request),true).getFirst():service.evaluate(x,request,true);
                 assertTrue(restored.allowed());
             }return null;});

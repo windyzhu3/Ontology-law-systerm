@@ -42,18 +42,21 @@ public final class JooqAuthorizationService implements AuthorizationService {
         if(READ_FACTS.get()!=null)throw new SQLException("Nested identity read scope","25001");
         lockForEvaluation(connection,tenantId);
         READ_FACTS.set(new ReadFacts(connection,tenantId));
-        return ()->READ_FACTS.remove();
+        return new ReadScope() {
+            public void close(){READ_FACTS.remove();}
+            public void discardObjectAccessFacts(){refreshObjectAccess(connection,tenantId);}
+        };
     }
 
     public AuthorizationSnapshot evaluate(Connection connection, Request request, boolean finalCheck) throws SQLException {
         requireTransaction(connection);
-        if(finalCheck) {lock(connection,request.actor().tenantId(),true);refreshObjectAccess(connection,request.actor().tenantId());}
+        if(finalCheck)lock(connection,request.actor().tenantId(),true);
         return checked(connection,request,databaseTime(connection)).value();
     }
     public List<AuthorizationSnapshot> evaluateAll(Connection connection,List<Request> requests,boolean finalCheck)throws SQLException {
         requireTransaction(connection);if(requests.isEmpty())return List.of();
         UUID tenant=requests.getFirst().actor().tenantId();
-        if(finalCheck) {lock(connection,tenant,true);refreshObjectAccess(connection,tenant);}
+        if(finalCheck)lock(connection,tenant,true);
         if(facts(connection,tenant)==null||requests.stream().anyMatch(r->!tenant.equals(r.actor().tenantId())))return AuthorizationService.super.evaluateAll(connection,requests,finalCheck);
         return stableBatch(connection,requests);
     }
