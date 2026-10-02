@@ -2690,10 +2690,13 @@ export interface components {
             actionLabel: string;
             actorLabel: string;
             appointmentLabel: string;
+            authorizationPathLabel: string;
             hasCorrection: boolean;
             hasCorrelation: boolean;
             id: components["schemas"]["Uuid"];
             objectLabel: string;
+            onBehalfLabel: string;
+            recordOrganizationLabel: string;
             resultLabel: string;
             scopeLabel: string;
             summary: string;

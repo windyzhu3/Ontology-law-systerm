@@ -5,7 +5,7 @@ from pathlib import Path
 ADDED=['AuditRecordV1', 'AuditRecordPageV1']
 CHANGED=['GrantableAuthorityCodeV1', 'SessionContextV1', 'AuthorityGrantV1']
 PATHS=['/api/v1/admin/audit-records', '/api/v1/admin/audit-records/{auditRecordId}', '/api/v1/admin/audit-records/{auditRecordId}/related']
-PIN='79daa33a5891ca09bf611d4f113925291f00767228fa77ef685251e9b51e33f3'
+PIN='42e056e371ae7f0709afd06410db6267f10bd12a236351493c69015506d7c37b'
 PREVIOUS_PIN='38287abef581fd622c793d6875c04669daeee60f11bf929a535f267042797ff0'
 def digest(value):
  return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=True).encode()).hexdigest()

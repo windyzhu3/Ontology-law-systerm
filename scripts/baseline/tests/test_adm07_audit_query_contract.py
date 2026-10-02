@@ -16,6 +16,7 @@ class AuditQueryContract(unittest.TestCase):
  def test_minimal_safe_dto(self):
   schema=self.doc['components']['schemas']['AuditRecordV1'];self.assertFalse(schema['additionalProperties']);props=schema['properties']
   self.assertIn('trustedAt',props);self.assertIn('summary',props)
+  for name in ['authorizationPathLabel','recordOrganizationLabel','onBehalfLabel']:self.assertIn(name,props)
   for name in ['change_summary','changeSummary','authorizationEvidence','sessionIdHmac','clientIpCiphertext','executionNodeCode','commandId','traceId','sourceRecordKeyDigest']:self.assertNotIn(name,props)
  def test_optional_entry_flag(self):
   schema=self.doc['components']['schemas']['SessionContextV1'];self.assertEqual(schema['properties']['canReadAuditRecords'],{'type':'boolean'});self.assertNotIn('canReadAuditRecords',schema['required'])

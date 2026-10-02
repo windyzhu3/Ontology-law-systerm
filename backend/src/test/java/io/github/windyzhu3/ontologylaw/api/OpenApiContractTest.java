@@ -366,9 +366,12 @@ public class OpenApiContractTest {
         // Approved U personal waiting reads add no business mutation surface.
         registered.put(new OperationKey("GET", "/api/v1/workbench/waiting"), "listPersonalWaiting");
         registered.put(new OperationKey("GET", "/api/v1/workbench/waiting/{taskId}"), "getPersonalWaiting");
+        registered.put(new OperationKey("GET", "/api/v1/admin/audit-records"), "listAuditRecords");
+        registered.put(new OperationKey("GET", "/api/v1/admin/audit-records/{auditRecordId}"), "getAuditRecord");
+        registered.put(new OperationKey("GET", "/api/v1/admin/audit-records/{auditRecordId}/related"), "listRelatedAuditRecords");
         assertEquals(registered, actual, "R1 plus registered R2 and R2.5 operations must remain closed and exact");
         assertEquals(
-                131,
+                134,
                 paths.size(),
                 "Four Identity collection paths share GET and POST; all operation pairs stay exact"
         );
@@ -1402,7 +1405,7 @@ public class OpenApiContractTest {
         assertEquals(Set.of("displayName", "state", "appointmentChoices", "selectedAppointmentId", "actorScopeKey",
                 "canEnterWorkbench", "canEnterIdentityAdmin", "delegatedAppointmentChoices", "selectedOnBehalfAppointmentId", "canManageOwnerExceptions", "canReadOpportunityLedger",
                 "canReadLeadManagement", "canReadBusinessOverview", "canReadBusinessManagement",
-                "businessManagementViews", "canReadTeamTasks"), fieldNames(schema("SessionContextV1").path("properties")));
+                "businessManagementViews", "canReadTeamTasks", "canReadAuditRecords"), fieldNames(schema("SessionContextV1").path("properties")));
         assertEquals(Set.of("string", "null"), stringSet(schema("SessionContextV1").path("properties").path("selectedAppointmentId").path("type")));
         assertEquals(Set.of("LEAD_CAPTURE", "LEAD_INGRESS_RESOLVE", "LEAD_INGRESS_COMPLETE", "LEAD_ASSIGN",
                 "LEAD_ROUTING_DECIDE", "SOURCE_INTAKE_REQUEST_ACK", "SALES_CONTACT_OWNER", "LEAD_VALIDITY_REVIEW",
@@ -1411,7 +1414,7 @@ public class OpenApiContractTest {
                 "PAYMENT_LEDGER_READ", "TRANSFER_LEDGER_READ", "CONTRACT_EXECUTION_VERIFY",
                 "CONTRACT_TERMINATION_REVIEW", "PAYMENT_SUBMIT", "PAYMENT_CONFIRM", "TRANSFER_SUBMIT",
                 "TRANSFER_REVIEW", "TRANSFER_ACCEPT", "MATTER_CLASSIFY", "MATTER_RECEIVE",
-                "TEAM_TASK_READ", "LEAD_MANAGEMENT_READ"),
+                "TEAM_TASK_READ", "LEAD_MANAGEMENT_READ", "AUDIT_READ"),
                 stringSet(schema("GrantableAuthorityCodeV1").path("enum")));
         assertEquals(20L, document.at("/components/parameters/IdentityLimit/schema/default").asLong());
         assertEquals(50L, document.at("/components/parameters/IdentityLimit/schema/maximum").asLong());

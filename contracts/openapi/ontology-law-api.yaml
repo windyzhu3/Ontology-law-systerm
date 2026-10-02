@@ -17469,7 +17469,19 @@ components:
       - verificationLabel
       - hasCorrelation
       - hasCorrection
+      - authorizationPathLabel
+      - recordOrganizationLabel
+      - onBehalfLabel
       properties:
+        authorizationPathLabel:
+          type: string
+          maxLength: 200
+        recordOrganizationLabel:
+          type: string
+          maxLength: 200
+        onBehalfLabel:
+          type: string
+          maxLength: 200
         id:
           $ref: '#/components/schemas/Uuid'
         trustedAt:
