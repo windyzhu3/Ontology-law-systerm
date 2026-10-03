@@ -14,8 +14,10 @@ public class R1JsonConfiguration {
             .withCoercionConfig(tools.jackson.databind.type.LogicalType.Textual,config->{for(var shape:java.util.List.of(tools.jackson.databind.cfg.CoercionInputShape.Integer,tools.jackson.databind.cfg.CoercionInputShape.Float,tools.jackson.databind.cfg.CoercionInputShape.Boolean))config.setCoercion(shape,tools.jackson.databind.cfg.CoercionAction.Fail);});}
     static SimpleModule oneOfModule(){
         var module=new SimpleModule("R1 closed ingress oneOf");
+        module.setMixInAnnotation(AuditRecordPageV1.class,AbsentOptionalFields.class);
         module.setMixInAnnotation(CurrentWorkCardEnvelope.class,OptionalSelectionNotice.class);
         module.setMixInAnnotation(NextSummary.class,OptionalSummaryMetadata.class);
+        module.setMixInAnnotation(IdentityChoiceV1.class,OptionalRoleCode.class);
         // Only these closed values/partials have optional fields whose absence is semantic.
         // Do not apply NON_NULL globally: CurrentCard requires explicit null placeholders.
         for(var type:java.util.List.of(CompleteLeadIngressPhoneOnlyValuesV1.class,CompleteLeadIngressPhoneAndEmailValuesV1.class,CompleteLeadIngressEmailOnlyValuesV1.class,
@@ -95,6 +97,10 @@ public class R1JsonConfiguration {
     }
     private record EmptyOpportunityValues() implements R2OpportunityFormV1Values {
         @com.fasterxml.jackson.annotation.JsonValue public java.util.Map<String,Object> values(){return java.util.Map.of();}
+    }
+    private abstract static class OptionalRoleCode {
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        public abstract String getCode();
     }
     private abstract static class OptionalSummaryMetadata {
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)

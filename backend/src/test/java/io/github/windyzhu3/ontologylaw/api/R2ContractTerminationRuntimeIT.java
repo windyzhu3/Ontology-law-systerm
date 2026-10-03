@@ -8,6 +8,22 @@ import java.util.*;import java.sql.*;
 import org.junit.jupiter.api.Test;
 /** Actual authority, runtime, receipt and both ledger projections, with synthetic signed facts. */
 class R2ContractTerminationRuntimeIT extends R2SalesTerminationIT {
+ @Test void assigned_termination_reviewer_reads_exact_current_workcard_with_committed_audit()throws Exception {
+  start();arrange();submit();var reviewer=supervisor();
+  for(var who:List.of(actor(),reviewer))authorize(who,"CONTRACT_READ");
+  authorize(actor(),"OPPORTUNITY_CLOSE");authorize(reviewer,"CONTRACT_TERMINATION_REVIEW");
+  var request=new CommandEnvelope(CommandEnvelope.Type.REQUEST_CONTRACT_TERMINATION_REVIEW,UUID.randomUUID(),UUID.randomUUID(),actor(),dispositionPayload(Map.of()));
+  assertEquals(CommandOutcome.Status.SUCCEEDED,run(request).status());
+  var current=(Map<?,?>)context().get("termination");
+  var task=UUID.fromString((String)((Map<?,?>)current.get("task")).get("id"));
+  try(var c=database.apiConnection()) {
+   var result=new CurrentWorkCardDisclosureService(protection,policies,"HH009_TERMINATION_CARD",cipher).read(c,reviewer,UUID.randomUUID(),null,task);
+   assertEquals(200,result.status(),result.errorCode());
+   assertEquals(task.toString(),((Map<?,?>)result.body().get("currentCard")).get("taskId"));
+   assertEquals("REVIEW_CONTRACT_TERMINATION",((Map<?,?>)result.body().get("currentCard")).get("taskType"));
+  }
+  assertTrue(Integer.parseInt(scalar("select count(*) from audit.audit_entry_classified_v where tenant_id=? and change_summary::text like '%R2_CURRENT_WORKCARD_DISCLOSURE_V1%'",seed.tenant()))>0);
+ }
  void authorize(Actor who,String code)throws Exception{mutate("insert into identity.authority_grant(tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values(?,?,?,?,?,?,clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",seed.tenant(),UUID.randomUUID(),who.appointmentId(),seed.appointment(),seed.org(),code);}
  CommandOutcome run(CommandEnvelope envelope)throws Exception{var actual=R2ContractServices.create(protectedBodies,cipher,null);try(var c=database.apiConnection()){return assertInstanceOf(CommandOutcome.class,R2OpportunityCommandRuntime.fromSourcePolicy(policies,protection,cipher,null,"F06_CONTRACT_RUNTIME_IT",actual).execute(c,envelope));}}
 

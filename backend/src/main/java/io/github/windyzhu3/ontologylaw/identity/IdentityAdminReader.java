@@ -9,7 +9,7 @@ import java.util.*;
 public interface IdentityAdminReader {
     enum Kind {
         PRINCIPAL("identity.principal"), ORGANIZATION("identity.organization_unit"),
-        APPOINTMENT("identity.appointment"), AUTHORITY_GRANT("identity.authority_grant");
+        APPOINTMENT("identity.appointment"), AUTHORITY_GRANT("identity.authority_grant"), ROLE("identity.appointment_role");
         public final String factType;
         Kind(String factType){this.factType=factType;}
         public static Kind of(String type){return Arrays.stream(values()).filter(k->k.factType.equals(type)).findFirst().orElseThrow();}
@@ -27,6 +27,27 @@ public interface IdentityAdminReader {
     Resource root(Connection c,UUID tenant)throws SQLException;
     Resource find(Connection c,UUID tenant,Kind kind,UUID id)throws SQLException;
     Access authorize(Connection c,Actor actor,String authority,Resource anchor,Resource target)throws SQLException;
+    /** Management delegation requires all four current root permissions, including exact target DENY checks. */
+    Access managementGrantAccess(Connection c,Actor actor,Resource target)throws SQLException;
+    static Access compactManagementAccess(Access combined) {
+        // Bind every exact authorization without repeating verbose evidence past the frozen audit limit.
+        var first=combined.authorization();String dependencies=HexFormat.of().formatHex(combined.digest());
+        String evidence="R2_IDENTITY_MANAGEMENT_DELEGATION_V1:"+dependencies;
+        try {
+            var sha=java.security.MessageDigest.getInstance("SHA-256");
+            var snapshot=new AuthorizationSnapshot(first.request(),first.checkedAt(),true,null,first.authorityFact(),evidence,sha.digest(evidence.getBytes(java.nio.charset.StandardCharsets.UTF_8)),dependencies);
+            return new Access(snapshot,combined.digest(),combined.scopes());
+        } catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+    }
+    default List<String> grantableAuthorities(Connection c,Actor actor)throws SQLException {
+        try {
+            managementGrantAccess(c,actor,null);
+            var codes=new ArrayList<>(IdentityCommands.GRANTABLE);codes.addAll(IdentityCommands.MANAGEMENT);return List.copyOf(codes);
+        } catch(IdentityCommands.Failure denied) {
+            if(!"NOT_AUTHORIZED".equals(denied.code()))throw denied;
+            return IdentityCommands.GRANTABLE;
+        }
+    }
     /** Current fact authorization with its mandatory immutable related scope, retaining the chosen anchor. */
     default Access authorizeResource(Connection c,Actor actor,String authority,Resource anchor,Resource target)throws SQLException {
         return authorize(c,actor,authority,anchor,target);
@@ -37,7 +58,7 @@ public interface IdentityAdminReader {
             var parent=find(c,actor.tenantId(),Kind.ORGANIZATION,UUID.fromString((String)target.values().get("parentOrganizationId")));
             try{return authorizeResource(c,actor,authority,parent,target);}catch(IdentityCommands.Failure denied){if(!"NOT_AUTHORIZED".equals(denied.code()))throw denied;}
         }
-        var anchor=kind==Kind.PRINCIPAL?root(c,actor.tenantId()):find(c,actor.tenantId(),Kind.ORGANIZATION,target.organization());
+        var anchor=(kind==Kind.PRINCIPAL||kind==Kind.ROLE)?root(c,actor.tenantId()):find(c,actor.tenantId(),Kind.ORGANIZATION,target.organization());
         return authorizeResource(c,actor,authority,anchor,target);
     }
     /** Add required evidence without replacing the original anchor or making a wider authorization choice. */

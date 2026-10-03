@@ -46,8 +46,8 @@ final class R1ApiDeployment implements AutoCloseable {
     final ActorContextResolver actors;
     final R1ApiServices services;
     final SessionContextController.Services session;final HumanCredentialVerifier humans;
-    final IdentityAdminController.Services identities;
-    private R1ApiDeployment(RuntimeDatabase database,ActorContextResolver actors,R1ApiServices services,SessionContextController.Services session,HumanCredentialVerifier humans,IdentityAdminController.Services identities){this.database=database;this.actors=actors;this.services=services;this.session=session;this.humans=humans;this.identities=identities;}
+    final IdentityAdminController.Services identities;final AuditRecordsController.Services auditRecords;
+    private R1ApiDeployment(RuntimeDatabase database,ActorContextResolver actors,R1ApiServices services,SessionContextController.Services session,HumanCredentialVerifier humans,IdentityAdminController.Services identities,AuditRecordsController.Services auditRecords){this.auditRecords=auditRecords;this.database=database;this.actors=actors;this.services=services;this.session=session;this.humans=humans;this.identities=identities;}
     static R1ApiDeployment from(Environment environment) {
         RuntimeDatabase opened=null;
         try {
@@ -109,7 +109,7 @@ final class R1ApiDeployment implements AutoCloseable {
             var contractProtection=io.github.windyzhu3.ontologylaw.contract.ContractProtection.aesGcm(tenant->Objects.requireNonNull(encryption.get(tenant)));
             var materialStore=io.github.windyzhu3.ontologylaw.api.internal.storage.MaterialObjectStoreFactory.configured();
             var payments=paymentKeys.isEmpty()?null:io.github.windyzhu3.ontologylaw.payment.PaymentWorkflowService.databaseBacked(io.github.windyzhu3.ontologylaw.payment.PaymentTransactionProtection.hmac(tenant->Objects.requireNonNull(paymentKeys.get(tenant))),new PaymentWorkflowPorts(contractProtection,opportunityProtection,materialStore,paymentAccounts::get));
-            return new R1ApiDeployment(database,actors,new R1ApiServices(database,sources,protection,bindings,settings.node(),cursor,settings.intakeSources()==null?List.of():settings.intakeSources(),opportunityProtection,materialStore,contractProtection,payments,Map.copyOf(transferDestinations)::get,R25AiConfiguration.model(environment)),new SessionContextController.Services(database::open,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(settings.node()),new ActorScopeProtection(scopes::get)),humans,new IdentityAdminController.Services(adminServices));
+            return new R1ApiDeployment(database,actors,new R1ApiServices(database,sources,protection,bindings,settings.node(),cursor,settings.intakeSources()==null?List.of():settings.intakeSources(),opportunityProtection,materialStore,contractProtection,payments,Map.copyOf(transferDestinations)::get,R25AiConfiguration.model(environment)),new SessionContextController.Services(database::open,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(settings.node()),new ActorScopeProtection(scopes::get)),humans,new IdentityAdminController.Services(adminServices),new AuditRecordsController.Services(database::open,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(settings.node()),new io.github.windyzhu3.ontologylaw.audit.AuditRecordProtection(adminCursorKey),settings.humanTrusts().stream().map(HumanTrust::tenantId).collect(java.util.stream.Collectors.toSet())));
         }catch(Exception invalid){if(opened!=null)opened.close();throw new IllegalStateException("R1_API_CONFIGURATION_UNAVAILABLE");}
     }
     private static RSAPublicKey publicKey(String file)throws Exception {

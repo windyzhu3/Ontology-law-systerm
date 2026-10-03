@@ -10,7 +10,7 @@ export function IdentityField({ label, value, onChange, error, type = "text", ch
 export function IdentityOptionField({ label, options, error, onDirty }: { label: string; options: ReturnType<typeof useIdentityOptions>; error?: string; onDirty: () => void }) {
   return <div className="identity-option-field">
     <IdentityField label={label} value={options.selected} disabled={options.loading} error={error} onChange={value => { options.select(value); onDirty(); }}>
-      <option value="">请选择{label}</option>{options.items.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+      <option value="">请选择{label}</option>{options.items.map(item => <option key={item.id} value={item.id}>{item.code ? `${item.label} · ${item.code}` : item.label}</option>)}
     </IdentityField>
     {options.loading && <p role="status">正在读取{label}候选…</p>}
     {options.error && <p role="alert">{options.error}</p>}

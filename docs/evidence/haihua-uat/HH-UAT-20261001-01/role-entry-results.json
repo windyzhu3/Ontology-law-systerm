@@ -1,0 +1,206 @@
+[
+  {
+    "username": "sales01",
+    "appointment": "销售一部 · 销售",
+    "status": "PASS",
+    "entries": {
+      "state": "READY",
+      "canEnterWorkbench": true,
+      "canEnterIdentityAdmin": false,
+      "businessManagementViews": [
+        "contracts",
+        "payments",
+        "transfer"
+      ],
+      "canManageOwnerExceptions": false,
+      "canReadBusinessManagement": true,
+      "canReadBusinessOverview": true,
+      "canReadLeadManagement": false,
+      "canReadOpportunityLedger": true,
+      "canReadTeamTasks": false
+    }
+  },
+  {
+    "username": "sales02",
+    "appointment": "销售一部 · 销售",
+    "status": "PASS",
+    "entries": {
+      "state": "READY",
+      "canEnterWorkbench": true,
+      "canEnterIdentityAdmin": false,
+      "businessManagementViews": [
+        "contracts",
+        "payments",
+        "transfer"
+      ],
+      "canManageOwnerExceptions": false,
+      "canReadBusinessManagement": true,
+      "canReadBusinessOverview": true,
+      "canReadLeadManagement": false,
+      "canReadOpportunityLedger": true,
+      "canReadTeamTasks": false
+    }
+  },
+  {
+    "username": "sales03",
+    "appointment": "销售一部 · 销售",
+    "status": "PASS",
+    "entries": {
+      "state": "READY",
+      "canEnterWorkbench": true,
+      "canEnterIdentityAdmin": false,
+      "businessManagementViews": [
+        "contracts",
+        "payments",
+        "transfer"
+      ],
+      "canManageOwnerExceptions": false,
+      "canReadBusinessManagement": true,
+      "canReadBusinessOverview": true,
+      "canReadLeadManagement": false,
+      "canReadOpportunityLedger": true,
+      "canReadTeamTasks": false
+    }
+  },
+  {
+    "username": "sales04",
+    "appointment": "销售二部 · 销售",
+    "status": "PASS",
+    "entries": {
+      "state": "READY",
+      "canEnterWorkbench": true,
+      "canEnterIdentityAdmin": false,
+      "businessManagementViews": [
+        "contracts",
+        "payments",
+        "transfer"
+      ],
+      "canManageOwnerExceptions": false,
+      "canReadBusinessManagement": true,
+      "canReadBusinessOverview": true,
+      "canReadLeadManagement": false,
+      "canReadOpportunityLedger": true,
+      "canReadTeamTasks": false
+    }
+  },
+  {
+    "username": "sales05",
+    "appointment": "销售二部 · 销售",
+    "status": "PASS",
+    "entries": {
+      "state": "READY",
+      "canEnterWorkbench": true,
+      "canEnterIdentityAdmin": false,
+      "businessManagementViews": [
+        "contracts",
+        "payments",
+        "transfer"
+      ],
+      "canManageOwnerExceptions": false,
+      "canReadBusinessManagement": true,
+      "canReadBusinessOverview": true,
+      "canReadLeadManagement": false,
+      "canReadOpportunityLedger": true,
+      "canReadTeamTasks": false
+    }
+  },
+  {
+    "username": "sales_manager01",
+    "appointment": "销售一部 · 销售主管",
+    "status": "PASS",
+    "entries": {
+      "state": "READY",
+      "canEnterWorkbench": true,
+      "canEnterIdentityAdmin": false,
+      "businessManagementViews": [
+        "contracts",
+        "payments",
+        "transfer"
+      ],
+      "canManageOwnerExceptions": true,
+      "canReadBusinessManagement": true,
+      "canReadBusinessOverview": true,
+      "canReadLeadManagement": true,
+      "canReadOpportunityLedger": true,
+      "canReadTeamTasks": true
+    }
+  },
+  {
+    "username": "sales_manager02",
+    "appointment": "销售二部 · 销售主管",
+    "status": "PASS",
+    "entries": {
+      "state": "READY",
+      "canEnterWorkbench": true,
+      "canEnterIdentityAdmin": false,
+      "businessManagementViews": [
+        "contracts",
+        "payments",
+        "transfer"
+      ],
+      "canManageOwnerExceptions": true,
+      "canReadBusinessManagement": true,
+      "canReadBusinessOverview": true,
+      "canReadLeadManagement": true,
+      "canReadOpportunityLedger": true,
+      "canReadTeamTasks": true
+    }
+  },
+  {
+    "username": "finance01",
+    "appointment": "财务部 · 财务人员",
+    "status": "PASS",
+    "entries": {
+      "state": "READY",
+      "canEnterWorkbench": true,
+      "canEnterIdentityAdmin": false,
+      "businessManagementViews": [
+        "contracts",
+        "payments"
+      ],
+      "canManageOwnerExceptions": false,
+      "canReadBusinessManagement": true,
+      "canReadBusinessOverview": true,
+      "canReadLeadManagement": false,
+      "canReadOpportunityLedger": false,
+      "canReadTeamTasks": false
+    }
+  },
+  {
+    "username": "case_admin01",
+    "appointment": "案管部 · 案管员",
+    "status": "PASS",
+    "entries": {
+      "state": "READY",
+      "canEnterWorkbench": true,
+      "canEnterIdentityAdmin": false,
+      "businessManagementViews": [
+        "contracts",
+        "transfer"
+      ],
+      "canManageOwnerExceptions": false,
+      "canReadBusinessManagement": true,
+      "canReadBusinessOverview": true,
+      "canReadLeadManagement": false,
+      "canReadOpportunityLedger": false,
+      "canReadTeamTasks": true
+    }
+  },
+  {
+    "username": "sys_manager01",
+    "appointment": "海华律师事务所 · 身份管理员",
+    "status": "PASS",
+    "entries": {
+      "state": "READY",
+      "canEnterWorkbench": false,
+      "canEnterIdentityAdmin": true,
+      "businessManagementViews": [],
+      "canManageOwnerExceptions": false,
+      "canReadBusinessManagement": false,
+      "canReadBusinessOverview": false,
+      "canReadLeadManagement": false,
+      "canReadOpportunityLedger": false,
+      "canReadTeamTasks": false
+    }
+  }
+]

@@ -91,7 +91,7 @@ class R2OpportunityActivationCommandIT extends ContactFlowFixture {
   var before=counts();assertThrows(CommandHandler.Rejected.class,()->run(command));assertEquals(before,counts());
  }
  @Test void final_authorization_rejects_a_new_task_object_deny_and_rolls_creation_back()throws Exception {
-  setupActivation();var delegate=new R2OpportunityActivationCommand(policies,protection,cipher);
+  setupActivation();var delegate=new R2OpportunityActivationCommand(policies,protection,cipher);var denialId=UUID.randomUUID();
   var wrapper=new CommandHandler(){
    public CommandEnvelope.Type type(){return delegate.type();}
    public Context resolve(java.sql.Connection c,CommandEnvelope e)throws java.sql.SQLException{return delegate.resolve(c,e);}
@@ -100,12 +100,15 @@ class R2OpportunityActivationCommandIT extends ContactFlowFixture {
    public void validateBeforeWork(java.sql.Connection c,CommandEnvelope e,Context ctx)throws java.sql.SQLException{delegate.validateBeforeWork(c,e,ctx);}
    public Result execute(java.sql.Connection c,CommandEnvelope e,Context ctx)throws java.sql.SQLException{
     var result=delegate.execute(c,e,ctx);
-    io.github.windyzhu3.ontologylaw.identity.AuthorizationServiceIT.sql(c,"insert into identity.object_access_grant (tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,access_code,effect_code,valid_from,state,created_at,object_subject_type,object_subject_id,object_subject_revision) values (?,?,?,?,'OPPORTUNITY_TASK_ACTIVATE','DENY',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp(),'responsibility.task_occurrence',?,?)",seed.tenant(),UUID.randomUUID(),actor.principalId(),seed.appointment(),result.fact().id(),result.fact().revision());return result;
+    io.github.windyzhu3.ontologylaw.identity.AuthorizationServiceIT.sql(c,"insert into identity.object_access_grant (tenant_id,object_access_grant_id,grantee_principal_id,granted_by_appointment_id,access_code,effect_code,valid_from,state,created_at,object_subject_type,object_subject_id,object_subject_revision) values (?,?,?,?,'OPPORTUNITY_TASK_ACTIVATE','DENY',clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp(),'responsibility.task_occurrence',?,?)",seed.tenant(),denialId,actor.principalId(),seed.appointment(),result.fact().id(),result.fact().revision());return result;
    }
    public void validateBeforeCommit(java.sql.Connection c,CommandEnvelope e,Context ctx,Result result)throws java.sql.SQLException{delegate.validateBeforeCommit(c,e,ctx,result);}
   };
   runtime=new CommandRuntime(List.of(wrapper),io.github.windyzhu3.ontologylaw.identity.AuthorizationService.databaseBacked(),io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked("R2_FINAL_DENY_IT"),R2OpportunityCommandRuntime.authorization(io.github.windyzhu3.ontologylaw.lead.R1AuthorizationReaders.databaseBacked(policies)),R2OpportunityCommandRuntime.events(io.github.windyzhu3.ontologylaw.lead.R1EventReaders.databaseBacked(),cipher));
   var result=assertInstanceOf(CommandOutcome.class,run(command));assertEquals(CommandOutcome.Status.REJECTED,result.status());assertEquals("NOT_AUTHORIZED",result.rejectionCode());
+  assertEquals("1",scalar("select count(*) from execution.command_receipt r join execution.command_execution_slot s using (tenant_id,command_execution_slot_id) where r.tenant_id=? and s.command_id=? and r.outcome='REJECTED' and r.rejection_code='NOT_AUTHORIZED' and r.result_fact_type is null",seed.tenant(),command.commandId()));
+  assertEquals("1",scalar("select count(*) from audit.audit_entry_classified_v where tenant_id=? and command_id=? and result_code='REJECTED' and change_summary::text like ?",seed.tenant(),command.commandId(),"%"+denialId+"%"));
+  assertEquals("0",scalar("select count(*) from identity.object_access_grant where tenant_id=? and object_access_grant_id=?",seed.tenant(),denialId));
   assertEquals("0",scalar("select count(*) from responsibility.task_occurrence where tenant_id=? and subject_id=?",seed.tenant(),opportunity.id()));assertEquals("0",scalar("select count(*) from execution.domain_event where tenant_id=? and command_id=?",seed.tenant(),command.commandId()));
  }
 

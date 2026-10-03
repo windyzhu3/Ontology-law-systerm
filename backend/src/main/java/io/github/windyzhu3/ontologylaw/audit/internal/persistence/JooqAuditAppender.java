@@ -9,6 +9,7 @@ import org.jooq.impl.DSL;
 import static io.github.windyzhu3.ontologylaw.audit.internal.persistence.jooq.Tables.AUDIT_ENTRY;
 
 public final class JooqAuditAppender implements AuditAppender {
+    public void append(Connection c,AuditRecordDisclosureEntry e)throws SQLException{write(c,e.id(),null,null,e.correlationId(),e.operation(),"SUCCEEDED",e.authorization(),e.authorization().request().subject(),"ADM07_AUDIT_DISCLOSURE_V1",1,e.summary(),e.digest());}
     public void appendWorkcards(Connection c,java.util.List<ReadDisclosureEntry> entries)throws SQLException {
         batch(c,entries,e->insert(c,e.id(),null,null,e.correlationId(),"READ_CURRENT_WORKCARD","SUCCEEDED",e.authorization(),e.disclosedSource(),e.schemaCode(),1,e.summary(),e.summaryDigest()));
     }

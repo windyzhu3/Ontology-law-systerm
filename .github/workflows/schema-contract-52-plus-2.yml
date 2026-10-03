@@ -69,14 +69,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 scripts/baseline/verify_baseline.py
+          python3 scripts/baseline/verify_baseline.py --r2-development
           cd database/schema-contract-52-plus-2
           python3 generate.py --check
           python3 -m unittest discover -s tests -v
           python3 scripts/verify_generated_sql.py
           python3 -m unittest discover -s runtime/tests -v
           python3 runtime/verify_runtime.py validate-promoted-evidence
-          python3 runtime/verify_runtime.py verify --ci-only --runs 2 --evidence-dir ../../.artifacts/schema-runtime
+          python3 ../../scripts/ci/verify_r1_schema_projection.py
       - name: Summarize PostgreSQL 18 runtime verification
         id: runtime_summary
         if: ${{ always() }}

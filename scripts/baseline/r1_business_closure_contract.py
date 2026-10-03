@@ -82,7 +82,7 @@ def validate_ingress_query_capability(root: Path, *, allow_r2_schema: bool = Fal
     expected_hash = "a4beeb91ed93be455736eafa3abb829f6a94fed3a263be5996832e458b7c4b39"
     try:
         manifest = json.loads((generated / "schema-contract-manifest.json").read_text(encoding="utf-8"))
-        projected_r2 = allow_r2_schema and manifest.get("contractVersion") in ("52-plus-2-r2-v1", "52-plus-2-r2-v2", "52-plus-2-r2-v3", "52-plus-2-r2-v4", "52-plus-2-r2-v5", "52-plus-2-r2-v6", "52-plus-2-r2-v7", "52-plus-2-r2-v8", "52-plus-2-r2-v9", "52-plus-2-r2-v10", "52-plus-2-r2-v12", "52-plus-2-r2-v13", "52-plus-2-r2-v14", "52-plus-2-r2-v15", "52-plus-2-r2-v16", "52-plus-2-r2-v17", "52-plus-2-r2-v19", "52-plus-2-r2-v20")
+        projected_r2 = allow_r2_schema and manifest.get("contractVersion") in ("52-plus-2-r2-v1", "52-plus-2-r2-v2", "52-plus-2-r2-v3", "52-plus-2-r2-v4", "52-plus-2-r2-v5", "52-plus-2-r2-v6", "52-plus-2-r2-v7", "52-plus-2-r2-v8", "52-plus-2-r2-v9", "52-plus-2-r2-v10", "52-plus-2-r2-v12", "52-plus-2-r2-v13", "52-plus-2-r2-v14", "52-plus-2-r2-v15", "52-plus-2-r2-v16", "52-plus-2-r2-v17", "52-plus-2-r2-v19", "52-plus-2-r2-v20", "52-plus-2-r2-v21", "52-plus-2-r2-v22")
         if projected_r2:
             try:
                 from scripts.baseline.r2_schema_successor_contract import historical_projection
@@ -115,6 +115,8 @@ def validate_ingress_query_capability(root: Path, *, allow_r2_schema: bool = Fal
             actual_paths.discard("db/migration/V1040__r2_execution_conditions.sql")
             actual_paths.discard("db/migration/V1050__r2_transfer_workflow.sql")
             actual_paths.discard("db/migration/V1060__r25_contract_responsibility_recovery.sql")
+            actual_paths.discard("db/migration/V1070__configurable_appointment_roles.sql")
+            actual_paths.discard("db/migration/V1080__metadata_comments.sql")
         if actual_paths != set(inventory) or len(inventory) != 21:
             raise ValueError("wrong migration inventory")
         for relative, digest in inventory.items():

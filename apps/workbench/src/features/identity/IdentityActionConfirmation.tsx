@@ -52,8 +52,8 @@ export function IdentityRecoveryConfirmation({ command }: { command: IdentityCom
 export function IdentityCommandFeedback({ command }: { command: IdentityCommand }) {
   if (!command.message) return null;
   return <section className="identity-command-feedback" aria-label="操作结果"><p role={command.phase === "unknown" || command.phase === "proven" || command.refreshFailed ? "alert" : "status"}>{command.message}</p>
-    {command.phase === "unknown" && <div className="identity-form-actions">{command.policy !== "NO" && <button onClick={command.retry}>重试原请求</button>}<button onClick={command.receipt}>查询原回执</button>{command.canRecover && <button onClick={command.requestRecovery}>前往恢复入口</button>}</div>}
+    {command.phase === "unknown" && <div className="identity-form-actions">{command.policy !== "NO" && <button disabled={command.batch?.running} onClick={command.retry}>重试原请求</button>}<button disabled={command.batch?.running} onClick={command.receipt}>查询原回执</button>{command.canRecover && <button disabled={command.batch?.running} onClick={command.requestRecovery}>前往恢复入口</button>}</div>}
     {command.phase === "proven" && (command.policy === "NEW_KEY_AFTER_REFRESH" || command.policy === "NEW_KEY_AFTER_ADMIN_FIX") && <><p>{command.policy === "NEW_KEY_AFTER_ADMIN_FIX" ? "请先联系管理员处理依赖，再重新读取并核对。" : "需要重新读取目标与版本，再开始新请求。"}</p><button onClick={() => void command.recheck()}>重新读取并核对</button></>}
-    {command.refreshFailed && <button onClick={() => void command.recheck()}>重读列表</button>}
+    {command.refreshFailed && command.phase !== "unknown" && command.phase !== "sending" && <button onClick={() => void command.recheck()}>重读列表</button>}
   </section>;
 }

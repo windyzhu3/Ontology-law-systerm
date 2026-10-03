@@ -11,6 +11,10 @@ export function rememberLoginDestination(path: string) {
   try { sessionStorage.setItem(key, JSON.stringify({ path, savedAt: Date.now() })); } catch { /* Login remains available without browser storage. */ }
 }
 
+export function clearLoginDestination() {
+  try { sessionStorage.removeItem(key); } catch { /* Sign-out remains available without storage. */ }
+}
+
 export function consumeLoginDestination(): Destination {
   try {
     const raw = sessionStorage.getItem(key);

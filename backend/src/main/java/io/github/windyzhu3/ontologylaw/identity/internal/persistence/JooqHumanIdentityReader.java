@@ -48,8 +48,9 @@ public final class JooqHumanIdentityReader implements HumanIdentityReader {
                 .and(p.PRINCIPAL_KIND.eq("HUMAN")).and(p.STATE.eq("ACTIVE")).and(t.STATE.eq("ACTIVE")).fetchOne();
         if(principal==null)throw new Failure("NOT_AUTHORIZED");
         var rows=d.fetch("""
-            select a.appointment_id,a.revision appointment_revision,a.role_code,o.organization_unit_id,o.revision organization_revision,o.display_name
-            from identity.appointment a join identity.organization_unit o on o.tenant_id=a.tenant_id and o.organization_unit_id=a.organization_unit_id
+            select a.appointment_id,a.revision appointment_revision,a.role_code,r.display_name role_name,o.organization_unit_id,o.revision organization_revision,o.display_name
+            from identity.appointment a join identity.appointment_role r on r.tenant_id=a.tenant_id and r.role_code=a.role_code
+            join identity.organization_unit o on o.tenant_id=a.tenant_id and o.organization_unit_id=a.organization_unit_id
             where a.tenant_id=? and a.principal_id=? and a.state='ACTIVE'
               and a.effective_from<=clock_timestamp() and (a.effective_until is null or a.effective_until>clock_timestamp())
               and %s order by a.appointment_id limit 51
@@ -59,12 +60,13 @@ public final class JooqHumanIdentityReader implements HumanIdentityReader {
     }
     public List<DelegatedChoice> delegated(Connection c,VerifiedHumanIdentity identity,UUID own)throws SQLException {
         var rows=db(c).fetch("""
-            select distinct a.appointment_id,a.revision appointment_revision,a.role_code,a.principal_id,
+            select distinct a.appointment_id,a.revision appointment_revision,a.role_code,r.display_name role_name,a.principal_id,
               o.organization_unit_id,o.revision organization_revision,o.display_name
             from identity.delegation_grant dg
             join identity.authority_grant g on g.tenant_id=dg.tenant_id and g.authority_grant_id=dg.source_authority_grant_id and g.grantee_appointment_id=dg.delegator_appointment_id
             join identity.appointment a on a.tenant_id=dg.tenant_id and a.appointment_id=dg.delegator_appointment_id
             join identity.principal p on p.tenant_id=a.tenant_id and p.principal_id=a.principal_id
+            join identity.appointment_role r on r.tenant_id=a.tenant_id and r.role_code=a.role_code
             join identity.organization_unit o on o.tenant_id=a.tenant_id and o.organization_unit_id=a.organization_unit_id
             where dg.tenant_id=? and dg.delegate_appointment_id=? and dg.state='ACTIVE' and g.state='ACTIVE'
               and p.state='ACTIVE' and p.principal_kind='HUMAN' and a.state='ACTIVE'
@@ -78,7 +80,7 @@ public final class JooqHumanIdentityReader implements HumanIdentityReader {
         return rows.stream().map(row->new DelegatedChoice(choice(row),row.get("principal_id",UUID.class))).toList();
     }
     private static Choice choice(org.jooq.Record row) {
-        String role=switch(row.get("role_code",String.class)){case "IDENTITY_ADMIN"->"身份管理员";case "INTAKE_OPERATOR"->"接入人员";case "ROUTING_SUPERVISOR"->"分配主管";case "CONTACT_OPERATOR"->"联系人员";default->"业务任职";};
+        String role=row.get("role_name",String.class);
         String label=row.get("display_name",String.class)+" · "+role;
         if(label.codePointCount(0,label.length())>200)label=label.substring(0,label.offsetByCodePoints(0,200));
         return new Choice(new Subject("identity.appointment",row.get("appointment_id",UUID.class),row.get("appointment_revision",Long.class),null),new Subject("identity.organization_unit",row.get("organization_unit_id",UUID.class),row.get("organization_revision",Long.class),null),label);

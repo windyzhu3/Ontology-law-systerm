@@ -13,6 +13,250 @@ tags:
 - name: InternalTaskCommands
 - name: InternalOpportunityTasks
 paths:
+  /api/v1/admin/audit-records:
+    get:
+      tags:
+      - AuditRecords
+      operationId: listAuditRecords
+      security:
+      - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-authority-code: AUDIT_READ
+      x-authority-path: DIRECT
+      x-error-codes:
+      - VALIDATION_FAILED
+      - UNAUTHENTICATED
+      - NOT_AUTHORIZED
+      - APPOINTMENT_INACTIVE
+      - NOT_FOUND
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - SERVICE_UNAVAILABLE
+      x-on-behalf-selection: REJECT
+      parameters:
+      - $ref: '#/components/parameters/AppointmentSelection'
+      - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
+      - name: start
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: end
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: scope
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - TENANT
+          - ORGANIZATION
+          - OBJECT
+          - SECURITY
+      - name: result
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - SUCCEEDED
+          - NO_CHANGE
+          - REJECTED
+          - FAILED
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - $ref: '#/components/parameters/IdentityLimit'
+      - $ref: '#/components/parameters/IdentityCursor'
+      responses:
+        '200':
+          description: Authorized read-only audit disclosure, returned only after its
+            disclosure audit commits.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/IdentityNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecordPageV1'
+        '400':
+          $ref: '#/components/responses/Identity400Problem'
+        '401':
+          $ref: '#/components/responses/Identity401Problem'
+        '403':
+          $ref: '#/components/responses/Identity403Problem'
+        '404':
+          $ref: '#/components/responses/Identity404Problem'
+        '429':
+          $ref: '#/components/responses/Identity429Problem'
+        '500':
+          $ref: '#/components/responses/Identity500Problem'
+        '503':
+          $ref: '#/components/responses/Identity503Problem'
+  /api/v1/admin/audit-records/{auditRecordId}:
+    get:
+      tags:
+      - AuditRecords
+      operationId: getAuditRecord
+      security:
+      - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-authority-code: AUDIT_READ
+      x-authority-path: DIRECT
+      x-error-codes:
+      - VALIDATION_FAILED
+      - UNAUTHENTICATED
+      - NOT_AUTHORIZED
+      - APPOINTMENT_INACTIVE
+      - NOT_FOUND
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - SERVICE_UNAVAILABLE
+      x-on-behalf-selection: REJECT
+      parameters:
+      - $ref: '#/components/parameters/AppointmentSelection'
+      - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
+      - name: auditRecordId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Authorized read-only audit disclosure, returned only after its
+            disclosure audit commits.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/IdentityNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecordV1'
+        '400':
+          $ref: '#/components/responses/Identity400Problem'
+        '401':
+          $ref: '#/components/responses/Identity401Problem'
+        '403':
+          $ref: '#/components/responses/Identity403Problem'
+        '404':
+          $ref: '#/components/responses/Identity404Problem'
+        '429':
+          $ref: '#/components/responses/Identity429Problem'
+        '500':
+          $ref: '#/components/responses/Identity500Problem'
+        '503':
+          $ref: '#/components/responses/Identity503Problem'
+  /api/v1/admin/audit-records/{auditRecordId}/related:
+    get:
+      tags:
+      - AuditRecords
+      operationId: listRelatedAuditRecords
+      security:
+      - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-authority-code: AUDIT_READ
+      x-authority-path: DIRECT
+      x-error-codes:
+      - VALIDATION_FAILED
+      - UNAUTHENTICATED
+      - NOT_AUTHORIZED
+      - APPOINTMENT_INACTIVE
+      - NOT_FOUND
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - SERVICE_UNAVAILABLE
+      x-on-behalf-selection: REJECT
+      parameters:
+      - $ref: '#/components/parameters/AppointmentSelection'
+      - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
+      - name: auditRecordId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: relation
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - CORRELATION
+          - CORRECTION
+      - name: start
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: end
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: scope
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - TENANT
+          - ORGANIZATION
+          - OBJECT
+          - SECURITY
+      - name: result
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - SUCCEEDED
+          - NO_CHANGE
+          - REJECTED
+          - FAILED
+      - name: search
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 100
+      - $ref: '#/components/parameters/IdentityLimit'
+      - $ref: '#/components/parameters/IdentityCursor'
+      responses:
+        '200':
+          description: Authorized read-only audit disclosure, returned only after its
+            disclosure audit commits.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/IdentityNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecordPageV1'
+        '400':
+          $ref: '#/components/responses/Identity400Problem'
+        '401':
+          $ref: '#/components/responses/Identity401Problem'
+        '403':
+          $ref: '#/components/responses/Identity403Problem'
+        '404':
+          $ref: '#/components/responses/Identity404Problem'
+        '429':
+          $ref: '#/components/responses/Identity429Problem'
+        '500':
+          $ref: '#/components/responses/Identity500Problem'
+        '503':
+          $ref: '#/components/responses/Identity503Problem'
   /api/v1/workbench/waiting:
     get:
       tags:
@@ -16357,6 +16601,378 @@ paths:
       x-envelope: INTERNAL_ADMIN
       x-authority-code: MATTER_CLASSIFY
       x-authority-path: DIRECT
+  /api/v1/admin/identity/roles:
+    get:
+      tags:
+      - IdentityAdmin
+      operationId: listAppointmentRoles
+      summary: list Appointment Roles
+      security:
+      - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: IDENTITY_SCOPED
+      x-authentication-profile: R1_IDENTITY_ADMIN_ACTOR_V1
+      x-error-codes:
+      - VALIDATION_FAILED
+      - UNAUTHENTICATED
+      - NOT_AUTHORIZED
+      - APPOINTMENT_INACTIVE
+      - NOT_FOUND
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - SERVICE_UNAVAILABLE
+      parameters:
+      - $ref: '#/components/parameters/AppointmentSelection'
+      - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
+      - $ref: '#/components/parameters/IdentityLimit'
+      - $ref: '#/components/parameters/IdentityCursor'
+      responses:
+        '200':
+          description: Audited bounded disclosure; no-store and no 304.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/IdentityNoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentRolePageV1'
+        '400':
+          $ref: '#/components/responses/Identity400Problem'
+        '401':
+          $ref: '#/components/responses/Identity401Problem'
+        '403':
+          $ref: '#/components/responses/Identity403Problem'
+        '404':
+          $ref: '#/components/responses/Identity404Problem'
+        '429':
+          $ref: '#/components/responses/Identity429Problem'
+        '500':
+          $ref: '#/components/responses/Identity500Problem'
+        '503':
+          $ref: '#/components/responses/Identity503Problem'
+      x-authority-code: IDENTITY_ORGANIZATION_MANAGE
+      x-on-behalf-selection: REJECT
+      x-authority-path: DIRECT
+    post:
+      tags:
+      - IdentityAdmin
+      operationId: createAppointmentRole
+      summary: create Appointment Role
+      security:
+      - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: IDENTITY_SCOPED
+      x-authentication-profile: R1_IDENTITY_ADMIN_ACTOR_V1
+      x-error-codes:
+      - VALIDATION_FAILED
+      - UNAUTHENTICATED
+      - NOT_AUTHORIZED
+      - APPOINTMENT_INACTIVE
+      - NOT_FOUND
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - SERVICE_UNAVAILABLE
+      - IDEMPOTENCY_KEY_REQUIRED
+      - IDEMPOTENCY_KEY_INVALID
+      - COMMAND_PAYLOAD_CONFLICT
+      - IDENTITY_BINDING_CONFLICT
+      - IDENTITY_STATE_CONFLICT
+      - IDENTITY_SELF_LOCKOUT
+      - IDENTITY_LAST_ADMIN
+      - IDENTITY_ORGANIZATION_DEPENDENCY
+      - IDENTITY_RESPONSIBILITY_DEPENDENCY
+      parameters:
+      - $ref: '#/components/parameters/AppointmentSelection'
+      - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/IdentityNoStore'
+            Location:
+              $ref: '#/components/headers/ReceiptLocation'
+            ETag:
+              $ref: '#/components/headers/IdentityETagHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentRoleCommandReceiptV1'
+        '400':
+          $ref: '#/components/responses/Identity400Problem'
+        '401':
+          $ref: '#/components/responses/Identity401Problem'
+        '403':
+          $ref: '#/components/responses/Identity403Problem'
+        '404':
+          $ref: '#/components/responses/Identity404Problem'
+        '409':
+          $ref: '#/components/responses/Identity409Problem'
+        '429':
+          $ref: '#/components/responses/Identity429Problem'
+        '500':
+          $ref: '#/components/responses/Identity500Problem'
+        '503':
+          $ref: '#/components/responses/Identity503Problem'
+      x-authority-code: IDENTITY_ORGANIZATION_MANAGE
+      x-on-behalf-selection: REJECT
+      x-authority-path: DIRECT
+      x-command-type: CREATE_APPOINTMENT_ROLE
+      x-envelope: INTERNAL_ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAppointmentRoleV1'
+  /api/v1/admin/identity/roles/{id}/display-name:
+    patch:
+      tags:
+      - IdentityAdmin
+      operationId: renameAppointmentRole
+      summary: rename Appointment Role
+      security:
+      - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: IDENTITY_SCOPED
+      x-authentication-profile: R1_IDENTITY_ADMIN_ACTOR_V1
+      x-error-codes:
+      - VALIDATION_FAILED
+      - UNAUTHENTICATED
+      - NOT_AUTHORIZED
+      - APPOINTMENT_INACTIVE
+      - NOT_FOUND
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - SERVICE_UNAVAILABLE
+      - IDEMPOTENCY_KEY_REQUIRED
+      - IDEMPOTENCY_KEY_INVALID
+      - COMMAND_PAYLOAD_CONFLICT
+      - IDENTITY_BINDING_CONFLICT
+      - IDENTITY_STATE_CONFLICT
+      - IDENTITY_SELF_LOCKOUT
+      - IDENTITY_LAST_ADMIN
+      - IDENTITY_ORGANIZATION_DEPENDENCY
+      - IDENTITY_RESPONSIBILITY_DEPENDENCY
+      - STALE_IDENTITY
+      - IDENTITY_PRECONDITION_REQUIRED
+      parameters:
+      - $ref: '#/components/parameters/AppointmentSelection'
+      - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IdentityIdPath'
+      - $ref: '#/components/parameters/IdentityIfMatch'
+      responses:
+        '200':
+          description: Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/IdentityNoStore'
+            Location:
+              $ref: '#/components/headers/ReceiptLocation'
+            ETag:
+              $ref: '#/components/headers/IdentityETagHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentRoleCommandReceiptV1'
+        '400':
+          $ref: '#/components/responses/Identity400Problem'
+        '401':
+          $ref: '#/components/responses/Identity401Problem'
+        '403':
+          $ref: '#/components/responses/Identity403Problem'
+        '404':
+          $ref: '#/components/responses/Identity404Problem'
+        '409':
+          $ref: '#/components/responses/Identity409Problem'
+        '412':
+          $ref: '#/components/responses/Identity412Problem'
+        '428':
+          $ref: '#/components/responses/Identity428Problem'
+        '429':
+          $ref: '#/components/responses/Identity429Problem'
+        '500':
+          $ref: '#/components/responses/Identity500Problem'
+        '503':
+          $ref: '#/components/responses/Identity503Problem'
+      x-authority-code: IDENTITY_ORGANIZATION_MANAGE
+      x-on-behalf-selection: REJECT
+      x-authority-path: DIRECT
+      x-command-type: RENAME_APPOINTMENT_ROLE
+      x-envelope: INTERNAL_ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameAppointmentRoleV1'
+  /api/v1/admin/identity/roles/{id}/deactivate:
+    post:
+      tags:
+      - IdentityAdmin
+      operationId: deactivateAppointmentRole
+      summary: close Appointment Role
+      security:
+      - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: IDENTITY_SCOPED
+      x-authentication-profile: R1_IDENTITY_ADMIN_ACTOR_V1
+      x-error-codes:
+      - VALIDATION_FAILED
+      - UNAUTHENTICATED
+      - NOT_AUTHORIZED
+      - APPOINTMENT_INACTIVE
+      - NOT_FOUND
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - SERVICE_UNAVAILABLE
+      - IDEMPOTENCY_KEY_REQUIRED
+      - IDEMPOTENCY_KEY_INVALID
+      - COMMAND_PAYLOAD_CONFLICT
+      - IDENTITY_BINDING_CONFLICT
+      - IDENTITY_STATE_CONFLICT
+      - IDENTITY_SELF_LOCKOUT
+      - IDENTITY_LAST_ADMIN
+      - IDENTITY_ORGANIZATION_DEPENDENCY
+      - IDENTITY_RESPONSIBILITY_DEPENDENCY
+      - STALE_IDENTITY
+      - IDENTITY_PRECONDITION_REQUIRED
+      parameters:
+      - $ref: '#/components/parameters/AppointmentSelection'
+      - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IdentityIdPath'
+      - $ref: '#/components/parameters/IdentityIfMatch'
+      responses:
+        '200':
+          description: Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/IdentityNoStore'
+            Location:
+              $ref: '#/components/headers/ReceiptLocation'
+            ETag:
+              $ref: '#/components/headers/IdentityETagHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentRoleCommandReceiptV1'
+        '400':
+          $ref: '#/components/responses/Identity400Problem'
+        '401':
+          $ref: '#/components/responses/Identity401Problem'
+        '403':
+          $ref: '#/components/responses/Identity403Problem'
+        '404':
+          $ref: '#/components/responses/Identity404Problem'
+        '409':
+          $ref: '#/components/responses/Identity409Problem'
+        '412':
+          $ref: '#/components/responses/Identity412Problem'
+        '428':
+          $ref: '#/components/responses/Identity428Problem'
+        '429':
+          $ref: '#/components/responses/Identity429Problem'
+        '500':
+          $ref: '#/components/responses/Identity500Problem'
+        '503':
+          $ref: '#/components/responses/Identity503Problem'
+      x-authority-code: IDENTITY_ORGANIZATION_MANAGE
+      x-on-behalf-selection: REJECT
+      x-authority-path: DIRECT
+      x-command-type: DEACTIVATE_APPOINTMENT_ROLE
+      x-envelope: INTERNAL_ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeactivateAppointmentRoleV1'
+  /api/v1/admin/identity/roles/{id}/reactivate:
+    post:
+      tags:
+      - IdentityAdmin
+      operationId: reactivateAppointmentRole
+      summary: close Appointment Role
+      security:
+      - publicBearer: []
+      x-tenant-source: ACTOR_CONTEXT
+      x-subject-binding: IDENTITY_SCOPED
+      x-authentication-profile: R1_IDENTITY_ADMIN_ACTOR_V1
+      x-error-codes:
+      - VALIDATION_FAILED
+      - UNAUTHENTICATED
+      - NOT_AUTHORIZED
+      - APPOINTMENT_INACTIVE
+      - NOT_FOUND
+      - RATE_LIMITED
+      - INTERNAL_ERROR
+      - SERVICE_UNAVAILABLE
+      - IDEMPOTENCY_KEY_REQUIRED
+      - IDEMPOTENCY_KEY_INVALID
+      - COMMAND_PAYLOAD_CONFLICT
+      - IDENTITY_BINDING_CONFLICT
+      - IDENTITY_STATE_CONFLICT
+      - IDENTITY_SELF_LOCKOUT
+      - IDENTITY_LAST_ADMIN
+      - IDENTITY_ORGANIZATION_DEPENDENCY
+      - IDENTITY_RESPONSIBILITY_DEPENDENCY
+      - STALE_IDENTITY
+      - IDENTITY_PRECONDITION_REQUIRED
+      parameters:
+      - $ref: '#/components/parameters/AppointmentSelection'
+      - $ref: '#/components/parameters/OnBehalfAppointmentSelection'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IdentityIdPath'
+      - $ref: '#/components/parameters/IdentityIfMatch'
+      responses:
+        '200':
+          description: Exact Identity terminal result; Fact, Slot, Receipt and Audit commit atomically.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/IdentityNoStore'
+            Location:
+              $ref: '#/components/headers/ReceiptLocation'
+            ETag:
+              $ref: '#/components/headers/IdentityETagHeader'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentRoleCommandReceiptV1'
+        '400':
+          $ref: '#/components/responses/Identity400Problem'
+        '401':
+          $ref: '#/components/responses/Identity401Problem'
+        '403':
+          $ref: '#/components/responses/Identity403Problem'
+        '404':
+          $ref: '#/components/responses/Identity404Problem'
+        '409':
+          $ref: '#/components/responses/Identity409Problem'
+        '412':
+          $ref: '#/components/responses/Identity412Problem'
+        '428':
+          $ref: '#/components/responses/Identity428Problem'
+        '429':
+          $ref: '#/components/responses/Identity429Problem'
+        '500':
+          $ref: '#/components/responses/Identity500Problem'
+        '503':
+          $ref: '#/components/responses/Identity503Problem'
+      x-authority-code: IDENTITY_ORGANIZATION_MANAGE
+      x-on-behalf-selection: REJECT
+      x-authority-path: DIRECT
+      x-command-type: REACTIVATE_APPOINTMENT_ROLE
+      x-envelope: INTERNAL_ADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReactivateAppointmentRoleV1'
+
 components:
   securitySchemes:
     publicBearer:
@@ -16837,6 +17453,82 @@ components:
           schema:
             $ref: '#/components/schemas/Problem'
   schemas:
+    AuditRecordV1:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - trustedAt
+      - actorLabel
+      - appointmentLabel
+      - objectLabel
+      - actionLabel
+      - scopeLabel
+      - resultLabel
+      - summary
+      - verificationLabel
+      - hasCorrelation
+      - hasCorrection
+      - authorizationPathLabel
+      - recordOrganizationLabel
+      - onBehalfLabel
+      properties:
+        authorizationPathLabel:
+          type: string
+          maxLength: 200
+        recordOrganizationLabel:
+          type: string
+          maxLength: 200
+        onBehalfLabel:
+          type: string
+          maxLength: 200
+        id:
+          $ref: '#/components/schemas/Uuid'
+        trustedAt:
+          type: string
+          format: date-time
+        actorLabel:
+          type: string
+          maxLength: 200
+        appointmentLabel:
+          type: string
+          maxLength: 200
+        objectLabel:
+          type: string
+          maxLength: 200
+        actionLabel:
+          type: string
+          maxLength: 200
+        scopeLabel:
+          type: string
+          maxLength: 200
+        resultLabel:
+          type: string
+          maxLength: 200
+        summary:
+          type: string
+          maxLength: 200
+        verificationLabel:
+          type: string
+          maxLength: 200
+        hasCorrelation:
+          type: boolean
+        hasCorrection:
+          type: boolean
+    AuditRecordPageV1:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/AuditRecordV1'
+        nextCursor:
+          type: string
+          maxLength: 4096
     PersonalWaitingRowV1:
       type: object
       additionalProperties: false
@@ -26245,9 +26937,16 @@ components:
           $ref: '#/components/schemas/Uuid'
         label:
           $ref: '#/components/schemas/SafeText200'
+        code:
+          $ref: '#/components/schemas/IdentityRoleCodeV1'
     GrantableAuthorityCodeV1:
       type: string
       enum:
+      - IDENTITY_PRINCIPAL_MANAGE
+      - IDENTITY_ORGANIZATION_MANAGE
+      - IDENTITY_APPOINTMENT_MANAGE
+      - IDENTITY_AUTHORITY_MANAGE
+      - AUDIT_READ
       - LEAD_CAPTURE
       - LEAD_INGRESS_RESOLVE
       - LEAD_INGRESS_COMPLETE
@@ -26294,10 +26993,9 @@ components:
       - LEAD_MANAGEMENT_READ
     IdentityRoleCodeV1:
       type: string
-      enum:
-      - INTAKE_OPERATOR
-      - ROUTING_SUPERVISOR
-      - CONTACT_OPERATOR
+      minLength: 1
+      maxLength: 64
+      pattern: ^[A-Z][A-Z0-9_]{0,63}$
     IdentityAdminPageV1:
       type: string
       enum:
@@ -26305,12 +27003,14 @@ components:
       - ORGANIZATIONS
       - APPOINTMENTS
       - AUTHORITY_GRANTS
+      - ROLES
     IdentityOptionKindV1:
       type: string
       enum:
       - PRINCIPAL
       - ORGANIZATION
       - APPOINTMENT
+      - ROLE
     SessionContextV1:
       description: Nine required fields. Selected IDs must match exactly one corresponding candidate; choices are UUID sorted and deduplicated. Cross-array membership, current qualification, bounded query overflow and fresh entry permission checks are explicit runtime obligations under Identity V1.1; generated types do not guarantee them.
       type: object
@@ -26326,6 +27026,8 @@ components:
       - delegatedAppointmentChoices
       - selectedOnBehalfAppointmentId
       properties:
+        canReadAuditRecords:
+          type: boolean
         delegatedAppointmentChoices:
           type: array
           maxItems: 50
@@ -26661,6 +27363,7 @@ components:
       - principal
       - organization
       - roleCode
+      - roleName
       - effectiveFrom
       - effectiveUntil
       - state
@@ -26673,12 +27376,9 @@ components:
         organization:
           $ref: '#/components/schemas/IdentityChoiceV1'
         roleCode:
-          type: string
-          enum:
-          - INTAKE_OPERATOR
-          - ROUTING_SUPERVISOR
-          - CONTACT_OPERATOR
-          - IDENTITY_ADMIN
+          $ref: '#/components/schemas/IdentityRoleCodeV1'
+        roleName:
+          $ref: '#/components/schemas/SafeText200'
         effectiveFrom:
           $ref: '#/components/schemas/Instant'
         effectiveUntil:
@@ -26714,6 +27414,7 @@ components:
         authorityCode:
           type: string
           enum:
+          - AUDIT_READ
           - LEAD_CAPTURE
           - LEAD_INGRESS_RESOLVE
           - LEAD_INGRESS_COMPLETE
@@ -30577,6 +31278,7 @@ components:
       - $ref: '#/components/schemas/OwnerExceptionValidationFactRefV1'
       - $ref: '#/components/schemas/IdentityPrincipalFactRefV1'
       - $ref: '#/components/schemas/OrganizationUnitFactRefV1'
+      - $ref: '#/components/schemas/AppointmentRoleFactRefV1'
       - $ref: '#/components/schemas/AppointmentFactRefV1'
       - $ref: '#/components/schemas/AuthorityGrantFactRefV1'
       - $ref: '#/components/schemas/LeadFactRef'
@@ -30807,6 +31509,7 @@ components:
       - STALE_TRANSFER_PARTY
       - STALE_TRANSFER_REVIEW_BASIS
       - TRANSFER_REVIEW_OUTCOME_UNAVAILABLE
+      - PAYMENT_ALREADY_RECORDED
     RetryPolicy:
       type: string
       enum:
@@ -32843,3 +33546,137 @@ components:
         revision:
           type: integer
           const: 0
+
+    CreateAppointmentRoleV1:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - displayName
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: ^[A-Z][A-Z0-9_]{0,63}$
+        displayName:
+          $ref: '#/components/schemas/SafeText200'
+
+    RenameAppointmentRoleV1:
+      type: object
+      additionalProperties: false
+      required:
+      - displayName
+      properties:
+        displayName:
+          $ref: '#/components/schemas/SafeText200'
+
+    DeactivateAppointmentRoleV1:
+      type: object
+      additionalProperties: false
+      required:
+      - reasonCode
+      properties:
+        reasonCode:
+          type: string
+          enum:
+          - ADMINISTRATIVE_ACTION
+          - SECURITY_RESPONSE
+    ReactivateAppointmentRoleV1:
+      type: object
+      additionalProperties: false
+      required:
+      - reasonCode
+      properties:
+        reasonCode:
+          type: string
+          enum:
+          - ADMINISTRATIVE_ACTION
+          - SECURITY_RESPONSE
+
+    AppointmentRoleV1:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - code
+      - displayName
+      - state
+      - etag
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        code:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: ^[A-Z][A-Z0-9_]{0,63}$
+        displayName:
+          $ref: '#/components/schemas/SafeText200'
+        state:
+          type: string
+          enum:
+          - ACTIVE
+          - INACTIVE
+        etag:
+          $ref: '#/components/schemas/IdentityETag'
+
+    AppointmentRolePageV1:
+      type: object
+      additionalProperties: false
+      required:
+      - items
+      - nextCursor
+      properties:
+        items:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/AppointmentRoleV1'
+        nextCursor:
+          type:
+          - string
+          - 'null'
+          minLength: 1
+          maxLength: 2048
+          pattern: ^[A-Za-z0-9_-]+$
+
+    AppointmentRoleFactRefV1:
+      type: object
+      additionalProperties: false
+      required:
+      - factType
+      - factRef
+      - revision
+      properties:
+        factType:
+          type: string
+          const: APPOINTMENT_ROLE
+        factRef:
+          $ref: '#/components/schemas/OpaqueRef'
+        revision:
+          $ref: '#/components/schemas/Revision'
+
+    AppointmentRoleCommandReceiptV1:
+      type: object
+      additionalProperties: false
+      required:
+      - commandId
+      - receiptId
+      - outcome
+      - completedAt
+      - resultFact
+      properties:
+        commandId:
+          $ref: '#/components/schemas/Uuid'
+        receiptId:
+          $ref: '#/components/schemas/Uuid'
+        outcome:
+          type: string
+          enum:
+          - SUCCEEDED
+          - NO_CHANGE
+        completedAt:
+          $ref: '#/components/schemas/Instant'
+        resultFact:
+          $ref: '#/components/schemas/AppointmentRoleFactRefV1'

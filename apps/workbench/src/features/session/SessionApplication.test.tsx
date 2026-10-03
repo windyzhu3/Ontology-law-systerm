@@ -27,6 +27,23 @@ import {
   tags,
 } from "../../test/fixtures";
 const scope = "ask1.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+it('recovers an original command before the audit-only default entry and returns to audit afterwards',async()=>{
+ history.replaceState(null,'','/login');const marker={commandId:selectorId,commandType:'CREATE_IDENTITY_PRINCIPAL',actorScopeKey:scope,recordedAt:new Date().toISOString()};sessionStorage.setItem(markerKey,JSON.stringify(marker));
+ const reads:Request[]=[];vi.stubGlobal('fetch',async(request:Request)=>{reads.push(request);return jsonResponse({items:[]});});
+ const f=fixture({context:{...context,canEnterWorkbench:false,canEnterIdentityAdmin:false,canReadAuditRecords:true},respond:async()=>jsonResponse({...receipt(selectorId),resultFact:{factType:'IDENTITY_PRINCIPAL',factRef:'safe-identity-result',revision:1}})});
+ render(<SessionApplication controller={f.controller} api={f.api}/>);const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ expect(await screen.findByRole('heading',{name:'核对原操作结果'})).toBeVisible();expect(f.controller.recovery.read()).toEqual(marker);expect(reads).toHaveLength(0);
+ const query=await screen.findByRole('button',{name:'查询原操作结果'});await waitFor(()=>expect(query).toBeEnabled());fireEvent.click(query);fireEvent.click(await screen.findByRole('button',{name:'继续'}));expect(await screen.findByRole('heading',{name:'审计记录'})).toBeVisible();expect(location.pathname).toBe('/admin/audit-records');expect(f.requests).toHaveLength(1);
+});
+it.each(['/admin/audit-records','/login'])('enters the audit-only page from %s without identity directory access',async path=>{
+ history.replaceState(null,'',path);
+ vi.stubGlobal('fetch',async()=>new Response(JSON.stringify({items:[]}),{status:200,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}}));
+ const f=fixture({context:{...context,canEnterWorkbench:false,canEnterIdentityAdmin:false,canReadAuditRecords:true}});
+ render(<SessionApplication controller={f.controller} api={f.api}/>);
+ const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ expect(await screen.findByRole('heading',{name:'审计记录'})).toBeVisible();
+ expect(screen.queryByRole('link',{name:'身份主体'})).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:/导出/})).not.toBeInTheDocument();
+});
 
 it.each(["switch", "popstate", "logout"] as const)("guards a dirty identity editor before explicit %s but immediately clears on expiry", async action => {
   history.replaceState(null, "", "/admin/identity/principals");
@@ -1049,6 +1066,18 @@ it('admits an independent management reader without workbench or contract body r
  act(()=>f.controller.invalidate('EXPIRED'));expect(screen.queryByRole('heading',{name:'合同台账'})).toBeNull();
 });
 
+it('opens the authorized contract view when returning from overview to the contract ledger',async()=>{
+ history.replaceState(null,'','/management/overview');
+ const reads=vi.fn().mockImplementation(async url=>jsonResponse(String(url)==='/api/v1/business-overview'?{month:'2026-10',asOf:'2026-10-01T00:00:00Z',metrics:[]}:{items:[],nextCursor:null}));vi.stubGlobal('fetch',reads);
+ const f=fixture({context:{...context,canEnterWorkbench:false,canReadBusinessOverview:true,canReadBusinessManagement:true,businessManagementViews:['contracts','payments','transfer']}});
+ render(<SessionApplication controller={f.controller} api={f.api}/>);
+ const confirm=await screen.findByRole('button',{name:'确认本次身份'});await waitFor(()=>expect(confirm).toBeEnabled());fireEvent.click(confirm);
+ await screen.findByRole('heading',{name:'经营概览'});fireEvent.click(screen.getByRole('button',{name:'合同台账'}));
+ await screen.findByRole('heading',{name:'合同台账'});await waitFor(()=>expect(reads.mock.calls.some(args=>String(args[0]).startsWith('/api/v1/contracts'))).toBe(true));
+ expect(reads.mock.calls.some(args=>String(args[0]).startsWith('/api/v1/business-management/payments'))).toBe(false);
+ expect(location.pathname).toBe('/management/contracts');expect(f.requests).toHaveLength(0);
+});
+
 it('opens transfer directly for a transfer-only reader without probing payment or contract data',async()=>{
  history.replaceState(null,'','/management/contracts');const reads=vi.fn().mockResolvedValue(jsonResponse({items:[],nextCursor:null}));vi.stubGlobal('fetch',reads);
  const f=fixture({context:{...context,canEnterWorkbench:false,canReadBusinessManagement:true,businessManagementViews:['transfer']}});render(<SessionApplication controller={f.controller} api={f.api}/>);
@@ -1114,4 +1143,35 @@ it.each([true,false])('keeps all common navigation entries across leads, overvie
  fireEvent.click(screen.getByRole('button',{name:'来源与责任'}));await screen.findByRole('heading',{name:'来源与责任'});expect(labels()).toEqual(names);
  expect(push).toHaveBeenCalled();push.mockRestore();
  act(()=>history.back());await waitFor(()=>expect(location.pathname).toBe('/management/team-tasks'));await screen.findByRole('heading',{name:'团队待办'});expect(labels()).toEqual(names);expect(identity()).toBe('合成入口办理人 · 业务一组 · 线索专员');
+});
+
+it.each(["button", "broadcast"] as const)("explicit admin logout via %s must not send the next ordinary account back to identity administration", async action => {
+  history.replaceState(null, "", "/admin/identity/principals");
+  sessionStorage.setItem('ols.login-destination.v1', JSON.stringify({path:'/admin/identity/organizations',savedAt:Date.now()}));
+  const admin = fixture({context:{...context,canEnterWorkbench:false,canEnterIdentityAdmin:true}});
+  const identity = identityFixture('/admin/identity/principals',{recovery:admin.controller.recovery});
+  const first = render(<SessionApplication controller={admin.controller} api={admin.api} identityApi={identity.api}/>);
+  const confirm = await screen.findByRole('button',{name:'确认本次身份'});
+  await waitFor(()=>expect(confirm).toBeEnabled()); fireEvent.click(confirm);
+  await screen.findByRole('button',{name:'新增身份主体'});
+  if(action==='button') fireEvent.click(screen.getByRole('button',{name:'退出'}));
+  else {
+    const channel=new BroadcastChannel('r1.session-logout');
+    channel.postMessage('LOGOUT');
+    await screen.findByText('已退出本页面，请重新登录。');
+    channel.close();
+  }
+  await waitFor(()=>expect(location.pathname).toBe('/login'));
+  expect(sessionStorage.getItem('ols.login-destination.v1')).toBeNull();
+  first.unmount();
+  history.replaceState(null,'','/auth/callback');
+  const manager=fixture();
+  render(<SessionApplication controller={manager.controller} api={manager.api}/>);
+  const nextConfirm=await screen.findByRole('button',{name:'确认本次身份'});
+  await waitFor(()=>expect(nextConfirm).toBeEnabled());
+  expect(location.pathname).toBe('/workbench');
+  expect(manager.requests).toHaveLength(0);
+  fireEvent.click(nextConfirm);
+  await screen.findByRole('main',{name:'责任工作台'});
+  expect(screen.queryByText('当前任职不能进入身份管理；请确认本人任职具备管理资格。')).toBeNull();
 });

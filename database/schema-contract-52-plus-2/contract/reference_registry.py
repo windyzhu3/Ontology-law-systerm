@@ -257,3 +257,7 @@ TYPED_REFERENCE_ALLOWED_TARGETS['responsibility.task_occurrence.completion_fact'
 
 TYPED_REFERENCE_ALLOWED_TARGETS['conflict.conflict_review.trigger_fact']+=('transfer.submission',)
 TYPED_REFERENCE_ALLOWED_TARGETS['conflict.conflict_review_party.source_item']+=('opportunity.customer_requirement_participant',)
+
+APPLICATION_FACT_TYPES += ('identity.appointment_role',)
+for _slot in ('audit.audit_entry.subject', 'execution.command_receipt.result_fact'):
+    TYPED_REFERENCE_ALLOWED_TARGETS[_slot] += ('identity.appointment_role',)

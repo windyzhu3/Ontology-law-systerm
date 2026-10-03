@@ -11,6 +11,7 @@ import {
 type S = components["schemas"];
 type CommandType = IdentityOriginalWrite["commandType"];
 type IdentitySuccessReceipt =
+  | S["AppointmentRoleCommandReceiptV1"]
   | S["IdentityPrincipalCommandReceiptV1"]
   | S["OrganizationUnitCommandReceiptV1"]
   | S["AppointmentCommandReceiptV1"]
@@ -20,8 +21,12 @@ const key = "019c7000-0000-7000-8000-000000000001";
 const targetId = "019c7000-0000-7000-8000-000000000002";
 const ifMatch = '"identity.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"';
 
-it("keeps the fourteen command discriminants and generated bodies exact", () => {
+it("keeps the eighteen command discriminants and generated bodies exact", () => {
   expectTypeOf<CommandType>().toEqualTypeOf<
+    | "CREATE_APPOINTMENT_ROLE"
+    | "RENAME_APPOINTMENT_ROLE"
+    | "DEACTIVATE_APPOINTMENT_ROLE"
+    | "REACTIVATE_APPOINTMENT_ROLE"
     | "CREATE_IDENTITY_PRINCIPAL"
     | "RENAME_IDENTITY_PRINCIPAL"
     | "SUSPEND_IDENTITY_PRINCIPAL"

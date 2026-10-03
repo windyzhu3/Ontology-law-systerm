@@ -13,7 +13,7 @@ public final class JooqCurrentTaskReader implements CurrentTaskReader {
         try(var p=c.prepareStatement("select cancellation_reason_code from responsibility.task_occurrence where tenant_id=? and task_occurrence_id=? and state='CANCELLED'")){p.setObject(1,tenant);p.setObject(2,task);try(var row=p.executeQuery()){return row.next()?row.getString(1):null;}}
     }
     public io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Subject cancellation(Connection c,UUID tenant,UUID task)throws SQLException {
-        try(var p=c.prepareStatement("select cancellation_fact_type,cancellation_fact_id,cancellation_fact_revision from responsibility.task_occurrence where tenant_id=? and task_occurrence_id=? and state='CANCELLED'")){p.setObject(1,tenant);p.setObject(2,task);try(var r=p.executeQuery()){return !r.next()||r.getString(1)==null?null:new io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Subject(r.getString(1),r.getObject(2,UUID.class),r.getObject(3,Long.class),null);}}
+        try(var p=c.prepareStatement("select cancellation_fact_type,cancellation_fact_id,cancellation_fact_revision,cancellation_fact_hash from responsibility.task_occurrence where tenant_id=? and task_occurrence_id=? and state='CANCELLED'")){p.setObject(1,tenant);p.setObject(2,task);try(var r=p.executeQuery()){return !r.next()||r.getString(1)==null?null:new io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Subject(r.getString(1),r.getObject(2,UUID.class),r.getObject(3,Long.class),hash(r.getBytes(4)));}}
     }
 
     private static DSLContext db(Connection c) { return DSL.using(c,SQLDialect.POSTGRES,new org.jooq.conf.Settings().withExecuteLogging(false)); }

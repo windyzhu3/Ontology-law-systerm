@@ -12,7 +12,7 @@ import { RecoveryStore } from '../../apps/workbench/src/features/session/recover
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { boundaryProbe, journalBindingProbe } from './boundary-probe';
+import { boundaryProbe, journalBindingProbe, syntheticPython } from './boundary-probe';
 import { allowReadOnlyRequest, COMPLETE_JOURNAL_SHA, readOnlyOutcome, type ReadOnlyEvidence } from '../fixtures/readonly-session';
 
 for (const mismatch of ['environment', 'run', 'build'] as const) test(`offline readonly journal binding rejects wrong ${mismatch} despite matching byte hash`, () => {
@@ -388,7 +388,7 @@ except Exception:
     print('REJECTED_BEFORE_EVIDENCE');sys.exit(2)
 `;
   for (const mode of ['load', 'snapshot']) for (const changed of ['none', 'api', 'spa', 'worker', 'api-created', 'api-pid', 'spa-actual']) {
-    const result = spawnSync('D:/soft/python3/python.exe', ['-B', '-c', probe, resolve(__dirname, '../..'), mode, synthetic, changed], { input: LOCAL_RUNTIME_BRIDGE, encoding: 'utf8', windowsHide: true });
+    const result = spawnSync(syntheticPython, ['-B', '-c', probe, resolve(__dirname, '../..'), mode, synthetic, changed], { input: LOCAL_RUNTIME_BRIDGE, encoding: 'utf8', windowsHide: true });
     expect(result.status).toBe(changed === 'none' ? 0 : 2);
     expect(result.stdout.trim()).toBe(changed === 'none' ? 'EVIDENCE_REACHED' : 'REJECTED_BEFORE_EVIDENCE');
   }
@@ -505,7 +505,7 @@ except Exception:
     print('REJECTED_BEFORE_CREDENTIALS');sys.exit(2)
 `;
   for (const mode of ['snapshot', 'load']) for (const scenario of ['coherent', 'unknown-kind', 'source-kind', 'legacy-kind', 'manifest-provenance', 'manifest-digest', 'provenance-release-digest', 'jar-bytes']) {
-    const result = spawnSync('D:/soft/python3/python.exe', ['-B', '-c', probe, resolve(__dirname, '../..'), mode, synthetic, scenario], { input: LOCAL_RUNTIME_BRIDGE, encoding: 'utf8', windowsHide: true });
+    const result = spawnSync(syntheticPython, ['-B', '-c', probe, resolve(__dirname, '../..'), mode, synthetic, scenario], { input: LOCAL_RUNTIME_BRIDGE, encoding: 'utf8', windowsHide: true });
     expect(result.status, `${mode}:${scenario}`).toBe(scenario === 'coherent' ? 0 : 2);
     expect(result.stdout.trim(), `${mode}:${scenario}`).toBe(scenario === 'coherent' ? 'VERIFIED_BEFORE_CREDENTIALS' : 'REJECTED_BEFORE_CREDENTIALS');
   }

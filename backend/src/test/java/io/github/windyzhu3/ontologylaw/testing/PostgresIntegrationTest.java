@@ -26,6 +26,21 @@ public abstract class PostgresIntegrationTest {
     @AfterAll
     void stopDatabase() { if (database != null) database.close(); }
 
+    /** Wait for the real database clock; do not rewrite immutable wait deadlines. */
+    protected void awaitDatabaseTime(java.time.Instant due) throws Exception {
+        long deadline=System.nanoTime()+java.time.Duration.ofSeconds(10).toNanos();
+        try(var c=database.apiConnection()) {
+            while(true) {
+                var observed=io.github.windyzhu3.ontologylaw.execution.internal.persistence.CapabilityRoleExecutor.inTransaction(c,io.github.windyzhu3.ontologylaw.execution.internal.persistence.CapabilityRoleExecutor.Capability.QUERY,x->{
+                    try(var statement=x.createStatement();var rows=statement.executeQuery("select clock_timestamp()")){rows.next();return rows.getObject(1,java.time.OffsetDateTime.class).toInstant();}
+                });
+                if(!observed.isBefore(due))return;
+                org.junit.jupiter.api.Assertions.assertTrue(System.nanoTime()<deadline,"Database clock did not reach the fixture deadline");
+                Thread.sleep(25);
+            }
+        }
+    }
+
     public static Path repositoryRoot() {
         Path path = Path.of("").toAbsolutePath();
         while (path != null && !Files.exists(path.resolve("database/schema-contract-52-plus-2/runtime/toolchain.lock.json"))) {
@@ -95,7 +110,7 @@ public abstract class PostgresIntegrationTest {
             flyway.validate();
             long migrations = java.util.Arrays.stream(flyway.info().applied())
                     .filter(migration -> migration.getVersion() != null).count();
-            long expected = target == null || "1060".equals(target) ? 41 : "1050".equals(target) ? 40 : "1040".equals(target) ? 39 : "1030".equals(target) ? 38 : "1020".equals(target) ? 37 : "1010".equals(target) ? 36 : "1000".equals(target) ? 35 : "990".equals(target) ? 34 : "980".equals(target) ? 33 : "970".equals(target) ? 32 : "960".equals(target) ? 31 : "950".equals(target) ? 30 : "940".equals(target) ? 29 : "930".equals(target) ? 28 : "920".equals(target) ? 27 : "910".equals(target) ? 26 : "900".equals(target) ? 25 : "890".equals(target) ? 24 : "880".equals(target) ? 23 : "870".equals(target) ? 22 : "860".equals(target) ? 21 : 20;
+            long expected = target == null || "1080".equals(target) ? 43 : "1070".equals(target) ? 42 : "1060".equals(target) ? 41 : "1050".equals(target) ? 40 : "1040".equals(target) ? 39 : "1030".equals(target) ? 38 : "1020".equals(target) ? 37 : "1010".equals(target) ? 36 : "1000".equals(target) ? 35 : "990".equals(target) ? 34 : "980".equals(target) ? 33 : "970".equals(target) ? 32 : "960".equals(target) ? 31 : "950".equals(target) ? 30 : "940".equals(target) ? 29 : "930".equals(target) ? 28 : "920".equals(target) ? 27 : "910".equals(target) ? 26 : "900".equals(target) ? 25 : "890".equals(target) ? 24 : "880".equals(target) ? 23 : "870".equals(target) ? 22 : "860".equals(target) ? 21 : 20;
             if (migrations != expected) throw new IllegalStateException("Expected " + expected + " migrations, got " + migrations);
             try (var connection = adminConnection(); var sql = connection.createStatement()) {
                 sql.execute(Files.readString(repositoryRoot().resolve("backend/src/test/resources/db/bootstrap-runtime-logins.sql")));

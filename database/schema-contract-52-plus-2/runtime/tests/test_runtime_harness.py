@@ -14,6 +14,7 @@ import sys
 import tempfile
 import time
 import unittest
+from r1_manifest_fixture import r1_manifest
 from unittest import mock
 
 from pglast import ast, parse_sql, parser
@@ -2104,11 +2105,7 @@ SELECT "PG_TEMP" /* hidden */ . "EXPECT_SQLSTATE"(
         lock = verify_runtime.load_toolchain_lock(
             PROJECT_ROOT / "runtime" / "toolchain.lock.json"
         )
-        manifest = json.loads(
-            (PROJECT_ROOT / "generated" / "schema-contract-manifest.json").read_text(
-                encoding="utf-8"
-            )
-        )
+        manifest = r1_manifest()
         self.assertEqual(manifest["contractVersion"], "52-plus-2-v1.2")
 
         with self.assertRaisesRegex(ValueError, "v1|legacy|publication"):

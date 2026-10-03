@@ -8,6 +8,15 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class R2WorkcardDisclosureTest {
+    @Test void termination_reviewer_has_exact_registered_direct_disclosure() {
+        for(var type:java.util.List.of("opportunity.opportunity","opportunity.responsibility_handoff")) {
+            var source=new Subject(type,UUID.randomUUID(),0L,null);
+            assertEquals("R2_CURRENT_WORKCARD_DISCLOSURE_AUDIT_V1",entry(source,source,"CONTRACT_TERMINATION_REVIEW","OPPORTUNITY_OWNER",Path.DIRECT).schemaCode());
+            assertThrows(IllegalArgumentException.class,()->entry(source,source,"CONTRACT_TERMINATION_REVIEW","OPPORTUNITY_OWNER",Path.DELEGATED));
+            assertThrows(IllegalArgumentException.class,()->entry(source,source,"CONTRACT_TERMINATION_REVIEW","CONTACT_OWNER",Path.DIRECT));
+            assertThrows(IllegalArgumentException.class,()->entry(source,new Subject(type,UUID.randomUUID(),0L,null),"CONTRACT_TERMINATION_REVIEW","OPPORTUNITY_OWNER",Path.DIRECT));
+        }
+    }
     @Test void signature_verifier_uses_registered_direct_workcard_disclosure_without_widening_authority(){
         for(String type:java.util.List.of("opportunity.opportunity","opportunity.responsibility_handoff")){
             var source=new Subject(type,UUID.randomUUID(),0L,null);

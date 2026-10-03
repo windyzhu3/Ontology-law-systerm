@@ -609,6 +609,7 @@ export function validReceipt(v: unknown, key: string): v is PublicReceipt {
       "OPPORTUNITY_CUSTOMER_DRAFT",
       "OPPORTUNITY_CUSTOMER_CONFIRMATION",
       "OPPORTUNITY_PROGRESS",
+      "APPOINTMENT_ROLE",
       "IDENTITY_PRINCIPAL",
       "ORGANIZATION_UNIT",
       "APPOINTMENT",

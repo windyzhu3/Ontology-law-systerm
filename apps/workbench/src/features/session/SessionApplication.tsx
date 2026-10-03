@@ -14,7 +14,7 @@ const isOwnerManagementRoute = (path: string) => ["/management/team-tasks", "/ma
 import { LeadIntakeApplication, leadIntakeRoute } from "../lead-intake/LeadIntakeApplication";
 import { createLeadIntakeApi } from "../lead-intake/leadIntakeApi";
 import { LoginPage } from "./LoginPage";
-import { consumeLoginDestination, rememberLoginDestination } from './loginDestination';
+import { clearLoginDestination, consumeLoginDestination, rememberLoginDestination } from './loginDestination';
 import type { SessionRuntime } from "./sessionConfiguration";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -127,6 +127,8 @@ function SessionRoutes({
   const [admission, setAdmission] = useState<Admission | null>(null);
   const context = state.context;
   const loginDestination = useRef<ReturnType<typeof consumeLoginDestination> | null>(null);
+  const explicitLogout = useRef(false);
+  const hadAuthenticatedSession = useRef(false);
   const overviewIntent = path === "/management/overview";
   const overviewTransport=useMemo(()=>createBusinessOverviewTransport(),[]);
   const leadIntent = path === "/management/leads";
@@ -148,12 +150,19 @@ function SessionRoutes({
   useEffect(() => {
     if (!setup || state.status === "INITIALIZING") return;
     if (state.status === "READY" || state.status === "SELECTING") {
+      explicitLogout.current = false;
+      hadAuthenticatedSession.current = true;
       if (path !== "/workbench" && !isIdentityAdminRoute(path) && path !== leadIntakeRoute && !managementIntent && !ledgerIntent && !businessIntent && !leadIntent && !overviewIntent) {
         loginDestination.current ??= consumeLoginDestination();
         navigate(loginDestination.current);
       }
     } else if (path !== "/login") {
-      if (state.status === 'SIGNED_OUT') rememberLoginDestination(path);
+      if (state.status === 'SIGNED_OUT') {
+        if (explicitLogout.current || hadAuthenticatedSession.current) {
+          clearLoginDestination();
+          loginDestination.current = null;
+        } else rememberLoginDestination(path);
+      }
       navigate("/login");
     }
   }, [setup, state.status, path]);
@@ -190,6 +199,9 @@ function SessionRoutes({
       stage: next,
     });
   }
+  function defaultAuditEntry(selected: SessionContext) {
+    return !adminIntent && !selected.canEnterWorkbench && selected.canReadAuditRecords===true && selected.selectedOnBehalfAppointmentId===null && !overviewIntent && !leadIntent && !businessIntent && !ledgerIntent && !managementIntent && !intakeIntent;
+  }
   function confirmed(selected: SessionContext) {
     let pending = true;
     try {
@@ -197,6 +209,7 @@ function SessionRoutes({
     } catch {
       /* Recovery page owns explicit invalid-clue cleanup. */
     }
+    if(!pending && defaultAuditEntry(selected)){navigate("/admin/audit-records");selectStage("admin",selected);return;}
     selectStage(
       pending
         ? "recovery"
@@ -213,7 +226,7 @@ function SessionRoutes({
         : intakeIntent
           ? selected.selectedOnBehalfAppointmentId === null ? "intake" : "unqualified"
           : adminIntent
-          ? selected.canEnterIdentityAdmin && selected.selectedOnBehalfAppointmentId === null
+          ? (path === "/admin/audit-records" ? selected.canReadAuditRecords === true : selected.canEnterIdentityAdmin) && selected.selectedOnBehalfAppointmentId === null
             ? "admin"
             : "unqualified"
           : selected.canEnterWorkbench
@@ -238,7 +251,7 @@ function SessionRoutes({
       !selected.actorScopeKey ||
       !selected.selectedAppointmentId ||
       selected.selectedOnBehalfAppointmentId !== null ||
-      !selected.canEnterIdentityAdmin
+      !(selected.canEnterIdentityAdmin || selected.canReadAuditRecords === true)
     )
       return;
     setAdmission({
@@ -247,7 +260,7 @@ function SessionRoutes({
       scope: selected.actorScopeKey,
       stage: "choosing",
     });
-    navigate("/admin/identity/principals");
+    navigate(selected.canEnterIdentityAdmin ? "/admin/identity/principals" : "/admin/audit-records");
   }
   useEffect(() => {
     if (!current || !context || ["choosing","recovery","unqualified"].includes(stage)) return;
@@ -255,19 +268,27 @@ function SessionRoutes({
     if(target && target!==stage) confirmed(context);
   },[path]);
   const leaveSession=(action:()=>void)=>stage==='admin'||stage==='intake'?guardedLeave(action):action();
-  const sessionActions=context?<SessionActions context={context} onSwitch={()=>leaveSession(()=>selectStage('choosing'))} onLogout={()=>leaveSession(()=>void controller.logout())}/>:undefined;
+  const sessionActions=context?<SessionActions context={context} onSwitch={()=>leaveSession(()=>selectStage('choosing'))} onLogout={()=>leaveSession(()=>{
+    explicitLogout.current = true;
+    loginDestination.current = null;
+    clearLoginDestination();
+    navigate('/login');
+    void controller.logout();
+  })}/>:undefined;
   if (!setup || !["READY", "SELECTING"].includes(state.status))
     return <LoginEntry controller={controller} />;
   if (
     stage === "admin" &&
     adminIntent &&
-    context?.canEnterIdentityAdmin &&
+    context !== null &&
+    (path === "/admin/audit-records" ? context?.canReadAuditRecords === true : context?.canEnterIdentityAdmin) &&
     context.selectedOnBehalfAppointmentId === null &&
     actor
   ) {
     return (
       <IdentityAdminApplication
         session={actor}
+        canManageIdentity={context.canEnterIdentityAdmin}
         api={identityApi}
         path={path}
         onNavigate={navigate}
@@ -308,7 +329,7 @@ function SessionRoutes({
       sessionActions={sessionActions}/>;
   }
   if(stage === "businessManagement" && actor && context?.canReadBusinessManagement === true && context.selectedOnBehalfAppointmentId === null){
-    return <ContractLedgerPage onLeads={onLeads} onOverview={onOverview} onTeam={context.canReadTeamTasks||context.canManageOwnerExceptions?()=>{navigate("/management/team-tasks");selectStage("management",context);}:undefined} session={actor} api={managementContracts} initialView="payments" onTasks={context.canEnterWorkbench?()=>{navigate('/workbench');selectStage('workbench',context);}:undefined} onBack={context.canReadOpportunityLedger?()=>{navigate('/management/opportunities');selectStage('ledger',context);}:undefined} onManagementTask={id=>{if(!context.canEnterWorkbench)throw Error('当前任职无办理权限');setIntakeTask({id,epoch:actor.identityEpoch,scope:actor.actorScopeKey});navigate('/workbench');selectStage('workbench',context);}} sessionActions={sessionActions}/>;
+    return <ContractLedgerPage onLeads={onLeads} onOverview={onOverview} onTeam={context.canReadTeamTasks||context.canManageOwnerExceptions?()=>{navigate("/management/team-tasks");selectStage("management",context);}:undefined} session={actor} api={managementContracts} initialView={context.businessManagementViews?.includes("contracts") ? "contracts" : "payments"} onTasks={context.canEnterWorkbench?()=>{navigate('/workbench');selectStage('workbench',context);}:undefined} onBack={context.canReadOpportunityLedger?()=>{navigate('/management/opportunities');selectStage('ledger',context);}:undefined} onManagementTask={id=>{if(!context.canEnterWorkbench)throw Error('当前任职无办理权限');setIntakeTask({id,epoch:actor.identityEpoch,scope:actor.actorScopeKey});navigate('/workbench');selectStage('workbench',context);}} sessionActions={sessionActions}/>;
   }
   if (stage === "ledger" && actor && context?.canReadOpportunityLedger === true && context.selectedOnBehalfAppointmentId === null) {
     return <App onLeads={onLeads} onOverview={onOverview} onTeam={context.canReadTeamTasks||context.canManageOwnerExceptions?()=>{navigate("/management/team-tasks");selectStage("management",context);}:undefined} session={actor} api={api} sessionActions={sessionActions} />;
@@ -368,6 +389,7 @@ function SessionRoutes({
           } catch {
             return;
           }
+          if(stage === "recovery" && defaultAuditEntry(context)){navigate("/admin/audit-records");selectStage("admin",context);return;}
           selectStage(
             stage === "recovery"
               ? overviewIntent
@@ -383,7 +405,7 @@ function SessionRoutes({
               : intakeIntent
                 ? context.selectedOnBehalfAppointmentId === null ? "intake" : "unqualified"
                 : adminIntent
-                ? context.canEnterIdentityAdmin && context.selectedOnBehalfAppointmentId === null
+                ? (path === "/admin/audit-records" ? context.canReadAuditRecords === true : context.canEnterIdentityAdmin) && context.selectedOnBehalfAppointmentId === null
                   ? "admin"
                   : "unqualified"
                 : context.canEnterWorkbench

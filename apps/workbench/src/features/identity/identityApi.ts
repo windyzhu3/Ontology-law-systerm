@@ -22,6 +22,7 @@ export type { IdentityOriginalWrite } from "./identityContract";
 const identityTag = /^"identity\.[A-Za-z0-9_-]{43}"$/;
 type S = components["schemas"];
 type IdentitySuccessReceipt =
+  | S["AppointmentRoleCommandReceiptV1"]
   | S["IdentityPrincipalCommandReceiptV1"]
   | S["OrganizationUnitCommandReceiptV1"]
   | S["AppointmentCommandReceiptV1"]
@@ -130,6 +131,21 @@ export function createIdentityApi(
         }),
       );
     },
+    async listAppointmentRoles(
+      session: WorkbenchSession,
+      query: NonNullable<operations["listAppointmentRoles"]["parameters"]["query"]>,
+      signal: AbortSignal,
+    ) {
+      return read("listAppointmentRoles", session, query, signal, async (middleware, headers) =>
+        client.GET("/api/v1/admin/identity/roles", {
+          params: { query },
+          headers,
+          signal,
+          cache: "no-store",
+          middleware: [middleware],
+        }),
+      );
+    },
     async listOrganizationUnits(
       session: WorkbenchSession,
       query: NonNullable<operations["listOrganizationUnits"]["parameters"]["query"]>,
@@ -218,6 +234,26 @@ export function createIdentityApi(
           break;
         case "DISABLE_IDENTITY_PRINCIPAL":
           result = await client.POST("/api/v1/admin/identity/principals/{id}/disable", {
+            params: { path: { id: original.targetId }, header: { "Idempotency-Key": original.key, "If-Match": original.ifMatch } }, headers, body: original.body, signal, middleware: [middleware],
+          });
+          break;
+        case "CREATE_APPOINTMENT_ROLE":
+          result = await client.POST("/api/v1/admin/identity/roles", {
+            params: { header: { "Idempotency-Key": original.key } }, headers, body: original.body, signal, middleware: [middleware],
+          });
+          break;
+        case "RENAME_APPOINTMENT_ROLE":
+          result = await client.PATCH("/api/v1/admin/identity/roles/{id}/display-name", {
+            params: { path: { id: original.targetId }, header: { "Idempotency-Key": original.key, "If-Match": original.ifMatch } }, headers, body: original.body, signal, middleware: [middleware],
+          });
+          break;
+        case "DEACTIVATE_APPOINTMENT_ROLE":
+          result = await client.POST("/api/v1/admin/identity/roles/{id}/deactivate", {
+            params: { path: { id: original.targetId }, header: { "Idempotency-Key": original.key, "If-Match": original.ifMatch } }, headers, body: original.body, signal, middleware: [middleware],
+          });
+          break;
+        case "REACTIVATE_APPOINTMENT_ROLE":
+          result = await client.POST("/api/v1/admin/identity/roles/{id}/reactivate", {
             params: { path: { id: original.targetId }, header: { "Idempotency-Key": original.key, "If-Match": original.ifMatch } }, headers, body: original.body, signal, middleware: [middleware],
           });
           break;

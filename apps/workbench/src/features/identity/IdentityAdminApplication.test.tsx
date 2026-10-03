@@ -5,6 +5,7 @@ import { deferred, taskId, selectorId, testSession } from "../../test/fixtures";
 import { createIdentityApi } from "./identityApi";
 import { IdentityAdminApplication } from "./IdentityAdminApplication";
 import type { IdentityAdminRoute } from "./identityRoutes";
+type IdentityWriteRoute=Exclude<IdentityAdminRoute,'/admin/audit-records'>;
 import { RecoveryStore } from "../session/recoveryMarker";
 
 type S = components["schemas"];
@@ -13,7 +14,8 @@ const organizationId = "019c7000-0000-7000-8000-000000000004";
 const headers = { "Content-Type": "application/json", "Cache-Control": "no-store" };
 const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers });
-const bodies: Record<IdentityAdminRoute, unknown> = {
+const bodies: Record<IdentityWriteRoute, unknown> = {
+  "/admin/identity/roles": {items:[{id:taskId,code:"CUSTOM_ADVISOR",displayName:"业务顾问",state:"ACTIVE",etag:identityETag}],nextCursor:null},
   "/admin/identity/principals": {
     items: [{ id: taskId, displayName: "陈晓", state: "ACTIVE", etag: identityETag } satisfies S["IdentityPrincipalV1"]],
     nextCursor: null,
@@ -23,7 +25,7 @@ const bodies: Record<IdentityAdminRoute, unknown> = {
     nextCursor: null,
   },
   "/admin/identity/appointments": {
-    items: [{ id: taskId, principal: { id: selectorId, label: "陈晓" }, organization: { id: organizationId, label: "销售二组" }, roleCode: "CONTACT_OPERATOR", effectiveFrom: "2026-06-12T09:00:00Z", effectiveUntil: null, state: "ACTIVE", etag: identityETag } satisfies S["AppointmentV1"]],
+    items: [{ id: taskId, principal: { id: selectorId, label: "陈晓" }, organization: { id: organizationId, label: "销售二组" }, roleCode: "CONTACT_OPERATOR", roleName: "首联经办", effectiveFrom: "2026-06-12T09:00:00Z", effectiveUntil: null, state: "ACTIVE", etag: identityETag } satisfies S["AppointmentV1"]],
     nextCursor: null,
   },
   "/admin/identity/authority-grants": {
@@ -31,7 +33,8 @@ const bodies: Record<IdentityAdminRoute, unknown> = {
     nextCursor: null,
   },
 };
-const cases: Array<[IdentityAdminRoute, string, string]> = [
+const cases: Array<[IdentityWriteRoute, string, string]> = [
+  ["/admin/identity/roles","/api/v1/admin/identity/roles?limit=20","业务顾问"],
   ["/admin/identity/principals", "/api/v1/admin/identity/principals?limit=20", "陈晓"],
   ["/admin/identity/organizations", "/api/v1/admin/identity/organizations?limit=20", "销售二组"],
   ["/admin/identity/appointments", "/api/v1/admin/identity/appointments?limit=20", "首联经办"],

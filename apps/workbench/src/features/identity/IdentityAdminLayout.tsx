@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Briefcase, Scales, ShieldCheck, TreeStructure, User } from "@phosphor-icons/react";
+import { Briefcase, Scales, ShieldCheck, TreeStructure, User, ListChecks } from "@phosphor-icons/react";
 import type { IdentityAdminRoute } from "./identityRoutes";
 
 const navigation: Array<{
@@ -9,6 +9,7 @@ const navigation: Array<{
 }> = [
   { path: "/admin/identity/principals", label: "身份主体", icon: User },
   { path: "/admin/identity/organizations", label: "组织架构", icon: TreeStructure },
+  { path: "/admin/identity/roles", label: "岗位管理", icon: Briefcase },
   { path: "/admin/identity/appointments", label: "任职管理", icon: Briefcase },
   { path: "/admin/identity/authority-grants", label: "直接授权", icon: ShieldCheck },
 ];
@@ -18,11 +19,15 @@ export function IdentityAdminLayout({
   onNavigate,
   sessionActions,
   children,
+  canManageIdentity = true,
+  canReadAuditRecords = false,
 }: {
   path: IdentityAdminRoute;
   onNavigate: (path: IdentityAdminRoute) => void;
   sessionActions: ReactNode;
   children: ReactNode;
+  canManageIdentity?: boolean;
+  canReadAuditRecords?: boolean;
 }) {
   return (
     <div className="identity-admin-shell">
@@ -37,7 +42,7 @@ export function IdentityAdminLayout({
         <aside className="identity-admin-sidebar">
           <p>身份与组织</p>
           <nav aria-label="身份管理">
-            {navigation.map(({ path: target, label, icon: Icon }) => (
+            {[...(canManageIdentity ? navigation : []),...(canReadAuditRecords ? [{path:'/admin/audit-records' as const,label:'审计记录',icon:ListChecks}]:[])].map(({ path: target, label, icon: Icon }) => (
               <a
                 key={target}
                 href={target}

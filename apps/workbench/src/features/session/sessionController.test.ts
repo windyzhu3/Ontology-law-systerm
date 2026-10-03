@@ -32,6 +32,9 @@ function adapter(): OidcAdapter {
   };
 }
 beforeEach(() => sessionStorage.clear());
+it('accepts audit-only own qualification without granting identity management and rejects represented audit rights',async()=>{
+ for(const represented of [false,true]){const data={...context,canEnterWorkbench:false,canEnterIdentityAdmin:false,canReadAuditRecords:true,selectedOnBehalfAppointmentId:represented?delegated:null};const c=new SessionController(adapter(),new RecoveryStore(sessionStorage),async()=>jsonResponse(data));await c.initialize();expect(c.getSnapshot().status==='READY').toBe(!represented);if(!represented)expect(c.getSnapshot().context?.canEnterIdentityAdmin).toBe(false);}
+});
 it('rejects overview rights in delegated sessions and accepts the direct optional hint',async()=>{
  for(const represented of [false,true]){const data={...context,canReadBusinessOverview:true,selectedOnBehalfAppointmentId:represented?delegated:null};const c=new SessionController(adapter(),new RecoveryStore(sessionStorage),async()=>jsonResponse(data));await c.initialize();expect(c.getSnapshot().status==='READY').toBe(!represented);}
 });

@@ -8,6 +8,7 @@ import { useIdentityList } from "./useIdentityList";
 import type { IdentityCommand } from "./useIdentityCommand";
 import { identityDetailEditor } from "./IdentityDetailEditor";
 import { IdentityCommandFeedback } from "./IdentityActionConfirmation";
+import { IdentityBatchResults } from "./IdentityBatchGrant";
 
 type Grant = components["schemas"]["AuthorityGrantV1"];
 
@@ -23,7 +24,7 @@ export function AuthorityGrantPage({ session, api, command }: { session: Workben
   return (
     <IdentityListPage
       title="直接授权"
-      description="向具体任职授予一项权限，并限定组织范围与有效期"
+      description="向具体任职选择一项或多项权限，并统一限定组织范围与有效期"
       createLabel="新增直接授权"
       count={list.items?.length ?? null}
       loading={list.loading}
@@ -36,7 +37,7 @@ export function AuthorityGrantPage({ session, api, command }: { session: Workben
       onReload={() => command.leave(() => void list.reload())}
       onCreate={() => command.open({ kind: "create", page: "AUTHORITY_GRANTS" })}
       editing={!!command.editor && command.editor.kind !== "action"}
-      feedback={command.editor?.kind !== "action" && <IdentityCommandFeedback command={command} />}
+      feedback={command.editor?.kind !== "action" && <><IdentityBatchResults command={command}/><IdentityCommandFeedback command={command} /></>}
       authorityDetail
       list={
         <table className="identity-table authority-table">

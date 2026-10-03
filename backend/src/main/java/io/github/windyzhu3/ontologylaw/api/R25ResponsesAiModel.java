@@ -56,6 +56,11 @@ public final class R25ResponsesAiModel implements R25AiModel {
             return parse(task,sources,result);
         } catch(InterruptedException ignored){Thread.currentThread().interrupt();throw new Failure("AI_UNAVAILABLE");}
         catch(TimeoutException ignored){throw new Failure("AI_TIMEOUT");}
+        catch(ExecutionException failure){
+            if(failure.getCause() instanceof HttpTimeoutException)throw new Failure("AI_TIMEOUT");
+            if(failure.getCause() instanceof Failure known)throw known;
+            throw new Failure("AI_UNAVAILABLE");
+        }
         catch(Failure failure){throw failure;}
         catch(Exception ignored){throw new Failure("AI_UNAVAILABLE");}
         finally {if(!pending.isDone())pending.cancel(true);}
@@ -70,7 +75,7 @@ public final class R25ResponsesAiModel implements R25AiModel {
             for(var buffer:buffers){if((long)bytes.size()+buffer.remaining()>65536){subscription.cancel();complete.completeExceptionally(new Failure("AI_INVALID_OUTPUT"));return;}var part=new byte[buffer.remaining()];buffer.get(part);bytes.writeBytes(part);}
             subscription.request(1);
         }
-        public void onError(Throwable failure){complete.completeExceptionally(new Failure("AI_UNAVAILABLE"));}
+        public void onError(Throwable failure){complete.completeExceptionally(new Failure(failure instanceof HttpTimeoutException?"AI_TIMEOUT":"AI_UNAVAILABLE"));}
         public void onComplete(){complete.complete(bytes.toByteArray());}
     }
 }

@@ -20,10 +20,11 @@ class CommandEnvelopeTest {
             }
         }
     }
-    @Test void fourteen_identity_types_are_human_internal_admin_and_reject_service() {
-        var identity=List.of("CREATE_IDENTITY_PRINCIPAL","RENAME_IDENTITY_PRINCIPAL","SUSPEND_IDENTITY_PRINCIPAL","RESUME_IDENTITY_PRINCIPAL","DISABLE_IDENTITY_PRINCIPAL","CREATE_ORGANIZATION_UNIT","RENAME_ORGANIZATION_UNIT","CLOSE_ORGANIZATION_UNIT","CREATE_APPOINTMENT","SUSPEND_APPOINTMENT","RESUME_APPOINTMENT","END_APPOINTMENT","CREATE_AUTHORITY_GRANT","REVOKE_AUTHORITY_GRANT");
-        assertEquals(76,Arrays.stream(CommandEnvelope.Type.values()).filter(type->type!=CommandEnvelope.Type.ACTIVATE_INITIAL_OPPORTUNITY_TASK&&type!=CommandEnvelope.Type.RECORD_OPPORTUNITY_PROGRESS&&type!=CommandEnvelope.Type.REOPEN_DUE_OPPORTUNITY_TASKS).count());
-        assertEquals(79,CommandEnvelope.Type.values().length);
+    @Test void eighteen_identity_types_are_human_internal_admin_and_reject_service() {
+        var identity=Set.of("CREATE_IDENTITY_PRINCIPAL","RENAME_IDENTITY_PRINCIPAL","SUSPEND_IDENTITY_PRINCIPAL","RESUME_IDENTITY_PRINCIPAL","DISABLE_IDENTITY_PRINCIPAL","CREATE_ORGANIZATION_UNIT","RENAME_ORGANIZATION_UNIT","CLOSE_ORGANIZATION_UNIT","CREATE_APPOINTMENT","SUSPEND_APPOINTMENT","RESUME_APPOINTMENT","END_APPOINTMENT","CREATE_AUTHORITY_GRANT","REVOKE_AUTHORITY_GRANT","CREATE_APPOINTMENT_ROLE","RENAME_APPOINTMENT_ROLE","DEACTIVATE_APPOINTMENT_ROLE","REACTIVATE_APPOINTMENT_ROLE");
+        assertEquals(identity,Arrays.stream(CommandEnvelope.Type.values()).filter(CommandEnvelope.Type::identity).map(Enum::name).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(80,Arrays.stream(CommandEnvelope.Type.values()).filter(type->type!=CommandEnvelope.Type.ACTIVATE_INITIAL_OPPORTUNITY_TASK&&type!=CommandEnvelope.Type.RECORD_OPPORTUNITY_PROGRESS&&type!=CommandEnvelope.Type.REOPEN_DUE_OPPORTUNITY_TASKS).count());
+        assertEquals(83,CommandEnvelope.Type.values().length);
         assertEquals(Set.of(CommandEnvelope.Type.SAVE_OPPORTUNITY_CUSTOMER_DRAFT,CommandEnvelope.Type.CONFIRM_OPPORTUNITY_CUSTOMER_REQUIREMENTS),Arrays.stream(CommandEnvelope.Type.values()).filter(CommandEnvelope.Type::customerRequirements).collect(java.util.stream.Collectors.toSet()));
         assertEquals(Set.of(CommandEnvelope.Type.OBSERVE_OPPORTUNITY_OWNER_EXCEPTION,CommandEnvelope.Type.TRANSFER_OPPORTUNITY_RESPONSIBILITY,CommandEnvelope.Type.RECORD_OPPORTUNITY_OWNER_COORDINATION),Arrays.stream(CommandEnvelope.Type.values()).filter(CommandEnvelope.Type::ownerException).collect(java.util.stream.Collectors.toSet()));
         for(String name:identity){var type=CommandEnvelope.Type.valueOf(name);var human=new Actor(UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),null,null);assertEquals(CommandEnvelope.Envelope.INTERNAL_ADMIN,new CommandEnvelope(type,UUID.randomUUID(),UUID.randomUUID(),human,Map.of()).envelope());var service=new Actor(human.tenantId(),human.principalId(),human.appointmentId(),null,null,PrincipalKind.SERVICE);assertThrows(IllegalArgumentException.class,()->new CommandEnvelope(type,UUID.randomUUID(),UUID.randomUUID(),service,Map.of()));}

@@ -40,7 +40,7 @@ public class Appointment implements Serializable {
     private final UUID organizationUnitId;
 
     /**
-     * 岗位代码：来自静态应用注册表，创建后不可修改，不直接授予业务权限。
+     * 岗位代码：关联同租户可配置目录，创建后不变，不授予权限。
      */
     private final String roleCode;
 
@@ -148,7 +148,7 @@ public class Appointment implements Serializable {
 
     /**
      * Getter for <code>identity.appointment.role_code</code>.
-     * 岗位代码：来自静态应用注册表，创建后不可修改，不直接授予业务权限。
+     * 岗位代码：关联同租户可配置目录，创建后不变，不授予权限。
      */
     public String getRoleCode() {
         return this.roleCode;

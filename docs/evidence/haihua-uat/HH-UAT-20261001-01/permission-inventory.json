@@ -1,0 +1,1025 @@
+{
+  "organizations": {
+    "HAIHUA": "b575b4d0-f1f2-4eb1-bda4-812913817a72",
+    "SALES_1": "01a0f54f-8981-734f-b49f-fb0856a55b80",
+    "SALES_2": "01a0f550-8b5c-7f7d-89d6-21a157d054e1",
+    "FINANCE": "01a0f551-3a5a-7457-8e75-a3c06282ed54",
+    "CASE_ADMIN": "01a0f551-3e62-75db-9c35-83d789f1415e"
+  },
+  "users": {
+    "sys_manager01": {
+      "appointmentId": "914b15e5-7c67-45a1-a3cc-647d5818d832",
+      "role": "IDENTITY_ADMIN",
+      "department": "HAIHUA"
+    },
+    "sales01": {
+      "department": "SALES_1",
+      "role": "SALES_REPRESENTATIVE",
+      "principalCreated": true,
+      "principalId": "01a0f551-4387-7afc-927a-a9bf5a5e5e87",
+      "appointmentId": "01a0f551-4731-7659-ac5d-3d941d68ad7e"
+    },
+    "sales02": {
+      "department": "SALES_1",
+      "role": "SALES_REPRESENTATIVE",
+      "principalCreated": true,
+      "principalId": "01a0f55b-01aa-7108-9cdb-a6d4ea0d8c41",
+      "appointmentId": "01a0f55b-080c-757a-9698-d5cd7540e4e3"
+    },
+    "sales03": {
+      "department": "SALES_1",
+      "role": "SALES_REPRESENTATIVE",
+      "principalCreated": true,
+      "principalId": "01a0f55b-0f4d-7dd7-9eb1-8d5516909a8f",
+      "appointmentId": "01a0f55b-1709-7272-bd28-d6f49f7c185f"
+    },
+    "sales04": {
+      "department": "SALES_2",
+      "role": "SALES_REPRESENTATIVE",
+      "principalCreated": true,
+      "principalId": "01a0f55b-1e74-7adf-bf08-a6bb1754664b",
+      "appointmentId": "01a0f55b-2601-70dd-a2f1-bb07aea2e842"
+    },
+    "sales05": {
+      "department": "SALES_2",
+      "role": "SALES_REPRESENTATIVE",
+      "principalCreated": true,
+      "principalId": "01a0f55b-2cef-7d27-924c-e61d6079b7c9",
+      "appointmentId": "01a0f55b-328f-71f6-addc-fdfb87f07c15"
+    },
+    "sales_manager01": {
+      "department": "SALES_1",
+      "role": "SALES_MANAGER",
+      "principalCreated": true,
+      "principalId": "01a0f55b-3b7c-76bf-baf9-c763509c6693",
+      "appointmentId": "01a0f55b-4323-7e9d-9b04-f8b564a73eac"
+    },
+    "sales_manager02": {
+      "department": "SALES_2",
+      "role": "SALES_MANAGER",
+      "principalCreated": true,
+      "principalId": "01a0f55b-4c1a-7feb-8934-53cf0dfd6a0d",
+      "appointmentId": "01a0f55b-518e-71d9-b0b2-f749cd4121fd"
+    },
+    "finance01": {
+      "department": "FINANCE",
+      "role": "FINANCE_OPERATOR",
+      "principalCreated": true,
+      "principalId": "01a0f55b-5a79-71f4-aa21-add0089acca9",
+      "appointmentId": "01a0f55b-61f0-738e-965e-29df9ceae50a"
+    },
+    "case_admin01": {
+      "department": "CASE_ADMIN",
+      "role": "CASE_ADMINISTRATOR",
+      "principalCreated": true,
+      "principalId": "01a0f55b-6b12-73be-849b-0905746e430f",
+      "appointmentId": "01a0f55b-728b-7bcf-b1b1-3413dd0d1170"
+    }
+  },
+  "grants": [
+    {
+      "key": "sales01:SALES_1:LEAD_CAPTURE",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "LEAD_CAPTURE"
+    },
+    {
+      "key": "sales01:SALES_1:SALES_CONTACT_OWNER",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "SALES_CONTACT_OWNER"
+    },
+    {
+      "key": "sales01:SALES_1:SALES_OPPORTUNITY_OWNER",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "SALES_OPPORTUNITY_OWNER"
+    },
+    {
+      "key": "sales01:SALES_1:OPPORTUNITY_CLOSE",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "OPPORTUNITY_CLOSE"
+    },
+    {
+      "key": "sales01:SALES_1:CUSTOMER_REQUIREMENTS_MANAGE",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "CUSTOMER_REQUIREMENTS_MANAGE"
+    },
+    {
+      "key": "sales01:SALES_1:PARTY_PROFILE_MANAGE",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "PARTY_PROFILE_MANAGE"
+    },
+    {
+      "key": "sales01:SALES_1:MATERIALS_MANAGE",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "MATERIALS_MANAGE"
+    },
+    {
+      "key": "sales01:SALES_1:MATERIALS_READ",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "MATERIALS_READ"
+    },
+    {
+      "key": "sales01:SALES_1:QUOTE_READ",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "QUOTE_READ"
+    },
+    {
+      "key": "sales01:SALES_1:QUOTE_PREPARE",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "QUOTE_PREPARE"
+    },
+    {
+      "key": "sales01:SALES_1:QUOTE_DELIVER",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "QUOTE_DELIVER"
+    },
+    {
+      "key": "sales01:SALES_1:QUOTE_RESPONSE",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "QUOTE_RESPONSE"
+    },
+    {
+      "key": "sales01:SALES_1:CONTRACT_READ",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "CONTRACT_READ"
+    },
+    {
+      "key": "sales01:SALES_1:CONTRACT_PREPARE",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "CONTRACT_PREPARE"
+    },
+    {
+      "key": "sales01:SALES_1:CONTRACT_EXECUTION_VERIFY",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "CONTRACT_EXECUTION_VERIFY"
+    },
+    {
+      "key": "sales01:SALES_1:PAYMENT_SUBMIT",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "PAYMENT_SUBMIT"
+    },
+    {
+      "key": "sales01:SALES_1:PAYMENT_LEDGER_READ",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "PAYMENT_LEDGER_READ"
+    },
+    {
+      "key": "sales01:SALES_1:TRANSFER_SUBMIT",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "TRANSFER_SUBMIT"
+    },
+    {
+      "key": "sales01:SALES_1:TRANSFER_LEDGER_READ",
+      "name": "sales01",
+      "scope": "SALES_1",
+      "code": "TRANSFER_LEDGER_READ"
+    },
+    {
+      "key": "sales02:SALES_1:LEAD_CAPTURE",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "LEAD_CAPTURE"
+    },
+    {
+      "key": "sales02:SALES_1:SALES_CONTACT_OWNER",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "SALES_CONTACT_OWNER"
+    },
+    {
+      "key": "sales02:SALES_1:SALES_OPPORTUNITY_OWNER",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "SALES_OPPORTUNITY_OWNER"
+    },
+    {
+      "key": "sales02:SALES_1:OPPORTUNITY_CLOSE",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "OPPORTUNITY_CLOSE"
+    },
+    {
+      "key": "sales02:SALES_1:CUSTOMER_REQUIREMENTS_MANAGE",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "CUSTOMER_REQUIREMENTS_MANAGE"
+    },
+    {
+      "key": "sales02:SALES_1:PARTY_PROFILE_MANAGE",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "PARTY_PROFILE_MANAGE"
+    },
+    {
+      "key": "sales02:SALES_1:MATERIALS_MANAGE",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "MATERIALS_MANAGE"
+    },
+    {
+      "key": "sales02:SALES_1:MATERIALS_READ",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "MATERIALS_READ"
+    },
+    {
+      "key": "sales02:SALES_1:QUOTE_READ",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "QUOTE_READ"
+    },
+    {
+      "key": "sales02:SALES_1:QUOTE_PREPARE",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "QUOTE_PREPARE"
+    },
+    {
+      "key": "sales02:SALES_1:QUOTE_DELIVER",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "QUOTE_DELIVER"
+    },
+    {
+      "key": "sales02:SALES_1:QUOTE_RESPONSE",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "QUOTE_RESPONSE"
+    },
+    {
+      "key": "sales02:SALES_1:CONTRACT_READ",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "CONTRACT_READ"
+    },
+    {
+      "key": "sales02:SALES_1:CONTRACT_PREPARE",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "CONTRACT_PREPARE"
+    },
+    {
+      "key": "sales02:SALES_1:CONTRACT_EXECUTION_VERIFY",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "CONTRACT_EXECUTION_VERIFY"
+    },
+    {
+      "key": "sales02:SALES_1:PAYMENT_SUBMIT",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "PAYMENT_SUBMIT"
+    },
+    {
+      "key": "sales02:SALES_1:PAYMENT_LEDGER_READ",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "PAYMENT_LEDGER_READ"
+    },
+    {
+      "key": "sales02:SALES_1:TRANSFER_SUBMIT",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "TRANSFER_SUBMIT"
+    },
+    {
+      "key": "sales02:SALES_1:TRANSFER_LEDGER_READ",
+      "name": "sales02",
+      "scope": "SALES_1",
+      "code": "TRANSFER_LEDGER_READ"
+    },
+    {
+      "key": "sales03:SALES_1:LEAD_CAPTURE",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "LEAD_CAPTURE"
+    },
+    {
+      "key": "sales03:SALES_1:SALES_CONTACT_OWNER",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "SALES_CONTACT_OWNER"
+    },
+    {
+      "key": "sales03:SALES_1:SALES_OPPORTUNITY_OWNER",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "SALES_OPPORTUNITY_OWNER"
+    },
+    {
+      "key": "sales03:SALES_1:OPPORTUNITY_CLOSE",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "OPPORTUNITY_CLOSE"
+    },
+    {
+      "key": "sales03:SALES_1:CUSTOMER_REQUIREMENTS_MANAGE",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "CUSTOMER_REQUIREMENTS_MANAGE"
+    },
+    {
+      "key": "sales03:SALES_1:PARTY_PROFILE_MANAGE",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "PARTY_PROFILE_MANAGE"
+    },
+    {
+      "key": "sales03:SALES_1:MATERIALS_MANAGE",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "MATERIALS_MANAGE"
+    },
+    {
+      "key": "sales03:SALES_1:MATERIALS_READ",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "MATERIALS_READ"
+    },
+    {
+      "key": "sales03:SALES_1:QUOTE_READ",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "QUOTE_READ"
+    },
+    {
+      "key": "sales03:SALES_1:QUOTE_PREPARE",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "QUOTE_PREPARE"
+    },
+    {
+      "key": "sales03:SALES_1:QUOTE_DELIVER",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "QUOTE_DELIVER"
+    },
+    {
+      "key": "sales03:SALES_1:QUOTE_RESPONSE",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "QUOTE_RESPONSE"
+    },
+    {
+      "key": "sales03:SALES_1:CONTRACT_READ",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "CONTRACT_READ"
+    },
+    {
+      "key": "sales03:SALES_1:CONTRACT_PREPARE",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "CONTRACT_PREPARE"
+    },
+    {
+      "key": "sales03:SALES_1:CONTRACT_EXECUTION_VERIFY",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "CONTRACT_EXECUTION_VERIFY"
+    },
+    {
+      "key": "sales03:SALES_1:PAYMENT_SUBMIT",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "PAYMENT_SUBMIT"
+    },
+    {
+      "key": "sales03:SALES_1:PAYMENT_LEDGER_READ",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "PAYMENT_LEDGER_READ"
+    },
+    {
+      "key": "sales03:SALES_1:TRANSFER_SUBMIT",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "TRANSFER_SUBMIT"
+    },
+    {
+      "key": "sales03:SALES_1:TRANSFER_LEDGER_READ",
+      "name": "sales03",
+      "scope": "SALES_1",
+      "code": "TRANSFER_LEDGER_READ"
+    },
+    {
+      "key": "sales04:SALES_2:LEAD_CAPTURE",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "LEAD_CAPTURE"
+    },
+    {
+      "key": "sales04:SALES_2:SALES_CONTACT_OWNER",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "SALES_CONTACT_OWNER"
+    },
+    {
+      "key": "sales04:SALES_2:SALES_OPPORTUNITY_OWNER",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "SALES_OPPORTUNITY_OWNER"
+    },
+    {
+      "key": "sales04:SALES_2:OPPORTUNITY_CLOSE",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "OPPORTUNITY_CLOSE"
+    },
+    {
+      "key": "sales04:SALES_2:CUSTOMER_REQUIREMENTS_MANAGE",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "CUSTOMER_REQUIREMENTS_MANAGE"
+    },
+    {
+      "key": "sales04:SALES_2:PARTY_PROFILE_MANAGE",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "PARTY_PROFILE_MANAGE"
+    },
+    {
+      "key": "sales04:SALES_2:MATERIALS_MANAGE",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "MATERIALS_MANAGE"
+    },
+    {
+      "key": "sales04:SALES_2:MATERIALS_READ",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "MATERIALS_READ"
+    },
+    {
+      "key": "sales04:SALES_2:QUOTE_READ",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "QUOTE_READ"
+    },
+    {
+      "key": "sales04:SALES_2:QUOTE_PREPARE",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "QUOTE_PREPARE"
+    },
+    {
+      "key": "sales04:SALES_2:QUOTE_DELIVER",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "QUOTE_DELIVER"
+    },
+    {
+      "key": "sales04:SALES_2:QUOTE_RESPONSE",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "QUOTE_RESPONSE"
+    },
+    {
+      "key": "sales04:SALES_2:CONTRACT_READ",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "CONTRACT_READ"
+    },
+    {
+      "key": "sales04:SALES_2:CONTRACT_PREPARE",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "CONTRACT_PREPARE"
+    },
+    {
+      "key": "sales04:SALES_2:CONTRACT_EXECUTION_VERIFY",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "CONTRACT_EXECUTION_VERIFY"
+    },
+    {
+      "key": "sales04:SALES_2:PAYMENT_SUBMIT",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "PAYMENT_SUBMIT"
+    },
+    {
+      "key": "sales04:SALES_2:PAYMENT_LEDGER_READ",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "PAYMENT_LEDGER_READ"
+    },
+    {
+      "key": "sales04:SALES_2:TRANSFER_SUBMIT",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "TRANSFER_SUBMIT"
+    },
+    {
+      "key": "sales04:SALES_2:TRANSFER_LEDGER_READ",
+      "name": "sales04",
+      "scope": "SALES_2",
+      "code": "TRANSFER_LEDGER_READ"
+    },
+    {
+      "key": "sales05:SALES_2:LEAD_CAPTURE",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "LEAD_CAPTURE"
+    },
+    {
+      "key": "sales05:SALES_2:SALES_CONTACT_OWNER",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "SALES_CONTACT_OWNER"
+    },
+    {
+      "key": "sales05:SALES_2:SALES_OPPORTUNITY_OWNER",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "SALES_OPPORTUNITY_OWNER"
+    },
+    {
+      "key": "sales05:SALES_2:OPPORTUNITY_CLOSE",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "OPPORTUNITY_CLOSE"
+    },
+    {
+      "key": "sales05:SALES_2:CUSTOMER_REQUIREMENTS_MANAGE",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "CUSTOMER_REQUIREMENTS_MANAGE"
+    },
+    {
+      "key": "sales05:SALES_2:PARTY_PROFILE_MANAGE",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "PARTY_PROFILE_MANAGE"
+    },
+    {
+      "key": "sales05:SALES_2:MATERIALS_MANAGE",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "MATERIALS_MANAGE"
+    },
+    {
+      "key": "sales05:SALES_2:MATERIALS_READ",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "MATERIALS_READ"
+    },
+    {
+      "key": "sales05:SALES_2:QUOTE_READ",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "QUOTE_READ"
+    },
+    {
+      "key": "sales05:SALES_2:QUOTE_PREPARE",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "QUOTE_PREPARE"
+    },
+    {
+      "key": "sales05:SALES_2:QUOTE_DELIVER",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "QUOTE_DELIVER"
+    },
+    {
+      "key": "sales05:SALES_2:QUOTE_RESPONSE",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "QUOTE_RESPONSE"
+    },
+    {
+      "key": "sales05:SALES_2:CONTRACT_READ",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "CONTRACT_READ"
+    },
+    {
+      "key": "sales05:SALES_2:CONTRACT_PREPARE",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "CONTRACT_PREPARE"
+    },
+    {
+      "key": "sales05:SALES_2:CONTRACT_EXECUTION_VERIFY",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "CONTRACT_EXECUTION_VERIFY"
+    },
+    {
+      "key": "sales05:SALES_2:PAYMENT_SUBMIT",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "PAYMENT_SUBMIT"
+    },
+    {
+      "key": "sales05:SALES_2:PAYMENT_LEDGER_READ",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "PAYMENT_LEDGER_READ"
+    },
+    {
+      "key": "sales05:SALES_2:TRANSFER_SUBMIT",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "TRANSFER_SUBMIT"
+    },
+    {
+      "key": "sales05:SALES_2:TRANSFER_LEDGER_READ",
+      "name": "sales05",
+      "scope": "SALES_2",
+      "code": "TRANSFER_LEDGER_READ"
+    },
+    {
+      "key": "sales_manager01:SALES_1:LEAD_MANAGEMENT_READ",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "LEAD_MANAGEMENT_READ"
+    },
+    {
+      "key": "sales_manager01:SALES_1:TEAM_TASK_READ",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "TEAM_TASK_READ"
+    },
+    {
+      "key": "sales_manager01:SALES_1:OPPORTUNITY_LEDGER_READ",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "OPPORTUNITY_LEDGER_READ"
+    },
+    {
+      "key": "sales_manager01:SALES_1:CONTRACT_READ",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "CONTRACT_READ"
+    },
+    {
+      "key": "sales_manager01:SALES_1:QUOTE_READ",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "QUOTE_READ"
+    },
+    {
+      "key": "sales_manager01:SALES_1:PAYMENT_LEDGER_READ",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "PAYMENT_LEDGER_READ"
+    },
+    {
+      "key": "sales_manager01:SALES_1:TRANSFER_LEDGER_READ",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "TRANSFER_LEDGER_READ"
+    },
+    {
+      "key": "sales_manager01:SALES_1:LEAD_CAPTURE",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "LEAD_CAPTURE"
+    },
+    {
+      "key": "sales_manager01:SALES_1:LEAD_INGRESS_RESOLVE",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "LEAD_INGRESS_RESOLVE"
+    },
+    {
+      "key": "sales_manager01:SALES_1:LEAD_INGRESS_COMPLETE",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "LEAD_INGRESS_COMPLETE"
+    },
+    {
+      "key": "sales_manager01:SALES_1:LEAD_ASSIGN",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "LEAD_ASSIGN"
+    },
+    {
+      "key": "sales_manager01:SALES_1:LEAD_ROUTING_DECIDE",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "LEAD_ROUTING_DECIDE"
+    },
+    {
+      "key": "sales_manager01:SALES_1:SOURCE_INTAKE_REQUEST_ACK",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "SOURCE_INTAKE_REQUEST_ACK"
+    },
+    {
+      "key": "sales_manager01:SALES_1:LEAD_VALIDITY_REVIEW",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "LEAD_VALIDITY_REVIEW"
+    },
+    {
+      "key": "sales_manager01:SALES_1:QUOTE_APPROVE",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "QUOTE_APPROVE"
+    },
+    {
+      "key": "sales_manager01:SALES_1:CONTRACT_PREPARATION_DECIDE",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "CONTRACT_PREPARATION_DECIDE"
+    },
+    {
+      "key": "sales_manager01:SALES_1:CONTRACT_APPROVE",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "CONTRACT_APPROVE"
+    },
+    {
+      "key": "sales_manager01:SALES_1:CONTRACT_TERMINATION_REVIEW",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "CONTRACT_TERMINATION_REVIEW"
+    },
+    {
+      "key": "sales_manager01:SALES_1:OPPORTUNITY_OWNER_EXCEPTION_READ",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "OPPORTUNITY_OWNER_EXCEPTION_READ"
+    },
+    {
+      "key": "sales_manager01:SALES_1:OPPORTUNITY_OWNER_EXCEPTION_RESOLVE",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE"
+    },
+    {
+      "key": "sales_manager01:SALES_1:OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ",
+      "name": "sales_manager01",
+      "scope": "SALES_1",
+      "code": "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ"
+    },
+    {
+      "key": "sales_manager02:SALES_2:LEAD_MANAGEMENT_READ",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "LEAD_MANAGEMENT_READ"
+    },
+    {
+      "key": "sales_manager02:SALES_2:TEAM_TASK_READ",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "TEAM_TASK_READ"
+    },
+    {
+      "key": "sales_manager02:SALES_2:OPPORTUNITY_LEDGER_READ",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "OPPORTUNITY_LEDGER_READ"
+    },
+    {
+      "key": "sales_manager02:SALES_2:CONTRACT_READ",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "CONTRACT_READ"
+    },
+    {
+      "key": "sales_manager02:SALES_2:QUOTE_READ",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "QUOTE_READ"
+    },
+    {
+      "key": "sales_manager02:SALES_2:PAYMENT_LEDGER_READ",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "PAYMENT_LEDGER_READ"
+    },
+    {
+      "key": "sales_manager02:SALES_2:TRANSFER_LEDGER_READ",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "TRANSFER_LEDGER_READ"
+    },
+    {
+      "key": "sales_manager02:SALES_2:LEAD_CAPTURE",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "LEAD_CAPTURE"
+    },
+    {
+      "key": "sales_manager02:SALES_2:LEAD_INGRESS_RESOLVE",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "LEAD_INGRESS_RESOLVE"
+    },
+    {
+      "key": "sales_manager02:SALES_2:LEAD_INGRESS_COMPLETE",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "LEAD_INGRESS_COMPLETE"
+    },
+    {
+      "key": "sales_manager02:SALES_2:LEAD_ASSIGN",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "LEAD_ASSIGN"
+    },
+    {
+      "key": "sales_manager02:SALES_2:LEAD_ROUTING_DECIDE",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "LEAD_ROUTING_DECIDE"
+    },
+    {
+      "key": "sales_manager02:SALES_2:SOURCE_INTAKE_REQUEST_ACK",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "SOURCE_INTAKE_REQUEST_ACK"
+    },
+    {
+      "key": "sales_manager02:SALES_2:LEAD_VALIDITY_REVIEW",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "LEAD_VALIDITY_REVIEW"
+    },
+    {
+      "key": "sales_manager02:SALES_2:QUOTE_APPROVE",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "QUOTE_APPROVE"
+    },
+    {
+      "key": "sales_manager02:SALES_2:CONTRACT_PREPARATION_DECIDE",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "CONTRACT_PREPARATION_DECIDE"
+    },
+    {
+      "key": "sales_manager02:SALES_2:CONTRACT_APPROVE",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "CONTRACT_APPROVE"
+    },
+    {
+      "key": "sales_manager02:SALES_2:CONTRACT_TERMINATION_REVIEW",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "CONTRACT_TERMINATION_REVIEW"
+    },
+    {
+      "key": "sales_manager02:SALES_2:OPPORTUNITY_OWNER_EXCEPTION_READ",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "OPPORTUNITY_OWNER_EXCEPTION_READ"
+    },
+    {
+      "key": "sales_manager02:SALES_2:OPPORTUNITY_OWNER_EXCEPTION_RESOLVE",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE"
+    },
+    {
+      "key": "sales_manager02:SALES_2:OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ",
+      "name": "sales_manager02",
+      "scope": "SALES_2",
+      "code": "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ"
+    },
+    {
+      "key": "finance01:SALES_1:CONTRACT_READ",
+      "name": "finance01",
+      "scope": "SALES_1",
+      "code": "CONTRACT_READ"
+    },
+    {
+      "key": "finance01:SALES_1:PAYMENT_CONFIRM",
+      "name": "finance01",
+      "scope": "SALES_1",
+      "code": "PAYMENT_CONFIRM"
+    },
+    {
+      "key": "finance01:SALES_1:PAYMENT_LEDGER_READ",
+      "name": "finance01",
+      "scope": "SALES_1",
+      "code": "PAYMENT_LEDGER_READ"
+    },
+    {
+      "key": "case_admin01:SALES_1:CONTRACT_READ",
+      "name": "case_admin01",
+      "scope": "SALES_1",
+      "code": "CONTRACT_READ"
+    },
+    {
+      "key": "case_admin01:SALES_1:CONTRACT_REVIEW",
+      "name": "case_admin01",
+      "scope": "SALES_1",
+      "code": "CONTRACT_REVIEW"
+    },
+    {
+      "key": "case_admin01:SALES_1:CONTRACT_SIGNATURE_VERIFY",
+      "name": "case_admin01",
+      "scope": "SALES_1",
+      "code": "CONTRACT_SIGNATURE_VERIFY"
+    },
+    {
+      "key": "finance01:SALES_2:CONTRACT_READ",
+      "name": "finance01",
+      "scope": "SALES_2",
+      "code": "CONTRACT_READ"
+    },
+    {
+      "key": "finance01:SALES_2:PAYMENT_CONFIRM",
+      "name": "finance01",
+      "scope": "SALES_2",
+      "code": "PAYMENT_CONFIRM"
+    },
+    {
+      "key": "finance01:SALES_2:PAYMENT_LEDGER_READ",
+      "name": "finance01",
+      "scope": "SALES_2",
+      "code": "PAYMENT_LEDGER_READ"
+    },
+    {
+      "key": "case_admin01:SALES_2:CONTRACT_READ",
+      "name": "case_admin01",
+      "scope": "SALES_2",
+      "code": "CONTRACT_READ"
+    },
+    {
+      "key": "case_admin01:SALES_2:CONTRACT_REVIEW",
+      "name": "case_admin01",
+      "scope": "SALES_2",
+      "code": "CONTRACT_REVIEW"
+    },
+    {
+      "key": "case_admin01:SALES_2:CONTRACT_SIGNATURE_VERIFY",
+      "name": "case_admin01",
+      "scope": "SALES_2",
+      "code": "CONTRACT_SIGNATURE_VERIFY"
+    },
+    {
+      "key": "finance01:FINANCE:PAYMENT_CONFIRM",
+      "name": "finance01",
+      "scope": "FINANCE",
+      "code": "PAYMENT_CONFIRM"
+    },
+    {
+      "key": "case_admin01:CASE_ADMIN:CONTRACT_READ",
+      "name": "case_admin01",
+      "scope": "CASE_ADMIN",
+      "code": "CONTRACT_READ"
+    },
+    {
+      "key": "case_admin01:CASE_ADMIN:TRANSFER_REVIEW",
+      "name": "case_admin01",
+      "scope": "CASE_ADMIN",
+      "code": "TRANSFER_REVIEW"
+    },
+    {
+      "key": "case_admin01:CASE_ADMIN:TRANSFER_ACCEPT",
+      "name": "case_admin01",
+      "scope": "CASE_ADMIN",
+      "code": "TRANSFER_ACCEPT"
+    },
+    {
+      "key": "case_admin01:CASE_ADMIN:MATTER_CLASSIFY",
+      "name": "case_admin01",
+      "scope": "CASE_ADMIN",
+      "code": "MATTER_CLASSIFY"
+    },
+    {
+      "key": "case_admin01:CASE_ADMIN:MATTER_RECEIVE",
+      "name": "case_admin01",
+      "scope": "CASE_ADMIN",
+      "code": "MATTER_RECEIVE"
+    },
+    {
+      "key": "case_admin01:CASE_ADMIN:TRANSFER_LEDGER_READ",
+      "name": "case_admin01",
+      "scope": "CASE_ADMIN",
+      "code": "TRANSFER_LEDGER_READ"
+    },
+    {
+      "key": "case_admin01:CASE_ADMIN:TEAM_TASK_READ",
+      "name": "case_admin01",
+      "scope": "CASE_ADMIN",
+      "code": "TEAM_TASK_READ"
+    }
+  ],
+  "adminCommands": 179,
+  "businessGrantCount": 157
+}

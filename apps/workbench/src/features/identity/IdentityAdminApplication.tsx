@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { WorkbenchSession } from "../../lib/api";
 import type { IdentityApi } from "./identityApi";
+import { RolePage } from "./RolePage";
+import { AuditRecordPage } from './AuditRecordPage';
+import { createAuditRecordApi,type AuditRecordApi } from './auditRecordApi';
 import { AppointmentPage } from "./AppointmentPage";
 import { AuthorityGrantPage } from "./AuthorityGrantPage";
 import { IdentityAdminLayout } from "./IdentityAdminLayout";
@@ -12,6 +15,7 @@ import "../../styles/workbench.css";
 import "../../styles/identity-admin.css";
 import { useIdentityCommand } from "./useIdentityCommand";
 import { IdentityActionConfirmation, IdentityDiscardConfirmation, IdentityRecoveryConfirmation } from "./IdentityActionConfirmation";
+import { IdentityBatchConfirmation } from "./IdentityBatchGrant";
 
 export type IdentityLeaveGuard = (next: () => void) => void;
 
@@ -23,6 +27,8 @@ export function IdentityAdminApplication({
   sessionActions,
   registerLeaveGuard,
   onRecover,
+  auditApi,
+  canManageIdentity = true,
 }: {
   session: WorkbenchSession;
   api: IdentityApi;
@@ -31,8 +37,10 @@ export function IdentityAdminApplication({
   sessionActions: ReactNode;
   registerLeaveGuard?: (guard: IdentityLeaveGuard | null) => void;
   onRecover?: () => void;
+  auditApi?: AuditRecordApi;
+  canManageIdentity?: boolean;
 }) {
-  return <IdentityAdminBoundary key={`${session.identityEpoch}:${session.actorScopeKey}:${session.selectedAppointmentId}`} {...{ session, api, path, onNavigate, sessionActions, registerLeaveGuard, onRecover }} />;
+  return <IdentityAdminBoundary key={`${session.identityEpoch}:${session.actorScopeKey}:${session.selectedAppointmentId}`} {...{ session, api, path, onNavigate, sessionActions, registerLeaveGuard, onRecover, auditApi, canManageIdentity }} />;
 }
 
 function IdentityAdminBoundary(props: Parameters<typeof IdentityAdminApplication>[0]) {
@@ -42,7 +50,8 @@ function IdentityAdminBoundary(props: Parameters<typeof IdentityAdminApplication
   return <IdentityAdminWorkspace {...props} session={guardedSession} />;
 }
 
-function IdentityAdminWorkspace({ session, api, path, onNavigate, sessionActions, registerLeaveGuard, onRecover }: Parameters<typeof IdentityAdminApplication>[0]) {
+function IdentityAdminWorkspace({ session, api, path, onNavigate, sessionActions, registerLeaveGuard, onRecover, auditApi,canManageIdentity }: Parameters<typeof IdentityAdminApplication>[0]) {
+  const audit=useMemo(()=>auditApi??createAuditRecordApi(),[auditApi]);
   const command = useIdentityCommand(session, api);
   command.bindRecovery(onRecover);
   const latestLeave = useRef(command.leave); latestLeave.current = command.leave;
@@ -52,11 +61,17 @@ function IdentityAdminWorkspace({ session, api, path, onNavigate, sessionActions
   }, [registerLeaveGuard]);
   let page: ReactNode;
   switch (path) {
+    case '/admin/audit-records':
+      page=session.canReadAuditRecords===true?<AuditRecordPage session={session} api={audit}/>:<p role="alert">当前任职没有审计查询权限。</p>;
+      break;
     case "/admin/identity/principals":
       page = <PrincipalPage session={session} api={api} command={command} />;
       break;
     case "/admin/identity/organizations":
       page = <OrganizationPage session={session} api={api} command={command} />;
+      break;
+    case "/admin/identity/roles":
+      page = <RolePage session={session} api={api} command={command} />;
       break;
     case "/admin/identity/appointments":
       page = <AppointmentPage session={session} api={api} command={command} />;
@@ -66,11 +81,12 @@ function IdentityAdminWorkspace({ session, api, path, onNavigate, sessionActions
       break;
   }
   return (
-    <><div inert={!!command.discard || command.editor?.kind === "action" || command.recoveryConfirmation}>
-    <IdentityAdminLayout path={path} onNavigate={next => command.leave(() => onNavigate(next))} sessionActions={sessionActions}>
-      {page}
+    <><div inert={!!command.discard || command.editor?.kind === "action" || command.recoveryConfirmation || !!command.batchPreview}>
+    <IdentityAdminLayout path={path} canManageIdentity={canManageIdentity} canReadAuditRecords={session.canReadAuditRecords===true} onNavigate={next => command.leave(() => onNavigate(next))} sessionActions={sessionActions}>
+      {path!=='/admin/audit-records'&&canManageIdentity===false?<p role="alert">当前任职没有身份管理权限。</p>:page}
     </IdentityAdminLayout>
     </div>
+    <IdentityBatchConfirmation command={command}/>
     {command.editor?.kind === "action" && !command.recoveryConfirmation && <IdentityActionConfirmation key={`${command.editor.commandType}:${command.editor.targetId}`} command={command} />}
     <IdentityDiscardConfirmation command={command} /><IdentityRecoveryConfirmation command={command} /></>
   );

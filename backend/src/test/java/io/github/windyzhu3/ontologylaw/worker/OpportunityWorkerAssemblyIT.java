@@ -41,8 +41,8 @@ class OpportunityWorkerAssemblyIT extends R1ProductionFixture {
         assertEquals("NONE",ledger(opportunity).get("taskState"));assertEquals(false,ledger(opportunity).get("canHandle"));
         var deployment=deployment(directory);
         UUID recoveryGrant=UUID.randomUUID();
-        for(String authority:List.of("OPPORTUNITY_TASK_ACTIVATE","OPPORTUNITY_TASK_RECOVER"))
-            mutate("insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values (?,?,?,?,?,?,clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",seed.tenant(),authority.endsWith("RECOVER")?recoveryGrant:UUID.randomUUID(),deployment.service().appointmentId(),seed.appointment(),seed.org(),authority);
+        for(String authority:List.of("OPPORTUNITY_TASK_ACTIVATE","OPPORTUNITY_TASK_RECOVER","CONTRACT_TASK_RECOVER"))
+            mutate("insert into identity.authority_grant (tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) values (?,?,?,?,?,?,clock_timestamp()-interval '1 day','ACTIVE',clock_timestamp())",seed.tenant(),authority.equals("OPPORTUNITY_TASK_RECOVER")?recoveryGrant:UUID.randomUUID(),deployment.service().appointmentId(),seed.appointment(),seed.org(),authority);
         int port;try(var socket=new ServerSocket(0)){port=socket.getLocalPort();}
         String origin="https://localhost:"+port;
         deployment.api().put("server.port",Integer.toString(port));
@@ -70,7 +70,7 @@ class OpportunityWorkerAssemblyIT extends R1ProductionFixture {
                 var health=context.getBean(WorkerRuntimeHealth.class);
                 await(30,()->"1".equals(taskCount(opportunity))&&health.healthy(),"Initial task was not automatically activated");
                 assertTrue(health.snapshot().opportunityTaskSchedulingEnabled());
-                assertTrue(health.snapshot().opportunityInitial());assertTrue(health.snapshot().opportunityDue());
+                assertTrue(health.snapshot().opportunityInitial());assertTrue(health.snapshot().opportunityDue());assertTrue(health.snapshot().contractPreparation());
                 assertFalse(health.snapshot().ownerExceptionEnabled());
                 assertCheckpoints(deployment.service().appointmentId());
                 initial=UUID.fromString(scalar("select task_occurrence_id::text from responsibility.task_occurrence where tenant_id=? and subject_id=? and business_purpose_code='PROGRESS_OPPORTUNITY'",seed.tenant(),opportunity));
@@ -153,7 +153,7 @@ class OpportunityWorkerAssemblyIT extends R1ProductionFixture {
         return scalar("select count(*)::text from opportunity.opportunity_progress where tenant_id=? and opportunity_id=?",seed.tenant(),opportunity);
     }
     private void assertCheckpoints(UUID appointment)throws Exception {
-        assertEquals("1",checkpoints(appointment,"INITIAL"));assertEquals("1",checkpoints(appointment,"DUE"));assertEquals("0",checkpoints(appointment,"OWNER_EXCEPTION"));
+        assertEquals("1",checkpoints(appointment,"INITIAL"));assertEquals("1",checkpoints(appointment,"DUE"));assertEquals("1",checkpoints(appointment,"CONTRACT_PREPARATION"));assertEquals("0",checkpoints(appointment,"OWNER_EXCEPTION"));
     }
     private String checkpoints(UUID appointment,String kind)throws Exception {
         try(var c=database.workerConnection()) {

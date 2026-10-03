@@ -95,6 +95,7 @@ export function useActorSession(): WorkbenchSession | null {
       canReadBusinessManagement: context.canReadBusinessManagement,
       canReadTeamTasks: context.canReadTeamTasks,
       canReadBusinessOverview: context.canReadBusinessOverview,
+      canReadAuditRecords: context.canReadAuditRecords,
       canReadLeadManagement: context.canReadLeadManagement,
       canManageOwnerExceptions: context.canManageOwnerExceptions,
       businessManagementViews: context.businessManagementViews,

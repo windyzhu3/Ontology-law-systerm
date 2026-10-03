@@ -28,7 +28,7 @@ class R2QuoteOwnerBoundaryIT extends R2QuoteWorkflowIT {
    var observed=R2OpportunityOwnerExceptionAssembly.checks().inspect(x,seed.tenant(),current,owner,java.time.Instant.now());
    assertTrue(observed.reasons().contains(OpportunityOwnerExceptionService.Reason.OWNER_AUTHORITY_MISSING));
    assertFalse(observed.reasons().contains(OpportunityOwnerExceptionService.Reason.SOURCE_INCONSISTENT));
-   io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.databaseBacked().create(x,seed.tenant(),io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.APPROVE_QUOTE,seed.appointment(),current,java.time.ZoneId.of("Asia/Shanghai"),java.time.Instant.now());
+   io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.databaseBacked().create(x,seed.tenant(),io.github.windyzhu3.ontologylaw.responsibility.TaskFactory.Type.APPROVE_QUOTE,seed.appointment(),current,java.time.ZoneId.of("Asia/Shanghai"),java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
    assertFalse(R2OpportunityOwnerExceptionAssembly.taskState(x,seed.tenant(),current,owner).lineageValid(),"An unassigned extra approval task must remain inconsistent");return null;
   });}
  }

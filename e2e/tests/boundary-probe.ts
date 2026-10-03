@@ -7,12 +7,18 @@ import { createRequire } from 'node:module';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 
+// Only synthetic probes use PATH on Linux; the protected local launcher stays pinned.
+export const syntheticPython = process.platform === 'win32' ? 'D:/soft/python3/python.exe' : 'python3';
+
 export function boundaryProbe(program: string, timeout?: number, maxBuffer?: number) {
   const root = mkdtempSync(join(tmpdir(), 'task9-async-synthetic-'));
   mkdirSync(join(root, '.superpowers/sdd/2026-09-08-task9-real-user-access-plan/local-login-runtime'), { recursive: true });
   let source = readFileSync(resolve(__dirname, '../fixtures/local-environment.ts'), 'utf8');
   const start = source.indexOf('String.raw`'), end = source.indexOf('`;', start);
+  const launcher = "execFile('D:/soft/python3/python.exe',";
+  if (start < 0 || end < start || source.split(launcher).length !== 2) throw new Error('T9_SYNTHETIC_BOUNDARY');
   source = source.slice(0, start) + JSON.stringify(program) + source.slice(end + 1);
+  source = source.replace(launcher, `execFile(${JSON.stringify(syntheticPython)},`);
   source += '\nexport { invoke as probe };';
   if (timeout !== undefined) source = source.replace('timeout: 60_000', `timeout: ${timeout}`);
   if (maxBuffer !== undefined) source = source.replace('maxBuffer: 2 * 1024 * 1024', `maxBuffer: ${maxBuffer}`);

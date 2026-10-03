@@ -1,7 +1,9 @@
 export const identityAdminRoutes = [
+  "/admin/audit-records",
   "/admin/identity/principals",
   "/admin/identity/organizations",
   "/admin/identity/appointments",
+  "/admin/identity/roles",
   "/admin/identity/authority-grants",
 ] as const;
 

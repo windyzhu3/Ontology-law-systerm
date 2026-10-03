@@ -5,7 +5,7 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
 
 printf '%s\n' '[r1-preflight] baseline'
-python3 scripts/baseline/verify_baseline.py
+python3 scripts/baseline/verify_baseline.py --r2-development
 
 (
   cd database/schema-contract-52-plus-2
@@ -17,8 +17,7 @@ python3 scripts/baseline/verify_baseline.py
 
   printf '%s\n' '[r1-preflight] PostgreSQL 18 runtime (two clean runs)'
   python3 runtime/verify_runtime.py validate-promoted-evidence
-  python3 runtime/verify_runtime.py \
-    verify --ci-only --runs 2 --evidence-dir ../../.artifacts/schema-runtime
+  python3 ../../scripts/ci/verify_r1_schema_projection.py
   python3 runtime/verify_runtime.py validate-ci-artifact
 )
 

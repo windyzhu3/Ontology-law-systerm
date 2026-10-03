@@ -22,6 +22,7 @@ export interface WorkbenchSession {
   readonly canReadBusinessManagement?: boolean;
   readonly canReadTeamTasks?: boolean;
   readonly canReadBusinessOverview?: boolean;
+  readonly canReadAuditRecords?: boolean;
   readonly canReadLeadManagement?: boolean;
   readonly canManageOwnerExceptions?: boolean;
   readonly businessManagementViews?: readonly ('contracts'|'payments'|'transfer')[];
@@ -164,6 +165,7 @@ export function matchesReceipt(
     if (value.resultFact.factType !== fact) return false;
     if (marker.commandType === "CLOSE_OPPORTUNITY" && (value.outcome !== "SUCCEEDED" || !("revision" in value.resultFact) || value.resultFact.revision !== 0)) return false;
     const identity = [
+      "APPOINTMENT_ROLE",
       "IDENTITY_PRINCIPAL",
       "ORGANIZATION_UNIT",
       "APPOINTMENT",
@@ -173,6 +175,7 @@ export function matchesReceipt(
       identity &&
       value.outcome === "NO_CHANGE" &&
       ![
+        "RENAME_APPOINTMENT_ROLE",
         "RENAME_IDENTITY_PRINCIPAL",
         "RENAME_ORGANIZATION_UNIT",
       ].includes(marker.commandType)

@@ -1,0 +1,254 @@
+package io.github.windyzhu3.ontologylaw.audit.internal;
+
+import java.security.MessageDigest;
+import java.util.Map;
+import java.util.Set;
+
+/** Closed display registry. No raw recovery payload, names or counts are copied from summaries. */
+public final class AuditRecordSummary {
+ private AuditRecordSummary(){}
+ // Exact audit Subject targets from the deployed schema contract typed-reference registry.
+ private static final Set<String> SOURCES=Set.of(
+  "audit.audit_entry",
+  "conflict.conflict_finding",
+  "conflict.conflict_review",
+  "conflict.conflict_review_party",
+  "contract.approval_policy",
+  "contract.approval_policy_member",
+  "contract.clause_version",
+  "contract.contract",
+  "contract.contract_execution",
+  "contract.contract_fee_term",
+  "contract.contract_participation",
+  "contract.contract_revision",
+  "contract.contract_signature",
+  "contract.contract_termination",
+  "contract.payment_confirmation",
+  "contract.payment_gate",
+  "contract.preparation_decision",
+  "contract.preparation_draft",
+  "contract.preparation_request",
+  "contract.preparation_workflow",
+  "contract.revision_approval_decision",
+  "contract.revision_approval_request",
+  "contract.revision_approval_requirement",
+  "contract.revision_clause",
+  "contract.revision_review_binding",
+  "contract.revision_review_decision",
+  "contract.revision_review_request",
+  "contract.signature_archive",
+  "contract.signature_arrangement",
+  "contract.signature_draft",
+  "contract.signature_handoff",
+  "contract.signature_plan",
+  "contract.signature_readiness",
+  "contract.signature_revision_return",
+  "contract.signature_submission",
+  "contract.signature_verification",
+  "contract.signature_workflow",
+  "contract.template_signing_party",
+  "contract.template_version",
+  "evidence.evidence_binding",
+  "evidence.evidence_submission",
+  "evidence.material_upload_basis",
+  "evidence.material_upload_check",
+  "evidence.received_source_object",
+  "evidence.upload_session",
+  "execution.command_execution_slot",
+  "execution.command_receipt",
+  "execution.domain_event",
+  "execution.domain_event_outbox",
+  "external_action.external_action",
+  "external_action.external_action_outbox",
+  "external_action.provider_inbox",
+  "identity.appointment",
+  "identity.appointment_role",
+  "identity.authority_grant",
+  "identity.delegation_grant",
+  "identity.object_access_grant",
+  "identity.organization_unit",
+  "identity.principal",
+  "identity.tenant",
+  "lead.lead",
+  "lead.lead_assignment",
+  "lead.lead_contact_result",
+  "opportunity.closure",
+  "opportunity.contract_preparation_source",
+  "opportunity.customer_requirement_confirmation",
+  "opportunity.customer_requirement_draft",
+  "opportunity.customer_requirement_draft_party",
+  "opportunity.customer_requirement_participant",
+  "opportunity.material_version",
+  "opportunity.opportunity",
+  "opportunity.opportunity_participation",
+  "opportunity.opportunity_progress",
+  "opportunity.owner_exception",
+  "opportunity.owner_exception_disposition",
+  "opportunity.quote_approval_decision",
+  "opportunity.quote_approval_member",
+  "opportunity.quote_approval_policy",
+  "opportunity.quote_approval_policy_signer",
+  "opportunity.quote_approval_request",
+  "opportunity.quote_draft",
+  "opportunity.quote_issue",
+  "opportunity.quote_line",
+  "opportunity.quote_manual_delivery",
+  "opportunity.quote_package_basis",
+  "opportunity.quote_payment_term",
+  "opportunity.quote_response",
+  "opportunity.quote_response_basis",
+  "opportunity.quote_revision",
+  "opportunity.quote_service_scope",
+  "opportunity.quote_workflow",
+  "opportunity.responsibility_handoff",
+  "party.party",
+  "party.profile_version",
+  "responsibility.action_draft",
+  "responsibility.decision_record",
+  "responsibility.task_occurrence",
+  "responsibility.wait_receipt",
+  "transfer.classification",
+  "transfer.intake",
+  "transfer.review",
+  "transfer.review_return_item",
+  "transfer.submission",
+  "transfer.transfer_request",
+  "transfer.transfer_return_item",
+  "transfer.transfer_snapshot",
+  "transfer.workflow");
+ private static final Set<String> SCHEMAS=Set.of("ADM07_AUDIT_DISCLOSURE_V1","R1_COMMAND_AUDIT_V1","R1_COMMAND_AUDIT_V2","R1_COMMAND_RECEIPT_DISCLOSURE_AUDIT_V1","R1_CURRENT_WORKCARD_DISCLOSURE_AUDIT_V1","R1_IDENTITY_BOOTSTRAP_V1","R1_IDENTITY_COMMAND_AUDIT_V1","R1_IDENTITY_DISCLOSURE_V1","R1_IDENTITY_SELF_DISCLOSURE_V1","R2_CONTRACT_DISCLOSURE_AUDIT_V1","R2_CURRENT_WORKCARD_DISCLOSURE_AUDIT_V1","R2_CUSTOMER_REQUIREMENTS_DISCLOSURE_AUDIT_V1","R2_FOLLOWUP_ATTEMPT_DISCLOSURE_AUDIT_V1","R2_MANAGEMENT_DISCLOSURE_AUDIT_V1","R2_MATERIAL_DISCLOSURE_AUDIT_V1","R2_OPPORTUNITY_CLOSURE_DISCLOSURE_AUDIT_V1","R2_OPPORTUNITY_LEDGER_DISCLOSURE_AUDIT_V1","R2_OPPORTUNITY_OWNER_VALIDATION_V1","R2_OWNER_EXCEPTION_DISCLOSURE_AUDIT_V1","R2_QUOTE_DISCLOSURE_AUDIT_V1");
+ private static final Map<String,String> ACTIONS=Map.ofEntries(
+  Map.entry("ACCEPT_OPPORTUNITY_MATERIAL","确认接收材料"),
+  Map.entry("ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST","确认停止接入请求"),
+  Map.entry("ARCHIVE_CONTRACT_SIGNATURE","确认签署归档"),
+  Map.entry("ASSIGN_LEAD","分配线索"),
+  Map.entry("BOOTSTRAP_IDENTITY_ADMIN","初始化身份管理"),
+  Map.entry("CAPTURE_LEAD","登记线索"),
+  Map.entry("CLASSIFY_MATTER","确认案件分类及承接"),
+  Map.entry("CLOSE_OPPORTUNITY","结束本次商机"),
+  Map.entry("CLOSE_ORGANIZATION_UNIT","关闭组织单元"),
+  Map.entry("COMPLETE_LEAD_INGRESS","补全线索接入信息"),
+  Map.entry("CONFIRM_CONTRACT_SIGNATURE_ARRANGEMENT","确认签署安排"),
+  Map.entry("CONFIRM_OPPORTUNITY_CUSTOMER_REQUIREMENTS","确认客户与需求"),
+  Map.entry("CREATE_APPOINTMENT","创建任职"),
+  Map.entry("CREATE_APPOINTMENT_ROLE","创建岗位"),
+  Map.entry("CREATE_AUTHORITY_GRANT","授予直接权限"),
+  Map.entry("CREATE_IDENTITY_PRINCIPAL","创建人员主体"),
+  Map.entry("CREATE_ORGANIZATION_UNIT","创建组织单元"),
+  Map.entry("DEACTIVATE_APPOINTMENT_ROLE","停用岗位"),
+  Map.entry("DISABLE_IDENTITY_PRINCIPAL","停用人员主体"),
+  Map.entry("END_APPOINTMENT","结束任职"),
+  Map.entry("END_CONTRACT_NEGOTIATION","结束本次签约办理"),
+  Map.entry("END_QUOTE_NEGOTIATION","结束本次报价办理"),
+  Map.entry("FORM_CONTRACT","形成合同版本"),
+  Map.entry("FORM_QUOTE","形成报价版本"),
+  Map.entry("GET_AUDIT_RECORD","查看审计详情"),
+  Map.entry("GET_IDENTITY_ADMIN_OPTIONS","查询身份管理选项"),
+  Map.entry("GET_SESSION_CONTEXT","确认当前身份"),
+  Map.entry("LIST_APPOINTMENTS","查询任职"),
+  Map.entry("LIST_APPOINTMENT_ROLES","查询岗位"),
+  Map.entry("LIST_AUDIT_RECORDS","查询审计记录"),
+  Map.entry("LIST_AUTHORITY_GRANTS","查询任职授权"),
+  Map.entry("LIST_IDENTITY_PRINCIPALS","查询人员"),
+  Map.entry("LIST_IDENTITY_PROVIDER_USERS","查询可登记人员"),
+  Map.entry("LIST_ORGANIZATION_UNITS","查询组织"),
+  Map.entry("LIST_RELATED_AUDIT_RECORDS","查看审计关系链"),
+  Map.entry("OPEN_OPPORTUNITY_MATERIAL_UPLOAD","准备接收材料"),
+  Map.entry("REACTIVATE_APPOINTMENT_ROLE","恢复岗位"),
+  Map.entry("READ_CONTRACT","查看合同"),
+  Map.entry("READ_CURRENT_WORKCARD","查看工作卡"),
+  Map.entry("READ_CUSTOMER_REQUIREMENTS","查看客户与需求"),
+  Map.entry("READ_FOLLOWUP_ATTEMPT","查看联系尝试"),
+  Map.entry("READ_OPPORTUNITY_CLOSURE","查看商机关闭记录"),
+  Map.entry("READ_OPPORTUNITY_LEDGER","查询商机台账"),
+  Map.entry("READ_OPPORTUNITY_MATERIAL","查看商机材料"),
+  Map.entry("READ_QUOTE","查看报价"),
+  Map.entry("RECORD_CONTACT_RESULT","记录首联结果"),
+  Map.entry("RECORD_CONTRACT_DECISION","记录合同审批决定"),
+  Map.entry("RECORD_CONTRACT_PREPARATION_DECISION","记录直接准备决定"),
+  Map.entry("RECORD_CONTRACT_RECEIPT_REVIEW","核对本笔收款"),
+  Map.entry("RECORD_CONTRACT_REVIEW","记录签约前审查"),
+  Map.entry("RECORD_CONTRACT_SIGNATURE_VERIFICATION","记录签署核验"),
+  Map.entry("RECORD_CONTRACT_TERMINATION_REVIEW","记录终止签约核对结果"),
+  Map.entry("RECORD_OPPORTUNITY_FOLLOWUP_ATTEMPT","记录联系尝试与下次安排"),
+  Map.entry("RECORD_OPPORTUNITY_OWNER_COORDINATION","商机责任协调"),
+  Map.entry("RECORD_OPPORTUNITY_PROGRESS","记录商机进展"),
+  Map.entry("RECORD_QUOTE_DECISION","记录报价决定"),
+  Map.entry("RECORD_QUOTE_DELIVERY","记录人工报价交付"),
+  Map.entry("RECORD_QUOTE_FOLLOWUP_ATTEMPT","记录报价联系尝试与下次安排"),
+  Map.entry("RECORD_QUOTE_RESPONSE","记录客户报价回复"),
+  Map.entry("RECORD_ROUTING_DISPOSITION","记录调配处置"),
+  Map.entry("RECORD_SOURCE_REQUEST_CONTINUATION","确认线索后续安排"),
+  Map.entry("RECORD_TRANSFER_CONFLICT_REVIEW","记录转案前冲突审查"),
+  Map.entry("RECORD_TRANSFER_INTAKE","记录案管接收"),
+  Map.entry("RENAME_APPOINTMENT_ROLE","更改岗位名称"),
+  Map.entry("RENAME_IDENTITY_PRINCIPAL","更改人员名称"),
+  Map.entry("RENAME_ORGANIZATION_UNIT","更改组织名称"),
+  Map.entry("REQUEST_CONTRACT_APPROVAL","提交合同审批"),
+  Map.entry("REQUEST_CONTRACT_PREPARATION","申请直接准备合同"),
+  Map.entry("REQUEST_CONTRACT_RECEIPT_REVIEW","提交后续收款凭证"),
+  Map.entry("REQUEST_CONTRACT_REVIEW","提交签约前审查"),
+  Map.entry("REQUEST_CONTRACT_TERMINATION_REVIEW","申请主管核对终止签约"),
+  Map.entry("REQUEST_QUOTE_APPROVAL","提交报价审批"),
+  Map.entry("RESOLVE_DUPLICATE_LEAD","核对线索归属"),
+  Map.entry("RESUBMIT_TRANSFER","补正并重新提交转案"),
+  Map.entry("RESUME_APPOINTMENT","恢复任职"),
+  Map.entry("RESUME_IDENTITY_PRINCIPAL","恢复人员主体"),
+  Map.entry("RETURN_CONTRACT_FOR_REVISION","返回合同修订"),
+  Map.entry("RETURN_CONTRACT_SIGNATURE_FOR_REVISION","返回合同修订"),
+  Map.entry("REVIEW_LEAD_VALIDITY","复核线索有效性"),
+  Map.entry("REVOKE_AUTHORITY_GRANT","撤销直接权限"),
+  Map.entry("SAVE_ACTION_DRAFT","保存候选"),
+  Map.entry("SAVE_CONTRACT_DRAFT","保存合同草稿"),
+  Map.entry("SAVE_CONTRACT_SIGNATURE_DRAFT","保存签署草稿"),
+  Map.entry("SAVE_OPPORTUNITY_CUSTOMER_DRAFT","保存客户与需求草稿"),
+  Map.entry("SAVE_QUOTE_DRAFT","保存收费方案草稿"),
+  Map.entry("START_CONTRACT_PREPARATION","接续合同准备"),
+  Map.entry("START_QUOTE_PREPARATION","开始报价准备"),
+  Map.entry("SUBMIT_CONTRACT_SIGNATURE","提交签署核验"),
+  Map.entry("SUBMIT_TRANSFER","提交转案材料"),
+  Map.entry("SUPPLEMENT_CONTRACT_RECEIPT","补充收款凭证"),
+  Map.entry("SUSPEND_APPOINTMENT","挂起任职"),
+  Map.entry("SUSPEND_IDENTITY_PRINCIPAL","挂起人员主体"),
+  Map.entry("TRANSFER_OPPORTUNITY_RESPONSIBILITY","商机责任交接"),
+  Map.entry("VERIFY_CONTRACT_EXECUTION_CONDITIONS","核对合同执行条件"));
+ public static Map<String,String> registeredActions(){return ACTIONS;}
+ public static Set<String> registeredSources(){return SOURCES;}
+ public static boolean classified(String scope,String path,String source){return Set.of("TENANT","ORGANIZATION","OBJECT","SECURITY").contains(scope)&&Set.of("DIRECT","DELEGATED","OBJECT","SYSTEM").contains(path)&&SOURCES.contains(source);}
+ public static String project(String schema,int version,String raw,byte[] expected){
+  var parsed=ReceiptAuditJson.object(ReceiptAuditJson.parse(raw));
+  if(expected==null||!MessageDigest.isEqual(expected,ReceiptAuditJson.digest(integrityEncoding(schema,version,parsed))))throw new IllegalArgumentException("Invalid audit summary integrity");
+  if(!SCHEMAS.contains(schema)||version!=(schema.endsWith("_V2")?2:1))return "未识别的摘要版本；仅展示操作及结果。";
+  if(schema.equals("R1_IDENTITY_COMMAND_AUDIT_V1")||schema.startsWith("R1_COMMAND_AUDIT_V")){
+   String domain=schema.equals("R1_IDENTITY_COMMAND_AUDIT_V1")?"身份与授权操作":"业务操作";
+   Object value=parsed.get("result");if(value instanceof Map<?,?> result){String outcome=safeOutcome(result.get("outcome"));if(outcome!=null)return "已核验"+domain+"摘要，结果为"+outcome+"。";}
+   return "已核验"+domain+"摘要；结果请查看记录结果栏。";
+  }
+  if(schema.equals("R1_IDENTITY_SELF_DISCLOSURE_V1"))return "已核验当前办理身份及本人任职。";
+  if(schema.equals("R1_IDENTITY_BOOTSTRAP_V1"))return "已按审核清单初始化人员、任职及管理授权。";
+  if(schema.equals("ADM07_AUDIT_DISCLOSURE_V1"))return "已在当前获权范围内完成审计查询并记录披露审计。";
+  Object mode=parsed.get("responseMode");if(mode instanceof String text)return switch(text){case "BODY"->"已按当前权限读取允许展示的资料。";case "REVALIDATION_ONLY","NOT_MODIFIED","NO_BODY","CACHE_REVALIDATED"->"已复核当前读取权限；本次未返回业务正文。";case "HISTORY"->"已按当前权限读取允许展示的历史版本。";default->"已核验本次操作摘要；原始业务内容不在此页展示。";};
+  return "已核验本次操作摘要；原始业务内容不在此页展示。";
+ }
+ // These two frozen writers hash their fixed field order, not JCS. Rebuild that exact protocol after JSONB reorders keys.
+ private static String integrityEncoding(String schema,int version,Map<String,Object> parsed){
+  if(version!=1||!Set.of("R1_CURRENT_WORKCARD_DISCLOSURE_AUDIT_V1","R2_CURRENT_WORKCARD_DISCLOSURE_AUDIT_V1").contains(schema))return ReceiptAuditJson.encode(parsed);
+  ReceiptAuditJson.fields(parsed,"profile","version","responseMode","fieldGroups","disclosedSource","authorizationAnchor");
+  String profile=schema.startsWith("R2_")?"R2_CURRENT_WORKCARD_DISCLOSURE_V1":"R1_CURRENT_WORKCARD_DISCLOSURE_V1";
+  if(!profile.equals(parsed.get("profile"))||!Long.valueOf(1).equals(parsed.get("version"))||!Set.of("BODY","CACHE_REVALIDATED").contains(parsed.get("responseMode"))||!java.util.List.of("CURRENT_WORKCARD").equals(parsed.get("fieldGroups")))throw new IllegalArgumentException("Invalid frozen workcard summary");
+  return "{\"profile\":"+ReceiptAuditJson.encode(profile)+",\"version\":1,\"responseMode\":"+ReceiptAuditJson.encode(parsed.get("responseMode"))+",\"fieldGroups\":[\"CURRENT_WORKCARD\"],\"disclosedSource\":"+legacySelector(parsed.get("disclosedSource"))+",\"authorizationAnchor\":"+legacySelector(parsed.get("authorizationAnchor"))+"}";
+ }
+ private static String legacySelector(Object value){
+  var selector=ReceiptAuditJson.object(value);ReceiptAuditJson.fields(selector,"type","id","revision","hash");
+  if(!(selector.get("type") instanceof String type)||!SOURCES.contains(type)||!(selector.get("id") instanceof String id))throw new IllegalArgumentException("Invalid frozen workcard selector");
+  java.util.UUID.fromString(id);Object revision=selector.get("revision"),hash=selector.get("hash");
+  if(revision!=null&&(!(revision instanceof Long number)||number<0)||hash!=null&&(!(hash instanceof String text)||java.util.Base64.getUrlDecoder().decode(text).length!=32))throw new IllegalArgumentException("Invalid frozen workcard selector");
+  return "{\"type\":"+ReceiptAuditJson.encode(type)+",\"id\":"+ReceiptAuditJson.encode(id)+",\"revision\":"+ReceiptAuditJson.encode(revision)+",\"hash\":"+ReceiptAuditJson.encode(hash)+"}";
+ }
+ private static String safeOutcome(Object value){if(!(value instanceof String text))return null;return switch(text){case "SUCCEEDED"->"成功";case "NO_CHANGE"->"无变更";case "REJECTED"->"已拒绝";case "FAILED"->"失败";default->null;};}
+ public static String name(String name){if(name==null||name.isBlank()||name.codePoints().anyMatch(c->Character.isISOControl(c)||Character.getType(c)==Character.FORMAT)||name.codePointCount(0,name.length())>200)return "未提供显示名称";return name;}
+ public static String objectLabel(String type){if(type==null)return "业务对象";return switch(type.split("\\.",2)[0]){case "identity"->"身份与授权";case "audit"->"审计记录";case "lead"->"线索";case "opportunity"->"商机";case "contract"->"合同";case "payment"->"收款";case "transfer"->"案管移交";case "responsibility"->"待办与办理";case "evidence"->"材料";case "party"->"客户资料";case "execution"->"业务执行";case "external_action"->"外部动作";case "conflict"->"冲突核对";default->"业务对象";};}
+ public static String actionLabel(String action){return ACTIONS.getOrDefault(action,"执行操作");}
+ public static String scopeLabel(String scope){return switch(scope){case "TENANT"->"事务所";case "ORGANIZATION"->"组织";case "OBJECT"->"对象";case "SECURITY"->"安全";default->"未识别范围";};}
+ public static String resultLabel(String result){return switch(result){case "SUCCEEDED","COMPLETED"->"成功";case "NO_CHANGE"->"无变更";case "REJECTED"->"已拒绝";case "FAILED"->"失败";default->"未识别结果";};}
+}

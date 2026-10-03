@@ -40,6 +40,7 @@ class R2SourceRequestHttpIT extends R1HttpFixture {
   var tls=new io.github.windyzhu3.ontologylaw.testing.TlsFixture(java.nio.file.Files.createTempDirectory("source-review-tls"));
   try(var http=new HttpHarness(worker,tls);var client=http.workerClient()) {
    var type=io.github.windyzhu3.ontologylaw.worker.InternalApiClient.RecoveryType.SOURCE_REQUEST_REVIEW_TASK;
+   awaitDatabaseTime(due);
    var page=client.due(http.workerBinding,type,null);assertEquals(200,page.status());assertEquals(1,page.candidates().size());var candidate=page.candidates().getFirst();assertEquals(current.selector().id(),candidate.taskId());
    mutate("update identity.authority_grant set state='REVOKED',revoked_at=clock_timestamp(),revocation_reason_code='FIXTURE',revision=revision+1 where tenant_id=? and authority_code='LEAD_ROUTING_DECIDE'",seed.tenant());
    assertTrue(client.due(http.workerBinding,type,null).candidates().isEmpty());

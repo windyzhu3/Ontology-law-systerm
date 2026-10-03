@@ -85,9 +85,9 @@ public class Appointment extends TableImpl<Record> {
 
     /**
      * The column <code>identity.appointment.role_code</code>.
-     * 岗位代码：来自静态应用注册表，创建后不可修改，不直接授予业务权限。
+     * 岗位代码：关联同租户可配置目录，创建后不变，不授予权限。
      */
-    public final TableField<Record, String> ROLE_CODE = createField(DSL.name("role_code"), SQLDataType.VARCHAR(64).nullable(false), this, "岗位代码：来自静态应用注册表，创建后不可修改，不直接授予业务权限。");
+    public final TableField<Record, String> ROLE_CODE = createField(DSL.name("role_code"), SQLDataType.VARCHAR(64).nullable(false), this, "岗位代码：关联同租户可配置目录，创建后不变，不授予权限。");
 
     /**
      * The column <code>identity.appointment.effective_from</code>.

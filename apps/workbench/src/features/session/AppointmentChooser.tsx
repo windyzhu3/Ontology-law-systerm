@@ -160,7 +160,8 @@ function ChoiceForm({
   const ownCandidate = !!context?.appointmentChoices.some((c) => c.id === own);
   const identityAdminCandidate =
     !!onEnterIdentityAdmin &&
-    !!context?.canEnterIdentityAdmin &&
+    (!!context?.canEnterIdentityAdmin || context?.canReadAuditRecords === true) &&
+    !!context &&
     context.selectedOnBehalfAppointmentId === null &&
     established &&
     ownCandidate;
@@ -276,7 +277,7 @@ function ChoiceForm({
       !selected?.actorScopeKey ||
       selected.selectedAppointmentId !== own ||
       selected.selectedOnBehalfAppointmentId !== null ||
-      !selected.canEnterIdentityAdmin
+      !(selected.canEnterIdentityAdmin || selected.canReadAuditRecords === true)
     )
       return;
     setConfirmed(false);
@@ -497,7 +498,7 @@ function ChoiceForm({
             disabled={!identityAdminEnabled}
             onClick={enterIdentityAdmin}
           >
-            进入身份管理
+            {context?.canEnterIdentityAdmin ? '进入身份管理' : '进入审计查询'}
           </button>
         )}
         <p role="status" className="choice-status" aria-live="polite">

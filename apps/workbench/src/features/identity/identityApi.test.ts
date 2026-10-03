@@ -230,7 +230,7 @@ const readCases = [
       page: "APPOINTMENTS",
       optionKind: "ORGANIZATION",
       candidates: { items: [choice], nextCursor: null },
-      roleCodes: ["INTAKE_OPERATOR", "ROUTING_SUPERVISOR", "CONTACT_OPERATOR"],
+      roleCodes: [],
       grantableAuthorityCodes: [],
     },
   },
@@ -254,7 +254,7 @@ const readCases = [
     operation: "listAppointments",
     query: { limit: 50, cursor: "cursor-token" },
     body: {
-      items: [{ id: targetId, principal: choice, organization: { id: organizationId, label: "华东组" }, roleCode: "CONTACT_OPERATOR", effectiveFrom: "2026-09-09T00:00:00Z", effectiveUntil: null, state: "ACTIVE", etag: identityETag }],
+      items: [{ id: targetId, principal: choice, organization: { id: organizationId, label: "华东组" }, roleCode: "CONTACT_OPERATOR", roleName: "首联经办", effectiveFrom: "2026-09-09T00:00:00Z", effectiveUntil: null, state: "ACTIVE", etag: identityETag }],
       nextCursor: null,
     },
   },
@@ -318,7 +318,7 @@ describe("identity reads", () => {
     ["provider lookup never returns a continuation", "listIdentityProviderUsers", { ...readCases[0].body, nextCursor: "unexpected" }],
     ["principal pages never exceed fifty", "listIdentityPrincipals", { ...readCases[2].body, items: Array.from({ length: 51 }, () => readCases[2].body.items[0]) }],
     ["SERVICE data is not accepted", "listOrganizationUnits", { ...readCases[3].body, items: [{ ...readCases[3].body.items[0], principalKind: "SERVICE" }] }],
-    ["appointment enums remain closed", "listAppointments", { ...readCases[4].body, items: [{ ...readCases[4].body.items[0], roleCode: "SERVICE_OPERATOR" }] }],
+    ["appointment code syntax stays constrained", "listAppointments", { ...readCases[4].body, items: [{ ...readCases[4].body.items[0], roleCode: "bad-role" }] }],
     ["authority enums remain closed", "listAuthorityGrants", { ...readCases[5].body, items: [{ ...readCases[5].body.items[0], authorityCode: "SYSTEM_ADMIN" }] }],
     ["options cannot expand grantable authority", "getIdentityAdminOptions", { ...readCases[1].body, grantableAuthorityCodes: ["IDENTITY_PRINCIPAL_MANAGE"] }],
   ])("rejects malformed read bodies: %s", async (_name, operation, body) => {
@@ -606,7 +606,7 @@ describe("identity writes", () => {
     ["missing update target", { ...writes[1].original, targetId: undefined }],
     ["weak update ETag", { ...writes[1].original, ifMatch: `W/${identityETag}` }],
     ["extra body property", { ...writes[0].original, body: { ...writes[0].original.body, bearer: "secret" } }],
-    ["management authority grant", { ...writes[12].original, body: { ...writes[12].original.body, authorityCode: "IDENTITY_PRINCIPAL_MANAGE" } }],
+    ["unregistered management authority grant", { ...writes[12].original, body: { ...writes[12].original.body, authorityCode: "IDENTITY_ARBITRARY_MANAGE" } }],
   ])("rejects a closed original request with %s before credentials or dispatch", async (_name, malformed) => {
     const requests: Request[] = [];
     const getValidAccessToken = vi.fn(async () => "must-not-be-read");

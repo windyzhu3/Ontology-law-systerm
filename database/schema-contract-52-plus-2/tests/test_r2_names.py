@@ -28,4 +28,5 @@ class R2NamesContractTest(unittest.TestCase):
         manifest=json.loads((root/'schema-contract-manifest.json').read_text(encoding='utf-8'))
         name='db/migration/V870__r2_lead_independent_names.sql'
         self.assertEqual(hashlib.sha256((root/name).read_bytes()).hexdigest(),manifest['generatedArtifactSha256'][name])
-        self.assertEqual(34,len(manifest['generatedArtifactSha256']))
+        self.assertEqual(43,len(manifest['generatedArtifactSha256']))
+        self.assertEqual('52-plus-2-r2-v22', manifest['contractVersion'])

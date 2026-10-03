@@ -24,9 +24,9 @@ public final class IdentityAdminReadRuntime {
             Kind kind;String code;boolean rootRequired=false,options=operation.equals("getIdentityAdminOptions");
             if(options) {
                 int authority=switch(page==null?"":page){case "PRINCIPALS"->0;case "ORGANIZATIONS"->1;case "APPOINTMENTS"->2;case "AUTHORITY_GRANTS"->3;default->throw new Failure("VALIDATION_FAILED");};code=IdentityCommands.MANAGEMENT.get(authority);
-                if(option==null||!switch(page){case "PRINCIPALS"->option.equals("PRINCIPAL");case "ORGANIZATIONS"->option.equals("ORGANIZATION");case "APPOINTMENTS"->Set.of("PRINCIPAL","ORGANIZATION").contains(option);default->Set.of("APPOINTMENT","ORGANIZATION").contains(option);})throw new Failure("VALIDATION_FAILED");
-                kind=Kind.valueOf(option);rootRequired=kind==Kind.PRINCIPAL;
-            } else {kind=switch(operation){case "listIdentityPrincipals","listIdentityProviderUsers"->Kind.PRINCIPAL;case "listOrganizationUnits"->Kind.ORGANIZATION;case "listAppointments"->Kind.APPOINTMENT;case "listAuthorityGrants"->Kind.AUTHORITY_GRANT;default->throw new Failure("VALIDATION_FAILED");};code=IdentityCommands.MANAGEMENT.get(kind.ordinal());rootRequired=kind==Kind.PRINCIPAL;}
+                if(option==null||!switch(page){case "PRINCIPALS"->option.equals("PRINCIPAL");case "ORGANIZATIONS"->option.equals("ORGANIZATION");case "APPOINTMENTS"->Set.of("PRINCIPAL","ORGANIZATION","ROLE").contains(option);default->Set.of("APPOINTMENT","ORGANIZATION").contains(option);})throw new Failure("VALIDATION_FAILED");
+                kind=Kind.valueOf(option);rootRequired=kind==Kind.PRINCIPAL||kind==Kind.ROLE;
+            } else {kind=switch(operation){case "listIdentityPrincipals","listIdentityProviderUsers"->Kind.PRINCIPAL;case "listOrganizationUnits"->Kind.ORGANIZATION;case "listAppointments"->Kind.APPOINTMENT;case "listAuthorityGrants"->Kind.AUTHORITY_GRANT;case "listAppointmentRoles"->Kind.ROLE;default->throw new Failure("VALIDATION_FAILED");};code=IdentityCommands.MANAGEMENT.get(kind==Kind.ROLE?2:kind.ordinal());rootRequired=kind==Kind.PRINCIPAL||kind==Kind.ROLE;}
             var access=reader.listAccess(c,actor,code,rootRequired);var sources=new ArrayList<Subject>();Map<String,Object> response;int count;
             if(operation.equals("listIdentityProviderUsers")) {
                 if(cursor!=null||search==null||search.isBlank()||search.codePointCount(0,search.length())>200||search.codePoints().anyMatch(Character::isISOControl))throw new Failure("VALIDATION_FAILED");
@@ -43,7 +43,7 @@ public final class IdentityAdminReadRuntime {
                 }
                 String next=result.hasMore()?protection.cursor(binding,new Position(result.items().getLast().createdAt(),result.items().getLast().fact().id())):null;
                 response=page(items,next);count=items.size();
-                if(options)response=Map.of("page",page,"optionKind",option,"roleCodes",page.equals("APPOINTMENTS")?IdentityCommands.ROLES:List.of(),"grantableAuthorityCodes",page.equals("AUTHORITY_GRANTS")?IdentityCommands.GRANTABLE:List.of(),"candidates",response);
+                if(options)response=Map.of("page",page,"optionKind",option,"roleCodes",List.of(),"grantableAuthorityCodes",page.equals("AUTHORITY_GRANTS")?reader.grantableAuthorities(c,actor):List.of(),"candidates",response);
             }
             // Final fresh DB-clock authorization includes current expiry after external work and projection.
             var finalAccess=reader.listAccess(c,actor,code,rootRequired);
@@ -58,10 +58,15 @@ public final class IdentityAdminReadRuntime {
                 }
             }
             access=finalAccess;
+            if(options&&page.equals("AUTHORITY_GRANTS")) {
+                var currentCodes=reader.grantableAuthorities(c,actor);
+                if(!currentCodes.equals(response.get("grantableAuthorityCodes")))throw new Failure("NOT_AUTHORIZED");
+                if(currentCodes.containsAll(IdentityCommands.MANAGEMENT))access=IdentityAdminReader.combine(access,reader.managementGrantAccess(c,actor,null));
+            }
             setLocalRole(c,Capability.AUDIT);audit.append(c,new AuditAppender.IdentityDisclosureEntry(UUID.randomUUID(),UUID.randomUUID(),operation,access.authorization(),count,sources));
             return response;
         });
     }
     private static Map<String,Object> page(List<?> items,String cursor){var result=new LinkedHashMap<String,Object>();result.put("items",items);result.put("nextCursor",cursor);return Collections.unmodifiableMap(result);}
-    @SuppressWarnings("unchecked") private static Map<String,Object> choice(Resource resource){String label=(String)resource.values().get("displayName");if(label==null)label=((Map<String,Object>)resource.values().get("principal")).get("label")+" · "+((Map<String,Object>)resource.values().get("organization")).get("label")+" · "+resource.values().get("roleCode");if(label.codePointCount(0,label.length())>200)label=label.substring(0,label.offsetByCodePoints(0,200));return Map.of("id",resource.fact().id().toString(),"label",label);}
+    @SuppressWarnings("unchecked") private static Map<String,Object> choice(Resource resource){String label=(String)resource.values().get("displayName");if(label==null)label=((Map<String,Object>)resource.values().get("principal")).get("label")+" · "+((Map<String,Object>)resource.values().get("organization")).get("label")+" · "+resource.values().get("roleName");if(label.codePointCount(0,label.length())>200)label=label.substring(0,label.offsetByCodePoints(0,200));return Kind.of(resource.fact().type())==Kind.ROLE?Map.of("id",resource.fact().id().toString(),"label",label,"code",resource.values().get("code")):Map.of("id",resource.fact().id().toString(),"label",label);}
 }

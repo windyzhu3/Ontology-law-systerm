@@ -30,7 +30,7 @@ class R1WorkerClientHttpIT extends R1HttpFixture {
         }
     }
     @Test void every_outbound_request_rechecks_actual_worker_deployment_gate_before_any_http_dispatch()throws Exception {
-        setupContact();var actor=service("R1_PROJECTION_CONSUME");var gate=RuntimeDatabase.databaseBacked(database::workerConnection,RuntimeDatabase.Role.WORKER,new RuntimeDatabase.Expected("52-plus-2-r2-v19",java.util.HexFormat.of().parseHex("11".repeat(32)),java.util.HexFormat.of().parseHex("22".repeat(32))));
+        setupContact();var actor=service("R1_PROJECTION_CONSUME");var gate=RuntimeDatabase.databaseBacked(database::workerConnection,RuntimeDatabase.Role.WORKER,new RuntimeDatabase.Expected("52-plus-2-r2-v22",java.util.HexFormat.of().parseHex("11".repeat(32)),java.util.HexFormat.of().parseHex("22".repeat(32))));
         try(var http=new HttpHarness(actor,new TlsFixture(directory));var worker=http.workerClient(gate::healthy)) {
             assertEquals(204,worker.readiness(http.workerBinding).status());int received=http.received.get();var before=counts();
             try(var c=database.migratorConnection()){io.github.windyzhu3.ontologylaw.identity.AuthorizationServiceIT.sql(c,"update platform_meta.deployment_state set operating_mode='BLOCKED',revision=revision+1,changed_at=clock_timestamp() where deployment_state_key='PRIMARY'");}

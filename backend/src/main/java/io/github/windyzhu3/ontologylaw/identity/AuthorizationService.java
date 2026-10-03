@@ -46,7 +46,12 @@ public interface AuthorizationService {
     }
     /** Explicit read-only scope. The identity lock is acquired before any reusable fact is read.
      * Close before leaving the transaction; callers must not mutate identity within this scope. */
-    interface ReadScope extends AutoCloseable { void close(); }
+    interface ReadScope extends AutoCloseable {
+        void close();
+        /** Command boundaries discard object facts after business work or rollback.
+         * Pure reads retain their locked catalog; each decision still uses current time. */
+        default void discardObjectAccessFacts() {}
+    }
     default ReadScope lockedReadScope(Connection connection,UUID tenantId)throws SQLException {
         lockForEvaluation(connection,tenantId);return ()->{};
     }
