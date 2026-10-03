@@ -22,6 +22,7 @@ import {
 import { BusinessDispatchGate, allowBusinessRequest, canonicalBusinessJson } from '../fixtures/business-session';
 import { BusinessSetup } from '../fixtures/r1-business-setup';
 import BusinessReporter, { businessFailureCode } from '../reporters/business-reporter';
+import { syntheticPython } from './boundary-probe';
 
 const runIdentity: BusinessRunIdentity = {
   runId: '00000000-0000-4000-8000-000000000101',
@@ -63,7 +64,8 @@ test('offline actual business config keeps stable worker projects and enables li
   const actualConfig = resolve(__dirname, '../business.config.ts'), playwright = resolve(__dirname, '../../node_modules/@playwright/test');
   writeFileSync(testPath, `const { test, expect } = require(${JSON.stringify(playwright)});\ntest('approved-local-business benign no-browser', () => expect(true).toBe(true));\n`);
   writeFileSync(configPath, `const loaded = require(${JSON.stringify(actualConfig)});\nconst actual = loaded.default ?? loaded;\nmodule.exports = { ...actual, testDir: __dirname, outputDir: ${JSON.stringify(join(folder, 'results'))}, reporter: [['line']], projects: actual.projects.map(project => ({ ...project, testDir: __dirname, testMatch: 'benign.spec.cjs' })) };\n`);
-  const pinnedNode = 'C:/Users/Jacob/.cache/codex-runtimes/ontology-law-prb/node-v24.20.0-win-x64/node.exe';
+  expect(process.version).toBe('v24.20.0');
+  const pinnedNode = process.execPath;
   const cli = resolve(__dirname, '../../node_modules/@playwright/test/cli.js');
   const run = (...args: string[]) => spawnSync(pinnedNode, [cli, 'test', '--config', configPath, ...args], { cwd: folder, encoding: 'utf8', windowsHide: true, timeout: 30_000, maxBuffer: 2 * 1024 * 1024 });
 
@@ -175,7 +177,7 @@ try:
 except Exception:print('REJECTED');sys.exit(2)
 `;
   for (const scenario of ['coherent', 'pending', 'missing-report', 'tampered-report']) {
-    const bootstrap = spawnSync('D:/soft/python3/python.exe', ['-B', '-c', probe, resolve(__dirname, '../..'), 'business', synthetic + '-' + scenario, scenario], { input: LOCAL_RUNTIME_BRIDGE, encoding: 'utf8', windowsHide: true });
+    const bootstrap = spawnSync(syntheticPython, ['-B', '-c', probe, resolve(__dirname, '../..'), 'business', synthetic + '-' + scenario, scenario], { input: LOCAL_RUNTIME_BRIDGE, encoding: 'utf8', windowsHide: true });
     expect(bootstrap.status, scenario).toBe(scenario === 'coherent' ? 0 : 2);
     expect(bootstrap.stdout.trim().endsWith(scenario === 'coherent' ? 'ACCEPTED' : 'REJECTED')).toBe(true);
   }
