@@ -135,7 +135,7 @@ def runtime_logins(root: Path, operation_id: str):
         journal.record(root,operation_id,{'phase':'APPLICATION_LOGINS_READY'})
 
 
-def verify_schema(root: Path, target='1080') -> dict:
+def verify_schema(root: Path, target='1080', *, assert_role_boundaries=True) -> dict:
     resources=runtime.load(root);repo=Path(resources['repo']);observed=observe(root)
     history=observed['history'];versions=[r['version'] for r in history if r['version']]
     if versions!=expected_versions(repo,target) or not all(r['success'] for r in history):raise RuntimeError('Unexpected Flyway history')
@@ -147,6 +147,7 @@ def verify_schema(root: Path, target='1080') -> dict:
         if len(observed['tables'])!=manifest['physicalTableCountAfterFlywayBootstrap']:raise RuntimeError('Catalog table count differs')
         if sql(root,"SELECT count(*) FROM pg_constraint WHERE conrelid='identity.appointment'::regclass AND contype='f' AND confrelid='identity.appointment_role'::regclass")!='1':raise RuntimeError('Appointment role foreign key absent')
         if sql(root,"SELECT count(*) FROM pg_trigger WHERE tgrelid='identity.appointment'::regclass AND NOT tgisinternal AND tgenabled='O' AND pg_get_triggerdef(oid) LIKE '%INSERT%'")=='0':raise RuntimeError('Appointment insert guard absent')
+    if not assert_role_boundaries:return observed
     # These assertions roll back even the successful temporary function.
     assertion="BEGIN; DO $$ BEGIN "
     for role in ['law_app_command','law_app_query','law_app_worker','law_audit_append']:

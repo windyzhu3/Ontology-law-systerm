@@ -187,9 +187,11 @@ def _start(root, plan):
         time.sleep(.5)
 
 
-def http(root, url, *, method='GET', headers=None, body=None):
+def http(root, url, *, method='GET', headers=None, body=None, client_certificate=False):
     plan=journal._read(root,root/'identity/plan.json');runtime.owned(root,'container',plan['pod'])
     request={'url':url,'method':method,'headers':headers or {},'body':body,'ca':str(root/'certs/ca.pem')}
+    if client_certificate:
+        request.update(certificate=str(root/'certs/service.crt'),privateKey=str(root/'certs/service.key'))
     result=runtime.run(['docker','exec','-i',plan['pod'],'node','/opt/ols/runtime/https-json.mjs'],canonical(request),timeout=25)
     return json.loads(result.stdout)
 
@@ -221,6 +223,18 @@ def verify(root: Path) -> dict:
         return {'status':'PASS','humanAccounts':17,'passwordUpdatesRequired':pending}
 
 
+def bootstrap_output(data: bytes) -> dict:
+    values=[]
+    for line in data.decode('utf-8').splitlines():
+        if line.startswith('{'):
+            try:value=json.loads(line)
+            except ValueError:raise RuntimeError('Original bootstrap JSON protocol malformed') from None
+            if not isinstance(value,dict):raise RuntimeError('Original bootstrap JSON object required')
+            values.append(value)
+    if len(values)!=1:raise RuntimeError('Exactly one original bootstrap result required; retain private diagnostics')
+    return values[0]
+
+
 def _bootstrap_command(root, mode):
     plan=journal._read(root,root/'identity/plan.json')
     launch=journal._read(root,root/'identity/bootstrap-launch.json')
@@ -232,7 +246,7 @@ def _bootstrap_command(root, mode):
     runtime.private_file(root/'identity'/('bootstrap-'+mode+'.stdout'),result.stdout)
     runtime.private_file(root/'identity'/('bootstrap-'+mode+'.stderr'),result.stderr)
     if result.returncode:raise RuntimeError('Original bootstrap failed or uncertain; retain manifest and key')
-    return json.loads(result.stdout)
+    return bootstrap_output(result.stdout)
 
 
 def _bootstrap_absent(root):

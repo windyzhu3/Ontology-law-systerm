@@ -11,6 +11,10 @@ sys.path.insert(0, str(LINUX))
 
 
 class IdentityTest(unittest.TestCase):
+    def test_bootstrap_protocol_preserves_diagnostics_and_requires_one_json_result(self):
+        from ols_linux.identity import bootstrap_output
+        self.assertEqual(bootstrap_output(b'INFO pool started\njOOQ banner\n{"mode":"DRY_RUN"}\n'),{'mode':'DRY_RUN'})
+        with self.assertRaises(RuntimeError):bootstrap_output(b'{"mode":"DRY_RUN"}\n{"mode":"CREATED"}\n')
     def setUp(self):
         self.assertTrue((LINUX/'ols_linux/identity.py').exists(), 'Native Linux identity provisioning missing')
         self.m = importlib.import_module('ols_linux.identity')
