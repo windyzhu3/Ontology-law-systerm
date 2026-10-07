@@ -135,13 +135,13 @@
 **Interfaces:** `admin.execute(runtime: Path, operation_id: str, command: dict, session_file: Path) -> dict` 保存并使用原commandId、body、precondition并核对本人Actor/当前任职；`admin.reconcile(runtime: Path, operation_id: str, command_id: str, session_file: Path) -> dict` 查询原结果，未知不新键。
 - `initialize.run(runtime: Path, config: dict, sessions: dict[str, Path]) -> dict` 消费L06的准确subject和原bootstrap；`initialize.resume(runtime: Path, operation_id: str, sessions: dict[str, Path]) -> dict` 原操作续跑；`verify.initialization(runtime: Path, config: dict) -> dict` 只读比较期望与实际。sessions键只允许dingqiming/huangxuexue，值是私密文件路径。
 
-- [ ] 测试实际7组织/17principal/20 HUMAN appointment及明确grant集合相等，无业务交易；丁3任职、黄2任职、其余各1。丁建立黄管理任职及四项身份权限，黄建立丁主任任职/授权；自我授权与最后管理员保护拒绝。普通用户AUDIT_READ拒绝，主任允许；重复运行不增对象，命令已提交响应丢失原键核对，无SQL HUMAN grant或SERVICE冒充。
-- [ ] 运行admin/initialize单元测试和 `python3 deploy/linux/verification/initialization.py --runtime <本轮实例> --sessions <私密会话索引>`：首次缺实现失败。
-- [ ] 实现具名顺序，使用现有IdentityAdminController及真实候选/前置条件/receipt；公开配置解析成准确subject/principal/appointment，不按名称认领外部对象。首次初始化在任何DDL/IdP写入前创建唯一init日志并检查空目标，整个L02/L06/L07流程沿用此operationId；恢复只接纳其已登记事实，不在bootstrap已建数据后重新要求空库。先建DIRECTOR/FINANCE_SUPERVISOR/CASE_SUPERVISOR目录，角色目录操作本身不赋权。
-- [ ] 打通bootstrap后管理API启动：受控准备先建技术SERVICE目录、任职及系统权限，配置准确bootstrap租户/原管理员trust和验证过的v22制品gate，再内部启动API。初始业务来源目录关闭、尚未解析的绑定/路由不启用，公网业务入口保持关闭；API真实管理命令完成后由L08安装完整可信配置并重启核对。技术SERVICE不算人类任职/业务授权，不依赖尚未存在的人类任职UUID启动管理API。
-- [ ] 核对完整grant范围：普通销售本人主链，两主管本部门审批，孙/焦分别两部核款，陈路监督无核款，杨案管职责，五案管无办理职责，主任显式全所HUMAN业务。总所身份资格与案管隶属按20任职设计分开；独立线索分配待指派不偷偷授权。
-- [ ] 通过真实初始化及重复/未知响应反例；verify只读，不取得新candidate、不重置密码、不补授权。报告分别显示初始化结构PASS、待改密人数、LEAD_ASSIGN待指派、模板待审核。
-- [ ] 提交本项，消息 `feat: initialize Haihua appointments through human administration`。
+- [x] 测试实际7组织/17principal/20 HUMAN appointment及明确grant集合相等，无业务交易；丁3任职、黄2任职、其余各1。丁建立黄管理任职及四项身份权限，黄建立丁主任任职/授权；自我授权与最后管理员保护拒绝。普通用户AUDIT_READ拒绝，主任允许；重复运行不增对象，命令已提交响应丢失原键核对，无SQL HUMAN grant或SERVICE冒充。
+- [x] 运行admin/initialize单元测试和 `python3 deploy/linux/verification/initialization.py --runtime <本轮实例> --sessions <私密会话索引>`：首次缺实现失败。
+- [x] 实现具名顺序，使用现有IdentityAdminController及真实候选/前置条件/receipt；公开配置解析成准确subject/principal/appointment，不按名称认领外部对象。首次初始化在任何DDL/IdP写入前创建唯一init日志并检查空目标，整个L02/L06/L07流程沿用此operationId；恢复只接纳其已登记事实，不在bootstrap已建数据后重新要求空库。先建DIRECTOR/FINANCE_SUPERVISOR/CASE_SUPERVISOR目录，角色目录操作本身不赋权。
+- [x] 打通bootstrap后管理API启动：受控准备先建技术SERVICE目录、任职及系统权限，配置准确bootstrap租户/原管理员trust和验证过的v22制品gate，再内部启动API。初始业务来源目录关闭、尚未解析的绑定/路由不启用，公网业务入口保持关闭；API真实管理命令完成后由L08安装完整可信配置并重启核对。技术SERVICE不算人类任职/业务授权，不依赖尚未存在的人类任职UUID启动管理API。
+- [x] 核对完整grant范围：普通销售本人主链，两主管本部门审批，孙/焦分别两部核款，陈路监督无核款，杨案管职责，五案管无办理职责，主任显式全所HUMAN业务。总所身份资格与案管隶属按20任职设计分开；独立线索分配待指派不偷偷授权。
+- [x] 通过真实初始化及重复/未知响应反例；verify只读，不取得新candidate、不重置密码、不补授权。报告分别显示初始化结构PASS、待改密人数、LEAD_ASSIGN待指派、模板待审核。
+- [x] 提交本项，消息 `feat: initialize Haihua appointments through human administration`。
 
 ### Task 8: L08 有界责任路由和已有审批策略配置
 
