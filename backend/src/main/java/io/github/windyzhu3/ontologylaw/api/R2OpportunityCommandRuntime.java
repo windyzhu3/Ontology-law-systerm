@@ -43,6 +43,9 @@ public final class R2OpportunityCommandRuntime {
     }
     public static CommandRuntime fromSourcePolicy(R1SourcePolicyRegistry sources,LeadProtection leads,OpportunityProgressProtection protection,R1ServiceSourceBinding services,String node,io.github.windyzhu3.ontologylaw.contract.ContractWorkflowService contracts,io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowService transfers){return fromSourcePolicy(sources,leads,protection,services,node,contracts,transfers,null);}
     public static CommandRuntime fromSourcePolicy(R1SourcePolicyRegistry sources,LeadProtection leads,OpportunityProgressProtection protection,R1ServiceSourceBinding services,String node,io.github.windyzhu3.ontologylaw.contract.ContractWorkflowService contracts,io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowService transfers,R2TransferRecoveryService transferRecovery){
+        return fromSourcePolicy(sources,leads,protection,services,node,contracts,transfers,transferRecovery,new R1HumanSourceBinding(List.of(),sources));
+    }
+    public static CommandRuntime fromSourcePolicy(R1SourcePolicyRegistry sources,LeadProtection leads,OpportunityProgressProtection protection,R1ServiceSourceBinding services,String node,io.github.windyzhu3.ontologylaw.contract.ContractWorkflowService contracts,io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowService transfers,R2TransferRecoveryService transferRecovery,R1HumanSourceBinding humanSources){
         var reader=LeadIngressService.databaseBacked(leads);var opportunities=EventOpportunityReader.databaseBacked();
         return assemble(sources,leads,protection,services,node,new R2OpportunityCommands(protection,(c,actor,subject)->{
             var opportunity=opportunities.byId(c,actor.tenantId(),subject.id());
@@ -50,7 +53,7 @@ public final class R2OpportunityCommandRuntime {
             var policy=lead==null?null:sources.find(lead.source());
             if(policy==null)throw new SQLException("Opportunity source policy unavailable","22000");
             return ZoneId.of(policy.businessTimezone());
-        }),contracts,transfers,transferRecovery);
+        }),contracts,transfers,transferRecovery,humanSources);
     }
     private static CommandRuntime assemble(R1SourcePolicyRegistry sources,LeadProtection leads,OpportunityProgressProtection protection,R1ServiceSourceBinding services,String node,R2OpportunityCommands r2){
         return assemble(sources,leads,protection,services,node,r2,null);
@@ -60,7 +63,10 @@ public final class R2OpportunityCommandRuntime {
     }
     private static CommandRuntime assemble(R1SourcePolicyRegistry sources,LeadProtection leads,OpportunityProgressProtection protection,R1ServiceSourceBinding services,String node,R2OpportunityCommands r2,io.github.windyzhu3.ontologylaw.contract.ContractWorkflowService contracts,io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowService transfers){return assemble(sources,leads,protection,services,node,r2,contracts,transfers,null);}
     private static CommandRuntime assemble(R1SourcePolicyRegistry sources,LeadProtection leads,OpportunityProgressProtection protection,R1ServiceSourceBinding services,String node,R2OpportunityCommands r2,io.github.windyzhu3.ontologylaw.contract.ContractWorkflowService contracts,io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowService transfers,R2TransferRecoveryService transferRecovery){
-        var handlers=new ArrayList<>(new LeadCommands(sources,leads).handlers());
+        return assemble(sources,leads,protection,services,node,r2,contracts,transfers,transferRecovery,new R1HumanSourceBinding(List.of(),sources));
+    }
+    private static CommandRuntime assemble(R1SourcePolicyRegistry sources,LeadProtection leads,OpportunityProgressProtection protection,R1ServiceSourceBinding services,String node,R2OpportunityCommands r2,io.github.windyzhu3.ontologylaw.contract.ContractWorkflowService contracts,io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowService transfers,R2TransferRecoveryService transferRecovery,R1HumanSourceBinding humanSources){
+        var handlers=new ArrayList<>(new LeadCommands(sources,leads,humanSources).handlers());
         handlers.add(r2.draft(new ActionDraftCommands(leads).handlers().getFirst()));handlers.add(r2.primary());
         handlers.add(new R2SalesChainRepairCommand(protection));
         handlers.add(new R2OpportunityRecoveryCommand(protection));

@@ -7,6 +7,14 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 import java.util.*;
 class AuditReadAuthorizationIT extends PostgresIntegrationTest {
+ @Test void sales_and_identity_management_permissions_do_not_allow_audit_disclosure()throws Exception{
+  for(String authority:List.of("LEAD_CAPTURE","IDENTITY_READ")){
+   var s=seed(database,"HUMAN",authority);var actor=new Actor(s.tenant(),s.principal(),s.appointment(),null,null);
+   try(var c=database.apiConnection()){
+    inTransaction(c,Capability.QUERY,x->{AuthorizationService.databaseBacked().lockForEvaluation(x,s.tenant());assertThrows(IdentityCommands.Failure.class,()->AuditReadAuthorization.databaseBacked().scopes(x,actor));return null;});
+   }
+  }
+ }
  @Test void audit_permission_is_independent_current_and_self_only()throws Exception{
   var s=seed(database,"HUMAN","AUDIT_READ");var actor=new Actor(s.tenant(),s.principal(),s.appointment(),null,null);
   var reader=AuditReadAuthorization.databaseBacked();var audit=new Subject("audit.audit_entry",UUID.randomUUID(),null,Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[32]));

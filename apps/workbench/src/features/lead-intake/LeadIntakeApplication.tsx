@@ -6,7 +6,7 @@ import type { WorkbenchSession } from "../../lib/sessionTransport";
 import { RecoveryStore } from "../session/recoveryMarker";
 import { IdentityDialog } from "../identity/IdentityActionConfirmation";
 import type { IdentityLeaveGuard } from "../identity/IdentityAdminApplication";
-import { createLeadIntakeApi, type LeadCaptureWrite } from "./leadIntakeApi";
+import { createLeadIntakeApi, type LeadCaptureWrite, type SourceSelection } from "./leadIntakeApi";
 import { captureBody, type CaptureFields, type IntakeSource } from "./leadCapture";
 import { readLeadImportFile, type LeadImportFile } from "./leadImportFile";
 import type { LeadImportField, LeadImportMapping, LeadImportRow } from "./leadImport";
@@ -25,6 +25,7 @@ export function LeadIntakeApplication(props: Props) {
 }
 function Workspace({ session, api, recovery, onReturn, returnLabel, sessionActions, registerLeaveGuard, onRecover, onOpenTask }: Props) {
   const [sources, setSources] = useState<IntakeSource[] | null>(null), [account, setAccount] = useState("");
+  const [sourceSelection,setSourceSelection]=useState<SourceSelection>("SELECTABLE");
   const [fields, setFields] = useState<CaptureFields>({ legalNeedSummary: "" });
   const [mode, setMode] = useState<"manual" | "file" | "preview" | "result" | "success" | "unknown">("manual");
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
@@ -52,13 +53,13 @@ function Workspace({ session, api, recovery, onReturn, returnLabel, sessionActio
   useEffect(() => { const warn = (event: BeforeUnloadEvent) => { if (dirty || busy || pending() || batch?.snapshot().busy || batch?.snapshot().rows.some(row => row.status === "pending")) { event.preventDefault(); event.returnValue = ""; } }; window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn); }, [dirty, busy, batch, recovery]);
   useEffect(() => () => active.current?.abort(), []);
   async function loadSources(signal: AbortSignal) {
-    try { const values = await api.sources(session, signal); if (signal.aborted || !session.isCurrent()) return; setSources(values); setAccount(old => values.some(value => value.sourceAccountCode === old) ? old : values[0]?.sourceAccountCode ?? ""); setError(""); }
+    try { const values = await api.sources(session, signal); if (signal.aborted || !session.isCurrent()) return; setSources(values.sources);setSourceSelection(values.sourceSelection); setAccount(old => values.sources.some(value => value.sourceAccountCode === old) ? old : values.sources[0]?.sourceAccountCode ?? ""); setError(""); }
     catch { if (!signal.aborted && session.isCurrent()) { setSources(null); setError("来源暂时不可用，请重新读取。"); } }
   }
   useEffect(() => { const controller = new AbortController(); void loadSources(controller.signal); return () => controller.abort(); }, [api, session]);
   const reset = () => { setFields({ legalNeedSummary: "" }); setFile(null); setMapping({}); setBatch(null); setWrite(null); setFactRef(null); sourceKey.current = crypto.randomUUID(); setMode("manual"); setError(""); };
   async function save() {
-    if (!source || active.current || pending()) { setError("请先选择可用来源并核对未决结果。"); return; }
+    if (!source || active.current || pending()) { setError("请核对当前来源和未决结果后继续。"); return; }
     let original: LeadCaptureWrite;
     try { original = { key: crypto.randomUUID(), body: captureBody(source, fields, sourceKey.current) }; } catch (failure) { setError((failure as Error).message); return; }
     const controller = new AbortController(); active.current = controller; setBusy(true); setError(""); setWrite(original);
@@ -95,7 +96,7 @@ function Workspace({ session, api, recovery, onReturn, returnLabel, sessionActio
     try { await next.submit(session, controller.signal); } catch { if (session.isCurrent() && !controller.signal.aborted) setError("导入已暂停，请按逐条结果核对后继续。"); } finally { if (active.current === controller) { active.current = null; setBusy(false); } }
   }
   if (!session.isCurrent() || session.selectedOnBehalfAppointmentId !== null) return <p role="alert">请使用当前本人任职重新进入录入页面。</p>;
-  const sourceField = <label className="identity-field">来源<select aria-label="来源" value={account} onChange={e => setAccount(e.target.value)} disabled={busy}>{sources?.map(item => <option key={item.sourceAccountCode} value={item.sourceAccountCode}>{item.displayName}</option>)}</select></label>;
+  const sourceField = sourceSelection==="BOUND_TO_PRINCIPAL"?<p className="identity-form-help">来源：{source?.displayName}</p>:<label className="identity-field">来源<select aria-label="来源" value={account} onChange={e => setAccount(e.target.value)} disabled={busy}>{sources?.map(item => <option key={item.sourceAccountCode} value={item.sourceAccountCode}>{item.displayName}</option>)}</select></label>;
   let body: ReactNode;
   if (!sources) body = <section className="identity-state"><p>{error || "正在读取可用来源…"}</p>{error && <button onClick={() => { const c = new AbortController(); active.current?.abort(); active.current = c; void loadSources(c.signal).finally(() => { if (active.current === c) active.current = null; }); }}>重新读取来源</button>}</section>;
   else if (!sources.length) body = <section className="identity-state"><h1>当前没有可用的录入来源</h1><p>请确认当前任职，或联系有权人员核对来源与录入权限。</p><button onClick={() => { const c = new AbortController(); active.current?.abort(); active.current = c; void loadSources(c.signal).finally(() => { if (active.current === c) active.current = null; }); }}>刷新来源</button></section>;

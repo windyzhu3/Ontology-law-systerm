@@ -26908,9 +26908,15 @@ components:
     LeadIntakeSourcesV1:
       type: object
       additionalProperties: false
+      x-contract-extension: LINUX_HUMAN_INTAKE_BINDING_V1
       required:
       - sources
       properties:
+        sourceSelection:
+          type: string
+          enum:
+          - BOUND_TO_PRINCIPAL
+          - SELECTABLE
         sources:
           type: array
           maxItems: 50

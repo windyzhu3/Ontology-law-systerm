@@ -9,7 +9,8 @@ import java.sql.*;import java.util.*;
 /** API composition keeps finance ownership independent from sales workflow disposition. */
 final class PaymentEnabledContractPorts extends ContractWorkflowPorts {
  private final PaymentWorkflowService payments;
- PaymentEnabledContractPorts(OpportunityProgressProtection protection,MaterialObjectStore objects,PaymentWorkflowService payments){super(protection,objects);this.payments=Objects.requireNonNull(payments);}
+ PaymentEnabledContractPorts(OpportunityProgressProtection protection,MaterialObjectStore objects,PaymentWorkflowService payments){this(protection,objects,payments,new BusinessResponsibilityRouting(List.of()));}
+ PaymentEnabledContractPorts(OpportunityProgressProtection protection,MaterialObjectStore objects,PaymentWorkflowService payments,BusinessResponsibilityRouting routing){super(protection,objects,routing);this.payments=Objects.requireNonNull(payments);}
  public RecoveryCandidate paymentRecovery(Connection c,Actor actor,Subject opportunity,Responsibility owner)throws SQLException{
   try{var candidate=payments.recovery(c,actor,opportunity);return candidate==null?null:new RecoveryCandidate(opportunity,owner.basis(),candidate.source(),candidate.workflow(),owner.owner());}catch(PaymentWorkflowService.Blocked denied){throw new ContractWorkflowService.Blocked(denied.code());}
  }

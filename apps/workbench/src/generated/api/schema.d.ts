@@ -3828,6 +3828,8 @@ export interface components {
         LeadIngressSourceCode: "OWNER_CONFIRMED" | "CUSTOMER_PROVIDED";
         LeadIntakeSourcesV1: {
             sources: components["schemas"]["LeadIntakeSourceV1"][];
+            /** @enum {string} */
+            sourceSelection?: "BOUND_TO_PRINCIPAL" | "SELECTABLE";
         };
         LeadIntakeSourceV1: {
             displayName: components["schemas"]["SafeText200"];

@@ -30,10 +30,13 @@ final class R1CommandService {
     }
     R1CommandService(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection,io.github.windyzhu3.ontologylaw.contract.ContractWorkflowService contracts,io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowService transfers) {this(database,sources,protection,services,node,opportunityProtection,contracts,transfers,null);}
     R1CommandService(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection,io.github.windyzhu3.ontologylaw.contract.ContractWorkflowService contracts,io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowService transfers,R2TransferRecoveryService transferRecovery) {
+        this(database,sources,protection,services,node,opportunityProtection,contracts,transfers,transferRecovery,new R1HumanSourceBinding(List.of(),sources));
+    }
+    R1CommandService(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection,io.github.windyzhu3.ontologylaw.contract.ContractWorkflowService contracts,io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowService transfers,R2TransferRecoveryService transferRecovery,R1HumanSourceBinding humanSources) {
         this.database=database;leads=CurrentLeadReader.databaseBacked(protection);
         var facts=R1AuthorizationReaders.databaseBacked(sources,services);
-        if(opportunityProtection==null){var handlers=new ArrayList<>(new LeadCommands(sources,protection).handlers());handlers.addAll(new ActionDraftCommands(protection).handlers());runtime=new CommandRuntime(handlers,AuthorizationService.databaseBacked(),AuditAppender.databaseBacked(node),facts,R1EventReaders.databaseBacked());}
-        else runtime=R2OpportunityCommandRuntime.fromSourcePolicy(sources,protection,opportunityProtection,services,node,contracts,transfers,transferRecovery);
+        if(opportunityProtection==null){var handlers=new ArrayList<>(new LeadCommands(sources,protection,humanSources).handlers());handlers.addAll(new ActionDraftCommands(protection).handlers());runtime=new CommandRuntime(handlers,AuthorizationService.databaseBacked(),AuditAppender.databaseBacked(node),facts,R1EventReaders.databaseBacked());}
+        else runtime=R2OpportunityCommandRuntime.fromSourcePolicy(sources,protection,opportunityProtection,services,node,contracts,transfers,transferRecovery,humanSources);
         tags=new R1TaskPreconditionRuntime(opportunityProtection==null?facts:R2OpportunityCommandRuntime.authorization(facts),this::tag);
     }
     Map<String,Object> precondition(io.github.windyzhu3.ontologylaw.identity.AuthorizationService.Actor actor,CommandEnvelope.Type operation,UUID taskId,String kind){

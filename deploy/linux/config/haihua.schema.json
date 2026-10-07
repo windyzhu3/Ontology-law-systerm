@@ -1,0 +1,477 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "tenantName",
+    "organizations",
+    "roles",
+    "people",
+    "defaults",
+    "passwordPolicy",
+    "leadAssignment",
+    "intakeSources",
+    "approvalPolicies",
+    "responsibilityRoutes",
+    "contractTemplates"
+  ],
+  "properties": {
+    "version": {
+      "const": 1,
+      "type": "integer"
+    },
+    "tenantName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "organizations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "name",
+          "parent"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "[A-Z][A-Z0-9_]{0,63}"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "parent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "minItems": 7,
+      "maxItems": 7,
+      "uniqueItems": true
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "name"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "[A-Z][A-Z0-9_]{0,63}"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true
+    },
+    "people": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "username",
+          "appointments"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "username": {
+            "type": "string",
+            "pattern": "[a-z][a-z0-9_]{0,63}"
+          },
+          "appointments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "key",
+                "organization",
+                "role",
+                "grants"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "pattern": "[a-z][a-z0-9_]{0,63}"
+                },
+                "organization": {
+                  "type": "string",
+                  "pattern": "[A-Z][A-Z0-9_]{0,63}"
+                },
+                "role": {
+                  "type": "string",
+                  "pattern": "[A-Z][A-Z0-9_]{0,63}"
+                },
+                "grants": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "authority",
+                      "scope"
+                    ],
+                    "properties": {
+                      "authority": {
+                        "type": "string",
+                        "enum": [
+                          "AUDIT_READ",
+                          "LEAD_MANAGEMENT_READ",
+                          "TEAM_TASK_READ",
+                          "LEAD_CAPTURE",
+                          "LEAD_INGRESS_RESOLVE",
+                          "LEAD_INGRESS_COMPLETE",
+                          "LEAD_ASSIGN",
+                          "LEAD_ROUTING_DECIDE",
+                          "SOURCE_INTAKE_REQUEST_ACK",
+                          "SALES_CONTACT_OWNER",
+                          "LEAD_VALIDITY_REVIEW",
+                          "SALES_OPPORTUNITY_OWNER",
+                          "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER",
+                          "OPPORTUNITY_OWNER_EXCEPTION_READ",
+                          "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE",
+                          "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ",
+                          "OPPORTUNITY_LEDGER_READ",
+                          "OPPORTUNITY_CLOSE",
+                          "CUSTOMER_REQUIREMENTS_MANAGE",
+                          "PARTY_PROFILE_MANAGE",
+                          "MATERIALS_MANAGE",
+                          "MATERIALS_READ",
+                          "QUOTE_READ",
+                          "QUOTE_PREPARE",
+                          "QUOTE_APPROVE",
+                          "QUOTE_SELF_AUTHORIZE",
+                          "QUOTE_DELIVER",
+                          "QUOTE_RESPONSE",
+                          "PAYMENT_LEDGER_READ",
+                          "TRANSFER_LEDGER_READ",
+                          "CONTRACT_READ",
+                          "CONTRACT_PREPARE",
+                          "CONTRACT_PREPARATION_DECIDE",
+                          "CONTRACT_REVIEW",
+                          "CONTRACT_APPROVE",
+                          "CONTRACT_SIGNATURE_VERIFY",
+                          "CONTRACT_EXECUTION_VERIFY",
+                          "PAYMENT_CONFIRM",
+                          "PAYMENT_SUBMIT",
+                          "CONTRACT_TERMINATION_REVIEW",
+                          "TRANSFER_SUBMIT",
+                          "TRANSFER_REVIEW",
+                          "TRANSFER_ACCEPT",
+                          "MATTER_CLASSIFY",
+                          "MATTER_RECEIVE",
+                          "IDENTITY_PRINCIPAL_MANAGE",
+                          "IDENTITY_ORGANIZATION_MANAGE",
+                          "IDENTITY_APPOINTMENT_MANAGE",
+                          "IDENTITY_AUTHORITY_MANAGE"
+                        ]
+                      },
+                      "scope": {
+                        "type": "string",
+                        "pattern": "[A-Z][A-Z0-9_]{0,63}"
+                      }
+                    }
+                  },
+                  "minItems": 0,
+                  "maxItems": 500,
+                  "uniqueItems": true
+                }
+              }
+            },
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true
+          }
+        }
+      },
+      "minItems": 17,
+      "maxItems": 17,
+      "uniqueItems": true
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "firm",
+        "address",
+        "phone",
+        "receiptLabel",
+        "bankName",
+        "bankAccount",
+        "representative"
+      ],
+      "properties": {
+        "firm": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "address": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "receiptLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "bankName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bankAccount": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "representative": {
+          "type": "string",
+          "pattern": "[a-z][a-z0-9_]{0,63}"
+        }
+      }
+    },
+    "passwordPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimumLength",
+        "temporary",
+        "requiredAction",
+        "notUsername",
+        "notEmail"
+      ],
+      "properties": {
+        "minimumLength": {
+          "const": 8,
+          "type": "integer"
+        },
+        "temporary": {
+          "const": true,
+          "type": "boolean"
+        },
+        "requiredAction": {
+          "const": "UPDATE_PASSWORD",
+          "type": "string"
+        },
+        "notUsername": {
+          "const": true,
+          "type": "boolean"
+        },
+        "notEmail": {
+          "const": true,
+          "type": "boolean"
+        }
+      }
+    },
+    "leadAssignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority",
+        "appointment",
+        "status"
+      ],
+      "properties": {
+        "authority": {
+          "const": "LEAD_ASSIGN",
+          "type": "string"
+        },
+        "appointment": {
+          "const": null,
+          "type": "null"
+        },
+        "status": {
+          "const": "PENDING_ADMIN_DESIGNATION",
+          "type": "string"
+        }
+      }
+    },
+    "intakeSources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "username",
+          "account",
+          "name",
+          "organization",
+          "channel",
+          "category",
+          "jurisdiction",
+          "urgency",
+          "assignmentMode"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "[a-z][a-z0-9_]{0,63}"
+          },
+          "account": {
+            "type": "string",
+            "pattern": "[A-Za-z][A-Za-z0-9_]{0,63}"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "organization": {
+            "type": "string",
+            "pattern": "[A-Z][A-Z0-9_]{0,63}"
+          },
+          "channel": {
+            "type": "string",
+            "pattern": "[A-Z][A-Z0-9_]{0,63}"
+          },
+          "category": {
+            "type": "string",
+            "pattern": "[A-Z][A-Z0-9_]{0,63}"
+          },
+          "jurisdiction": {
+            "type": "string",
+            "pattern": "[A-Z][A-Z0-9_]{0,63}"
+          },
+          "urgency": {
+            "type": "string",
+            "pattern": "[A-Z][A-Z0-9_]{0,63}"
+          },
+          "assignmentMode": {
+            "const": "MANUAL",
+            "type": "string"
+          }
+        }
+      },
+      "minItems": 17,
+      "maxItems": 17,
+      "uniqueItems": true
+    },
+    "approvalPolicies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "organization",
+          "quoteCode",
+          "contractCode",
+          "approvers"
+        ],
+        "properties": {
+          "organization": {
+            "type": "string",
+            "pattern": "[A-Z][A-Z0-9_]{0,63}"
+          },
+          "quoteCode": {
+            "type": "string",
+            "pattern": "[A-Z][A-Z0-9_]{0,63}"
+          },
+          "contractCode": {
+            "type": "string",
+            "pattern": "[A-Z][A-Z0-9_]{0,63}"
+          },
+          "approvers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "[a-z][a-z0-9_]{0,63}"
+            },
+            "minItems": 1,
+            "maxItems": 10,
+            "uniqueItems": true
+          }
+        }
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true
+    },
+    "responsibilityRoutes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceOrganization",
+          "stage",
+          "appointment"
+        ],
+        "properties": {
+          "sourceOrganization": {
+            "type": "string",
+            "pattern": "[A-Z][A-Z0-9_]{0,63}"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "AWAIT_REVIEW",
+              "AWAIT_VERIFICATION",
+              "ARCHIVE",
+              "CHECK_RECEIPT",
+              "REVIEW_TRANSFER",
+              "INTAKE",
+              "CLASSIFY"
+            ]
+          },
+          "appointment": {
+            "type": "string",
+            "pattern": "[a-z][a-z0-9_]{0,63}"
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true
+    },
+    "contractTemplates": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "consulting",
+          "civil-litigation",
+          "enforcement"
+        ]
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ontology-law:haihua-initialization:1",
+  "title": "海华首次初始化公开配置 V1"
+}

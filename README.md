@@ -4,6 +4,8 @@
 
 [基线总入口](docs/baseline/CURRENT-MVP-BASELINE.md)保留冻结合同，并导航至当前具名后继。当前开发沿用用户已确认的 [R2.5 MVP 收口计划](docs/superpowers/plans/2026-09-28-r2.5-mvp-replan.md)。销售主链、登录与身份管理、合同及签后办理、M01 已有实现；待收口的是有界查询与性能、M02、早期线索管理、经营概览、三项人工确认 AI 和真实试点条件。
 
+Linux v20→v22 迁移发布及海华空库初始化入口见 [Linux 操作说明](deploy/linux/README.md)，初始化配置位于 `deploy/linux/config/haihua.json`。它区分真实迁移、空库初始化、候选合同模板及独立合成验收；腾讯云域名和证书为执行时私密参数。
+
 从 [当前实现/合同索引](docs/baseline/R2.5-CURRENT-IMPLEMENTATION.md) 和 [唯一执行记录](docs/progress/2026-09-28-r2.5-execution.md) 开始阅读。当前 R2 实现在 `codex/r2-sales-mvp` 工作树，含大量未提交变更；不能把同 HEAD 的 main 当作同一源码快照。数据库已到具名 v19 后继，119 张应用表、122 张物理表、40 个 SQL 迁移至 V1050。
 
 本页以下保留 R1 原始结构说明；其中 52＋2、V860、仅 MatterRef 等描述只适用于原冻结阶段。具名 R2 后继及已确认分类/承接范围以当前索引为入口，旧合同未被增量替代部分继续生效。历史验收与本轮验证分开，R1 暂停验收、R2 未获发布准入的状态保留。

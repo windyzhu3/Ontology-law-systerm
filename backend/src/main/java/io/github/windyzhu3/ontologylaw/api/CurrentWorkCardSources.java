@@ -53,6 +53,10 @@ final class CurrentWorkCardSources {
             if(type.subjectType().equals("opportunity.opportunity")&&(opportunities==null||actor.onBehalfAppointmentId()!=null))continue;
             var snapshot=authorized(c,actor,owner.organization().selector(),owner.organization().selector().id(),type);
             if(snapshot!=null){workbench=true;dependencies.add(snapshot);}
+            else if(type.subjectType().equals("opportunity.opportunity")){
+                var scoped=authorities.entryAuthorizations(c,actor,type.slot,type.authority);
+                if(!scoped.isEmpty()){workbench=true;dependencies.addAll(scoped);}
+            }
         }
         var all=CurrentWorkCardQuery.ordered(tasks.ownedTasks(c,actor.tenantId(),ownerId),now);
         var visible=new ArrayList<CurrentTaskReader.Task>();var bindings=new LinkedHashMap<Subject,DisclosurePlan.Entry>();

@@ -9,6 +9,9 @@ import io.github.windyzhu3.ontologylaw.identity.AuthorizationService.*;
 public interface R1AuthorityReader {
     record Candidate(UUID appointmentId, UUID principalId, UUID organizationId, Instant startsAt, Request authorization) {}
     Request select(Connection connection, Actor actor, Subject subject, UUID organization, String slot, String authorityCode) throws SQLException;
+    /** Entry qualification on the selected HUMAN appointment's own grant scopes.
+     * This discloses no business fact and never replaces per-object authorization. */
+    default List<AuthorizationSnapshot> entryAuthorizations(Connection c,Actor actor,String slot,String code)throws SQLException {return List.of();}
     /** Select and finally evaluate one complete authority path without evaluating the winning path twice. */
     default AuthorizationSnapshot authorize(Connection c,Actor actor,Subject subject,UUID organization,String slot,String code)throws SQLException {
         var request=select(c,actor,subject,organization,slot,code);

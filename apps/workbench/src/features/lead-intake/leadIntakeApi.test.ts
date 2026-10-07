@@ -11,6 +11,22 @@ const success = () => ({ ...receipt(taskId), resultFact: { factType: "LEAD", fac
 const response = (data: unknown, status = 201) => new Response(JSON.stringify(data), { status, headers: {
   "Content-Type": "application/json", "Cache-Control": "no-store", Location: `/api/v1/commands/${taskId}/receipt`,
 } });
+const intakeSource={sourceAccountCode:"helong",displayName:"何龙",sourceChannelCode:"MANUAL",serviceCategoryCode:"GENERAL_INTAKE",jurisdictionCode:"CN",urgencyCode:"NORMAL"};
+it("returns the bound source mode and accepts an empty bound catalog",async()=>{
+  for(const sources of [[intakeSource],[]]) {
+    const api=createLeadIntakeApi(new RecoveryStore(sessionStorage),async()=>response({sources,sourceSelection:"BOUND_TO_PRINCIPAL"},200),"https://law.test");
+    expect(await api.sources(testSession(),new AbortController().signal)).toEqual({sources,sourceSelection:"BOUND_TO_PRINCIPAL"});
+  }
+});
+it("preserves legacy selectable catalogs but rejects multiple bound sources and unknown modes",async()=>{
+  const sources=[intakeSource,{...intakeSource,sourceAccountCode:"wanhefeng",displayName:"万和峰"}];
+  const legacy=createLeadIntakeApi(new RecoveryStore(sessionStorage),async()=>response({sources},200),"https://law.test");
+  expect(await legacy.sources(testSession(),new AbortController().signal)).toEqual({sources,sourceSelection:"SELECTABLE"});
+  for(const body of [{sources,sourceSelection:"BOUND_TO_PRINCIPAL"},{sources,sourceSelection:"AUTO"},{sources,sourceSelection:null}]) {
+    const api=createLeadIntakeApi(new RecoveryStore(sessionStorage),async()=>response(body,200),"https://law.test");
+    await expect(api.sources(testSession(),new AbortController().signal)).rejects.toThrow();
+  }
+});
 beforeEach(() => sessionStorage.clear());
 
 it("submits the original capture through authenticated transport and clears only its proven receipt", async () => {

@@ -34,6 +34,7 @@ public final class R1ApiServices {
     private final ContractPreparationDiscovery contractDiscovery;
     private final R1ProjectionConsumer consumer;
     private final LeadIntakeSources intakeSources;
+    private final R1HumanSourceBinding humanSources;
     public R1ApiServices(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,byte[] cursorKey) {
         this(database,sources,protection,services,node,cursorKey,java.util.List.of());
     }
@@ -54,25 +55,32 @@ public final class R1ApiServices {
         this(database,sources,protection,services,node,cursorKey,intakeMetadata,opportunityProtection,materialStore,contractProtection,payments,transferDestinations,R25ResponsesAiModel.disabled());
     }
     public R1ApiServices(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,byte[] cursorKey,java.util.List<LeadIntakeSources.Source> intakeMetadata,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection,io.github.windyzhu3.ontologylaw.evidence.MaterialObjectStore materialStore,io.github.windyzhu3.ontologylaw.contract.ContractProtection contractProtection,io.github.windyzhu3.ontologylaw.payment.PaymentWorkflowService payments,java.util.function.Function<UUID,UUID> transferDestinations,R25AiModel aiModel) {
+        this(database,sources,protection,services,node,cursorKey,intakeMetadata,opportunityProtection,materialStore,contractProtection,payments,transferDestinations,aiModel,new R1HumanSourceBinding(java.util.List.of(),sources));
+    }
+    public R1ApiServices(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,byte[] cursorKey,java.util.List<LeadIntakeSources.Source> intakeMetadata,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection,io.github.windyzhu3.ontologylaw.evidence.MaterialObjectStore materialStore,io.github.windyzhu3.ontologylaw.contract.ContractProtection contractProtection,io.github.windyzhu3.ontologylaw.payment.PaymentWorkflowService payments,java.util.function.Function<UUID,UUID> transferDestinations,R25AiModel aiModel,R1HumanSourceBinding humanSources) {
+        this(database,sources,protection,services,node,cursorKey,intakeMetadata,opportunityProtection,materialStore,contractProtection,payments,transferDestinations,aiModel,humanSources,new BusinessResponsibilityRouting(java.util.List.of()));
+    }
+    public R1ApiServices(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,byte[] cursorKey,java.util.List<LeadIntakeSources.Source> intakeMetadata,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection,io.github.windyzhu3.ontologylaw.evidence.MaterialObjectStore materialStore,io.github.windyzhu3.ontologylaw.contract.ContractProtection contractProtection,io.github.windyzhu3.ontologylaw.payment.PaymentWorkflowService payments,java.util.function.Function<UUID,UUID> transferDestinations,R25AiModel aiModel,R1HumanSourceBinding humanSources,BusinessResponsibilityRouting routing) {
+        this.humanSources=java.util.Objects.requireNonNull(humanSources);
         this.opportunityEnabled=opportunityProtection!=null;
         var aiSources=opportunityProtection==null?null:new R25AiSourceReadService(cursorKey,protection,opportunityProtection,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node));
         this.aiCandidates=aiSources==null?null:new R25AiCandidateService(cursorKey,(actor,id,task)->{try(var connection=database.open()){return aiSources.read(connection,actor,id,task);}},aiModel,java.time.Clock.systemUTC());
         this.contractGeneration=new R2ContractGenerationService(materialStore,contractProtection);
-        this.intakeSources=new LeadIntakeSources(sources,intakeMetadata);
+        this.intakeSources=new LeadIntakeSources(sources,intakeMetadata,humanSources);
         this.database=java.util.Objects.requireNonNull(database);this.receipts=new CommandReceiptRecoveryService(sources,protection,services,node);
-        var contracts=contractProtection==null||opportunityProtection==null?null:R2ContractServices.create(contractProtection,opportunityProtection,materialStore,payments);
+        var contracts=contractProtection==null||opportunityProtection==null?null:R2ContractServices.create(contractProtection,opportunityProtection,materialStore,payments,routing);
 
         this.businessOverview=new R25BusinessOverviewReadService(cursorKey,protection,sources,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node));
         this.leadManagement=new R25LeadManagementReadService(cursorKey,protection,sources,intakeMetadata,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node));
         this.teamReads=new R2TeamManagementReadService(cursorKey,protection,opportunityProtection,contractProtection,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node));
         this.managementReads=new R2ManagementLedgerReadService(cursorKey,protection,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node));
         this.contractReads=contracts==null?null:new R2ContractReadService(contracts,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node),cursorKey);
-        var transferPorts=contracts==null?null:new TransferWorkflowPorts(contractProtection,opportunityProtection,materialStore,transferDestinations);
+        var transferPorts=contracts==null?null:new TransferWorkflowPorts(contractProtection,opportunityProtection,materialStore,transferDestinations,routing);
         var transfers=transferPorts==null?null:io.github.windyzhu3.ontologylaw.transfer.TransferWorkflowService.databaseBacked(transferPorts);
-        this.transferReads=transferPorts==null?null:new R2TransferReadService(contractProtection,opportunityProtection,contracts,new ContractWorkflowPorts(opportunityProtection,materialStore),transferPorts,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node));
+        this.transferReads=transferPorts==null?null:new R2TransferReadService(contractProtection,opportunityProtection,contracts,new ContractWorkflowPorts(opportunityProtection,materialStore,routing),transferPorts,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node));
         var transferRecovery=transferPorts==null?null:new R2TransferRecoveryService(transferPorts,opportunityProtection);
         this.contractDiscovery=contracts==null?null:new ContractPreparationDiscovery(contracts,cursorKey,transferRecovery);
-        this.commands=new R1CommandService(database,sources,protection,services,node,opportunityProtection,contracts,transfers,transferRecovery);
+        this.commands=new R1CommandService(database,sources,protection,services,node,opportunityProtection,contracts,transfers,transferRecovery,humanSources);
         this.cards=new CurrentWorkCardDisclosureService(protection,sources,node,opportunityProtection);
         this.readiness=new R1ProjectionReadinessService(sources);this.discovery=new DueR1TaskDiscoveryService(cursorKey,sources,protection);this.consumer=new R1ProjectionConsumer(sources);
         this.opportunityDiscovery=new R2OpportunityDiscoveryService(cursorKey);
@@ -89,7 +97,8 @@ public final class R1ApiServices {
         if(actor.principalKind()!=io.github.windyzhu3.ontologylaw.identity.AuthorizationService.PrincipalKind.HUMAN || actor.onBehalfAppointmentId()!=null)
             throw new R1HttpFailure("NOT_AUTHORIZED");
         try(var c=database.open()) {
-            return java.util.Map.of("sources",new io.github.windyzhu3.ontologylaw.execution.LeadIntakeReadRuntime().read(c,actor,connection -> intakeSources.read(connection,actor)));
+            var sources=new io.github.windyzhu3.ontologylaw.execution.LeadIntakeReadRuntime().read(c,actor,connection -> intakeSources.read(connection,actor));
+            return humanSources.enabled(actor.tenantId())?java.util.Map.of("sources",sources,"sourceSelection","BOUND_TO_PRINCIPAL"):java.util.Map.of("sources",sources);
         } catch(java.sql.SQLException | RuntimeException unavailable) { throw new R1HttpFailure("SERVICE_UNAVAILABLE"); }
     }
     R1ProjectionReadinessService.Response readiness(Actor actor){

@@ -68,6 +68,11 @@ def exact(actual, expected):
 
 def intake_transport_projection(document):
     try:
+        from scripts.baseline.linux_human_intake_contract import human_intake_projection
+    except ModuleNotFoundError:
+        from linux_human_intake_contract import human_intake_projection
+    document=human_intake_projection(document)
+    try:
         from scripts.baseline.adm07_audit_query_contract import audit_query_projection
     except ModuleNotFoundError:
         from adm07_audit_query_contract import audit_query_projection

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "code": "consulting",
+      "candidateVersion": 1,
+      "status": "CANDIDATE_NOT_APPROVED",
+      "fields": "consulting.fields.json",
+      "files": {
+        "consulting.docx": "023669a05093a3a8364b22d2396f891f0dd9ec7087a4d5a524391a2486652e32",
+        "consulting.pdf": "b122637e63606c1da65a7489d333df4a5dd513695ac9bed99168a49905600415",
+        "consulting.fields.json": "5c227279039abbb1b0a775344dd37eb733aed3ce61e682a227c538dda0c07d13"
+      }
+    },
+    {
+      "code": "civil-litigation",
+      "candidateVersion": 1,
+      "status": "CANDIDATE_NOT_APPROVED",
+      "fields": "civil-litigation.fields.json",
+      "files": {
+        "civil-litigation.docx": "6dec24d9c99b5ca96fe19d86cf91497bd50dac87a4b4d51e0839894482db7b50",
+        "civil-litigation.pdf": "54fa9270104827ad5be1cdad32075b10094de5f2f4be70fb74629031de70b7b8",
+        "civil-litigation.fields.json": "4bf3ce5d852ab0fdd63d68ec5ecb203217bbdc61fc4768dce9524abaf9497ce5"
+      }
+    },
+    {
+      "code": "enforcement",
+      "candidateVersion": 1,
+      "status": "CANDIDATE_NOT_APPROVED",
+      "fields": "enforcement.fields.json",
+      "files": {
+        "enforcement.docx": "0f2dae006f3216177878bec0e2ba13d8901b74a9ec80f9b742d4549912338587",
+        "enforcement.pdf": "1ca9d21b7d4fd0a73ac1eaadc8005a97fba2118d0f838a04157e84d24fbb1232",
+        "enforcement.fields.json": "898b73bb695f8eff17facce8c1b57366250b388b9f3d42a99ace80dca6554478"
+      }
+    }
+  ],
+  "sourcesSha256": "bf2982c336be33a1d3fc06cb3977b0a20d05dde5ab97ec7b5510815326f2658a"
+}
