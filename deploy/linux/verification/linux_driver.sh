@@ -26,7 +26,7 @@ root=Path(tempfile.mkdtemp(prefix='source-',dir=base))
 source=Path('/input')
 for name in ['deploy/linux','database/schema-contract-52-plus-2/generated']:
     shutil.copytree(source/name,root/name,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
-for name in ['database/schema-contract-52-plus-2/runtime/toolchain.lock.json','deploy/identity/identity-toolchain.lock.json','backend/src/test/resources/db/bootstrap-runtime-logins.sql']:
+for name in ['database/schema-contract-52-plus-2/runtime/toolchain.lock.json','deploy/identity/identity-toolchain.lock.json','deploy/identity/realm-template.json','backend/src/test/resources/db/bootstrap-runtime-logins.sql']:
     (root/name).parent.mkdir(parents=True,exist_ok=True)
     shutil.copyfile(source/name,root/name)
 print(root)
@@ -34,7 +34,9 @@ PY
 )
 cd "$source_root"
 python -m unittest discover -s deploy/linux/tests -v
-if [ "${4:-empty}" = migration ]; then
+if [ "${4:-empty}" = identity ]; then
+  python deploy/linux/verification/identity_database.py --run-id "$run_id" --runtime-image "$3"
+elif [ "${4:-empty}" = migration ]; then
   python deploy/linux/verification/migration.py --run-id "$run_id"
 else
   python deploy/linux/verification/empty_database.py --run-id "$run_id" --runtime-image "$3"

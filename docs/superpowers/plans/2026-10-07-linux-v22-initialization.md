@@ -116,15 +116,17 @@
 
 ### Task 6: L06 真实IdP账号、首次改密与原引导
 
-**Files:** 新建 `deploy/linux/ols_linux/identity.py`、`deploy/linux/tests/test_identity.py`、`deploy/linux/verification/identity_login.mjs`。读取 `deploy/identity/realm-template.json`，仅在新环境私密派生realm中设置min8，不降低已有环境默认。
+**Files:** 新建 `deploy/linux/ols_linux/identity.py`、`deploy/linux/tests/test_identity.py`、`deploy/linux/verification/identity_login.mjs`；新增 `deploy/linux/runtime/https-json.mjs`、`deploy/linux/verification/browser_runner.py`、`deploy/linux/verification/identity_database.py`、`deploy/linux/tests/test_browser_runner.py`，更新 Linux 验证驱动。读取 `deploy/identity/realm-template.json`，仅在新环境私密派生realm中设置min8，不降低已有环境默认。
 
 **Interfaces:** `identity.prepare(runtime: Path, config: dict, initial_password_file: Path) -> dict` 返回日志登记的17个准确IdP subjects；`identity.bootstrap(runtime: Path, config: dict) -> dict` 调用现有IdentityBootstrapCommand的candidate/dry-run/execute/verify；`identity.verify(runtime: Path) -> dict` 只读。输出写私密文件，公开结果仅含逻辑账号与通过状态。
 
-- [ ] 单元/真实协议断言所有17账号 `temporary == true` 且requiredActions包含 `UPDATE_PASSWORD`；policy含length8/notUsername/notEmail、directAccessGrants=false、PKCE S256。已有非本日志realm拒绝；已创建账号响应丢失必须核对准确subject，不重置密码/新建用户。同日志改配置拒绝。
-- [ ] `python3 -m unittest discover -s deploy/linux/tests -p test_identity.py -v` 首次缺模块失败；真实流程 `node deploy/linux/verification/identity_login.mjs --runtime <本轮实例>` 首次缺新入口失败。
-- [ ] 实现临时秘密文件传递、账号创建前原日志、已创建对象的精确引用核对和原引导manifest。初始丁启明ROOT/IDENTITY_ADMIN结构不改；candidate过期/execute未知先调用原verify，不自动新candidate。脚本提示两位管理员通过真实页面各自改密和提供本人受保护会话，其他15人不代改。
-- [ ] 在独立Linux IdP验证：未改密不得进入业务，8位合规新密码通过；保留7位/用户名/邮箱反例；两位管理员改密成功，其他15仍待改密。无password grant、token日志泄露或原环境realm变化。
-- [ ] 提交本项，消息 `feat: prepare Haihua identity with required password updates`。
+- [x] 单元/真实协议断言所有17账号 `temporary == true` 且requiredActions包含 `UPDATE_PASSWORD`；policy含length8/notUsername/notEmail、directAccessGrants=false、PKCE S256。已有非本日志realm拒绝；已创建账号响应丢失必须核对准确subject，不重置密码/新建用户。同日志改配置拒绝。
+- [x] `python3 -m unittest discover -s deploy/linux/tests -p test_identity.py -v` 首次缺模块失败；真实流程 `node deploy/linux/verification/identity_login.mjs --runtime <本轮实例>` 首次缺新入口失败。
+- [x] 实现临时秘密文件传递、账号创建前原日志、已创建对象的精确引用核对和原引导manifest。初始丁启明ROOT/IDENTITY_ADMIN结构不改；candidate过期/execute未知先调用原verify，不自动新candidate。脚本提示两位管理员通过真实页面各自改密和提供本人受保护会话，其他15人不代改。
+- [x] 在独立Linux IdP验证：未改密不得进入业务，8位合规新密码通过；保留7位/用户名/邮箱反例；两位管理员改密成功，其他15仍待改密。无password grant、token日志泄露或原环境realm变化。
+- [x] 提交本项，消息 `feat: prepare Haihua identity with required password updates`。
+
+**验证证据：** Linux 51/51 Python 测试及真实 Chromium/PKCE 改密通过，17 个原 subject 保持，另外 15 人仍需首次改密。原引导状态机已覆盖；依赖 L07 制品与 operator 装配的真实引导正向验证在 L07 完成，见实施台账裁决。
 
 ### Task 7: L07 通过真实HUMAN管理命令建立任职与授权
 
