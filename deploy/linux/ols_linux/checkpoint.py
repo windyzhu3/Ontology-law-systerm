@@ -44,8 +44,42 @@ def cluster_facts(root: Path, *, containers=None) -> dict:
         owner=database.sql(root,f"SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname='{db}'",identity=identity,containers=containers)
         roles=json.loads(database.sql(root,"SELECT json_agg(json_build_object('name',rolname,'super',rolsuper,'inherit',rolinherit,'createRole',rolcreaterole,'createDb',rolcreatedb,'canLogin',rolcanlogin,'replication',rolreplication,'bypassRls',rolbypassrls,'limit',rolconnlimit,'password',rolpassword,'validUntil',rolvaliduntil) ORDER BY rolname) FROM pg_authid WHERE rolname NOT LIKE 'pg_%'",identity=identity,containers=containers))
         members=json.loads(database.sql(root,"SELECT coalesce(json_agg(json_build_object('role',r.rolname,'member',m.rolname,'grantor',g.rolname,'admin',a.admin_option,'inherit',a.inherit_option,'set',a.set_option) ORDER BY r.rolname,m.rolname,g.rolname),'[]'::json) FROM pg_auth_members a JOIN pg_roles r ON r.oid=a.roleid JOIN pg_roles m ON m.oid=a.member JOIN pg_roles g ON g.oid=a.grantor",identity=identity,containers=containers))
-        result[key]={'databaseOwner':owner,'rolesDigest':digest(roles),'membersDigest':digest(members)}
+        acl=json.loads(database.sql(root,f"SELECT coalesce(json_agg(json_build_object('grantee',CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END,'grantor',pg_get_userbyid(a.grantor),'privilege',a.privilege_type,'grantable',a.is_grantable) ORDER BY a.grantee=0,pg_get_userbyid(a.grantee),pg_get_userbyid(a.grantor),a.privilege_type),'[]'::json) FROM pg_database d CROSS JOIN LATERAL aclexplode(coalesce(d.datacl,acldefault('d',d.datdba))) a WHERE d.datname='{db}'",identity=identity,containers=containers))
+        result[key]={'databaseOwner':owner,'rolesDigest':digest(roles),'membersDigest':digest(members),'databaseAclDigest':digest(acl)}
     return result
+
+
+def assert_cluster_facts(expected,actual):
+    if set(expected)!=set(actual):raise RuntimeError('Restored clusters differ')
+    for key,value in expected.items():
+        # File-only version 1 backups predate the explicit ACL digest. Their
+        # original archive still supplies the exact DATABASE privilege SQL.
+        if set(value) not in ({'databaseOwner','rolesDigest','membersDigest'},{'databaseOwner','rolesDigest','membersDigest','databaseAclDigest'}):raise RuntimeError('Unsupported checkpoint cluster facts')
+        if any(actual[key].get(name)!=fact for name,fact in value.items()):raise RuntimeError('Restored ownership, roles or database ACL differ')
+
+
+def database_acl_sql(text,db):
+    if db not in {'law_contract_runtime','keycloak'}:raise RuntimeError('Unknown restore database')
+    statements=[]
+    for line in text.splitlines():
+        if ' ON DATABASE ' not in line:continue
+        match=re.fullmatch(r'(REVOKE|GRANT) ((?:CONNECT|CREATE|TEMPORARY)(?:,(?:CONNECT|CREATE|TEMPORARY))*) ON DATABASE '+db+r' (FROM|TO) (PUBLIC|[a-z][a-z0-9_]*)( WITH GRANT OPTION)?;',line)
+        if not match or (match[1]=='REVOKE')!=(match[3]=='FROM'):raise RuntimeError('Unsupported original database ACL statement')
+        statements.append(line)
+    return '\n'.join(statements)+'\n'
+
+
+def restore_database_acl(target,directory,*,containers=None):
+    resources=runtime.load(target)
+    for key,db in [('businessDb','law_contract_runtime'),('identityDb','keycloak')]:
+        name=(containers if containers is not None else resources['containers'])[key]
+        if name not in resources['containers'].values():raise RuntimeError('Unregistered database ACL target')
+        runtime.owned(target,'container',name)
+        # pg_restore without --create omits DATABASE ACL, although the archive
+        # records it. Read that original SQL; never execute CREATE or schema SQL.
+        result=runtime.run(['docker','exec','-i',name,'pg_restore','--create','--schema-only','--file','-'],(directory/(key+'.dump')).read_bytes(),timeout=300)
+        sql=database_acl_sql(result.stdout.decode('utf-8'),db)
+        if sql.strip():runtime.run(['docker','exec','-i',name,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-d',db],('BEGIN;\n'+sql+'COMMIT;\n').encode())
 
 
 def _directory(root,operation_id):
@@ -63,6 +97,8 @@ def read(root: Path,operation_id: str) -> dict:
         actual=inventory(directory)
         actual.pop('checkpoint.json',None);actual.pop('restore-proof.json',None)
         if actual!=value['files']:raise RuntimeError('Checkpoint bytes differ or are incomplete')
+        if 'assetDirectories' in value and asset_directories(directory/'assets')!=value['assetDirectories']:
+            raise RuntimeError('Checkpoint asset directories differ')
         return value
 
 
@@ -83,6 +119,8 @@ def _copy(source: Path,target: Path):
     if source.resolve()!=source.absolute():raise RuntimeError('Linked checkpoint input refused')
     if source.is_dir():
         inventory(source)
+        if target.resolve()!=target.absolute():raise RuntimeError('Linked checkpoint target refused')
+        target.mkdir(mode=0o700,parents=True,exist_ok=True)
         for child in source.rglob('*'):
             destination=target/child.relative_to(source)
             if child.is_dir():destination.mkdir(mode=0o700,parents=True,exist_ok=True)
@@ -91,6 +129,11 @@ def _copy(source: Path,target: Path):
         if target.exists() and (target.resolve()!=target.absolute() or not target.is_file() or sha(target)!=sha(source)):
             raise RuntimeError('Original restore asset differs; never overwritten')
         runtime.private_file(target,source.read_bytes())
+
+
+def asset_directories(directory):
+    inventory(directory)
+    return sorted(path.relative_to(directory).as_posix() for path in directory.rglob('*') if path.is_dir())
 
 
 def capture(root: Path,operation_id: str) -> dict:
@@ -113,7 +156,7 @@ def capture(root: Path,operation_id: str) -> dict:
             if path.name in controls or path.name.endswith('.log') or path.name=='flyway.conf':continue
             _copy(path,directory/'assets'/path.name)
         value={'version':1,'operationId':operation_id,'instanceId':resources['instanceId'],'observed':observed,'clusterFacts':cluster_facts(root),
-               'businessFacts':facts,'identityFacts':identity_facts,'files':inventory(directory)}
+               'businessFacts':facts,'identityFacts':identity_facts,'files':inventory(directory),'assetDirectories':asset_directories(directory/'assets')}
         journal._write(root,directory/'checkpoint.json',value)
         journal.record(root,operation_id,{'phase':'CHECKPOINT_CAPTURED','checkpointDigest':digest(value)})
         return value
@@ -131,6 +174,7 @@ def _restore_databases(target: Path,directory: Path, *, containers=None):
             result=subprocess.run(['docker','exec','-i',name,'pg_restore','-U','postgres','-d',db,'--exit-on-error'],stdin=source,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=300,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
         if result.returncode:raise RuntimeError('Checkpoint database restore failed; isolated target retained')
+    restore_database_acl(target,directory,containers=containers)
 
 
 def proof_target(root,operation_id):
@@ -174,11 +218,13 @@ def verify_restore(root: Path,operation_id: str) -> dict:
             if current!=expected:database.sql(target,f'ALTER DATABASE {db} OWNER TO {expected}',identity=identity)
         if database.observe(target)!=value['observed'] or table_facts(target)!=value['businessFacts'] or table_facts(target,True)!=value['identityFacts']:
             raise RuntimeError('Restored facts differ; isolated target retained')
-        if cluster_facts(target)!=value['clusterFacts']:raise RuntimeError('Restored database ownership or roles differ; isolated target retained')
+        assert_cluster_facts(value['clusterFacts'],cluster_facts(target))
         # Material/config/secret/release bytes are checked independently of the database.
         _copy(directory/'assets',target/'restored-assets')
         expected={name[7:]:h for name,h in value['files'].items() if name.startswith('assets/')}
         if inventory(target/'restored-assets')!=expected:raise RuntimeError('Restored non-database bytes differ')
+        if 'assetDirectories' in value and asset_directories(target/'restored-assets')!=value['assetDirectories']:
+            raise RuntimeError('Restored non-database directories differ')
         proof={'checkpointDigest':digest(value),'targetInstanceId':target_op['instanceId'],'observed':value['observed'],'assetHashes':expected}
         journal._write(root,directory/'restore-proof.json',proof)
         runtime.cleanup_verification(target)

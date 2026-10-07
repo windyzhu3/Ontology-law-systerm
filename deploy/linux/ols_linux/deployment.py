@@ -65,6 +65,12 @@ def create_args(args):
     return ['docker','create',*args[3:]]
 
 
+def scanner_environment():
+    # Keep fresh signatures and real scanning. A concurrent reload retains two
+    # complete signature databases and can kill clamd within its sealed budget.
+    return ['CLAMD_CONF_ConcurrentDatabaseReload=no']
+
+
 def final_names(prefix,descriptor_digest):
     if not re.fullmatch('[a-f0-9]{64}',descriptor_digest):raise RuntimeError('Exact descriptor required')
     suffix=descriptor_digest[:12]
@@ -141,7 +147,7 @@ def bind_release(root,descriptor):
             if role=='entry':base+=['--entrypoint','node']
             base += [image,*args]
             return {'name':names[role],'role':role,'digest':sealed,'args':base}
-        entries.append(command('scanner',scanner['image'],[],resources['network'],['type=volume,source='+volume+',target=/var/lib/clamav']))
+        entries.append(command('scanner',scanner['image'],[],resources['network'],['type=volume,source='+volume+',target=/var/lib/clamav'],scanner_environment()))
         mount='type=bind,source='+str(root)+',target='+str(root)+',readonly'
         jar=directory/descriptor['jar'];network='container:'+plan['pod']
         for role in ('api','worker'):

@@ -48,7 +48,8 @@ def prepare(root,modules):
 
 def run(root,file,args=(),timeout=1200):
     name=runtime.load(root)['containers']['businessBrowser'];runtime.owned(root,'container',name)
-    result=runtime.run(['docker','exec','-e','OLS_NATIVE_BUSINESS_RUNTIME='+str(root),name,'node',file,*args],timeout=timeout,check=False)
+    ca=root/('certs/http-trust.pem' if (root/'certs/http-trust.pem').exists() else 'certs/ca.pem')
+    result=runtime.run(['docker','exec','-e','OLS_NATIVE_BUSINESS_RUNTIME='+str(root),'-e','NODE_EXTRA_CA_CERTS='+str(ca),name,'node',file,*args],timeout=timeout,check=False)
     target=root/'verification'/('browser-'+Path(file).stem+'-'+str(__import__('time').time_ns())+'.log')
     runtime.private_file(target,result.stdout+result.stderr)
     if result.returncode:raise RuntimeError('Original native browser step failed; protected diagnostics and commands retained')

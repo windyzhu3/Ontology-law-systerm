@@ -389,6 +389,16 @@ def _restore_runtime_registry(root: Path):
     ingress=launch.get('ingress')
     if ingress and ingress['name'] not in resources['containers'].values():raise RuntimeError('Restored ingress was never registered')
     for entry in launch['containers']:resources['containers'][entry['role']]=entry['name']
+    # Compatibility with already verified older checkpoints whose file-only
+    # inventories omitted an empty material store. Never replace any material.
+    materials=root/'materials'
+    if not materials.exists() and (root/'restore-plan.json').exists():
+        plan=journal._read(root,root/'restore-plan.json');cp=checkpoint.verified(root,plan['sourceOperationId'])
+        if any(name.startswith('assets/materials/') for name in cp['files']):raise RuntimeError('Original restored material bytes are missing')
+        api=next((entry for entry in launch['containers'] if entry['role']=='api'),None)
+        if api is None or 'type=bind,source='+str(materials)+',target='+str(materials) not in api['args']:
+            raise RuntimeError('Original empty material store mount unavailable')
+        materials.mkdir(mode=0o700)
     resources['repo']=str(directory);resources['ingress']=ingress['name'] if ingress else None
     if ingress:resources['containers']['entry']=ingress['name']
     runtime.save(root,resources)
@@ -451,8 +461,9 @@ def start(root: Path) -> dict:
 
 
 def _assert_restored(root: Path,value: dict, *, containers=None,assets=True):
-    if database.observe(root,containers=containers)!=value['observed'] or checkpoint.table_facts(root,containers=containers)!=value['businessFacts'] or checkpoint.table_facts(root,True,containers=containers)!=value['identityFacts'] or checkpoint.cluster_facts(root,containers=containers)!=value['clusterFacts']:
+    if database.observe(root,containers=containers)!=value['observed'] or checkpoint.table_facts(root,containers=containers)!=value['businessFacts'] or checkpoint.table_facts(root,True,containers=containers)!=value['identityFacts']:
         raise RuntimeError('Linked restored database facts differ; ingress remains closed')
+    checkpoint.assert_cluster_facts(value['clusterFacts'],checkpoint.cluster_facts(root,containers=containers))
     if assets:
         actual={};expected={name[7:]:h for name,h in value['files'].items() if name.startswith('assets/')}
         for name in {name.split('/')[0] for name in expected}:

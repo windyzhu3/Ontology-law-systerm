@@ -49,6 +49,29 @@ class CheckpointTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):self.m._copy(source,target)
         self.assertEqual((target/'key').read_bytes(),b'conflicting fixture')
 
+    def test_empty_material_store_survives_checkpoint_copy_and_restore(self):
+        source=Path(self.tmp.name)/'materials';source.mkdir()
+        target=Path(self.tmp.name)/'backup/materials'
+        self.m._copy(source,target)
+        self.assertTrue(target.is_dir(),'Empty material directory must be preserved for the registered API mount')
+        restored=Path(self.tmp.name)/'restored/materials';self.m._copy(target,restored)
+        self.assertTrue(restored.is_dir())
+
+    def test_database_acl_from_original_archive_is_bounded_to_that_database(self):
+        sql='CREATE DATABASE law_contract_runtime;\nREVOKE CONNECT,TEMPORARY ON DATABASE law_contract_runtime FROM PUBLIC;\nGRANT CONNECT ON DATABASE law_contract_runtime TO law_api_login;\n'
+        actual=self.m.database_acl_sql(sql,'law_contract_runtime')
+        self.assertNotIn('CREATE DATABASE',actual)
+        self.assertIn('REVOKE CONNECT,TEMPORARY',actual)
+        self.assertIn('GRANT CONNECT',actual)
+        for bad in [sql.replace('TO law_api_login','TO law_api_login; DROP TABLE identity.appointment'),sql.replace('ON DATABASE law_contract_runtime','ON DATABASE other_database')]:
+            with self.assertRaises(RuntimeError):self.m.database_acl_sql(bad,'law_contract_runtime')
+
+    def test_cluster_fact_verification_includes_database_acl(self):
+        expected={key:{'databaseOwner':'postgres','rolesDigest':'a'*64,'membersDigest':'b'*64,'databaseAclDigest':'c'*64} for key in ['businessDb','identityDb']}
+        self.m.assert_cluster_facts(expected,expected)
+        changed=json.loads(json.dumps(expected));changed['businessDb']['databaseAclDigest']='d'*64
+        with self.assertRaises(RuntimeError):self.m.assert_cluster_facts(expected,changed)
+
     def test_fact_digest_batches_queries_without_merging_tables(self):
         from ols_linux.config import digest
         rows=[{'name':'identity.appointment','rows':[{'id':'one','state':'ACTIVE'}]},

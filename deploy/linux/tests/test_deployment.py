@@ -85,3 +85,6 @@ class DeploymentTests(unittest.TestCase):
         old=m.final_names('ols-private','a'*64);new=m.final_names('ols-private','b'*64)
         self.assertNotEqual(old['scanner'],new['scanner'])
         self.assertEqual(old,m.final_names('ols-private','a'*64))
+
+    def test_scanner_does_not_double_database_memory_during_updates(self):
+        self.assertEqual(self.module().scanner_environment(),['CLAMD_CONF_ConcurrentDatabaseReload=no'])
