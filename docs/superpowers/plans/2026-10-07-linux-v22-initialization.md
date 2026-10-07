@@ -164,12 +164,12 @@
 
 **Interfaces:** `acceptance.py --run-id <唯一ID> --scenario empty|upgrade|business|all`；只建立日志登记资源，分为初始化实例、v20升级实例、合成业务实例。消费前项工具，必须使用待发布真实JAR/SPA与真实IdP，不能以mock/direct数据库事实代替业务办理。
 
-- [ ] 先写失败场景清单与machine assertions：`assert initialization_business_transactions == 0`、`assert human_appointments == 20`、`assert old_fact_digests_preserved`、`assert all(owners_match_configuration)`；业务四组合明确为销售一部/二部各“引用报价进入合同”和“直接合同”链路，共4条从线索至案管接收分类的正常链。
-- [ ] 运行 `python3 deploy/linux/verification/acceptance.py --run-id <唯一ID> --scenario all`，确认缺覆盖阶段失败，不把SKIP当PASS。
-- [ ] 实现真实页面PKCE登录/首次改密/退出切换、身份管理和审计读取反例、自动来源手工与批量导入、草稿切换与原键恢复；合成库用登记的独立分配授权及审核模板办理材料扫描、报价/合同审批、签署核验归档、付款、转案。正式初始化库不写这些测试授权、材料或业务事实。
-- [ ] 注入并验收两项迁移间中断、命令超时已提交、gateCAS冲突、缺备份/停止失败/并发、管理未知响应、来源伪造、经办撤权和同人独立性冲突；验证等待/原键恢复及联动实际restore。失败停留在安全阶段，不自动“补成成功”。
-- [ ] 完成all场景，保存runId、commit、镜像/制品/配置/模板摘要、真实计数、案例与原命令引用、失败裁定及restore证据。仅公开去秘密结果；真实令牌和材料正文保持私密。
-- [ ] 提交本项，消息 `test: verify Linux migration and Haihua initialization end to end`。
+- [x] 先写失败场景清单与machine assertions：`assert initialization_business_transactions == 0`、`assert human_appointments == 20`、`assert old_fact_digests_preserved`、`assert all(owners_match_configuration)`；业务四组合明确为销售一部/二部各“引用报价进入合同”和“直接合同”链路，共4条从线索至案管接收分类的正常链。
+- [x] 运行 `python3 deploy/linux/verification/acceptance.py --run-id <唯一ID> --scenario all`，确认缺覆盖阶段失败，不把SKIP当PASS。
+- [x] 实现真实页面PKCE登录/首次改密/退出切换、身份管理和审计读取反例、自动来源手工与批量导入、草稿切换与原键恢复；合成库用登记的独立分配授权及审核模板办理材料扫描、报价/合同审批、签署核验归档、付款、转案。正式初始化库不写这些测试授权、材料或业务事实。
+- [x] 注入并验收两项迁移间中断、命令超时已提交、gateCAS冲突、缺备份/停止失败/并发、管理未知响应、来源伪造、经办撤权和同人独立性冲突；验证等待/原键恢复及联动实际restore。失败停留在安全阶段，不自动“补成成功”。
+- [x] 完成all场景，保存runId、commit、镜像/制品/配置/模板摘要、真实计数、案例与原命令引用、失败裁定及restore证据。仅公开去秘密结果；真实令牌和材料正文保持私密。
+- [x] 提交本项，消息 `test: verify Linux migration and Haihua initialization end to end`。
 
 ### Task 10: L10 唯一 CLI、操作文档、构建回归和交付
 
@@ -177,10 +177,10 @@
 
 **Interfaces:** `python3 deploy/linux/linux.py --runtime <绝对私密目录> <subcommand>`。具名子命令：`prepare`、`describe-bundle`、`initialize`、`initialize-resume --operation-id`、`verify-initialization`、`upgrade --bundle`、`upgrade-resume --operation-id`、`publish-bytes --bundle`、`release-status`、`restore-checkpoint --operation-id`、`start`、`stop`、`health`。initialize还接受 `--config`、`--initial-password-file`、`--sessions-file`；无秘密值argv参数。退出码0仅表示相应阶段确证完成，unknown/blocked返回非0并显示原operationId和核对命令。
 
-- [ ] CLI测试断言秘密参数拒绝、未知子命令/误将v21当新upgrade拒绝、只读命令无mutation、start/restore归属不符拒绝、CLI调用准确前项接口；首次缺入口失败。
-- [ ] 运行 `python3 -m unittest discover -s deploy/linux/tests -p test_cli.py -v`；实现解析/分派，不复制前项状态机。README给空库与v20两套命令、Linux锁定前置、两管理员改密/会话阶段、停写恢复、候选模板审核和LEAD_ASSIGN待指派条件；不宣传全自动无会话或正式模板已审核。
-- [ ] 验证 `python3 -m unittest discover -s deploy/linux/tests -v`、相关已有 local-login/haihua工具回归；`npm run openapi:check`、`npm run typecheck`、`npm run build`；后端上述定向IT及ArchitectureTest，`./mvnw -B -f backend/pom.xml -DskipTests package`。schema `generate.py --check`、`scripts/verify_generated_sql.py` 在其目录执行，核对43 SQL摘要仍等于实施前清单；jOOQ本任务无DDL变化，验证现有生成产物一致，不改数据库合同源。
-- [ ] 使用最终构建的bundle复核L09健康/登录及发布引用，确保证据指向最终字节；仅制品变化且不影响场景时不重复无关完整业务测试，新失败按影响补测。检查公开Git差异无密码/令牌/私钥/备份，现有本地运行资源未变化。
+- [x] CLI测试断言秘密参数拒绝、未知子命令/误将v21当新upgrade拒绝、只读命令无mutation、start/restore归属不符拒绝、CLI调用准确前项接口；首次缺入口失败。
+- [x] 运行 `python3 -m unittest discover -s deploy/linux/tests -p test_cli.py -v`；实现解析/分派，不复制前项状态机。README给空库与v20两套命令、Linux锁定前置、两管理员改密/会话阶段、停写恢复、候选模板审核和LEAD_ASSIGN待指派条件；不宣传全自动无会话或正式模板已审核。
+- [x] 验证 `python3 -m unittest discover -s deploy/linux/tests -v`、相关已有 local-login/haihua工具回归；`npm run openapi:check`、`npm run typecheck`、`npm run build`；后端上述定向IT及ArchitectureTest，`./mvnw -B -f backend/pom.xml -DskipTests package`。schema `generate.py --check`、`scripts/verify_generated_sql.py` 在其目录执行，核对43 SQL摘要仍等于实施前清单；jOOQ本任务无DDL变化，验证现有生成产物一致，不改数据库合同源。
+- [x] 使用最终构建的bundle复核L09健康/登录及发布引用，确保证据指向最终字节；仅制品变化且不影响场景时不重复无关完整业务测试，新失败按影响补测。检查公开Git差异无密码/令牌/私钥/备份，现有本地运行资源未变化。
 - [ ] 完成全分支代码审查，修复实际问题并重跑受影响验证；更新各项checkbox、证据及限制。提交开发分支，不以设计/模拟测试替代完成声明；合并main/实际云部署依后续明确操作指令执行。
 - [ ] 提交本项，消息 `docs: deliver Linux release and initialization workflow`。
 
@@ -189,3 +189,5 @@
 计划自审已覆盖设计第1–11节：发布与恢复L01–L03/L10，首次身份与授权L06–L07，来源L04–L05，经办/策略L08，候选目录L01，真实验证L02/L03/L06/L07/L09。五项Review Focus均有对应反例；相邻任务接口名称和私密数据边界一致。
 
 实施结束分别报告数据库迁移、身份初始化、业务准备、合成业务验收四种结果。未审核模板、分配权限待指派和其他人员首次改密属于已知准备条件，不能隐藏在“全部可正式使用”结论中；本计划确认后按当前会话顺序实施。
+
+L09 实际 all 运行 `linux-v22-final-a7ef88313cc7` 通过；L10 实现与构建验证完成，唯一全分支审查为剩余交付门禁。报告见 `docs/evidence/linux-v22-initialization/report.md`。
