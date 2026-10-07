@@ -6,6 +6,23 @@ from unittest.mock import patch
 
 
 class CliTests(unittest.TestCase):
+    def test_describe_can_build_exact_native_archive_through_same_entry(self):
+        m=self.module()
+        args=m.parser().parse_args(['--runtime','/private','describe-bundle','--repo','/source','--build-directory','/private/build','--oidc-settings-file','/private/oidc.json'])
+        with patch.object(m,'private_json',return_value={'public':'settings'}),patch.object(m.runtime,'load',return_value={'runtimeImage':'sha256:'+'a'*64}),patch.object(m.build,'run',return_value={'native':'proof'}) as build:
+            self.assertEqual(m.dispatch(args),{'native':'proof'});build.assert_called_once_with(Path('/source'),Path('/private/build'),'sha256:'+'a'*64,{'public':'settings'})
+
+    def test_partial_business_configuration_resumes_original_install(self):
+        m=self.module()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)/'runtime';cfg={'config':'original'};op=m.journal.begin(root,'initialize',m.config.digest(cfg))
+            candidate={'version':2,'schemaVersion':'52-plus-2-r2-v22'}
+            m.journal._write(root,root/'identity/bootstrap.json',{'state':'VERIFIED'})
+            m.journal._write(root,root/'business/configuration.json',{'policyState':'UNKNOWN'})
+            with patch.object(m.release,'_candidate',return_value=candidate),patch.object(m.assembly,'start_admin'),patch.object(m.initialize,'run') as roster,patch.object(m.business_config,'install') as install,patch.object(m,'sessions',return_value={}),patch.object(m.initialize,'finish',return_value={'phase':'COMPLETE'}):
+                m.original_initialization(root,{'config':cfg,'bundleDirectory':directory,'descriptor':candidate},Path('/sessions'))
+            roster.assert_called_once();install.assert_called_once_with(root,op['operationId'],cfg)
+
     def module(self):
         path=Path(__file__).resolve().parents[1]/'linux.py'
         self.assertTrue(path.exists(),'Unique Linux operation entry missing')

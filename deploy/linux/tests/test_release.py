@@ -59,6 +59,15 @@ class ReleaseTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):self.m.require_same_schema('52-plus-2-r2-v20','52-plus-2-r2-v22')
         self.m.require_same_schema('52-plus-2-r2-v22','52-plus-2-r2-v22')
 
+    def test_same_schema_v20_publication_validates_frozen_v20_target(self):
+        from ols_linux import journal,database
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'runtime';op=journal.begin(root,'initialize','a'*64);journal.record(root,op['operationId'],{'phase':'COMPLETE'})
+            observed={'gate':dict(self.gate,operating_mode='ACTIVE')}
+            with patch.object(database,'observe',return_value=observed),patch.object(database,'verify_schema',return_value=observed) as schema,patch.object(self.m,'_installed',return_value={}),patch.object(self.m,'resume',return_value={'phase':'COMPLETE'}):
+                self.m._publish_same_schema(root,Path(folder),{'descriptorDigest':'b'*64})
+                schema.assert_called_once_with(root,'1060')
+
     def test_rollback_old_jar_without_linked_checkpoint_is_not_supported(self):
         self.assertFalse(hasattr(self.m,'rollback_jar'))
 
@@ -115,6 +124,22 @@ class ReleaseTest(unittest.TestCase):
             root=Path(folder)/'runtime';journal.begin(root,'initialize','a'*64)
             journal._write(root,root/'current-release.json',{'directory':folder,'descriptor':{'schemaVersion':'52-plus-2-r2-v20'}})
             with self.assertRaises(RuntimeError):self.m._installed(root,self.gate)
+
+    def test_failed_manual_start_can_resume_only_its_exact_recorded_gate(self):
+        from ols_linux import journal,bundle,database
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'runtime';op=journal.begin(root,'initialize','a'*64)
+            descriptor={'descriptorDigest':'b'*64};failed={'operating_mode':'BLOCKED','revision':9}
+            journal.record(root,op['operationId'],{'phase':'ACTIVATION_FAILED'})
+            journal._write(root,root/'current-release.json',{'directory':folder,'descriptor':descriptor})
+            journal._write(root,root/'operations'/(op['operationId']+'-manual-stop.json'),{'operationId':op['operationId'],'descriptorDigest':'b'*64})
+            journal._write(root,root/'operations'/(op['operationId']+'-activation.json'),{'descriptorDigest':'b'*64,'failed':failed})
+            with patch.object(bundle,'verify'),patch.object(database,'observe',return_value={'gate':failed}),patch.object(self.m,'_installed'),patch.object(self.m,'_activate',return_value={'phase':'COMPLETE'}) as activate:
+                self.m.start(root)
+                activate.assert_called_once()
+            with patch.object(bundle,'verify'),patch.object(database,'observe',return_value={'gate':dict(failed,revision=10)}),patch.object(self.m,'_installed'),patch.object(self.m,'_activate') as activate:
+                with self.assertRaises(RuntimeError):self.m.start(root)
+                activate.assert_not_called()
 
 
 if __name__=='__main__':unittest.main()

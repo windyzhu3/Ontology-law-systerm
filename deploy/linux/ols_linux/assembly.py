@@ -6,6 +6,7 @@ import hmac
 import json
 from pathlib import Path
 import secrets
+import ssl
 import time
 import uuid
 from . import bundle,database,identity,journal,release,runtime
@@ -30,6 +31,26 @@ def _secrets(root):
     return values
 
 
+def certificate_der(path):
+    text=Path(path).read_text(encoding='ascii').strip()
+    if text.count('-----BEGIN CERTIFICATE-----')!=1 or text.count('-----END CERTIFICATE-----')!=1:
+        raise RuntimeError('One explicit trust anchor certificate required')
+    return ssl.PEM_cert_to_DER_cert(text)
+
+
+def ensure_trust_anchor(root,plan,alias,certificate):
+    expected=certificate_der(certificate)
+    args=['docker','run','--rm','--label',runtime.LABEL+'='+plan['instanceId'],
+          '--mount',f'type=bind,source={root},target={root}','--entrypoint','keytool',plan['runtimeImage']]
+    store=['-alias',alias,'-keystore',root/'certs/identity-trust.p12','-storetype','PKCS12',
+           '-storepass:file',root/'secrets/trust-password.txt']
+    observed=runtime.run([*args,'-exportcert',*store],check=False)
+    if observed.returncode:
+        runtime.run([*args,'-importcert','-noprompt','-file',certificate,*store])
+        observed=runtime.run([*args,'-exportcert',*store])
+    if observed.stdout!=expected:raise RuntimeError('Original application trust anchor differs')
+
+
 def _tls(root,plan):
     path=root/'assembly/tls.json'
     if path.exists():
@@ -48,13 +69,10 @@ chmod 600 certs/*
 '''
     runtime.run(['docker','run','--rm','--label',runtime.LABEL+'='+plan['instanceId'],'--mount',f'type=bind,source={root},target=/out',resources['postgresImage'],'sh','-euc',script])
     trust=root/'certs/identity-trust.p12'
-    if not trust.exists():
-        runtime.run(['docker','run','--rm','--label',runtime.LABEL+'='+plan['instanceId'],'--mount',f'type=bind,source={root},target={root}','--entrypoint','keytool',plan['runtimeImage'],
-            '-importcert','-noprompt','-alias','ols-ca','-file',root/'certs/ca.pem','-keystore',trust,'-storetype','PKCS12','-storepass:file',root/'secrets/trust-password.txt'])
-        trust.chmod(0o600)
-        if resources.get('publicTlsHashes'):
-            runtime.run(['docker','run','--rm','--label',runtime.LABEL+'='+plan['instanceId'],'--mount',f'type=bind,source={root},target={root}','--entrypoint','keytool',plan['runtimeImage'],
-                '-importcert','-noprompt','-alias','ols-public-ca','-file',root/'certs/public-ca.pem','-keystore',trust,'-storetype','PKCS12','-storepass:file',root/'secrets/trust-password.txt'])
+    ensure_trust_anchor(root,plan,'ols-ca',root/'certs/ca.pem')
+    trust.chmod(0o600)
+    if resources.get('publicTlsHashes'):
+        ensure_trust_anchor(root,plan,'ols-public-ca',root/'certs/public-ca.pem')
     names=['certs/server.p12','certs/service.key','certs/service.crt','certs/service.p12','certs/service-public.pem','certs/identity-trust.p12']
     journal._write(root,path,{name:bundle.sha(root/name) for name in names})
 

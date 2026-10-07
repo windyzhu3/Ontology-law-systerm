@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 sys.dont_write_bytecode=True
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from ols_linux import assembly,bundle,business_config,checkpoint,config,identity,initialize,journal,release,runtime,verify
+from ols_linux import assembly,build,bundle,business_config,checkpoint,config,identity,initialize,journal,release,runtime,verify
 
 
 def parser():
@@ -15,8 +15,10 @@ def parser():
     commands=p.add_subparsers(dest='command',required=True)
     prepare=commands.add_parser('prepare');prepare.add_argument('--settings-file',type=Path,required=True);prepare.add_argument('--config',type=Path,required=True)
     describe=commands.add_parser('describe-bundle')
-    for name in ('repo','jar','spa'):describe.add_argument('--'+name,type=Path,required=True)
-    describe.add_argument('--commit',required=True);describe.add_argument('--output',type=Path)
+    describe.add_argument('--repo',type=Path,required=True)
+    for name in ('jar','spa'):describe.add_argument('--'+name,type=Path)
+    describe.add_argument('--commit');describe.add_argument('--output',type=Path)
+    describe.add_argument('--build-directory',type=Path);describe.add_argument('--oidc-settings-file',type=Path)
     initial=commands.add_parser('initialize');initial.add_argument('--config',type=Path,required=True)
     initial.add_argument('--bundle',type=Path,required=True);initial.add_argument('--initial-password-file',type=Path,required=True)
     initial.add_argument('--sessions-file',type=Path)
@@ -64,7 +66,7 @@ def original_initialization(root,inputs,sessions_file,capture_admin=None):
         return {'operationId':operation['operationId'],'phase':'HUMAN_SESSIONS_REQUIRED',
                 'requiredAdministrators':['dingqiming','huangxuexue'],'next':'initialize-resume --operation-id '+operation['operationId']+' --sessions-file <private-file>'}
     # Management ingress remains closed while the two real HUMAN sessions administer.
-    if not (root/'business/configuration.json').exists():
+    if operation['phase']!='BUSINESS_CONFIG_READY':
         assembly.start_admin(root,candidate)
         initialize.run(root,cfg,sessions(sessions_file))
         business_config.install(root,operation['operationId'],cfg)
@@ -85,7 +87,13 @@ def dispatch(args):
         cfg=config.load(args.config);result=verify.initialization(root,cfg)
         business_config.verify_configuration(root,cfg);return result
     if name=='describe-bundle':
-        result=bundle.describe(args.repo,args.jar,args.spa,args.commit,include_runtime=True)
+        if args.build_directory is not None or args.oidc_settings_file is not None:
+            if args.build_directory is None or args.oidc_settings_file is None or args.jar is not None or args.spa is not None or args.commit is not None:
+                raise RuntimeError('Native build needs paired original target/public OIDC file, without prebuilt inputs')
+            result=build.run(args.repo,args.build_directory,runtime.load(root)['runtimeImage'],private_json(args.oidc_settings_file))
+        else:
+            if args.jar is None or args.spa is None or args.commit is None:raise RuntimeError('Exact successful native build artifacts and source commit required')
+            result=bundle.describe(args.repo,args.jar,args.spa,args.commit,include_runtime=True)
         if args.output:runtime.private_file(args.output,config.canonical(result))
         return result
     if name=='prepare':

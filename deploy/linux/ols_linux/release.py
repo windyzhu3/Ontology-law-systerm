@@ -87,7 +87,7 @@ def _advance(root: Path,op: dict,inputs: dict) -> dict:
     if phase in {'CHECKPOINT_VERIFIED','MIGRATION_UNKNOWN','MIGRATED','SCHEMA_VERIFIED'}:
         cp=checkpoint.verified(root,operation_id)
         if op['kind']=='publish-bytes':
-            observed=database.verify_schema(root)
+            observed=_same_schema_verified(root)
             if observed['history']!=cp['observed']['history'] or not _same_gate(observed['gate'],cp['observed']['gate']):raise RuntimeError('Same-schema publication gate or history changed')
         else:
             sources={'source':Path(inputs['bundleDirectory'])} if inputs['descriptor'].get('version')==2 else {}
@@ -211,8 +211,15 @@ def _verify_legacy(descriptor: dict,directory: Path):
     if proof!={'commit':descriptor['commit'],'jarExitCode':0,'spaExitCode':0,'jarSha256':bundle.sha(jar),'spaFiles':descriptor['spaFiles']}:raise RuntimeError('Old successful build evidence unavailable')
 
 
+def _same_schema_verified(root):
+    version=database.observe(root)['gate']['schema_contract_version']
+    target={'52-plus-2-r2-v20':'1060','52-plus-2-r2-v22':'1080'}.get(version)
+    if target is None:raise RuntimeError('Byte publication refuses intermediate or unknown schema')
+    return database.verify_schema(root,target)
+
+
 def _publish_same_schema(root: Path,bundle_dir: Path,descriptor: dict) -> dict:
-    observed=database.verify_schema(root)
+    observed=_same_schema_verified(root)
     if observed['gate']['operating_mode']!='ACTIVE':raise RuntimeError('Byte publication requires verified ACTIVE runtime')
     baseline=_installed(root,observed['gate'])
     op=journal.begin(root,'publish-bytes',descriptor['descriptorDigest'])
@@ -423,13 +430,19 @@ def start(root: Path) -> dict:
             if digest(value)!=plan['checkpointDigest']:raise RuntimeError('Linked original restore changed')
             if op['phase']=='RESTORED_MAINTENANCE':_assert_restored(root,value)
             _restore_runtime_registry(root);restored=True
-        elif op['phase'] not in {'COMPLETE','STOP_REQUESTED','WRITERS_STOPPED','STOPPED'}:
+        elif op['phase'] not in {'COMPLETE','STOP_REQUESTED','WRITERS_STOPPED','STOPPED'} and not (
+            op['phase'] in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILED'} and
+            (root/'operations'/(op['operationId']+'-manual-stop.json')).exists()):
             raise RuntimeError('Unknown publication phase cannot start writers')
         current=journal._read(root,root/'current-release.json')
         descriptor=current['descriptor'];bundle.verify(descriptor,Path(current['directory']))
         if not restored:
             _installed(root,database.observe(root)['gate'])
-            if database.observe(root)['gate']['operating_mode']!='ACTIVE':raise RuntimeError('Manual start cannot change the deployment gate')
+            gate=database.observe(root)['gate']
+            if gate['operating_mode']!='ACTIVE':
+                activation=journal._read(root,root/'operations'/(op['operationId']+'-activation.json'))
+                if op['phase'] not in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILED'} or activation['descriptorDigest']!=descriptor['descriptorDigest'] or not _same_gate(gate,activation.get('failed',{})):
+                    raise RuntimeError('Manual start cannot change an unrecognized deployment gate')
             if op['phase']!='COMPLETE':
                 saved=journal._read(root,root/'operations'/(op['operationId']+'-manual-stop.json'))
                 if saved!={'operationId':op['operationId'],'descriptorDigest':descriptor['descriptorDigest']}:

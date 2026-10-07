@@ -133,6 +133,13 @@ def _restore_databases(target: Path,directory: Path, *, containers=None):
         if result.returncode:raise RuntimeError('Checkpoint database restore failed; isolated target retained')
 
 
+def proof_target(root,operation_id):
+    owner=journal._owner(root)
+    target=root.parent/('.ols-proof-'+owner['instanceId']+'-'+operation_id)
+    if target.resolve()!=target.absolute() or target.exists():raise RuntimeError('Original durable proof target is occupied or linked')
+    return target
+
+
 def verify_restore(root: Path,operation_id: str) -> dict:
     with journal.locked(root) as root:
         value=read(root,operation_id);directory=_directory(root,operation_id)
@@ -147,7 +154,7 @@ def verify_restore(root: Path,operation_id: str) -> dict:
             target=Path(previous[-1]['target']);target_op=journal.current(target)
             if target_op['instanceId']!=previous[-1]['targetInstanceId'] or target_op['configDigest']!=digest(value):raise RuntimeError('Original restore target differs')
         else:
-            target=Path(tempfile.mkdtemp(prefix='ols-restore-proof-'))
+            target=proof_target(root,operation_id)
             target_op=journal.begin(target,'initialize',digest(value))
             _copy(directory/'assets/certs',target/'certs');_copy(directory/'assets/secrets',target/'secrets')
         resources=runtime.load(root)

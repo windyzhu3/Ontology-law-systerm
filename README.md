@@ -1,5 +1,7 @@
 # Ontology Law System｜律所待办驱动智能管理系统
 
+Linux v20→v22 迁移发布及海华空库初始化入口见 [Linux 操作说明](deploy/linux/README.md)，初始化配置位于 `deploy/linux/config/haihua.json`。它区分真实迁移、空库初始化、候选合同模板及独立合成验收；腾讯云域名和证书为执行时私密参数。
+
 > 以准确业务事实驱动责任：**一张卡、一个 Owner、一个主命令、一个明确结果**。当一张卡无法维持这一约束时，拆分责任或后置能力，不增加通用流程结构。
 
 [基线总入口](docs/baseline/CURRENT-MVP-BASELINE.md)保留冻结合同，并导航至当前具名后继。当前开发沿用用户已确认的 [R2.5 MVP 收口计划](docs/superpowers/plans/2026-09-28-r2.5-mvp-replan.md)。销售主链、登录与身份管理、合同及签后办理、M01 已有实现；待收口的是有界查询与性能、M02、早期线索管理、经营概览、三项人工确认 AI 和真实试点条件。
