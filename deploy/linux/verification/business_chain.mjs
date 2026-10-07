@@ -55,8 +55,10 @@ for(const c of cases.filter(c=>!selected||c.code===selected)){
  }else if(phase==='sign-transfer'){
   await step(c.code+':arrange',()=>module('sign-arrange',c.sales,c.code));
   for(const slot of ['1','2']){await step(c.code+':sign-submit:'+slot,()=>module('sign-submit',c.sales,c.code,slot));await step(c.code+':sign-verify:'+slot,()=>module('sign-verify',c.code,slot,'VERIFIED'));}
-  await step(c.code+':archive',()=>module('sign-archive','case_admin01',c.code));await step(c.code+':execution',()=>module('execution',c.sales,c.code));
+  await step(c.code+':archive',()=>module('sign-archive','case_admin01',c.code));
+  if(c.entry==='QUOTE')await step(c.code+':execution',()=>module('execution',c.sales,c.code));
   await step(c.code+':payment-proof',()=>module('upload-material',c.sales,c.code,path.join(runtime,'fixtures',c.code+'-NATIVE-G0'+c.sales.slice(-1)+'-SYNTHETIC-payment.pdf')));await step(c.code+':payment',()=>module('payment',c.code,'10000','NATIVE-G0'+c.sales.slice(-1)));
+  if(c.entry==='DIRECT')await step(c.code+':execution',()=>module('execution',c.sales,c.code));
   await step(c.code+':transfer-prepare',()=>module('transfer',c.sales,c.code,'prepare'));for(const stage of ['review','intake','classify'])await step(c.code+':transfer-'+stage,()=>module('transfer','case_admin01',c.code,stage));
  }else throw Error('Explicit bounded phase required');
 }
