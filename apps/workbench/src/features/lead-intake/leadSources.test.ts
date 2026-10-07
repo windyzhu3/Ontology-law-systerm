@@ -12,7 +12,7 @@ it("reads configured sources with current credentials without changing an unreso
   const before = store.read();
   const requests: Request[] = [];
   const api = createLeadIntakeApi(store, async request => { requests.push(request); return reply({ sources: [source] }); }, "https://law.test");
-  expect(await api.sources(testSession(), new AbortController().signal)).toEqual([source]);
+  expect(await api.sources(testSession(), new AbortController().signal)).toEqual({sources:[source],sourceSelection:"SELECTABLE"});
   expect(requests).toHaveLength(1);
   expect(requests[0].method).toBe("GET");
   expect(requests[0].url).toBe("https://law.test/api/v1/leads/intake-sources");
@@ -38,8 +38,8 @@ it("refuses cached responses and stale sessions, and accepts an empty catalog", 
   const api = createLeadIntakeApi(store, async () => { current = false; return reply({ sources: [source] }); }, "https://law.test");
   await expect(api.sources({ ...testSession(), isCurrent: () => current }, new AbortController().signal)).rejects.toThrow();
   const empty = createLeadIntakeApi(store, async () => reply({ sources: [] }), "https://law.test");
-  expect(await empty.sources(testSession(), new AbortController().signal)).toEqual([]);
+  expect(await empty.sources(testSession(), new AbortController().signal)).toEqual({sources:[],sourceSelection:"SELECTABLE"});
   const mixed = { ...source, sourceAccountCode: "sales_intake" };
   const named = createLeadIntakeApi(store, async () => reply({ sources: [mixed] }), "https://law.test");
-  expect(await named.sources(testSession(), new AbortController().signal)).toEqual([mixed]);
+  expect(await named.sources(testSession(), new AbortController().signal)).toEqual({sources:[mixed],sourceSelection:"SELECTABLE"});
 });

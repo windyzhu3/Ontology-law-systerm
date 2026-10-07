@@ -39,7 +39,7 @@ abstract class R1HttpFixture extends ContactFlowFixture {
     io.github.windyzhu3.ontologylaw.evidence.MaterialObjectStore materialStore;
     io.github.windyzhu3.ontologylaw.contract.ContractProtection contractProtection;
     String realHumanToken;
-    @org.junit.jupiter.api.BeforeEach void resetDisclosureFault(){disclosureConnection=java.util.function.UnaryOperator.identity();credentialConnection=java.util.function.UnaryOperator.identity();aiModel=R25ResponsesAiModel.disabled();}
+    @org.junit.jupiter.api.BeforeEach void resetDisclosureFault(){disclosureConnection=java.util.function.UnaryOperator.identity();credentialConnection=java.util.function.UnaryOperator.identity();aiModel=R25ResponsesAiModel.disabled();humanIntakeBindings=null;}
     static KeyPair signing(){try{var g=KeyPairGenerator.getInstance("RSA");g.initialize(2048);return g.generateKeyPair();}catch(Exception e){throw new AssertionError(e);}}
     protected AuthorizationServiceIT.Seed seedFor(TaskFactory.Type type)throws Exception{return AuthorizationServiceIT.seed(database,"HUMAN",type.authority,this::credentialHmac);}
     byte[] credentialHmac(UUID tenant){try{byte[] key=new byte[32];new SecureRandom().nextBytes(key);credentialKeys.put(tenant,key);var mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec(key,"HmacSHA256"));return mac.doFinal(SUBJECT.getBytes(java.nio.charset.StandardCharsets.UTF_8));}catch(Exception e){throw new AssertionError(e);}}

@@ -104,15 +104,15 @@
 
 ### Task 5: L05 自动来源的HTTP合同与导入界面
 
-**Files:** 修改 `contracts/openapi/ontology-law-api.yaml`、`apps/workbench/src/generated/api/schema.d.ts`、`J/api/R1ApiServices.java`、`apps/workbench/src/features/lead-intake/{leadIntakeApi,LeadIntakeApplication}.ts*`及各自已有测试；新增 `docs/baseline/LINUX-HUMAN-INTAKE-BINDING-V1.md`，更新 `docs/contracts/r2-lead-intake-sources-v1.md`。Java API模型使用既有Maven生成路径，不手写生成类。
+**Files:** 新增具名基线投影 `scripts/baseline/linux_human_intake_contract.py` 及其 mutation tests，接入已有 intake validator；修改 `contracts/openapi/ontology-law-api.yaml`、`apps/workbench/src/generated/api/schema.d.ts`、`J/api/{R1ApiServices,R1JsonConfiguration}.java`、`apps/workbench/src/features/lead-intake/{leadIntakeApi,LeadIntakeApplication}.ts*`及各自已有测试；新增 `docs/baseline/LINUX-HUMAN-INTAKE-BINDING-V1.md`，更新 `docs/contracts/r2-lead-intake-sources-v1.md`。Java API模型使用既有Maven生成路径，不手写生成类。
 
 **Interfaces:** `LeadIntakeSourcesV1` 增量可选 `sourceSelection: 'BOUND_TO_PRINCIPAL' | 'SELECTABLE'`。启用绑定租户显式给出BOUND_TO_PRINCIPAL，未配置租户保留旧响应；客户端缺字段时按原SELECTABLE处理。前端 `SourceSelection = 'BOUND_TO_PRINCIPAL' | 'SELECTABLE'`，`sources(...) -> Promise<{sources: IntakeSource[]; sourceSelection: SourceSelection}>`；绑定模式只允许0/1条，非法数量拒绝展示/提交。
 
-- [ ] 增加断言：绑定模式 `expect(screen.queryByRole('combobox', {name:'来源'})).toBeNull()`、当前来源只读显示；手工/CSV/XLSX请求均用该source；旧响应仍能选择。模拟退出/切换时旧response忽略，旧draft不提交，新账号没有自动重发，原恢复标记仍可查询；两条绑定来源响应拒绝。
-- [ ] `npm test -- --run src/features/lead-intake/leadIntakeApi.test.ts src/features/lead-intake/LeadIntakeApplication.test.tsx`：首次新协议/界面断言失败。
-- [ ] 实现协议、严格解析器与只读来源文案“来源：<本人来源>”；保留共用页面/菜单/按钮及现有恢复流程。会话变化沿用已有清理机制，不能把任职变化视作可自动重写原命令。冻结合同只通过具名增量说明调整，记录兼容范围，不广泛松开baseline断言。
-- [ ] `npm run openapi:generate` 后通过上述测试、`npm run openapi:check`、`npm run typecheck` 和 HTTP IT；不删除旧模式反例。
-- [ ] 提交本项，消息 `feat: show bound intake sources in the shared workbench`。
+- [x] 增加断言：绑定模式 `expect(screen.queryByRole('combobox', {name:'来源'})).toBeNull()`、当前来源只读显示；手工/CSV/XLSX请求均用该source；旧响应仍能选择。模拟退出/切换时旧response忽略，旧draft不提交，新账号没有自动重发，原恢复标记仍可查询；两条绑定来源响应拒绝。
+- [x] `npm test -- --run src/features/lead-intake/leadIntakeApi.test.ts src/features/lead-intake/LeadIntakeApplication.test.tsx`：首次新协议/界面断言失败。
+- [x] 实现协议、严格解析器与只读来源文案“来源：<本人来源>”；保留共用页面/菜单/按钮及现有恢复流程。会话变化沿用已有清理机制，不能把任职变化视作可自动重写原命令。冻结合同只通过具名增量说明调整，记录兼容范围，不广泛松开baseline断言。
+- [x] `npm run openapi:generate` 后通过上述测试、`npm run openapi:check`、`npm run typecheck` 和 HTTP IT；不删除旧模式反例。
+- [x] 提交本项，消息 `feat: show bound intake sources in the shared workbench`。
 
 ### Task 6: L06 真实IdP账号、首次改密与原引导
 

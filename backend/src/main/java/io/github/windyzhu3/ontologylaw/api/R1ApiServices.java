@@ -34,6 +34,7 @@ public final class R1ApiServices {
     private final ContractPreparationDiscovery contractDiscovery;
     private final R1ProjectionConsumer consumer;
     private final LeadIntakeSources intakeSources;
+    private final R1HumanSourceBinding humanSources;
     public R1ApiServices(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,byte[] cursorKey) {
         this(database,sources,protection,services,node,cursorKey,java.util.List.of());
     }
@@ -57,6 +58,7 @@ public final class R1ApiServices {
         this(database,sources,protection,services,node,cursorKey,intakeMetadata,opportunityProtection,materialStore,contractProtection,payments,transferDestinations,aiModel,new R1HumanSourceBinding(java.util.List.of(),sources));
     }
     public R1ApiServices(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,byte[] cursorKey,java.util.List<LeadIntakeSources.Source> intakeMetadata,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection,io.github.windyzhu3.ontologylaw.evidence.MaterialObjectStore materialStore,io.github.windyzhu3.ontologylaw.contract.ContractProtection contractProtection,io.github.windyzhu3.ontologylaw.payment.PaymentWorkflowService payments,java.util.function.Function<UUID,UUID> transferDestinations,R25AiModel aiModel,R1HumanSourceBinding humanSources) {
+        this.humanSources=java.util.Objects.requireNonNull(humanSources);
         this.opportunityEnabled=opportunityProtection!=null;
         var aiSources=opportunityProtection==null?null:new R25AiSourceReadService(cursorKey,protection,opportunityProtection,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node));
         this.aiCandidates=aiSources==null?null:new R25AiCandidateService(cursorKey,(actor,id,task)->{try(var connection=database.open()){return aiSources.read(connection,actor,id,task);}},aiModel,java.time.Clock.systemUTC());
@@ -92,7 +94,8 @@ public final class R1ApiServices {
         if(actor.principalKind()!=io.github.windyzhu3.ontologylaw.identity.AuthorizationService.PrincipalKind.HUMAN || actor.onBehalfAppointmentId()!=null)
             throw new R1HttpFailure("NOT_AUTHORIZED");
         try(var c=database.open()) {
-            return java.util.Map.of("sources",new io.github.windyzhu3.ontologylaw.execution.LeadIntakeReadRuntime().read(c,actor,connection -> intakeSources.read(connection,actor)));
+            var sources=new io.github.windyzhu3.ontologylaw.execution.LeadIntakeReadRuntime().read(c,actor,connection -> intakeSources.read(connection,actor));
+            return humanSources.enabled(actor.tenantId())?java.util.Map.of("sources",sources,"sourceSelection","BOUND_TO_PRINCIPAL"):java.util.Map.of("sources",sources);
         } catch(java.sql.SQLException | RuntimeException unavailable) { throw new R1HttpFailure("SERVICE_UNAVAILABLE"); }
     }
     R1ProjectionReadinessService.Response readiness(Actor actor){

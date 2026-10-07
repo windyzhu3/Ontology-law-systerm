@@ -1,4 +1,7 @@
+/// <reference types="node" />
 import { beforeEach, expect, it, vi } from "vitest";
+import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 const interaction = { type: (element: HTMLElement, value: string) => fireEvent.change(element, { target: { value } }), click: (element: HTMLElement) => fireEvent.click(element) };
 import { testSession, receipt, taskId } from "../../test/fixtures";
@@ -7,13 +10,13 @@ import { createLeadIntakeApi } from "./leadIntakeApi";
 import { LeadIntakeApplication } from "./LeadIntakeApplication";
 const source = { sourceAccountCode: "sales", displayName: "客户转介绍", sourceChannelCode: "MANUAL", serviceCategoryCode: "GENERAL_INTAKE", jurisdictionCode: "CN", urgencyCode: "NORMAL" };
 beforeEach(() => sessionStorage.clear());
-function setup(unknown = false, sources = [source]) {
+function setup(unknown = false, sources = [source], sourceSelection?: "BOUND_TO_PRINCIPAL" | "SELECTABLE") {
   const recovery = new RecoveryStore(sessionStorage), requests: Request[] = [];
   let command = "";
   const api = createLeadIntakeApi(recovery, async request => {
     requests.push(request);
     const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "Location": `/api/v1/commands/${command}/receipt` } });
-    if (request.url.endsWith("intake-sources")) return response({ sources });
+    if (request.url.endsWith("intake-sources")) return response({ sources,...(sourceSelection?{sourceSelection}:{}) });
     if (request.method === "POST") { command = request.headers.get("Idempotency-Key")!; if (unknown) throw new Error("offline"); }
     return response({ ...receipt(command), resultFact: { factType: "LEAD", factRef: "a".repeat(43), revision: 0 } }, request.method === "POST" ? 201 : 200);
   }, "https://law.test");
@@ -21,6 +24,53 @@ function setup(unknown = false, sources = [source]) {
   const view = render(<LeadIntakeApplication session={testSession()} api={api} recovery={recovery} onReturn={onReturn} onRecover={onRecover} onOpenTask={onOpenTask} sessionActions="销售一组" />);
   return { ...view, api, recovery, requests, onReturn, onRecover, onOpenTask };
 }
+it("shows the bound account read-only and uses it for manual capture",async()=>{
+  const {requests}=setup(false,[source],"BOUND_TO_PRINCIPAL");
+  await screen.findByText("来源：客户转介绍");expect(screen.queryByRole("combobox",{name:"来源"})).toBeNull();
+  fireEvent.change(screen.getByLabelText("需求描述"),{target:{value:"本人录入"}});fireEvent.click(screen.getByRole("button",{name:"保存线索"}));
+  await screen.findByRole("heading",{name:"线索已录入"});expect(await requests.find(r=>r.method==="POST")!.json()).toMatchObject({sourceAccountCode:source.sourceAccountCode});
+});
+it("retains source selection for legacy responses and refuses an ambiguous bound catalog",async()=>{
+  const other={...source,sourceAccountCode:"other",displayName:"旧模式另一来源"};const legacy=setup(false,[source,other]);
+  const select=await screen.findByRole("combobox",{name:"来源"});fireEvent.change(select,{target:{value:"other"}});
+  fireEvent.change(screen.getByLabelText("需求描述"),{target:{value:"旧模式录入"}});fireEvent.click(screen.getByRole("button",{name:"保存线索"}));
+  await screen.findByRole("heading",{name:"线索已录入"});expect(await legacy.requests.find(r=>r.method==="POST")!.json()).toMatchObject({sourceAccountCode:"other"});legacy.unmount();
+  const invalid=setup(false,[source,other],"BOUND_TO_PRINCIPAL");await screen.findByRole("button",{name:"重新读取来源"});
+  expect(screen.queryByRole("combobox",{name:"来源"})).toBeNull();expect(screen.queryByRole("button",{name:"保存线索"})).toBeNull();expect(invalid.requests.every(r=>r.method==="GET")).toBe(true);
+});
+it.each(["csv","xlsx"])("uses the bound account for every %s imported row",async extension=>{
+  const {requests}=setup(false,[source],"BOUND_TO_PRINCIPAL");
+  fireEvent.click(await screen.findByRole("button",{name:"批量导入"}));
+  const bytes=extension==="csv"?new TextEncoder().encode("来源记录号,需求描述\nbound-a,本人需求一\nbound-b,本人需求二"):Uint8Array.from(readFileSync(resolve("src/test/lead-intake-fixtures/lead-intake-openpyxl.xlsx")));
+  const file=new File([bytes],`bound.${extension}`);Object.defineProperty(file,"arrayBuffer",{value:async()=>bytes.buffer});
+  fireEvent.change(screen.getByLabelText("选择文件"),{target:{files:[file]}});
+  if(extension==="xlsx") {
+    await screen.findByLabelText("映射来源记录号");
+    for(const [label,value] of [["来源记录号","来源记录"],["联系人","姓名"],["手机号","电话"],["需求描述","需求"]])fireEvent.change(screen.getByLabelText(`映射${label}`),{target:{value}});
+  }
+  expect(screen.queryByRole("combobox",{name:"来源"})).toBeNull();fireEvent.click(await screen.findByRole("button",{name:"确认导入 2 条"}));
+  await screen.findByText("2条已录入");const posts=requests.filter(r=>r.method==="POST");expect(posts).toHaveLength(2);
+  for(const post of posts)expect(await post.json()).toMatchObject({sourceAccountCode:source.sourceAccountCode});
+});
+it("switching accounts discards the draft without replaying or deleting the original marker",async()=>{
+  const view=setup(true,[source],"BOUND_TO_PRINCIPAL");
+  fireEvent.change(await screen.findByLabelText("需求描述"),{target:{value:"旧账号正文"}});fireEvent.click(screen.getByRole("button",{name:"保存线索"}));
+  await screen.findByRole("button",{name:"核对提交结果"});const marker=view.recovery.read();
+  view.rerender(<LeadIntakeApplication session={testSession(2)} api={view.api} recovery={view.recovery} onReturn={view.onReturn} sessionActions="新账号"/>);
+  expect(await screen.findByLabelText("需求描述")).toHaveValue("");expect(screen.queryByText("旧账号正文")).toBeNull();expect(view.recovery.read()).toEqual(marker);
+  fireEvent.change(screen.getByLabelText("需求描述"),{target:{value:"新账号正文"}});fireEvent.click(screen.getByRole("button",{name:"保存线索"}));
+  expect(view.requests.filter(r=>r.method==="POST")).toHaveLength(1);expect(view.recovery.read()).toEqual(marker);
+  await expect(view.api.receipt(testSession(2),marker!.commandId,new AbortController().signal)).rejects.toThrow();
+});
+it("ignores an old account catalog arriving after the new account catalog",async()=>{
+  let completeOld!:(response:Response)=>void;let reads=0;
+  const reply=(label:string)=>new Response(JSON.stringify({sources:[{...source,displayName:label}],sourceSelection:"BOUND_TO_PRINCIPAL"}),{headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
+  const recovery=new RecoveryStore(sessionStorage);const api=createLeadIntakeApi(recovery,async()=>++reads===1?new Promise<Response>(resolve=>{completeOld=resolve;}):reply("新账号来源"),"https://law.test");
+  const view=render(<LeadIntakeApplication session={testSession()} api={api} recovery={recovery} onReturn={()=>{}} sessionActions="旧账号"/>);
+  await waitFor(()=>expect(reads).toBe(1));view.rerender(<LeadIntakeApplication session={testSession(2)} api={api} recovery={recovery} onReturn={()=>{}} sessionActions="新账号"/>);
+  await screen.findByText("来源：新账号来源");completeOld(reply("旧账号来源"));
+  await waitFor(()=>expect(screen.queryByText("来源：旧账号来源")).toBeNull());expect(screen.getByText("来源：新账号来源")).toBeVisible();
+});
 it("saves independent names and shows confirmed capture without inventing a follow-up task", async () => {
   const { requests } = setup(), user = interaction;
   await screen.findByLabelText("联系人");

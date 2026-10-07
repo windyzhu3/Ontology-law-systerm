@@ -24,6 +24,7 @@ class LeadIntakeSourcesHttpIT extends R1HttpFixture {
             assertEquals(200,response.statusCode(),response.body());
             assertEquals("no-store",response.headers().firstValue("Cache-Control").orElseThrow());
             assertEquals(List.of(Map.of("sourceAccountCode","FIXTURE","displayName","客户转介绍","sourceChannelCode","MANUAL","serviceCategoryCode","CONSULTATION","jurisdictionCode","CN","urgencyCode","NORMAL")),http.body(response).get("sources"));
+            assertFalse(http.body(response).containsKey("sourceSelection"));
             assertEquals(before,counts());
             var malformed = http.request("GET",PATH,null,Map.of("X-Appointment-Id","not-a-uuid"));
             assertEquals(400,malformed.statusCode(),malformed.body());
@@ -50,6 +51,7 @@ class LeadIntakeSourcesHttpIT extends R1HttpFixture {
             var before=counts();var response=http.request("GET",PATH,null,Map.of());
             assertEquals(200,response.statusCode(),response.body());
             assertEquals(1,((List<?>)http.body(response).get("sources")).size());
+            assertEquals("BOUND_TO_PRINCIPAL",http.body(response).get("sourceSelection"));
             assertFalse(response.body().contains("其他来源"));assertEquals(before,counts());
             var leadCount=scalar("select count(*) from lead.lead where tenant_id=?",seed.tenant());
             var taskCount=scalar("select count(*) from responsibility.task_occurrence where tenant_id=?",seed.tenant());

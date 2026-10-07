@@ -8,6 +8,11 @@ import org.springframework.core.env.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class LeadIntakeConfigurationTest {
+    @Test void absent_source_mode_is_omitted_without_loosening_other_fields() throws Exception {
+        var mapper=tools.jackson.databind.json.JsonMapper.builder().addModule(R1JsonConfiguration.oneOfModule()).build();
+        var model=R1WireModels.model(Map.of("sources",List.of()),io.github.windyzhu3.ontologylaw.api.adapter.generated.model.LeadIntakeSourcesV1.class);
+        assertEquals("{\"sources\":[]}",mapper.writeValueAsString(model));
+    }
     @Test void deployment_binds_human_source_by_exact_tenant_and_principal() {
         var tenant=UUID.randomUUID();var principal=UUID.randomUUID();var values=new HashMap<String,Object>();
         values.put("ols.api.node","TEST");

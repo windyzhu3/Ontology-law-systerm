@@ -6,13 +6,16 @@ import { uuidPattern, type RecoveryStore } from "../session/recoveryMarker";
 import { provenWriteOutcome } from "../session/recoveryOutcome";
 export type LeadCaptureWrite = { key: string; body: components["schemas"]["CaptureLeadV1"] };
 type IntakeSource = components["schemas"]["LeadIntakeSourceV1"];
-function sourceList(value: unknown): IntakeSource[] {
+export type SourceSelection="BOUND_TO_PRINCIPAL" | "SELECTABLE";
+function sourceList(value: unknown): {sources:IntakeSource[];sourceSelection:SourceSelection} {
   const invalid = () => new Error("来源信息暂时不可用，请刷新后重试。");
-  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).length !== 1 || !("sources" in value)
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key=>key!=="sources"&&key!=="sourceSelection") || !("sources" in value)
     || !Array.isArray(value.sources) || value.sources.length > 50) throw invalid();
+  const selection="sourceSelection" in value?value.sourceSelection:"SELECTABLE";
+  if(selection!=="BOUND_TO_PRINCIPAL"&&selection!=="SELECTABLE"||selection==="BOUND_TO_PRINCIPAL"&&value.sources.length>1)throw invalid();
   const codes = ["sourceAccountCode", "sourceChannelCode", "serviceCategoryCode", "jurisdictionCode", "urgencyCode"];
   const accounts = new Set<string>(), names = new Set<string>();
-  return value.sources.map((item: unknown) => {
+  const sources=value.sources.map((item: unknown) => {
     if (!item || typeof item !== "object" || Array.isArray(item)) throw invalid();
     const fields = item as Record<string, unknown>;
     if (Object.keys(fields).length !== 6 || codes.some(key => typeof fields[key] !== "string" || !(key === "sourceAccountCode" ? /^[A-Za-z][A-Za-z0-9_]{0,63}$/ : /^[A-Z][A-Z0-9_]{0,63}$/).test(fields[key] as string))
@@ -22,6 +25,7 @@ function sourceList(value: unknown): IntakeSource[] {
     accounts.add(source.sourceAccountCode); names.add(source.displayName);
     return { ...source };
   });
+  return {sources,sourceSelection:selection};
 }
 /** Uses the existing capture command and shared unresolved-write guard; never stores lead body in browser storage. */
 export function createLeadIntakeApi(recovery: RecoveryStore, fetcher?: (request: Request) => Promise<Response>, baseUrl = window.location.origin) {
