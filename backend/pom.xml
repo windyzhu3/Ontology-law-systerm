@@ -158,6 +158,12 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource><directory>src/main/resources</directory></resource>
+      <!-- Controlled Linux builder supplies these inputs before native packaging.
+           The default directory is absent in ordinary development builds. -->
+      <resource><directory>${ols.build.resources}</directory><filtering>false</filtering></resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
