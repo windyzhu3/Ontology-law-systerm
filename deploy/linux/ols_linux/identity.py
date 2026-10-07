@@ -9,7 +9,7 @@ import secrets
 import tarfile
 import time
 import uuid
-from urllib.parse import urlencode
+from urllib.parse import urlencode,urlsplit
 from . import journal, runtime, database
 from .config import canonical, digest
 from .bundle import sha
@@ -42,7 +42,8 @@ def _new_plan(root, config, password):
     for key in ['pod','identity']:
         if runtime.inspect('container',name+'-'+key):raise RuntimeError('Existing named runtime is not adopted')
     realm=name;spa=name+'-spa';audience=name+'-api';directory=name+'-directory'
-    origin='https://localhost:'+str(ports['entry']);issuer='https://localhost:'+str(ports['identity'])+'/realms/'+realm
+    from .public_runtime import origins
+    public=origins(resources,ports);origin=public['origin'];issuer=public['identityOrigin']+'/realms/'+realm
     values={'IDENTITY_REALM':realm,'SPA_CLIENT_ID':spa,'SPA_REDIRECT_URI':origin+'/auth/callback',
         'SPA_ORIGIN':origin,'SPA_LOGOUT_REDIRECT_URI':origin+'/login','API_AUDIENCE':audience,'DIRECTORY_CLIENT_ID':directory}
     template=(repo/'deploy/identity/realm-template.json').read_text(encoding='utf-8')
@@ -72,7 +73,7 @@ def _new_plan(root, config, password):
     if lock['version']!='26.7.3' or not re.fullmatch('sha256:[a-f0-9]{64}',image_digest):raise RuntimeError('Reviewed identity image required')
     plan={'version':1,'operationId':op['operationId'],'instanceId':op['instanceId'],'tenantId':str(uuid.uuid4()),'configDigest':digest(config),
         'initialPasswordDigest':digest({'value':password}),'subjects':subjects,'marker':marker,'realm':realm,
-        'issuer':issuer,'origin':origin,'apiOrigin':'https://localhost:'+str(ports['api']),
+        'issuer':issuer,'origin':origin,'apiOrigin':public['apiOrigin'],
         'spaClient':spa,'audience':audience,'directoryClient':directory,'ports':ports,'runtimeImage':image,
         'keycloakImage':lock['image']+'@'+image_digest,'pod':name+'-pod','identity':name+'-identity'}
     runtime.private_file(root/'identity/realm.json',canonical(representation))
@@ -172,7 +173,10 @@ def _start(root, plan):
     actual=runtime.owned(root,'container',plan['identity'])
     if not actual['State']['Running']:
         # Recopy only the original sealed import/secret bytes into the registered stopped container.
-        _copy_files(plan['identity'],'/opt/keycloak/conf',{**{name:(root/'certs'/name).read_bytes() for name in ['ca.pem','server.crt','server.key']},
+        public=bool(resources.get('publicTlsHashes'))
+        _copy_files(plan['identity'],'/opt/keycloak/conf',{'ca.pem':(root/'certs/ca.pem').read_bytes(),
+            'server.crt':(root/'certs'/('public.crt' if public else 'server.crt')).read_bytes(),
+            'server.key':(root/'certs'/('public.key' if public else 'server.key')).read_bytes(),
             'db-password':(root/'secrets/identity-app.txt').read_bytes()})
         _copy_files(plan['identity'],'/opt/keycloak/data/import',{plan['realm']+'-realm.json':(root/'identity/realm.json').read_bytes()})
         runtime.run(['docker','start',plan['identity']])
@@ -200,7 +204,12 @@ def http_helper(root):
 
 def http(root, url, *, method='GET', headers=None, body=None, client_certificate=False):
     plan=journal._read(root,root/'identity/plan.json');runtime.owned(root,'container',plan['pod'])
-    request={'url':url,'method':method,'headers':headers or {},'body':body,'ca':str(root/'certs/ca.pem')}
+    allowed=list({urlsplit(plan[name]).scheme+'://'+urlsplit(plan[name]).netloc for name in ('origin','issuer','apiOrigin')})
+    parsed=urlsplit(url)
+    if parsed.scheme!='https' or parsed.username or parsed.password or parsed.scheme+'://'+parsed.netloc not in allowed:
+        raise RuntimeError('Only the original registered HTTPS origins are allowed')
+    request={'url':url,'method':method,'headers':headers or {},'body':body,'allowedOrigins':allowed,
+             'ca':str(root/('certs/http-trust.pem' if runtime.load(root).get('publicTlsHashes') else 'certs/ca.pem'))}
     if client_certificate:
         request.update(certificate=str(root/'certs/service.crt'),privateKey=str(root/'certs/service.key'))
     result=runtime.run(['docker','exec','-i',plan['pod'],'node',http_helper(root)],canonical(request),timeout=25)

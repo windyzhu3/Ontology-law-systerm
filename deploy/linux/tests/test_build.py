@@ -17,6 +17,8 @@ class BuildTests(unittest.TestCase):
                 self.assertEqual(module.completion(root,'a'*40,0,0)['version'],2)
                 self.assertTrue(describe.call_args.kwargs.get('include_runtime'),
                     'Native releases must seal the executable helper, template and runtime payload')
+                self.assertEqual(json.loads((root/'release.json').read_text()),{'version':2},
+                    'A successful native build must be directly usable by the publication entry')
 
     def module(self):
         try:

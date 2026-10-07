@@ -7,6 +7,14 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 
 
 class AssemblyTests(unittest.TestCase):
+    def test_old_native_foundation_uses_the_static_service_role_without_new_ddl(self):
+        module=self.module()
+        value={'tenantId':'00000000-0000-4000-8000-000000000001','principalId':'00000000-0000-4000-8000-000000000002','appointmentId':'00000000-0000-4000-8000-000000000003','roleId':'00000000-0000-4000-8000-000000000020','grants':{code:'00000000-0000-4000-8000-'+str(i).zfill(12) for i,code in enumerate(module.SERVICE_CODES,4)}}
+        statement=module.service_statement(value,'a'*64,schema_version='52-plus-2-r2-v20')
+        self.assertNotIn('appointment_role',statement);self.assertNotIn('CREATE TABLE',statement)
+        self.assertIn("'CONTACT_OPERATOR'",statement);self.assertIn("'SERVICE','LINUX_SERVICE'",statement)
+        with self.assertRaises(RuntimeError):module.service_statement(value,'a'*64,schema_version='52-plus-2-r2-v21')
+
     def module(self):
         try:return importlib.import_module('ols_linux.assembly')
         except ImportError:self.fail('Native bootstrap and API assembly missing')

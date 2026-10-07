@@ -90,12 +90,13 @@ def _advance(root: Path,op: dict,inputs: dict) -> dict:
             observed=database.verify_schema(root)
             if observed['history']!=cp['observed']['history'] or not _same_gate(observed['gate'],cp['observed']['gate']):raise RuntimeError('Same-schema publication gate or history changed')
         else:
+            sources={'source':Path(inputs['bundleDirectory'])} if inputs['descriptor'].get('version')==2 else {}
             target=reconcile_migrations(cp['observed']['history'],cp['observed']['gate'],database.observe(root))
             if target!='1080':
-                database.flyway(root,operation_id,'validate')
-                database.flyway(root,operation_id,'migrate')
-            database.flyway(root,operation_id,'validate')
-            observed=database.verify_schema(root)
+                database.flyway(root,operation_id,'validate',**sources)
+                database.flyway(root,operation_id,'migrate',**sources)
+            database.flyway(root,operation_id,'validate',**sources)
+            observed=database.verify_schema(root,**sources)
             reconcile_migrations(cp['observed']['history'],cp['observed']['gate'],observed)
         checkpoint.assert_preserved(cp['businessFacts'],checkpoint.table_facts(root))
         journal.record(root,operation_id,{'phase':'SCHEMA_VERIFIED','gate':observed['gate']})
@@ -106,6 +107,9 @@ def _advance(root: Path,op: dict,inputs: dict) -> dict:
         journal.record(root,operation_id,{'phase':'BUNDLE_INSTALLED','descriptorDigest':inputs['descriptor']['descriptorDigest']})
         phase='BUNDLE_INSTALLED'
     if phase in {'BUNDLE_INSTALLED','ACTIVATION_UNKNOWN','ACTIVATION_FAILED','RUNTIME_VERIFIED','INGRESS_OPEN'}:
+        if phase=='BUNDLE_INSTALLED' and inputs['descriptor'].get('version')==2:
+            from .deployment import bind_release
+            bind_release(root,inputs['descriptor'])
         return _activate(root,operation_id,inputs)
     raise RuntimeError('Original operation requires explicit reconciliation of its recorded phase')
 
@@ -216,8 +220,8 @@ def _publish_same_schema(root: Path,bundle_dir: Path,descriptor: dict) -> dict:
     return resume(root,op['operationId'])
 
 
-def _activate(root: Path,operation_id: str,inputs: dict) -> dict:
-    descriptor=inputs['descriptor'];activation_file=root/'operations'/(operation_id+'-activation.json')
+def _activate(root: Path,operation_id: str,inputs: dict, *, restored=False) -> dict:
+    descriptor=inputs['descriptor'];activation_file=root/'operations'/(operation_id+('-restored-activation.json' if restored else '-activation.json'))
     journal.record(root,operation_id,{'phase':'ACTIVATION_UNKNOWN','descriptorDigest':descriptor['descriptorDigest']})
     if not (root/'launch.json').exists():raise RuntimeError('Prepared native Linux runtime configuration unavailable; ingress stays closed')
     launch=journal._read(root,root/'launch.json')
@@ -361,8 +365,76 @@ def restore_checkpoint(root: Path,source_operation_id: str,value: dict) -> dict:
         journal.record(root,operation_id,{'phase':'RESTORE_ASSETS_UNKNOWN','checkpointDigest':cp_digest})
         _restore_assets(root,directory,operation_id,value)
         _assert_restored(root,value)
+        if (root/'launch.json').exists():_restore_runtime_registry(root)
         journal.record(root,operation_id,{'phase':'RESTORED_MAINTENANCE','checkpointDigest':cp_digest,'gate':value['observed']['gate']})
         return {'status':'RESTORED_MAINTENANCE','operationId':operation_id,'schemaVersion':value['observed']['gate']['schema_contract_version']}
+
+
+def _restore_runtime_registry(root: Path):
+    current=journal._read(root,root/'current-release.json');launch=journal._read(root,root/'launch.json')
+    directory=Path(current['directory']);descriptor=current['descriptor']
+    if directory.resolve()!=directory.absolute() or not directory.is_relative_to(root/'releases') or launch['descriptorDigest']!=descriptor['descriptorDigest']:
+        raise RuntimeError('Restored release or launch does not belong to this instance')
+    bundle.verify(descriptor,directory)
+    resources=runtime.load(root);known=set(resources['containers'].values())|set(resources['writers'])
+    if any(e['name'] not in known or e['name'] not in resources['writers'] for e in launch['containers']):
+        raise RuntimeError('Restored writer was never registered; it is not adopted')
+    ingress=launch.get('ingress')
+    if ingress and ingress['name'] not in resources['containers'].values():raise RuntimeError('Restored ingress was never registered')
+    for entry in launch['containers']:resources['containers'][entry['role']]=entry['name']
+    resources['repo']=str(directory);resources['ingress']=ingress['name'] if ingress else None
+    if ingress:resources['containers']['entry']=ingress['name']
+    runtime.save(root,resources)
+
+
+def health(root: Path) -> dict:
+    from . import verify
+    with journal.locked(root) as root:
+        current=journal._read(root,root/'current-release.json')
+        bundle.verify(current['descriptor'],Path(current['directory']))
+        return {'operationId':journal.current(root)['operationId'],'status':'PASS',
+                'runtime':verify.runtime_ready(root,current['descriptor']),'ingress':verify.ingress_ready(root,current['descriptor'])}
+
+
+def stop(root: Path) -> dict:
+    with journal.locked(root) as root:
+        op=journal.current(root)
+        if op['phase'] not in {'COMPLETE','STOP_REQUESTED','WRITERS_STOPPED','STOPPED'}:
+            raise RuntimeError('Pending publication or restore must use its original continuation')
+        current=journal._read(root,root/'current-release.json')
+        bundle.verify(current['descriptor'],Path(current['directory']))
+        path=root/'operations'/(op['operationId']+'-manual-stop.json')
+        record={'operationId':op['operationId'],'descriptorDigest':current['descriptor']['descriptorDigest']}
+        if path.exists() and journal._read(root,path)!=record:raise RuntimeError('Original stopped release changed')
+        if not path.exists():journal._write(root,path,record)
+        journal.record(root,op['operationId'],{'phase':'STOP_REQUESTED'})
+        runtime.stop_writers(root,op['operationId'])
+        journal.record(root,op['operationId'],{'phase':'STOPPED'})
+        return {'operationId':op['operationId'],'phase':'STOPPED','ingress':'CLOSED','writers':'OBSERVED_STOPPED'}
+
+
+def start(root: Path) -> dict:
+    with journal.locked(root) as root:
+        op=journal.current(root);restored=False
+        if (root/'restore-plan.json').exists() and op['phase'] in {'RESTORED_MAINTENANCE','ACTIVATION_UNKNOWN','ACTIVATION_FAILED'}:
+            plan=journal._read(root,root/'restore-plan.json')
+            if plan['operationId']!=op['operationId']:raise RuntimeError('Start belongs to another restore')
+            value=checkpoint.verified(root,plan['sourceOperationId'])
+            if digest(value)!=plan['checkpointDigest']:raise RuntimeError('Linked original restore changed')
+            if op['phase']=='RESTORED_MAINTENANCE':_assert_restored(root,value)
+            _restore_runtime_registry(root);restored=True
+        elif op['phase'] not in {'COMPLETE','STOP_REQUESTED','WRITERS_STOPPED','STOPPED'}:
+            raise RuntimeError('Unknown publication phase cannot start writers')
+        current=journal._read(root,root/'current-release.json')
+        descriptor=current['descriptor'];bundle.verify(descriptor,Path(current['directory']))
+        if not restored:
+            _installed(root,database.observe(root)['gate'])
+            if database.observe(root)['gate']['operating_mode']!='ACTIVE':raise RuntimeError('Manual start cannot change the deployment gate')
+            if op['phase']!='COMPLETE':
+                saved=journal._read(root,root/'operations'/(op['operationId']+'-manual-stop.json'))
+                if saved!={'operationId':op['operationId'],'descriptorDigest':descriptor['descriptorDigest']}:
+                    raise RuntimeError('Exact originally stopped release required')
+        return _activate(root,op['operationId'],{'descriptor':descriptor},restored=restored)
 
 
 def _assert_restored(root: Path,value: dict, *, containers=None,assets=True):

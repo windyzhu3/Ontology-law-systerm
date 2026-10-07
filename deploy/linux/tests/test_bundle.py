@@ -13,6 +13,16 @@ sys.path.insert(0, str(LINUX))
 
 
 class BundleTest(unittest.TestCase):
+    def test_exact_legacy_payload_can_be_verified_without_admitting_v21(self):
+        sys.path.insert(0,str(LINUX/'verification'))
+        from fixtures.bundles import create
+        descriptor=create(REPO,self.root/'legacy','v20')
+        self.m.verify(descriptor,self.root/'legacy')
+        manifest=self.root/'legacy'/self.m.GENERATED/'schema-contract-manifest.json'
+        value=json.loads(manifest.read_text(encoding='utf-8'));value['contractVersion']='52-plus-2-r2-v21'
+        manifest.write_text(json.dumps(value),encoding='utf-8')
+        with self.assertRaises(RuntimeError):self.m.verify(descriptor,self.root/'legacy')
+
     def setUp(self):
         self.assertTrue((LINUX / 'ols_linux/bundle.py').is_file(), 'release descriptor missing')
         self.m = importlib.import_module('ols_linux.bundle')

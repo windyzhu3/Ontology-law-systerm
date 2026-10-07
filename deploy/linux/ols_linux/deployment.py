@@ -96,6 +96,8 @@ def bind_release(root,descriptor):
         entry={'dist':str(directory/descriptor['spa']),'hostHeader':urlsplit(plan['origin']).netloc,'apiOrigin':plan['apiOrigin'],
             'identityOrigin':plan['issuer'].split('/realms/')[0],'ca':str(root/'certs/ca.pem'),'certificate':str(root/'certs/server.crt'),
             'privateKey':str(root/'certs/server.key'),'spaFiles':descriptor['spaFiles'],'port':plan['ports']['entry']}
+        if resources.get('publicTlsHashes'):
+            entry.update(ca=str(root/'certs/http-trust.pem'),certificate=str(root/'certs/public.crt'),privateKey=str(root/'certs/public.key'))
         files={config_dir/'api.properties':property_bytes(api),config_dir/'worker.properties':property_bytes(worker),config_dir/'entry.json':canonical(entry)}
         file_hashes={str(path.relative_to(root)):hashlib.sha256(data).hexdigest() for path,data in files.items()}
         record={'descriptorDigest':descriptor['descriptorDigest'],'files':file_hashes,'names':names,'originalIdentityPlanDigest':digest(plan),'originalServiceDigest':digest(service)}
@@ -193,7 +195,7 @@ def verify_ready(root,descriptor):
             actual[role]=value
         log=runtime.run(['docker','logs','--since',actual['worker']['State']['StartedAt'],entries['worker']['name']])
         worker=worker_ready((log.stdout+log.stderr).decode('utf-8','replace'))
-        ping="const net=require('net');let b='';const s=net.connect(3310,process.argv[1],()=>s.write('nPING\\0'));s.setTimeout(3000,()=>s.destroy());s.on('data',d=>{b+=d; if(b.includes('PONG')){s.end();process.exit(0);}});s.on('error',()=>process.exit(1));s.on('close',()=>process.exit(b.includes('PONG')?0:1));"
+        ping=r"const net=require('net');let b='';const s=net.connect(3310,process.argv[1],()=>s.write('zPING\0'));s.setTimeout(3000,()=>s.destroy());s.on('data',d=>{b+=d; if(b.includes('PONG')){s.end();process.exit(0);}});s.on('error',()=>process.exit(1));s.on('close',()=>process.exit(b.includes('PONG')?0:1));"
         scanner=runtime.run(['docker','exec',plan['pod'],'node','-e',ping,entries['scanner']['name']],check=False,timeout=6).returncode==0
         try:
             discovery=identity.http(root,plan['issuer']+'/.well-known/openid-configuration')

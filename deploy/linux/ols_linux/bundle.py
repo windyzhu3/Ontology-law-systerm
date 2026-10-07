@@ -30,7 +30,7 @@ def describe(repo: Path, jar: Path, spa: Path, commit: str, *, include_runtime=F
     if jar.is_symlink() or not jar.is_file() or not zipfile.is_zipfile(jar): raise RuntimeError('Executable application JAR required')
     manifest = repo / GENERATED / 'schema-contract-manifest.json'
     value = json.loads(manifest.read_text(encoding='utf-8'))
-    if value['contractVersion'] != '52-plus-2-r2-v22': raise RuntimeError('This bundle builder requires the reviewed v22 contract')
+    if value['contractVersion'] not in {'52-plus-2-r2-v20','52-plus-2-r2-v22'}: raise RuntimeError('Only the frozen v20 baseline or reviewed v22 target is supported')
     with zipfile.ZipFile(jar) as z:
         try:
             embedded = z.read('BOOT-INF/classes/schema-contract/schema-contract-manifest.json')
@@ -47,10 +47,11 @@ def describe(repo: Path, jar: Path, spa: Path, commit: str, *, include_runtime=F
     if proof != {'commit':commit, 'jarExitCode':0, 'spaExitCode':0, 'jarSha256':sha(jar), 'spaFiles':tree}:
         raise RuntimeError('Build failed or artifacts differ from their recorded build')
     migrations = inventory(repo / GENERATED / 'db/migration')
-    if len(migrations) != 43 or any(value['generatedArtifactSha256'].get('db/migration/' + name) != hash_value for name, hash_value in migrations.items()):
+    successors={'V1070__configurable_appointment_roles.sql','V1080__metadata_comments.sql'} if value['contractVersion']=='52-plus-2-r2-v22' else set()
+    if len(migrations) != 41+len(successors) or any(value['generatedArtifactSha256'].get('db/migration/' + name) != hash_value for name, hash_value in migrations.items()):
         raise RuntimeError('Generated migration inventory does not match the manifest')
     frozen = json.loads((Path(__file__).resolve().parents[1] / 'config/v20-migration-hashes.json').read_text(encoding='utf-8'))
-    if len(frozen) != 41 or any(migrations.get(name) != expected for name, expected in frozen.items()) or set(migrations) - set(frozen) != {'V1070__configurable_appointment_roles.sql','V1080__metadata_comments.sql'}:
+    if len(frozen) != 41 or any(migrations.get(name) != expected for name, expected in frozen.items()) or set(migrations) - set(frozen) != successors:
         raise RuntimeError('Reviewed v20 prefix or two successor migrations differ')
     paths = [manifest, jar, proof_path, *[repo / lock for lock in LOCKS]]
     config_dir = repo / 'deploy/linux/config'

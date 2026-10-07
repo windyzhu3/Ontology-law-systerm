@@ -4,7 +4,7 @@ import fs from 'node:fs';
 let input='';for await(const chunk of process.stdin)input+=chunk;
 try {
   const value=JSON.parse(input);const url=new URL(value.url);
-  if(url.protocol!=='https:'||url.hostname!=='localhost')throw Error('Controlled localhost HTTPS only');
+  if(url.protocol!=='https:'||url.username||url.password||!Array.isArray(value.allowedOrigins)||!value.allowedOrigins.includes(url.origin))throw Error('Original registered HTTPS origins only');
   const response=await new Promise((resolve,reject)=>{
     if(Boolean(value.certificate)!==Boolean(value.privateKey))throw Error('Paired client TLS files required');
     const client=value.certificate?{cert:fs.readFileSync(value.certificate),key:fs.readFileSync(value.privateKey)}:{};

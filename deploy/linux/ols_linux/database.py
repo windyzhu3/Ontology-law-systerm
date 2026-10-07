@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import re
 import zlib
-from . import journal,runtime
+from . import bundle,journal,runtime
 from .bundle import inventory,sha,GENERATED
 
 
@@ -17,10 +17,23 @@ def verify_sources(repo: Path):
     manifest=json.loads((repo/GENERATED/'schema-contract-manifest.json').read_text())
     actual=inventory(repo/GENERATED/'db/migration')
     frozen=json.loads((Path(__file__).resolve().parents[1]/'config/v20-migration-hashes.json').read_text())
-    if len(actual)!=43 or any(manifest['generatedArtifactSha256'].get('db/migration/'+n)!=v for n,v in actual.items()):
+    version=manifest['contractVersion']
+    successor={'V1070__configurable_appointment_roles.sql','V1080__metadata_comments.sql'} if version=='52-plus-2-r2-v22' else set()
+    if version not in {'52-plus-2-r2-v20','52-plus-2-r2-v22'} or len(actual)!=41+len(successor) or any(manifest['generatedArtifactSha256'].get('db/migration/'+n)!=v for n,v in actual.items()):
         raise RuntimeError('Migration bytes differ from the reviewed manifest')
-    if any(actual.get(n)!=v for n,v in frozen.items()) or set(actual)-set(frozen)!={'V1070__configurable_appointment_roles.sql','V1080__metadata_comments.sql'}:
+    if any(actual.get(n)!=v for n,v in frozen.items()) or set(actual)-set(frozen)!=successor:
         raise RuntimeError('Frozen migration prefix differs')
+
+
+def source_directory(root: Path, candidate: Path|None=None) -> Path:
+    if candidate is None:return Path(runtime.load(root)['repo'])
+    candidate=Path(candidate).absolute();op=journal.current(root)
+    if op['kind']!='upgrade':raise RuntimeError('Candidate SQL source requires the original upgrade')
+    inputs=journal._read(root,root/'operations'/(op['operationId']+'-inputs.json'))
+    if candidate.resolve()!=candidate or str(candidate)!=inputs['bundleDirectory'] or inputs['descriptor']['descriptorDigest']!=op['configDigest']:
+        raise RuntimeError('Only the exact original sealed upgrade SQL source is accepted')
+    bundle.verify(inputs['descriptor'],candidate)
+    return candidate
 
 
 def migration_checksums(repo: Path,target=None) -> dict:
@@ -73,11 +86,11 @@ def roles(root: Path, operation_id: str):
         journal.record(root,operation_id,{'phase':'ROLES_READY'})
 
 
-def flyway(root: Path, operation_id: str, action: str, target: str|None=None) -> dict:
+def flyway(root: Path, operation_id: str, action: str, target: str|None=None, *, source: Path|None=None) -> dict:
     if action not in {'validate','migrate'} or target not in {None,'1060','1070','1080'}:
         raise ValueError('Only controlled validation and reviewed forward targets are allowed')
     with journal.locked(root) as root:
-        operation=journal.read(root,operation_id);resources=runtime.load(root);repo=Path(resources['repo'])
+        operation=journal.read(root,operation_id);resources=runtime.load(root);repo=source_directory(root,source)
         verify_sources(repo)
         if operation['kind'] not in {'initialize','upgrade'}:raise RuntimeError('Migration is not a byte publication')
         if operation['kind']=='upgrade' and operation['phase'] not in {'CHECKPOINT_VERIFIED','MIGRATION_UNKNOWN','MIGRATED','SCHEMA_VERIFIED'}:
@@ -135,8 +148,8 @@ def runtime_logins(root: Path, operation_id: str):
         journal.record(root,operation_id,{'phase':'APPLICATION_LOGINS_READY'})
 
 
-def verify_schema(root: Path, target='1080', *, assert_role_boundaries=True) -> dict:
-    resources=runtime.load(root);repo=Path(resources['repo']);observed=observe(root)
+def verify_schema(root: Path, target='1080', *, assert_role_boundaries=True, source: Path|None=None) -> dict:
+    repo=source_directory(root,source);observed=observe(root)
     history=observed['history'];versions=[r['version'] for r in history if r['version']]
     if versions!=expected_versions(repo,target) or not all(r['success'] for r in history):raise RuntimeError('Unexpected Flyway history')
     verify_sources(repo);verify_history(repo,history,target)

@@ -21,7 +21,7 @@ assert.equal(plan.instanceId,owner.instanceId);
 const input=JSON.parse(fs.readFileSync(path.join(root,'identity/browser-input.json')));
 const initial=fs.readFileSync(input.initialPasswordFile,'utf8').trim();
 const save=(name,value)=>fs.writeFileSync(path.join(root,'identity',name),JSON.stringify(value),{mode:0o600});
-const ca=fs.readFileSync(path.join(root,'certs/ca.pem'));
+const ca=fs.readFileSync(path.join(root,fs.existsSync(path.join(root,'certs/http-trust.pem'))?'certs/http-trust.pem':'certs/ca.pem'));
 async function request(url,method='GET',body,headers={}){
   return new Promise((resolve,reject)=>{const req=https.request(url,{method,headers,ca,minVersion:'TLSv1.3',rejectUnauthorized:true,timeout:15000},res=>{
     const chunks=[];res.on('data',c=>chunks.push(c));res.on('end',()=>resolve({status:res.statusCode,body:Buffer.concat(chunks).toString('utf8')}));

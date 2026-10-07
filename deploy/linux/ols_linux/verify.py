@@ -76,7 +76,10 @@ def initialization(root: Path,config: dict) -> dict:
 
 def runtime_ready(root: Path,descriptor: dict) -> dict:
     with journal.locked(root) as root:
-        plan=journal._read(root,root/'identity/plan.json');observed=database.verify_schema(root,assert_role_boundaries=False)
+        plan=journal._read(root,root/'identity/plan.json')
+        target={'52-plus-2-r2-v20':'1060','52-plus-2-r2-v22':'1080'}.get(descriptor['schemaVersion'])
+        if target is None:raise RuntimeError('Only a complete supported release can qualify health')
+        observed=database.verify_schema(root,target,assert_role_boundaries=False)
         gate=observed['gate']
         if gate['operating_mode']!='ACTIVE' or gate['active_release_digest']!=descriptor['files'][descriptor['jar']] or gate['active_manifest_hash']!=descriptor['manifestHash']:raise RuntimeError('Actual active release gate differs')
         from .deployment import verify_ready

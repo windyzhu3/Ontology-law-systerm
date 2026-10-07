@@ -9,6 +9,35 @@ sys.path.insert(0,str(LINUX))
 
 
 class ReleaseTest(unittest.TestCase):
+    def test_manual_start_refuses_unknown_phase_before_launching_any_writer(self):
+        from ols_linux import journal,runtime
+        self.assertTrue(callable(getattr(self.m,'start',None)), 'Qualified manual start missing')
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'runtime';journal.begin(root,'initialize','a'*64)
+            with patch.object(runtime,'start_internal') as launch:
+                with self.assertRaises(RuntimeError):self.m.start(root)
+                launch.assert_not_called()
+
+    def test_restore_registry_reselects_only_previously_registered_old_containers(self):
+        from ols_linux import journal,runtime,bundle
+        self.assertTrue(callable(getattr(self.m,'_restore_runtime_registry',None)), 'Linked restore runtime binding missing')
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'runtime';journal.begin(root,'initialize','a'*64)
+            old=root/'releases'/('a'*64);old.mkdir(parents=True)
+            journal._write(root,root/'current-release.json',{'directory':str(old),'descriptor':{'descriptorDigest':'a'*64}})
+            journal._write(root,root/'launch.json',{'descriptorDigest':'a'*64,'containers':[{'role':'api','name':'old-api'}],
+                'ingress':{'name':'old-entry'}})
+            resources={'containers':{'api':'new-api','retainedapi':'old-api','entry':'new-entry','retainedentry':'old-entry'},
+                       'writers':['old-api','new-api'],'repo':str(root/'new'),'ingress':'new-entry'}
+            with patch.object(runtime,'load',return_value=resources),patch.object(runtime,'save') as save,patch.object(bundle,'verify'):
+                self.m._restore_runtime_registry(root)
+                self.assertEqual(resources['repo'],str(old));self.assertEqual(resources['containers']['api'],'old-api')
+                self.assertEqual(resources['ingress'],'old-entry');save.assert_called_once()
+            resources['containers'].pop('retainedapi');resources['containers']['api']='new-api';resources['writers']=['new-api']
+            with patch.object(runtime,'load',return_value=resources),patch.object(runtime,'save') as save,patch.object(bundle,'verify'):
+                with self.assertRaises(RuntimeError):self.m._restore_runtime_registry(root)
+                save.assert_not_called()
+
     def setUp(self):
         self.assertTrue((LINUX/'ols_linux/release.py').is_file(),'Journaled migration capability missing')
         self.m=importlib.import_module('ols_linux.release')

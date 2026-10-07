@@ -52,6 +52,9 @@ chmod 600 certs/*
         runtime.run(['docker','run','--rm','--label',runtime.LABEL+'='+plan['instanceId'],'--mount',f'type=bind,source={root},target={root}','--entrypoint','keytool',plan['runtimeImage'],
             '-importcert','-noprompt','-alias','ols-ca','-file',root/'certs/ca.pem','-keystore',trust,'-storetype','PKCS12','-storepass:file',root/'secrets/trust-password.txt'])
         trust.chmod(0o600)
+        if resources.get('publicTlsHashes'):
+            runtime.run(['docker','run','--rm','--label',runtime.LABEL+'='+plan['instanceId'],'--mount',f'type=bind,source={root},target={root}','--entrypoint','keytool',plan['runtimeImage'],
+                '-importcert','-noprompt','-alias','ols-public-ca','-file',root/'certs/public-ca.pem','-keystore',trust,'-storetype','PKCS12','-storepass:file',root/'secrets/trust-password.txt'])
     names=['certs/server.p12','certs/service.key','certs/service.crt','certs/service.p12','certs/service-public.pem','certs/identity-trust.p12']
     journal._write(root,path,{name:bundle.sha(root/name) for name in names})
 
@@ -64,7 +67,9 @@ def migration_complete(repo,history):
     return versions==expected
 
 
-def _schema(root,opid):
+def _schema(root,opid,schema_version='52-plus-2-r2-v22'):
+    target={'52-plus-2-r2-v20':'1060','52-plus-2-r2-v22':'1080'}.get(schema_version)
+    if target is None:raise RuntimeError('Only the frozen v20 foundation or reviewed v22 initialization is supported')
     path=root/'assembly/schema.json'
     if not path.exists():
         if database.observe(root)['history'] or database.sql(root,"SELECT count(*) FROM pg_roles WHERE rolname IN ('law_schema_migrator','law_api_login','law_worker_login')")!='0':raise RuntimeError('Existing unregistered application database is not adopted')
@@ -74,8 +79,8 @@ def _schema(root,opid):
     if count=='0':database.roles(root,opid)
     elif count!='5' or database.sql(root,"SELECT count(*) FROM pg_roles WHERE rolname IN ('law_schema_migrator','law_app_command','law_app_query','law_app_worker','law_audit_append') AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolinherit")!='5':raise RuntimeError('Original migration role attributes differ')
     history=database.observe(root)['history']
-    if not migration_complete(Path(runtime.load(root)['repo']),history):database.flyway(root,opid,'migrate')
-    database.flyway(root,opid,'validate');database.verify_schema(root)
+    if not migration_complete(Path(runtime.load(root)['repo']),history):database.flyway(root,opid,'migrate',target)
+    database.flyway(root,opid,'validate',target);database.verify_schema(root,target)
     count=database.sql(root,"SELECT count(*) FROM pg_roles WHERE rolname IN ('law_api_login','law_worker_login')")
     if count=='0':database.runtime_logins(root,opid)
     elif count!='2' or database.sql(root,"SELECT count(*) FROM pg_roles WHERE rolname IN ('law_api_login','law_worker_login') AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolinherit")!='2':raise RuntimeError('Original application login attributes differ')
@@ -90,7 +95,7 @@ def bootstrap(root: Path,config: dict,descriptor: dict,directory: Path) -> dict:
         if path.exists() and journal._read(root,path)!=descriptor:raise RuntimeError('Original bootstrap release changed')
         if not path.exists():journal._write(root,path,descriptor)
         installed=release._install_bundle(root,directory,descriptor)
-        _schema(root,op['operationId']);values=_secrets(root);_tls(root,plan)
+        _schema(root,op['operationId'],descriptor['schemaVersion']);values=_secrets(root);_tls(root,plan)
         gate_path=root/'assembly/initial-gate.json'
         if not gate_path.exists():
             before=database.observe(root)['gate']
@@ -111,18 +116,24 @@ def bootstrap(root: Path,config: dict,descriptor: dict,directory: Path) -> dict:
         return dict(result,descriptorDigest=descriptor['descriptorDigest'])
 
 
-def service_statement(value: dict,subject_digest: str) -> str:
+def service_statement(value: dict,subject_digest: str, *, schema_version='52-plus-2-r2-v22') -> str:
+    if schema_version not in {'52-plus-2-r2-v20','52-plus-2-r2-v22'}:raise RuntimeError('Unsupported SERVICE foundation')
     for key in ('tenantId','principalId','appointmentId','roleId'):uuid.UUID(value[key])
     if set(value['grants'])!=set(SERVICE_CODES) or len(subject_digest)!=64 or any(c not in '0123456789abcdef' for c in subject_digest):raise ValueError('Exact technical service inventory required')
     for id in value['grants'].values():uuid.UUID(id)
     t,p,a=value['tenantId'],value['principalId'],value['appointmentId']
     sql=f"BEGIN; INSERT INTO identity.appointment_role(tenant_id,appointment_role_id,role_code,display_name,state,created_at) VALUES ('{t}','{value['roleId']}','SERVICE','Linux infrastructure','ACTIVE',clock_timestamp()); INSERT INTO identity.principal(tenant_id,principal_id,principal_kind,identity_provider_code,external_subject_hmac,display_name,state,created_at) VALUES ('{t}','{p}','SERVICE','LINUX_SERVICE',decode('{subject_digest}','hex'),'Linux infrastructure','ACTIVE',clock_timestamp()); INSERT INTO identity.appointment(tenant_id,appointment_id,principal_id,organization_unit_id,role_code,effective_from,state,created_at) SELECT '{t}','{a}','{p}',organization_unit_id,'SERVICE',clock_timestamp(),'ACTIVE',clock_timestamp() FROM identity.organization_unit WHERE tenant_id='{t}' AND unit_code='ROOT';"
+    if schema_version=='52-plus-2-r2-v20':
+        sql='BEGIN; INSERT INTO identity.principal'+sql.split(' INSERT INTO identity.principal',1)[1]
+        sql=sql.replace("organization_unit_id,'SERVICE',clock_timestamp()","organization_unit_id,'CONTACT_OPERATOR',clock_timestamp()")
     for code,id in value['grants'].items():
         sql+=f" INSERT INTO identity.authority_grant(tenant_id,authority_grant_id,grantee_appointment_id,granted_by_appointment_id,scope_organization_unit_id,authority_code,valid_from,state,created_at) SELECT '{t}','{id}','{a}',ap.appointment_id,o.organization_unit_id,'{code}',clock_timestamp(),'ACTIVE',clock_timestamp() FROM identity.organization_unit o JOIN identity.appointment ap ON ap.tenant_id=o.tenant_id AND ap.organization_unit_id=o.organization_unit_id JOIN identity.principal pr ON pr.tenant_id=ap.tenant_id AND pr.principal_id=ap.principal_id WHERE o.tenant_id='{t}' AND o.unit_code='ROOT' AND ap.role_code='IDENTITY_ADMIN' AND pr.principal_kind='HUMAN';"
     return sql+' COMMIT;'
 
 
 def service(root,plan):
+    schema=database.observe(root)['gate']['schema_contract_version']
+    role='CONTACT_OPERATOR' if schema=='52-plus-2-r2-v20' else 'SERVICE'
     path=root/'assembly/service.json'
     if not path.exists():
         if database.sql(root,"SELECT count(*) FROM identity.principal WHERE principal_kind='SERVICE'")!='0':raise RuntimeError('Existing SERVICE is not adopted')
@@ -134,11 +145,11 @@ def service(root,plan):
     count=database.sql(root,"SELECT count(*) FROM identity.principal WHERE principal_kind='SERVICE'")
     if count=='0':
         key=base64.b64decode(identity.secret_file(root/'secrets/subject-key.txt'))
-        database.sql(root,service_statement(value,hmac.new(key,b'linux-infrastructure',hashlib.sha256).hexdigest()))
+        database.sql(root,service_statement(value,hmac.new(key,b'linux-infrastructure',hashlib.sha256).hexdigest(),schema_version=schema))
     elif count!='1':raise RuntimeError('SERVICE inventory differs')
     # Exact UUIDs and technical authority set, not matching by display name.
     actual=json.loads(database.sql(root,"SELECT json_build_object('principalId',p.principal_id,'appointmentId',a.appointment_id,'kind',p.principal_kind,'provider',p.identity_provider_code,'role',a.role_code,'codes',(SELECT json_agg(authority_code ORDER BY authority_code) FROM identity.authority_grant WHERE grantee_appointment_id=a.appointment_id)) FROM identity.principal p JOIN identity.appointment a ON a.tenant_id=p.tenant_id AND a.principal_id=p.principal_id WHERE p.principal_kind='SERVICE'"))
-    if actual!={'principalId':value['principalId'],'appointmentId':value['appointmentId'],'kind':'SERVICE','provider':'LINUX_SERVICE','role':'SERVICE','codes':sorted(SERVICE_CODES)}:raise RuntimeError('Original SERVICE references or authority inventory differs')
+    if actual!={'principalId':value['principalId'],'appointmentId':value['appointmentId'],'kind':'SERVICE','provider':'LINUX_SERVICE','role':role,'codes':sorted(SERVICE_CODES)}:raise RuntimeError('Original SERVICE references or authority inventory differs')
     return value
 
 

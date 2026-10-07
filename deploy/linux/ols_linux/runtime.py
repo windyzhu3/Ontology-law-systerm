@@ -93,6 +93,16 @@ def validate_tls(root: Path):
         context=ssl.create_default_context(cafile=str(root/'certs/ca.pem'))
         context.load_cert_chain(str(root/'certs/server.crt'),str(root/'certs/server.key'))
     except (ssl.SSLError,OSError) as error:raise RuntimeError('Invalid or mismatched TLS material') from error
+    if (root/'resources.json').exists():
+        resources=load(root)
+        if resources.get('publicTlsHashes'):
+            if any(sha(root/name)!=expected for name,expected in resources['publicTlsHashes'].items()):raise RuntimeError('Original public TLS files changed')
+            if (root/'certs/http-trust.pem').read_bytes()!=(root/'certs/ca.pem').read_bytes()+b'\n'+(root/'certs/public-ca.pem').read_bytes():
+                raise RuntimeError('Original HTTP trust anchors changed')
+            try:
+                public=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                public.load_cert_chain(str(root/'certs/public.crt'),str(root/'certs/public.key'))
+            except (ssl.SSLError,OSError) as error:raise RuntimeError('Invalid original public certificate/key pair') from error
 
 
 def prepare(root: Path, settings: dict) -> dict:
@@ -101,9 +111,11 @@ def prepare(root: Path, settings: dict) -> dict:
         if operation['kind']!='initialize' or operation['phase'] not in {'CREATED','PREPARING','INFRASTRUCTURE_READY'}:
             raise RuntimeError('Infrastructure requires the original initialization operation')
         prefix=settings['name'];repo=Path(settings['repo']).absolute()
+        from . import public_runtime
+        public_tls=public_runtime.inputs(settings)
         if not re.fullmatch('ols-[a-z0-9][a-z0-9-]{0,45}',prefix): raise ValueError('Unique ols resource prefix required')
         run(['docker','info','--format','{{.OSType}}'])
-        config_digest=digest(settings)
+        config_digest=digest({'settings':settings,'publicTls':public_tls}) if public_tls else digest(settings)
         if (root/'resources.json').exists():
             resources=load(root)
             if resources['settingsDigest']!=config_digest: raise RuntimeError('Infrastructure settings changed; refuse old operation reuse')
@@ -116,6 +128,9 @@ def prepare(root: Path, settings: dict) -> dict:
                        'flywayImage':image(repo,'redgate/flyway')}
             for kind,names in [('network',[resources['network']]),('volume',resources['volumes']),('container',list(resources['containers'].values()))]:
                 if any(inspect(kind,name) for name in names): raise RuntimeError('Requested resources already exist; not adopted by name')
+            save(root,resources)
+        if public_tls:
+            resources.update(publicTlsHashes=public_tls,publicOrigin=settings['publicOrigin'],identityOrigin=settings['identityOrigin'])
             save(root,resources)
         opid=operation['operationId'];instance=operation['instanceId']
         journal.record(root,opid,{'phase':'PREPARING','settingsDigest':config_digest})
@@ -137,6 +152,7 @@ def prepare(root: Path, settings: dict) -> dict:
                     'chmod 600 /out/*')
             user=[] if os.name=='nt' else ['--user',str(os.getuid())+':'+str(os.getgid())]
             run(['docker','run','--rm',*label,*user,'--mount',f'type=bind,source={certs},target=/out',resources['postgresImage'],'sh','-euc',script])
+        if public_tls:public_runtime.install(root,settings,public_tls)
         validate_tls(root)
         private_file(certs/'pg_hba.conf',b'local all all trust\nlocal replication all trust\nhostnossl all all all reject\nhostssl all all all scram-sha-256\n')
         (root/'secrets').mkdir(mode=0o700,exist_ok=True)

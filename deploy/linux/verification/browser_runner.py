@@ -15,6 +15,7 @@ apt-get install -y --no-install-recommends libnss3-tools >>/tmp/ols-browser-tool
 mkdir -p /root/.local/share/pki/nssdb
 if [ ! -f /root/.local/share/pki/nssdb/cert9.db ]; then timeout 10s certutil -N -d sql:/root/.local/share/pki/nssdb --empty-password </dev/null >/dev/null 2>&1; fi
 timeout 10s certutil -A -d sql:/root/.local/share/pki/nssdb -n OLS-Isolated-Acceptance -t 'C,,' -i "$1/certs/ca.pem" </dev/null >/dev/null 2>&1
+if [ -f "$1/certs/public-ca.pem" ]; then timeout 10s certutil -A -d sql:/root/.local/share/pki/nssdb -n OLS-Public-Acceptance -t 'C,,' -i "$1/certs/public-ca.pem" </dev/null >/dev/null 2>&1; fi
 test "$(node -p 'require("/tools/node_modules/@playwright/test/package.json").version')" = 1.63.0
 node /tools/deploy/linux/verification/identity_login.mjs --runtime "$1"
 '''
