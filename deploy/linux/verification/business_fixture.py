@@ -47,7 +47,13 @@ def prepare(root,parent,repo):
             records[name]={'commandId':str(uuid.uuid4()),'path':'/api/v1/admin/identity/authority-grants','actor':actor,'precondition':None,
                 'body':{'appointmentId':state['appointments'][name],'authorityCode':'LEAD_ASSIGN','scopeOrganizationId':state['organizations'][scope],'validFrom':state['effectiveFrom'],'validUntil':None}}
             journal._write(root,grants,records)
-        admin.execute(root,state['operationId'],records[name],root/'identity/dingqiming-session.json')
+        if journal.current(root)['operationId']==state['operationId']:
+            admin.execute(root,state['operationId'],records[name],root/'identity/dingqiming-session.json')
+        else:
+            original=journal._read(root,root/'admin-commands'/(records[name]['commandId']+'.json'))
+            if original['command']!=records[name] or original.get('receipt',{}).get('outcome')!='SUCCEEDED':raise RuntimeError('Original independent assignment receipt unavailable')
+            appointment=str(uuid.UUID(records[name]['body']['appointmentId']));organization=str(uuid.UUID(records[name]['body']['scopeOrganizationId']))
+            if database.sql(root,f"select count(*) from identity.authority_grant where grantee_appointment_id='{appointment}' and scope_organization_unit_id='{organization}' and authority_code='LEAD_ASSIGN' and state='ACTIVE'")!='1':raise RuntimeError('Original independent assignment no longer effective')
     steps=root/'verification/business-steps';steps.mkdir(mode=0o700,exist_ok=True)
     sources={}
     for name in STEPS:
@@ -55,6 +61,8 @@ def prepare(root,parent,repo):
         text=text.replace("'@playwright/test'","'/tools/node_modules/@playwright/test/index.mjs'").replace("channel:'chrome',",'')
         if name=='transfer':text=text.replace("if(ids.length!==1)throw Error('one qualified receiver required');await select.selectOption(ids[0]);","const map=JSON.parse(fs.readFileSync(path.join(runtime,'account-map.json')));const target=map.users.case_admin01.appointmentId;if(!ids.includes(target))throw Error('Configured Yang receiver not qualified');await select.selectOption(target);").replace("import {login,save}","import fs from 'node:fs';import path from 'node:path';import {login,save,runtime}")
         if name=='payment':text=text.replace("login(browser,'finance01')","login(browser,code.includes('G03')||code.includes('G04')?'finance02':'finance01')")
+        if name=='quote-accept':text=text.replace("if(options.length!==1)throw Error('one exact '+label+' required');await select.selectOption(options[0].id);","const exact=label==='本次接收委托方'?options:options.filter(x=>x.label.startsWith(code+'-quote-proof-SYNTHETIC-NOT-LEGAL.pdf'));if(exact.length!==1)throw Error('one exact '+label+' required');await select.selectOption(exact[0].id);")
+        if name=='contract-form':text=text.replace("'synthetic-template.json'","code+'-synthetic-template.json'")
         runtime.private_file(steps/(name+'.mjs'),text.encode())
     shutil.copyfile(repo/'deploy/linux/verification/business-browser.mjs',steps/'browser.mjs');(steps/'browser.mjs').chmod(0o600)
     shutil.copyfile(repo/'deploy/linux/verification/business_chain.mjs',steps/'business_chain.mjs');(steps/'business_chain.mjs').chmod(0o600)

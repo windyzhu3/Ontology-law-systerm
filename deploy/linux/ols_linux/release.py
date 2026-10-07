@@ -254,8 +254,9 @@ def _activate(root: Path,operation_id: str,inputs: dict, *, restored=False) -> d
     if activation.get('failed') and _same_gate(actual,activation['failed']):
         activation['before']=actual;activation['expected']=dict(actual,operating_mode='ACTIVE',revision=actual['revision']+1,changed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='microseconds'))
         activation.pop('failed');journal._write(root,activation_file,activation)
-    if _same_gate(actual,activation['before']):actual=_cas_gate(root,actual,activation['expected'])
-    elif not _same_gate(actual,activation['expected']):raise RuntimeError('Original activation gate conflicts')
+    if _same_gate(actual,activation['expected']):pass
+    elif _same_gate(actual,activation['before']):actual=_cas_gate(root,actual,activation['expected'])
+    else:raise RuntimeError('Original activation gate conflicts')
     try:
         runtime.start_internal(root,descriptor)
         try:from .verify import runtime_ready
@@ -280,6 +281,21 @@ def _activate(root: Path,operation_id: str,inputs: dict, *, restored=False) -> d
         raise RuntimeError('Runtime activation failed; writers stopped, ingress closed, original operation retained') from None
 
 
+def _retain_completed_restore_plan(root,operation_id,checkpoint_digest):
+    path=root/'restore-plan.json'
+    if not path.exists():return
+    plan=journal._read(root,path)
+    if plan['operationId']==operation_id:
+        if plan['checkpointDigest']!=checkpoint_digest:raise RuntimeError('Original linked restore differs')
+        return
+    previous=journal.read(root,plan['operationId'])
+    if previous['phase']!='COMPLETE':raise RuntimeError('Another original restore is still pending')
+    retained=root/'operations'/(previous['operationId']+'-restore-plan.json')
+    if retained.exists() and journal._read(root,retained)!=plan:raise RuntimeError('Completed restore evidence conflicts')
+    if retained.resolve()!=retained.absolute():raise RuntimeError('Linked completed restore evidence refused')
+    path.replace(retained)
+
+
 def restore_checkpoint(root: Path,source_operation_id: str,value: dict) -> dict:
     """Restore both databases into new owned volumes, verify, then switch names and assets."""
     with journal.locked(root) as root:
@@ -288,7 +304,7 @@ def restore_checkpoint(root: Path,source_operation_id: str,value: dict) -> dict:
         if current['phase']=='COMPLETE':current=journal.begin(root,'restore',cp_digest)
         elif current['operationId']!=source_operation_id and not(current['kind']=='restore' and current['configDigest']==cp_digest):
             raise RuntimeError('Another original operation is pending')
-        operation_id=current['operationId'];plan_path=root/'restore-plan.json'
+        operation_id=current['operationId'];_retain_completed_restore_plan(root,operation_id,cp_digest);plan_path=root/'restore-plan.json'
         if plan_path.exists():
             plan=journal._read(root,plan_path)
             if plan['operationId']!=operation_id or plan['checkpointDigest']!=cp_digest:raise RuntimeError('Original linked restore differs')
@@ -416,10 +432,11 @@ def health(root: Path) -> dict:
 def stop(root: Path) -> dict:
     with journal.locked(root) as root:
         op=journal.current(root)
-        if op['phase'] not in {'COMPLETE','STOP_REQUESTED','WRITERS_STOPPED','STOPPED'}:
+        if op['phase'] not in {'COMPLETE','STOP_REQUESTED','WRITERS_STOPPED','STOPPED'} and not(op['kind']=='runtime-control' and op['phase']=='CREATED'):
             raise RuntimeError('Pending publication or restore must use its original continuation')
         current=journal._read(root,root/'current-release.json')
         bundle.verify(current['descriptor'],Path(current['directory']))
+        if op['phase']=='COMPLETE':op=journal.begin(root,'runtime-control',current['descriptor']['descriptorDigest'])
         path=root/'operations'/(op['operationId']+'-manual-stop.json')
         record={'operationId':op['operationId'],'descriptorDigest':current['descriptor']['descriptorDigest']}
         if path.exists() and journal._read(root,path)!=record:raise RuntimeError('Original stopped release changed')
@@ -433,14 +450,14 @@ def stop(root: Path) -> dict:
 def start(root: Path) -> dict:
     with journal.locked(root) as root:
         op=journal.current(root);restored=False
-        if (root/'restore-plan.json').exists() and op['phase'] in {'RESTORED_MAINTENANCE','ACTIVATION_UNKNOWN','ACTIVATION_FAILED'}:
+        if (root/'restore-plan.json').exists() and journal._read(root,root/'restore-plan.json')['operationId']==op['operationId'] and op['phase'] in {'RESTORED_MAINTENANCE','ACTIVATION_UNKNOWN','ACTIVATION_FAILED'}:
             plan=journal._read(root,root/'restore-plan.json')
             if plan['operationId']!=op['operationId']:raise RuntimeError('Start belongs to another restore')
             value=checkpoint.verified(root,plan['sourceOperationId'])
             if digest(value)!=plan['checkpointDigest']:raise RuntimeError('Linked original restore changed')
             if op['phase']=='RESTORED_MAINTENANCE':_assert_restored(root,value)
             _restore_runtime_registry(root);restored=True
-        elif op['phase'] not in {'COMPLETE','STOP_REQUESTED','WRITERS_STOPPED','STOPPED'} and not (
+        elif op['phase'] not in {'COMPLETE','STOP_REQUESTED','WRITERS_STOPPED','STOPPED'} and not(op['kind']=='runtime-control' and op['phase']=='CREATED') and not (
             op['phase'] in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILED'} and
             (root/'operations'/(op['operationId']+'-manual-stop.json')).exists()):
             raise RuntimeError('Unknown publication phase cannot start writers')
@@ -449,6 +466,12 @@ def start(root: Path) -> dict:
         if not restored:
             _installed(root,database.observe(root)['gate'])
             gate=database.observe(root)['gate']
+            if op['phase']=='COMPLETE':op=journal.begin(root,'runtime-control',descriptor['descriptorDigest'])
+            if op['kind']=='runtime-control' and op['configDigest']!=descriptor['descriptorDigest']:raise RuntimeError('Original runtime control release changed')
+            anchor=root/'operations'/(op['operationId']+'-manual-stop.json')
+            if op['kind']=='runtime-control' and not anchor.exists():
+                if op['phase']!='CREATED' or gate['operating_mode']!='ACTIVE':raise RuntimeError('Original manual start anchor unavailable')
+                journal._write(root,anchor,{'operationId':op['operationId'],'descriptorDigest':descriptor['descriptorDigest']})
             if gate['operating_mode']!='ACTIVE':
                 activation=journal._read(root,root/'operations'/(op['operationId']+'-activation.json'))
                 if op['phase'] not in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILED'} or activation['descriptorDigest']!=descriptor['descriptorDigest'] or not _same_gate(gate,activation.get('failed',{})):
@@ -457,6 +480,10 @@ def start(root: Path) -> dict:
                 saved=journal._read(root,root/'operations'/(op['operationId']+'-manual-stop.json'))
                 if saved!={'operationId':op['operationId'],'descriptorDigest':descriptor['descriptorDigest']}:
                     raise RuntimeError('Exact originally stopped release required')
+            activation=root/'operations'/(op['operationId']+'-activation.json')
+            if not activation.exists():
+                if gate['operating_mode']!='ACTIVE':raise RuntimeError('Only an already active verified release can restart')
+                journal._write(root,activation,{'before':gate,'expected':gate,'descriptorDigest':descriptor['descriptorDigest'],'manualRestart':True})
         return _activate(root,op['operationId'],{'descriptor':descriptor},restored=restored)
 
 

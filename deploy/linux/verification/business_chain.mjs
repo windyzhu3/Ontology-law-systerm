@@ -51,7 +51,7 @@ for(const c of cases.filter(c=>!selected||c.code===selected)){
   if(c.entry==='QUOTE'){
    await step(c.code+':quote-proof',()=>module('upload-material',c.sales,c.code,path.join(runtime,'fixtures',c.code+'-quote-proof-SYNTHETIC-NOT-LEGAL.pdf')));await step(c.code+':quote-prepare',()=>module('quote-prepare',c.sales,c.code));await step(c.code+':quote-decide',()=>module('quote-decide',c.manager,c.code,'APPROVED'));await step(c.code+':quote-accept',()=>module('quote-accept',c.sales,c.code));
   }else{await step(c.code+':direct-request',()=>module('direct-request',c.sales,c.code));await step(c.code+':direct-decide',()=>module('direct-decide',c.manager,c.code));}
-  await step(c.code+':form',()=>module('contract-form',c.sales,c.code));await step(c.code+':review',()=>module('contract-decide','case_admin01',c.code,'review','CLEAR'));await step(c.code+':submit',()=>module('contract-submit',c.sales,c.code));await step(c.code+':approval',()=>module('contract-decide',c.manager,c.code,'approval','APPROVED'));
+  await step(c.code+':form',()=>module('contract-form',c.sales,c.code));await step(c.code+':review',()=>module('contract-decide','case_admin01',c.code,'review','CLEAR'));await step(c.code+':submit',()=>module('contract-submit',c.sales,c.code,'approval'));await step(c.code+':approval',()=>module('contract-decide',c.manager,c.code,'approval','APPROVED'));
  }else if(phase==='sign-transfer'){
   await step(c.code+':arrange',()=>module('sign-arrange',c.sales,c.code));
   for(const slot of ['1','2']){await step(c.code+':sign-submit:'+slot,()=>module('sign-submit',c.sales,c.code,slot));await step(c.code+':sign-verify:'+slot,()=>module('sign-verify',c.code,slot,'VERIFIED'));}

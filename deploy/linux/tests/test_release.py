@@ -9,6 +9,28 @@ sys.path.insert(0,str(LINUX))
 
 
 class ReleaseTest(unittest.TestCase):
+    def test_manual_stop_retains_completed_release_operation(self):
+        from ols_linux import journal,runtime,bundle
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'private';first=journal.begin(root,'initialize','a'*64);journal.record(root,first['operationId'],{'phase':'COMPLETE'})
+            current={'directory':str(root),'descriptor':{'descriptorDigest':'b'*64}};journal._write(root,root/'current-release.json',current)
+            with patch.object(bundle,'verify'),patch.object(runtime,'stop_writers'):
+                result=self.m.stop(root)
+            self.assertEqual(result['phase'],'STOPPED');self.assertNotEqual(result['operationId'],first['operationId'])
+            self.assertEqual(journal.read(root,first['operationId'])['phase'],'COMPLETE')
+
+    def test_completed_restore_plan_is_retained_when_next_restore_starts(self):
+        from ols_linux import journal
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'private';first=journal.begin(root,'restore','a'*64);journal.record(root,first['operationId'],{'phase':'COMPLETE'})
+            original={'operationId':first['operationId'],'checkpointDigest':'a'*64};journal._write(root,root/'restore-plan.json',original)
+            second=journal.begin(root,'restore','b'*64)
+            self.m._retain_completed_restore_plan(root,second['operationId'],'b'*64)
+            self.assertFalse((root/'restore-plan.json').exists())
+            self.assertEqual(journal._read(root,root/'operations'/(first['operationId']+'-restore-plan.json')),original)
+            journal._write(root,root/'restore-plan.json',dict(original,operationId=second['operationId']))
+            with self.assertRaises(RuntimeError):self.m._retain_completed_restore_plan(root,first['operationId'],'c'*64)
+
     def test_manual_start_refuses_unknown_phase_before_launching_any_writer(self):
         from ols_linux import journal,runtime
         self.assertTrue(callable(getattr(self.m,'start',None)), 'Qualified manual start missing')

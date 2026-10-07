@@ -109,7 +109,7 @@ def _read(root, path):
 
 
 def begin(runtime: Path, kind: str, config_digest: str) -> dict:
-    if kind not in {'initialize', 'upgrade', 'publish-bytes', 'restore'} or not re.fullmatch('[a-f0-9]{64}', config_digest):
+    if kind not in {'initialize', 'upgrade', 'publish-bytes', 'restore', 'runtime-control'} or not re.fullmatch('[a-f0-9]{64}', config_digest):
         raise ValueError('Valid operation kind and input digest required')
     root = safe_root(runtime)
     root.mkdir(parents=True, mode=0o700, exist_ok=True)
