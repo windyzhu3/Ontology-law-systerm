@@ -24,6 +24,7 @@ public class SessionContextController implements SessionApi {
                 return runtime.read(c,identity,own,behalf,UUID.randomUUID(),(connection,actor,choice)->{
                     var authorities=R1AuthorityReader.databaseBacked();boolean workbench=false,admin=false;
                     for(var task:TaskFactory.Type.values())if(authorities.select(connection,actor,choice.organization(),choice.organization().id(),task.slot,task.authority)!=null){workbench=true;break;}
+                    if(!workbench)for(var task:TaskFactory.Type.values())if(task.subjectType().equals("opportunity.opportunity")&&!authorities.entryAuthorizations(connection,actor,task.slot,task.authority).isEmpty()){workbench=true;break;}
                     if(actor.onBehalfAppointmentId()==null) {
                         var root=HumanIdentityReader.databaseBacked().rootOrganization(connection,actor.tenantId());
                         for(String code:List.of("IDENTITY_PRINCIPAL_MANAGE","IDENTITY_ORGANIZATION_MANAGE","IDENTITY_APPOINTMENT_MANAGE","IDENTITY_AUTHORITY_MANAGE")) {

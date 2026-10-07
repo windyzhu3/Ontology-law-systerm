@@ -24,3 +24,17 @@ class AcceptanceContractTests(unittest.TestCase):
                             cases[:-1]+[dict(cases[-1],ownersMatch=False)]]:
             with self.assertRaises(RuntimeError):m.require_chains(replacement)
 
+    def test_live_case_owner_and_final_matter_relationships_cannot_be_claimed(self):
+        m=self.module()
+        expected={'review':'yang','approval':'manager','signature':'yang','archive':'yang','payment':'finance','transferReview':'yang','intake':'yang','classification':'yang'}
+        facts={key:[{'id':key,'owner':owner,'decision':m.CASE_DECISIONS[key]}] for key,owner in expected.items()}
+        facts['signature']*=2;facts['contract']=[{'approvedRevision':'revision','execution':'execution'}]
+        facts['intake'][0]['matter']='matter';facts['classification'][0].update(matter='matter',intake='intake',recipient='yang')
+        m.require_case_facts(facts,expected)
+        import copy
+        for key,field,value in [('payment','owner','sales'),('classification','matter','another'),('classification','intake','another'),('classification','recipient','director')]:
+            changed=copy.deepcopy(facts);changed[key][0][field]=value
+            with self.assertRaises(RuntimeError):m.require_case_facts(changed,expected)
+        changed=copy.deepcopy(facts);changed['contract'][0]['execution']=None
+        with self.assertRaises(RuntimeError):m.require_case_facts(changed,expected)
+

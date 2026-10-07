@@ -163,5 +163,29 @@ class ReleaseTest(unittest.TestCase):
                 with self.assertRaises(RuntimeError):self.m.start(root)
                 activate.assert_not_called()
 
+    def test_linked_restore_preserves_current_control_plan_and_historical_quarantine(self):
+        from ols_linux import journal,runtime,bundle
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'runtime';op=journal.begin(root,'restore','a'*64)
+            journal._write(root,root/'restore-plan.json',{'operationId':op['operationId']})
+            runtime.private_file(root/'quarantine/earlier/kept.txt',b'kept')
+            directory=root/'checkpoints/original';runtime.private_file(directory/'assets/config/original.txt',b'original')
+            runtime.private_file(directory/'assets/restore-plan.json',b'older-control-plan')
+            runtime.private_file(directory/'assets/quarantine/earlier/kept.txt',b'older-archive')
+            value={'files':{'assets/'+k:v for k,v in bundle.inventory(directory/'assets').items()}}
+            self.m._restore_assets(root,directory,op['operationId'],value)
+            self.assertEqual(op['operationId'],journal._read(root,root/'restore-plan.json')['operationId'])
+            self.assertEqual(b'kept',(root/'quarantine/earlier/kept.txt').read_bytes())
+            self.assertEqual(b'original',(root/'config/original.txt').read_bytes())
+
+    def test_original_restore_can_continue_after_copying_a_sealed_empty_material_directory(self):
+        from ols_linux import journal
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'runtime';op=journal.begin(root,'restore','a'*64)
+            directory=root/'checkpoints/original';(directory/'assets/materials').mkdir(parents=True)
+            (root/'materials').mkdir();(root/'quarantine'/op['operationId']/'assets/materials').mkdir(parents=True)
+            self.m._restore_assets(root,directory,op['operationId'],{'files':{},'assetDirectories':['materials']})
+            self.assertTrue((root/'materials').is_dir())
+
 
 if __name__=='__main__':unittest.main()

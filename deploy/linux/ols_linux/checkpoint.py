@@ -10,6 +10,7 @@ from .bundle import inventory,sha
 from .config import digest
 
 EXCLUDED={'platform_meta.deployment_state','platform_meta.flyway_schema_history'}
+INSTANCE_CONTROLS={'instance.json','instance.lock','journal.key','resources.json','current-operation.json','operations','checkpoints','quarantine','restore-plan.json'}
 
 
 def role_restore_sql(raw: bytes) -> bytes:
@@ -151,7 +152,7 @@ def capture(root: Path,operation_id: str) -> dict:
             name=resources['containers'][key];runtime.owned(root,'container',name)
             _dump(root,directory/(key+'.dump'),['docker','exec',name,'pg_dump','-U','postgres','-d',db,'-Fc'])
             _dump(root,directory/(key+'-roles.sql'),['docker','exec',name,'pg_dumpall','-U','postgres','--roles-only','--quote-all-identifiers'])
-        controls={'instance.json','instance.lock','journal.key','resources.json','current-operation.json','operations','checkpoints'}
+        controls=INSTANCE_CONTROLS
         for path in root.iterdir():
             if path.name in controls or path.name.endswith('.log') or path.name=='flyway.conf':continue
             _copy(path,directory/'assets'/path.name)

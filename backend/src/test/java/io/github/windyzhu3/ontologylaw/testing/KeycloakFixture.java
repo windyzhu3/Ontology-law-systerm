@@ -22,7 +22,16 @@ public final class KeycloakFixture implements AutoCloseable {
     public static final String REDIRECT="http://127.0.0.1:19092/callback";
     public final String introspectionSecret=random(), directorySecret=random();
     public final String username="synthetic-user", password=random();
-    private final Network network=Network.newNetwork();
+    private final Network network=fixtureNetwork();
+    /** Optional isolated test subnet when Docker's default pools are exhausted.
+     * Docker refuses overlaps; never adopts an existing network or changes host pools. */
+    private static Network fixtureNetwork(){
+        String subnet=System.getProperty("ols.test.identityNetworkSubnet");
+        if(subnet==null)return Network.newNetwork();
+        if(!subnet.matches("10\\.249\\.(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])\\.0/24"))throw new IllegalArgumentException("Explicit private /24 test subnet required");
+        return Network.builder().createNetworkCmdModifier(cmd->cmd.withIpam(new com.github.dockerjava.api.model.Network.Ipam()
+                .withConfig(new com.github.dockerjava.api.model.Network.Ipam.Config().withSubnet(subnet)))).build();
+    }
     private PostgreSQLContainer postgres;
     private GenericContainer<?> keycloak;
     private final TlsFixture tls;private TlsFixture.Key identityTrust;private javax.net.ssl.SSLContext tlsContext;

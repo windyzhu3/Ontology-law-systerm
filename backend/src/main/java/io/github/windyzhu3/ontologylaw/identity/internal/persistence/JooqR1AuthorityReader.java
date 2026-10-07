@@ -17,6 +17,18 @@ public final class JooqR1AuthorityReader implements R1AuthorityReader {
         var result=choose(c,actor,subject,organization,slot,code,false);
         return result==null?null:result.request();
     }
+    public List<AuthorizationSnapshot> entryAuthorizations(Connection c,Actor actor,String slot,String code)throws SQLException {
+        if(actor.principalKind()!=PrincipalKind.HUMAN||actor.onBehalfAppointmentId()!=null)return List.of();
+        var g=AUTHORITY_GRANT;var o=ORGANIZATION_UNIT;
+        var scopes=db(c).selectDistinct(o.ORGANIZATION_UNIT_ID,o.REVISION).from(g).join(o)
+            .on(o.TENANT_ID.eq(g.TENANT_ID)).and(o.ORGANIZATION_UNIT_ID.eq(g.SCOPE_ORGANIZATION_UNIT_ID))
+            .where(g.TENANT_ID.eq(actor.tenantId())).and(g.GRANTEE_APPOINTMENT_ID.eq(actor.appointmentId()))
+            .and(g.AUTHORITY_CODE.eq(code)).and(g.STATE.eq("ACTIVE")).and(o.STATE.eq("ACTIVE"))
+            .orderBy(o.ORGANIZATION_UNIT_ID).fetch();
+        var result=new ArrayList<AuthorizationSnapshot>();
+        for(var row:scopes){var id=row.get(o.ORGANIZATION_UNIT_ID);var subject=new Subject("identity.organization_unit",id,row.get(o.REVISION),null);var snapshot=authorize(c,actor,subject,id,slot,code);if(snapshot!=null&&snapshot.allowed())result.add(snapshot);}
+        return List.copyOf(result);
+    }
     public AuthorizationSnapshot authorize(Connection c,Actor actor,Subject subject,UUID organization,String slot,String code)throws SQLException {
         return choose(c,actor,subject,organization,slot,code,true);
     }

@@ -492,21 +492,26 @@ def _assert_restored(root: Path,value: dict, *, containers=None,assets=True):
         raise RuntimeError('Linked restored database facts differ; ingress remains closed')
     checkpoint.assert_cluster_facts(value['clusterFacts'],checkpoint.cluster_facts(root,containers=containers))
     if assets:
-        actual={};expected={name[7:]:h for name,h in value['files'].items() if name.startswith('assets/')}
+        actual={};expected={name[7:]:h for name,h in value['files'].items() if name.startswith('assets/') and name.split('/')[1] not in checkpoint.INSTANCE_CONTROLS}
         for name in {name.split('/')[0] for name in expected}:
             path=root/name
             if path.is_dir():actual.update({name+'/'+child:h for child,h in bundle.inventory(path).items()})
             elif path.is_file() and path.resolve()==path.absolute():actual[name]=bundle.sha(path)
         if actual!=expected:raise RuntimeError('Restored asset inventory differs')
         for name,expected in value['files'].items():
-            if name.startswith('assets/'):
+            if name.startswith('assets/') and name.split('/')[1] not in checkpoint.INSTANCE_CONTROLS:
                 path=root/name[7:]
                 if path.resolve()!=path.absolute() or not path.is_file() or bundle.sha(path)!=expected:raise RuntimeError('Linked restored asset differs')
+        for name in value.get('assetDirectories',[]):
+            if name.split('/')[0] in checkpoint.INSTANCE_CONTROLS:continue
+            path=root/name
+            if path.resolve()!=path.absolute() or not path.is_dir():raise RuntimeError('Linked restored asset directory differs')
 
 
 def _restore_assets(root: Path,directory: Path,operation_id: str,value: dict):
-    controls={'instance.json','instance.lock','journal.key','resources.json','current-operation.json','operations','checkpoints','quarantine','restore-plan.json'}
+    controls=checkpoint.INSTANCE_CONTROLS
     expected_roots={name.split('/')[1] for name in value['files'] if name.startswith('assets/')}
+    expected_roots.update(name.split('/')[0] for name in value.get('assetDirectories',[]))
     archive=root/'quarantine'/operation_id/'assets'
     if archive.resolve()!=archive.absolute() or not archive.is_relative_to(root):raise RuntimeError('Linked asset quarantine directory refused')
     archive.mkdir(mode=0o700,parents=True,exist_ok=True)
@@ -517,4 +522,8 @@ def _restore_assets(root: Path,directory: Path,operation_id: str,value: dict):
         if saved.exists():
             if path.name not in expected_roots:raise RuntimeError('Unexpected asset remains after original restore')
         else:os.replace(path,saved)
-    checkpoint._copy(directory/'assets',root)
+    # Older sealed checkpoints included historical control plans/quarantine.
+    # Their hashes remain verified in the checkpoint, but restoring them would
+    # overwrite this operation's journal and preserved live diagnostic history.
+    for path in (directory/'assets').iterdir():
+        if path.name not in controls:checkpoint._copy(path,root/path.name)

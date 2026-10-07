@@ -60,7 +60,13 @@ def prepare(root,parent,repo):
         source=repo/'deploy/haihua-uat'/(name+'.mjs');text=source.read_text(encoding='utf-8');sources[str(source.relative_to(repo))]=bundle.sha(source)
         text=text.replace("'@playwright/test'","'/tools/node_modules/@playwright/test/index.mjs'").replace("channel:'chrome',",'')
         if name=='transfer':text=text.replace("if(ids.length!==1)throw Error('one qualified receiver required');await select.selectOption(ids[0]);","const map=JSON.parse(fs.readFileSync(path.join(runtime,'account-map.json')));const target=map.users.case_admin01.appointmentId;if(!ids.includes(target))throw Error('Configured Yang receiver not qualified');await select.selectOption(target);").replace("import {login,save}","import fs from 'node:fs';import path from 'node:path';import {login,save,runtime}")
-        if name=='payment':text=text.replace("login(browser,'finance01')","login(browser,code.includes('G03')||code.includes('G04')?'finance02':'finance01')")
+        if name=='payment':text=text.replace("login(browser,'finance01')","login(browser,code.includes('G03')||code.includes('G04')?'finance02':'finance01')").replace("actor:'finance01'","actor:code.includes('G03')||code.includes('G04')?'finance02':'finance01'")
+        if name=='business-browser':text=text.replace("export async function selectTask(page,code,purpose){", """export async function selectTask(page,code,purpose){
+ if(purpose==='到账'&&await page.getByRole('heading',{name:'合同台账',exact:true}).isVisible()){
+  await page.getByLabel('查看内容',{exact:true}).selectOption('payments');await page.getByLabel('搜索客户',{exact:true}).fill(code);
+  const row=page.locator('.record-table button').filter({hasText:code});await row.waitFor();if(await row.count()!==1)throw Error('One exact authorized payment required');await row.click();await page.getByRole('button',{name:'前往办理',exact:true}).click();return;
+ }
+""")
         if name=='quote-accept':text=text.replace("if(options.length!==1)throw Error('one exact '+label+' required');await select.selectOption(options[0].id);","const exact=label==='本次接收委托方'?options:options.filter(x=>x.label.startsWith(code+'-quote-proof-SYNTHETIC-NOT-LEGAL.pdf'));if(exact.length!==1)throw Error('one exact '+label+' required');await select.selectOption(exact[0].id);")
         if name=='contract-form':text=text.replace("'synthetic-template.json'","code+'-synthetic-template.json'")
         runtime.private_file(steps/(name+'.mjs'),text.encode())
