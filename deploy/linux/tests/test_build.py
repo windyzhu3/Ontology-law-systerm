@@ -6,6 +6,18 @@ import unittest
 
 
 class BuildTests(unittest.TestCase):
+    def test_native_completion_requires_the_complete_runtime_payload(self):
+        from unittest.mock import patch
+        module=self.module()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);jar=root/'backend/target/ontology-law-system-0.1.0-SNAPSHOT.jar'
+            jar.parent.mkdir(parents=True);jar.write_bytes(b'packaged-fixture')
+            spa=root/'apps/workbench/dist';spa.mkdir(parents=True);(spa/'index.html').write_bytes(b'fixture')
+            with patch.object(module.bundle,'describe',return_value={'version':2}) as describe:
+                self.assertEqual(module.completion(root,'a'*40,0,0)['version'],2)
+                self.assertTrue(describe.call_args.kwargs.get('include_runtime'),
+                    'Native releases must seal the executable helper, template and runtime payload')
+
     def module(self):
         try:
             return importlib.import_module('ols_linux.build')

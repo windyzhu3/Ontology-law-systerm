@@ -33,7 +33,7 @@ def completion(root: Path, commit: str, jar_exit: int, spa_exit: int) -> dict:
     jar=root/'backend/target/ontology-law-system-0.1.0-SNAPSHOT.jar';spa=root/'apps/workbench/dist'
     proof={'commit':commit,'jarExitCode':jar_exit,'spaExitCode':spa_exit,'jarSha256':bundle.sha(jar),'spaFiles':bundle.inventory(spa)}
     runtime.private_file(root/'.artifacts/linux-build-proof.json',canonical(proof))
-    return bundle.describe(root,jar,spa,commit)
+    return bundle.describe(root,jar,spa,commit,include_runtime=True)
 
 
 def maven(root: Path) -> Path:
