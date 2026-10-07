@@ -5,6 +5,8 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import tarfile
+import urllib.request
+import zipfile
 from . import bundle, runtime
 from .config import canonical
 
@@ -34,6 +36,25 @@ def completion(root: Path, commit: str, jar_exit: int, spa_exit: int) -> dict:
     return bundle.describe(root,jar,spa,commit)
 
 
+def maven(root: Path) -> Path:
+    expected='5af3b743dd8b876b5c45da33b676251e5f1687712644abb4ee519ca56e1d89ce'
+    url='https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.16/apache-maven-3.9.16-bin.zip'
+    wrapper=dict(line.split('=',1) for line in (root/'.mvn/wrapper/maven-wrapper.properties').read_text().splitlines() if '=' in line)
+    if wrapper.get('distributionUrl')!=url or wrapper.get('distributionSha256Sum')!=expected:raise RuntimeError('Reviewed exact Maven wrapper required')
+    archive=root/'.artifacts/maven.zip'
+    if not archive.exists():
+        with urllib.request.urlopen(url,timeout=60) as response:runtime.private_file(archive,response.read(32*1024*1024))
+    if archive.is_symlink() or bundle.sha(archive)!=expected:raise RuntimeError('Maven archive checksum differs')
+    target=root/'.artifacts/maven'
+    executable=target/'apache-maven-3.9.16/bin/mvn'
+    if not target.exists():
+        target.mkdir(mode=0o700)
+        with zipfile.ZipFile(archive) as z:
+            if any(PurePosixPath(n).is_absolute() or '..' in PurePosixPath(n).parts for n in z.namelist()):raise RuntimeError('Unsafe Maven archive')
+            z.extractall(target)
+    return executable
+
+
 def run(repo: Path, target: Path, image: str, oidc: dict) -> dict:
     repo,target=Path(repo).absolute(),Path(target).absolute()
     if os.name=='nt':raise RuntimeError('Native build requires the Linux entry')
@@ -60,7 +81,8 @@ def archived(target: Path, commit: str, image: str, oidc: dict) -> dict:
     result=runtime.run(['docker','run','--rm','--name',name,'--label','ols.build='+commit,'--log-driver','local','--log-opt','max-size=10m','--mount',f'type=bind,source={target},target=/src','--workdir','/src',*env,'--entrypoint','sh',image,'-ec',script],timeout=1800,check=False)
     runtime.private_file(target/'.artifacts/spa-build.log',result.stdout+result.stderr)
     if result.returncode:raise RuntimeError('Native SPA build failed; original source and log retained')
-    script='sh ./mvnw -B -f backend/pom.xml -DskipTests -Dols.build.resources=../.artifacts/linux-build-resources package'
+    maven(target)
+    script='sh .artifacts/maven/apache-maven-3.9.16/bin/mvn -B -f backend/pom.xml -DskipTests -Dols.build.resources=../.artifacts/linux-build-resources package'
     result=runtime.run(['docker','run','--rm','--name',name,'--label','ols.build='+commit,'--log-driver','local','--log-opt','max-size=10m','--mount',f'type=bind,source={target},target=/src','--workdir','/src','--entrypoint','sh',image,'-ec',script],timeout=1800,check=False)
     runtime.private_file(target/'.artifacts/jar-build.log',result.stdout+result.stderr)
     if result.returncode:raise RuntimeError('Native JAR build failed; original source and log retained')

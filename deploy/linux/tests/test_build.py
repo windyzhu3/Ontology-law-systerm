@@ -38,3 +38,10 @@ class BuildTests(unittest.TestCase):
                 entry=tarfile.TarInfo(name); archive.addfile(entry)
             with tempfile.TemporaryDirectory() as directory:
                 with self.assertRaises(RuntimeError): module.extract(payload.getvalue(),Path(directory))
+
+    def test_maven_download_rejects_an_unpinned_wrapper(self):
+        module=self.module()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);p=root/'.mvn/wrapper/maven-wrapper.properties';p.parent.mkdir(parents=True)
+            p.write_text('distributionUrl=https://example.invalid/maven.zip\ndistributionSha256Sum='+'0'*64)
+            with self.assertRaises(RuntimeError): module.maven(root)
