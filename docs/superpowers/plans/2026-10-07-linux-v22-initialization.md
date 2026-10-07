@@ -180,9 +180,9 @@
 - [x] CLI测试断言秘密参数拒绝、未知子命令/误将v21当新upgrade拒绝、只读命令无mutation、start/restore归属不符拒绝、CLI调用准确前项接口；首次缺入口失败。
 - [x] 运行 `python3 -m unittest discover -s deploy/linux/tests -p test_cli.py -v`；实现解析/分派，不复制前项状态机。README给空库与v20两套命令、Linux锁定前置、两管理员改密/会话阶段、停写恢复、候选模板审核和LEAD_ASSIGN待指派条件；不宣传全自动无会话或正式模板已审核。
 - [x] 验证 `python3 -m unittest discover -s deploy/linux/tests -v`、相关已有 local-login/haihua工具回归；`npm run openapi:check`、`npm run typecheck`、`npm run build`；后端上述定向IT及ArchitectureTest，`./mvnw -B -f backend/pom.xml -DskipTests package`。schema `generate.py --check`、`scripts/verify_generated_sql.py` 在其目录执行，核对43 SQL摘要仍等于实施前清单；jOOQ本任务无DDL变化，验证现有生成产物一致，不改数据库合同源。
-- [x] 使用最终构建的bundle复核L09健康/登录及发布引用，确保证据指向最终字节；仅制品变化且不影响场景时不重复无关完整业务测试，新失败按影响补测。检查公开Git差异无密码/令牌/私钥/备份，现有本地运行资源未变化。
-- [ ] 完成全分支代码审查，修复实际问题并重跑受影响验证；更新各项checkbox、证据及限制。提交开发分支，不以设计/模拟测试替代完成声明；合并main/实际云部署依后续明确操作指令执行。
-- [ ] 提交本项，消息 `docs: deliver Linux release and initialization workflow`。
+- [x] 使用最终构建的bundle复核L09健康/登录及发布引用，确保证据指向最终字节；仅制品变化且不影响场景时不重复无关完整业务测试，新失败按影响补测。检查公开Git差异无密码/令牌/私钥/备份，原本地环境账号、数据、配置与 Java 进程保全；Docker 迁盘及原容器恢复依本轮明确追加授权执行。
+- [x] 完成全分支代码审查，修复实际问题并重跑受影响验证；更新各项checkbox、证据及限制。提交开发分支，不以设计/模拟测试替代完成声明；合并main/实际云部署依后续明确操作指令执行。
+- [x] 提交本项，消息 `docs: deliver Linux release and initialization workflow`。
 
 ## 自审与交付判定
 
@@ -190,4 +190,4 @@
 
 实施结束分别报告数据库迁移、身份初始化、业务准备、合成业务验收四种结果。未审核模板、分配权限待指派和其他人员首次改密属于已知准备条件，不能隐藏在“全部可正式使用”结论中；本计划确认后按当前会话顺序实施。
 
-L09 实际 all 运行 `linux-v22-final-a7ef88313cc7` 通过；L10 实现与构建验证完成，唯一全分支审查为剩余交付门禁。报告见 `docs/evidence/linux-v22-initialization/report.md`。
+L09 最终实际 all 运行 `linux-v22-final-e1680925ee9a` 通过；L10 实现、构建与独立全分支审查完成，三个 Important 均经 RED→GREEN、138 项原生 Linux 整轮及真实故障验证收口；没有延期 Minor。报告见 `docs/evidence/linux-v22-initialization/report.md`。

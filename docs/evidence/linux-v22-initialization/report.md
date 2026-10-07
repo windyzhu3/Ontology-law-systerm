@@ -1,6 +1,6 @@
 # Linux v22 发布与海华初始化验收报告
 
-执行日期：2026-10-07。实际 Linux 三实例全场景运行 `linux-v22-final-a7ef88313cc7`：PASS；四条实际页面业务链均完成到案管接收分类。全分支独立代码审查作为交付最后一关，尚待完成。
+执行日期：2026-10-07。实际 Linux 三实例全场景运行 `linux-v22-final-e1680925ee9a`：PASS；四条实际页面业务链均完成到案管接收分类。独立全分支审查发现的三个 Important 已经修复，并完成 RED→GREEN、138 项零跳过 Linux 整轮及真实故障验收；本轮交付门禁已关闭。
 
 ## 初始化与业务准备
 
@@ -16,10 +16,10 @@
 
 ## 真实原生制品与迁移恢复
 
-实际最终 JAR/SPA 来源提交：`0ba4d8f091cbe3bcb4bc56e66d35067dff90bbbc`。之后的提交仅调整验收编排和交付文档，封装的运行负载不变。两个实际原 issuer 的 SPA 分别构建；共享真实 Linux 构建的 JAR `8d1712f7d49c67eec2f59089bdb3b8e8870d0756778474fca000c6ced6914a11`。
+实际最终 JAR/SPA 来源提交：`1cff383bb2ccb5233a2f4c2d594c83390148bd03`。之后的提交仅调整验收编排和交付文档，封装的运行负载不变。两个实际原 issuer 的 SPA 分别构建；共享真实 Linux 构建的 JAR `fdcddc1a83df47b9929d28280d061168489b6e266e85473dbd8816f5296a8618`。
 
-- 空库最终 descriptor：`4e187e489efa7450cd6ee6d448059fe5421e7d8354f0af071bedb7dd9777a4cc`。
-- 合成业务最终 descriptor：`3c7fa11ce1da67b6ba043f011884d4d3710363fc7ae60a683734111f9752bcf0`。
+- 空库最终 descriptor：`edcf3e1da119c5a2b6b54fa08b74d31317714b527fc3fa72e3d80ca91902479a`。
+- 合成业务最终 descriptor：`1e2299626a56e0cfadb4d62f6c5c72837b161fe497eba76f79a9f5dfc1c137c6`。
 - 实际运行镜像：`sha256:beb0276a4ab09100c6205ec84d6cb517684a88dc5b615464945730980052e733`；其他锁定镜像和 JDK/Node/npm 下载摘要见仓库的 `deploy/identity/identity-toolchain.lock.json`、`deploy/linux/runtime/toolchain.lock.json`、`deploy/linux/runtime/scanner.lock.json`，没有使用浮动版本代替锁定引用。
 
 v20 原生源码 `5eded7f71a26bf24cfbb7f14b548d418eeb96c0e`，实际原 JAR `74866d6a5d667b079527e715344835a0c2c5dc17728f7933ff61b92a367ece5c`。真实迁移候选源码 `0523c7e90684fa331fce2c4ea531b951f5812ae5`，descriptor `c4bb797a99f605dda7a8ba0fceab82510a706f3fd146d9184b38dc380ecbea50`；其两次迁移中断、续跑及旧版联动恢复已完成。随后最终协议修复在上述最终发布的两个 v22 实例实际验证，不把旧场景候选冒称最终提交。
@@ -49,7 +49,7 @@ v20 原生源码 `5eded7f71a26bf24cfbb7f14b548d418eeb96c0e`，实际原 JAR `748
 
 ## 失败与验证边界
 
-Linux 工具最终 133/133、零跳过；架构 13/13、零跳过；跨部门财务入口 PostgreSQL 定向 1/1、零跳过；既有会话 HTTP 28/28、零跳过。较早 245 项集成运行是 242 通过、3 失败，三项修复后独立 3/3 通过；原失败整轮没有改称整体通过。502 项后端单元测试有 4 项既有平台跳过；Windows 对应 Linux Python 回归也有 4 项平台跳过，不能替代零跳过的 Linux 实测。
+Linux 工具最终 138/138、零跳过；架构 13/13、零跳过；跨部门财务入口 PostgreSQL 定向 1/1、零跳过；既有会话 HTTP 28/28、零跳过。较早 245 项集成运行是 242 通过、3 失败，三项修复后独立 3/3 通过；原失败整轮没有改称整体通过。502 项后端单元测试有 4 项既有平台跳过；Windows 对应 Linux Python 回归也有 4 项平台跳过，不能替代零跳过的 Linux 实测。
 
 Windows 发布 Python 90/90、Node 4/4；海华工具 Python 3/3、Node 9/9；schema 生成检查与 SQL 解析 43 SQL/119 函数通过。实际 Linux 完成锁定 npm ci、OpenAPI 检查、类型检查、SPA build、Maven package，以及精确源码提交和嵌入 metadata 核对。
 
@@ -57,14 +57,26 @@ Windows 发布 Python 90/90、Node 4/4；海华工具 Python 3/3、Node 9/9；sc
 
 Docker 数据盘在关闭状态复制、独立摘要核对后迁至 D，原三数据卷和账号保留；最终原环境文件摘要相等、IdP TLS 与扫描服务正常、11 原账号重新真实登录通过，Java 原 PID 20380/30172 保持。三个 Linux 测试实例已显式停止，保留全部数据及私密证据。
 
+## 独立审查修复与最终故障验收
+
+修复两库部分恢复续跑、证书目录链接写入边界及激活失败二次中断，共三个 Important；没有 Critical 或延期 Minor。五项新回归先失败，最终 Linux 整轮 138/138 零跳过。独立审查及修复方式见 `final-review.md`。
+
+原发布 `da118ec65e294b0299ef1d2679be5010` 的隔离证明真实注入角色已提交、第一库已提交后的响应丢失，以及实际健康通过后制造失败、停写后退出和 BLOCKED CAS 已提交后的响应丢失；四次显式原操作续跑后完整服务及初始化核对通过。真实 Linux 证书链接反例在任何 Docker 命令前拒绝，外部空目录保持不变。
+
+正式联动恢复 `02cf8420abd540bc8eaf8c6f77c12e87` 使用原 v20 检查点 `af18eba4faa8414ba61981ad91540b1c`，同样注入角色和第一库提交响应丢失，两次原命令续跑完成；两个库各导入一次角色、恢复一次归档。启动前双库/角色/ACL/资产精确核对，原 v20 全服务重新开放并通过健康检查。
+
+最终业务发布 `85c94e7a4e684e30bb45ec73943cde54` 曾在只读 ACL 归档提取返回非零时拒绝推进；原摘要与目标状态复核后，同一只读提取成功，业务发布由正式 CLI 开始，诊断续跑调用同一 release.resume，随后正式 CLI health 独立通过。前两次返回非零的具体原因没有断言，原失败记录保留。已停止验收浏览器未显式启动的编排失败也保留，随后仅启动原登记浏览器完成 9 身份 PKCE/退出、同一上下文草稿切换及四条现存链的准确事实/回执核对。
+
+运行后的全摘要断言曾因正常元数据变化失败：仅 Worker 轮询游标、Keycloak `public.server_config`、`public.jgroups_ping` 变化。恢复证明在服务启动前严格相等，运行后其他全部身份/业务事实及角色、owner、ACL 摘要仍须相等。另一轮 all `linux-v22-final-67452adb30b7` 因完整资产恢复隔离了备份后生成的迁移证明而拒绝通过；该原 HMAC 证明、字节、旧制品和当前不可变事实重新核对后，同一证明恢复验收入口，最后 all 通过。没有将原失败运行改称通过。
+
 ## 去秘密证据摘要
 
 以下 SHA-256 对应私密 HMAC 封装证据，供持有该实例日志密钥的人复核；摘要本身不替代完整原记录。
 
-- `ols-l06-linux-20261007-d-r_szdvtm/native-all.json`：`452d496c1bbe31e6f68f6467f22e286b9704104c224c603bd72c4ff41ba7a7eb`
-- `ols-l06-linux-20261007-d-r_szdvtm/final-native-publication.json`：`a282b8d18e910407566d339b775ef9a0dc2496a772bc383f247c6bbe82ec0488`
-- `ols-l09-business-e5d30cbe2361/native-business.json`：`cec9121b2bb73663be5c54d649bbf508c6ff8cd1ee43fe0486cf166115f27f53`
-- `ols-l09-business-e5d30cbe2361/final-native-publication.json`：`d0d7c1e0e9b1f9bbcbfaf10c28e899ce34df00e26883c97ab9b7da26e264bc0a`
+- `ols-l06-linux-20261007-d-r_szdvtm/native-all.json`：`a73969efbc4e1537ad2a2f6192992a3762941185685258f6b73e8f73597e2e83`
+- `ols-l06-linux-20261007-d-r_szdvtm/final-native-publication.json`：`6cbfcbd9e51fa72f1023eea6ed85f26a126bfaa701733a2c6e57c4c173d9887f`
+- `ols-l09-business-e5d30cbe2361/native-business.json`：`26107087fef70cf923f5b32ef6083e2477d618c9a31eb31c448a20cc088add1d`
+- `ols-l09-business-e5d30cbe2361/final-native-publication.json`：`b39d50ca762328c55c05e9c11456652dc693dca51e2f15c3606753116dc82b6e`
 - `ols-l09-upgrade-d5fee2a6bd76/native-upgrade.json`：`dd044d0e30210a61bb3cd49f873f5ec7d56108938901ec992dd3318f5b6d7680`
 
 本报告不表示已推送、合并 main 或部署腾讯云；这些操作不属于本轮确认范围。上线验收可按 `deploy/linux/README.md` 使用仓库配置与唯一 CLI，正式模板审核、独立线索分配授权及其余人员改密仍为业务使用前准备条件。
