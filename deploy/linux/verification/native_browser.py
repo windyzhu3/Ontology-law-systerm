@@ -3,7 +3,7 @@ from pathlib import Path
 import json
 from ols_linux import config,identity,journal,runtime
 
-STARTUP='''set -eu
+LEGACY_STARTUP='''set -eu
 apt-get update >/tmp/ols-browser-tools.log 2>&1
 apt-get install -y --no-install-recommends libnss3-tools >>/tmp/ols-browser-tools.log 2>&1
 mkdir -p /root/.local/share/pki/nssdb
@@ -13,6 +13,7 @@ if [ -f "$1/certs/public-ca.pem" ]; then timeout 10s certutil -A -d sql:/root/.l
 test "$(node -p 'require("/tools/node_modules/@playwright/test/package.json").version')" = 1.63.0
 exec tail -f /dev/null
 '''
+STARTUP=LEGACY_STARTUP.replace('timeout 10s certutil -N -d sql:/root/.local/share/pki/nssdb --empty-password </dev/null >/dev/null 2>&1', 'if [ ! -f /root/.local/share/pki/nssdb/cert9.db ]; then timeout 10s certutil -N -d sql:/root/.local/share/pki/nssdb --empty-password </dev/null >/dev/null 2>&1; fi')
 
 
 def prepare(root,modules):
@@ -21,12 +22,20 @@ def prepare(root,modules):
     repo=Path(resources['repo']);lock=json.loads((repo/'deploy/identity/identity-toolchain.lock.json').read_text())['browserTests']
     image=lock['image']+':'+lock['tag']+'@'+lock['platformDigest']
     if lock['version']!='1.63.0':raise RuntimeError('Exact locked browser version required')
-    name=resources['name']+'-business-browser';launch=config.digest({'image':image,'startup':STARTUP,'modules':modules,'root':str(root)})
+    base=resources['name']+'-business-browser';name=resources['containers'].get('businessBrowser',base)
+    if name not in {base,base+'-v2'}:raise RuntimeError('Unexpected registered native browser name')
+    launch=config.digest({'image':image,'startup':STARTUP,'modules':modules,'root':str(root)})
     actual=runtime.inspect('container',name)
     if actual:
         if resources['containers'].get('businessBrowser')!=name:raise RuntimeError('Unregistered browser not adopted')
         actual=runtime.owned(root,'container',name)
-        if actual['Config']['Labels'].get('ols.browser-launch')!=launch:raise RuntimeError('Original browser launch changed')
+        if actual['Config']['Labels'].get('ols.browser-launch')!=launch:
+            legacy=config.digest({'image':image,'startup':LEGACY_STARTUP,'modules':modules,'root':str(root)})
+            if name!=base or actual['State']['Running'] or actual['Config']['Labels'].get('ols.browser-launch')!=legacy:raise RuntimeError('Original browser launch changed')
+            resources['containers']['businessBrowserPrevious']=base;name=base+'-v2'
+            if runtime.inspect('container',name):raise RuntimeError('Replacement browser name exists; not adopted')
+            actual=None
+    if actual:
         if not actual['State']['Running']:runtime.run(['docker','start',name])
     else:
         resources['containers']['businessBrowser']=name;runtime.save(root,resources)
