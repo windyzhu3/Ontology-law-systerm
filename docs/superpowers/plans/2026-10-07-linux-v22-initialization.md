@@ -70,11 +70,11 @@
 **Interfaces:** 消费L01日志和制品；`runtime.prepare(runtime: Path, settings: dict) -> dict` 登记网络/卷/容器/端口/TLS资源；`runtime.stop_writers(runtime: Path, operation_id: str) -> None` 关闭公网入口并停写核验；`runtime.start_internal(runtime: Path, descriptor: dict) -> dict` 内部启动；`runtime.open_ingress(runtime: Path, operation_id: str) -> None` 仅经验证阶段开放。
 - `database.observe(runtime: Path) -> dict` 返回准确gate/history/catalog；`database.flyway(runtime: Path, operation_id: str, action: str, target: str | None = None) -> dict` 只接受validate/migrate，使用锁定镜像、专用migrator与私密配置文件。`harness.create(run_id: str) -> Path` 返回新独立实例根。
 
-- [ ] 测试：`assert spy.commands_contain_no('pwsh', 'icacls', 'certutil')`；停止失败不得进入迁移；缺/错TLS、占用端口/外部卷、非登记writer拒绝；`repair/clean`拒绝。empty_database验证 `assert sql_versions == expected_43_versions`、所有history成功及schema为v22；API/worker角色无DDL能力。
-- [ ] 运行runtime/database测试，缺实现失败；执行 `python3 deploy/linux/verification/empty_database.py --run-id <本轮唯一ID>`，首次缺入口失败。测试只能创建本轮资源。
-- [ ] 实现 runtime/database接口和容器入口：应用镜像从匹配的既有JDK/Linux制品构建，核对版本；秘密以文件挂载，不放argv/公网。API/Worker各用独立容器、同一JAR，Node入口复用既有SPA服务语义。默认仅内部网络/loopback，CA校验和mTLS保持。资源删除仅限日志登记且label匹配的本轮测试资源。
-- [ ] 通过单元测试与真实空库43迁移/schema/数据库角色检查；记录Linux版本、镜像摘要及结果。此项只证明数据库基础能力，不宣称初始化完成。
-- [ ] 提交本项，消息 `feat: add isolated Linux runtime and schema preparation`。
+- [x] 测试：`assert spy.commands_contain_no('pwsh', 'icacls', 'certutil')`；停止失败不得进入迁移；缺/错TLS、占用端口/外部卷、非登记writer拒绝；`repair/clean`拒绝。empty_database验证 `assert sql_versions == expected_43_versions`、所有history成功及schema为v22；API/worker角色无DDL能力。
+- [x] 运行runtime/database测试，缺实现失败；执行 `python3 deploy/linux/verification/empty_database.py --run-id <本轮唯一ID>`，首次缺入口失败。测试只能创建本轮资源。
+- [x] 实现 runtime/database接口和容器入口：应用镜像从匹配的既有JDK/Linux制品构建，核对版本；秘密以文件挂载，不放argv/公网。API/Worker各用独立容器、同一JAR，Node入口复用既有SPA服务语义。默认仅内部网络/loopback，CA校验和mTLS保持。资源删除仅限日志登记且label匹配的本轮测试资源。
+- [x] 通过单元测试与真实空库43迁移/schema/数据库角色检查；记录Linux版本、镜像摘要及结果。此项只证明数据库基础能力，不宣称初始化完成。
+- [x] 提交本项，消息 `feat: add isolated Linux runtime and schema preparation`。
 
 ### Task 3: L03 v20→v22状态机、检查点、原操作恢复
 

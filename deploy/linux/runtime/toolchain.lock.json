@@ -1,0 +1,24 @@
+{
+  "platform": "linux/amd64",
+  "jdk": {
+    "version": "25.0.4.1+1",
+    "url": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_x64_linux_hotspot_25.0.4.1_1.tar.gz",
+    "sha256": "dbb698396d478e7fa2b1e50f4103324b2a99b90569ee27c33f2261f9215cf41e",
+    "checksumSource": "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.4.1%2B1/OpenJDK25U-jdk_x64_linux_hotspot_25.0.4.1_1.tar.gz.sha256.txt"
+  },
+  "node": {
+    "version": "24.20.0",
+    "npmVersion": "11.9.0",
+    "image": "node@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e",
+    "url": "https://nodejs.org/download/release/v24.20.0/node-v24.20.0-linux-x64.tar.xz",
+    "sha256": "2f2c0da162318f0de47665410c7c8c2ed3d36c8f3105de4bbc61176c70a7cbf2",
+    "checksumSource": "https://nodejs.org/download/release/v24.20.0/SHASUMS256.txt"
+  },
+  "npm": {
+    "version": "11.9.0",
+    "url": "https://registry.npmjs.org/npm/-/npm-11.9.0.tgz",
+    "sha256": "5a172e3228e59d44cb9f44d5e83977178323bba3cc506016cae8e40b92ad418f",
+    "integrity": "sha512-BBZoU926FCypj4b7V7ElinxsWcy4Kss88UG3ejFYmKyq7Uc5XnT34Me2nEhgCOaL5qY4HvGu5aI92C4OYd7NaA==",
+    "checksumSource": "https://registry.npmjs.org/npm/11.9.0"
+  }
+}

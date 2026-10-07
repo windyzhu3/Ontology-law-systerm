@@ -1,0 +1,8 @@
+{
+  "pythonImage": "python@sha256:dddfd7e07f9d15aeeca61529320492139d21cac7f0070c00609243e51e4e0016",
+  "dockerCliVersion": "29.4.3",
+  "dockerCliUrl": "https://download.docker.com/linux/static/stable/x86_64/docker-29.4.3.tgz",
+  "archiveSha256": "bc9734a89d3edd15eeca8620961f6499ba69948814c85d7ac3488e34b3e16d01",
+  "binarySha256": "d6dfa144a057cfb0089510026dc08245c5b8b087c22d6e6817c350bcb461d5ac",
+  "purpose": "Linux verification only; no daemon installation"
+}
