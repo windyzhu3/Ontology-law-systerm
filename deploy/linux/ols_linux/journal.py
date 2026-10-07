@@ -98,7 +98,7 @@ def _write(root, path, payload):
 
 
 def _read(root, path):
-    if path.is_symlink(): raise RuntimeError('Unsafe original-operation path')
+    if path.resolve()!=path.absolute(): raise RuntimeError('Unsafe original-operation path')
     try:
         value = json.loads(path.read_text(encoding='utf-8'))
         expected = hmac.new(_key(root), canonical(value['payload']), hashlib.sha256).hexdigest()

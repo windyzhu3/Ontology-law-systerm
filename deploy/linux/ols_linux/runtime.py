@@ -145,33 +145,10 @@ def prepare(root: Path, settings: dict) -> dict:
             if not path.exists(): private_file(path,secrets.token_urlsafe(32).encode())
         for index,(key,db) in enumerate([('businessDb','law_contract_runtime'),('identityDb','keycloak')]):
             name=resources['containers'][key]
-            if inspect('container',name):
-                actual=owned(root,'container',name)
-                if not actual['State']['Running']: raise RuntimeError('Registered database stopped; explicit original resume required')
-            else:
-                secret=root/'secrets'/('business-db.txt' if index==0 else 'identity-db.txt')
-                ports=[]
-                if key in resources['ports']:
-                    port=resources['ports'][key]
-                    if type(port)!=int or not 1024<=port<=65535: raise ValueError('Valid loopback port required')
-                    ports=['-p',f'127.0.0.1:{port}:5432']
-                startup=('mkdir -p /tmp/ols-tls; cp /run/ols-certs/ca.pem /run/ols-certs/server.crt /run/ols-certs/server.key /run/ols-certs/pg_hba.conf /tmp/ols-tls/; '
-                         'cp /run/ols-password /tmp/ols-tls/password; chown -R postgres:postgres /tmp/ols-tls; chmod 700 /tmp/ols-tls; chmod 600 /tmp/ols-tls/*; '
-                         'exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/tmp/ols-tls/server.crt '
-                         '-c ssl_key_file=/tmp/ols-tls/server.key -c ssl_ca_file=/tmp/ols-tls/ca.pem -c ssl_min_protocol_version=TLSv1.3 -c hba_file=/tmp/ols-tls/pg_hba.conf')
-                run(['docker','run','-d','--name',name,*label,'--network',resources['network'],*ports,
-                     '-e','POSTGRES_DB='+db,'-e','POSTGRES_PASSWORD_FILE=/tmp/ols-tls/password','-e','POSTGRES_HOST_AUTH_METHOD=scram-sha-256',
-                     '--mount',f'type=volume,source={resources["volumes"][index]},target=/var/lib/postgresql',
-                     '--mount',f'type=bind,source={secret},target=/run/ols-password,readonly',
-                     '--mount',f'type=bind,source={certs},target=/run/ols-certs,readonly',resources['postgresImage'],'sh','-euc',startup])
-            deadline=time.monotonic()+90
-            while run(['docker','exec',name,'pg_isready','-h','127.0.0.1','-U','postgres','-d',db],check=False).returncode:
-                if time.monotonic()>deadline: raise RuntimeError('Database readiness unknown; original resources retained')
-                time.sleep(.25)
-            if key in resources['ports']:
-                bindings=owned(root,'container',name)['NetworkSettings'].get('Ports',{}).get('5432/tcp')
-                if bindings!=[{'HostIp':'127.0.0.1','HostPort':str(resources['ports'][key])}]:
-                    raise RuntimeError('Requested database loopback port is unavailable; original resources retained')
+            if inspect('container',name) and not owned(root,'container',name)['State']['Running']:
+                raise RuntimeError('Registered database stopped; explicit original resume required')
+            secret=root/'secrets'/('business-db.txt' if index==0 else 'identity-db.txt')
+            start_database(root,name,resources['volumes'][index],db,secret,certs,opid,resources['ports'].get(key))
         journal.record(root,opid,{'phase':'INFRASTRUCTURE_READY','resourcesDigest':digest(resources),'caSha256':sha(certs/'ca.pem')})
         return resources
 
@@ -191,6 +168,40 @@ def stop_writers(root: Path, operation_id: str) -> None:
             count=database.sql(root,f"SELECT count(*) FROM pg_stat_activity WHERE datname='{db}' AND backend_type='client backend' AND pid<>pg_backend_pid()",identity=identity)
             if count!='0':raise RuntimeError('Unregistered database sessions remain; not stopped by the controller')
         journal.record(root,operation_id,{'phase':'WRITERS_STOPPED','writers':names})
+
+
+def start_database(root: Path,name: str,volume: str,db: str,secret: Path,certs: Path,operation_id: str,port=None):
+    """Start only a previously registered replacement database; preserve its volume."""
+    resources=load(root);journal.read(root,operation_id)
+    if name not in resources['containers'].values() or volume not in resources['volumes'] or db not in {'law_contract_runtime','keycloak'}:
+        raise RuntimeError('Unregistered replacement database resource')
+    owned(root,'volume',volume);owned(root,'network',resources['network'])
+    for path in [Path(secret),Path(certs)]:
+        if path.resolve()!=path.absolute() or not path.is_relative_to(root):raise RuntimeError('Replacement secrets outside controlled runtime')
+    actual=inspect('container',name)
+    if actual:
+        actual=owned(root,'container',name)
+        if not any(m.get('Name')==volume and m.get('Destination')=='/var/lib/postgresql' for m in actual['Mounts']):raise RuntimeError('Replacement database volume differs')
+        if not actual['State']['Running']:run(['docker','start',name])
+    else:
+        ports=[]
+        if port is not None:
+            if type(port)!=int or not 1024<=port<=65535:raise ValueError('Valid loopback port required')
+            ports=['-p',f'127.0.0.1:{port}:5432']
+        startup=('mkdir -p /tmp/ols-tls; cp /run/ols-certs/ca.pem /run/ols-certs/server.crt /run/ols-certs/server.key /run/ols-certs/pg_hba.conf /tmp/ols-tls/; '
+            'cp /run/ols-password /tmp/ols-tls/password; chown -R postgres:postgres /tmp/ols-tls; chmod 700 /tmp/ols-tls; chmod 600 /tmp/ols-tls/*; '
+            'exec docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/tmp/ols-tls/server.crt -c ssl_key_file=/tmp/ols-tls/server.key '
+            '-c ssl_ca_file=/tmp/ols-tls/ca.pem -c ssl_min_protocol_version=TLSv1.3 -c hba_file=/tmp/ols-tls/pg_hba.conf')
+        run(['docker','run','-d','--name',name,'--label',LABEL+'='+resources['instanceId'],'--label','ols.operation='+operation_id,
+            '--network',resources['network'],*ports,'-e','POSTGRES_DB='+db,'-e','POSTGRES_PASSWORD_FILE=/tmp/ols-tls/password',
+            '--mount',f'type=volume,source={volume},target=/var/lib/postgresql','--mount',f'type=bind,source={secret},target=/run/ols-password,readonly',
+            '--mount',f'type=bind,source={certs},target=/run/ols-certs,readonly',resources['postgresImage'],'sh','-euc',startup])
+    deadline=time.monotonic()+90
+    while run(['docker','exec',name,'pg_isready','-h','127.0.0.1','-U','postgres','-d',db],check=False).returncode:
+        if time.monotonic()>deadline:raise RuntimeError('Replacement database readiness unknown')
+        time.sleep(.25)
+    if port is not None and owned(root,'container',name)['NetworkSettings'].get('Ports',{}).get('5432/tcp')!=[{'HostIp':'127.0.0.1','HostPort':str(port)}]:
+        raise RuntimeError('Replacement loopback port is unavailable')
 
 
 def start_internal(root: Path, descriptor: dict) -> dict:

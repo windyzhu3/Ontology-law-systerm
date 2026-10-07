@@ -12,6 +12,14 @@ sys.path.insert(0, str(LINUX))
 
 
 class JournalTest(unittest.TestCase):
+    @unittest.skipIf(os.name=='nt','POSIX directory-link check runs in Linux verification')
+    def test_valid_signed_operation_through_external_parent_link_is_refused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'runtime';outside=Path(folder)/'outside'
+            op=self.m.begin(root,'initialize','a'*64)
+            (root/'operations').rename(outside)
+            (root/'operations').symlink_to(outside,target_is_directory=True)
+            with self.assertRaises(RuntimeError):self.m.read(root,op['operationId'])
     def setUp(self):
         self.assertTrue((LINUX / 'ols_linux/journal.py').is_file(), 'private journal missing')
         self.m = importlib.import_module('ols_linux.journal')

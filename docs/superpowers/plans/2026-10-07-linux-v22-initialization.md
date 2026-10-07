@@ -83,12 +83,12 @@
 **Interfaces:** 消费L01/L02；`checkpoint.capture(runtime: Path, operation_id: str) -> dict` 返回业务库/身份库/材料/密钥配置引用/旧制品摘要；`checkpoint.verify_restore(runtime: Path, operation_id: str) -> dict` 在独立目标实际恢复；`checkpoint.restore(runtime: Path, operation_id: str) -> dict` 显式执行已验证检查点联动恢复。
 - `release.upgrade(runtime: Path, bundle_dir: Path) -> dict` 新升级仅接受真实v20；`release.resume(runtime: Path, operation_id: str) -> dict` 只推进原操作剩余阶段；`release.publish_bytes(runtime: Path, bundle_dir: Path) -> dict` 只接受同schema；`release.status(runtime: Path) -> dict` 只读。
 
-- [ ] 失败测试断言：`assert old_table_digests_after == old_table_digests_before`、`assert history_after[:len(history_before)] == history_before`、`assert appended_versions == ['1070', '1080']`。旧表摘要集仅排除单独核对的deployment_state/Flyway history；不排除身份、授权、业务、任务、审计表，新appointment_role种子另验。错版、旧41文件篡改、bundle不符、并发、缺备份/恢复证明、writer未停都拒绝。V1070后中断原resume只执行V1080；两项已提交但命令超时，resume不再迁移。旧JAR独立rollback拒绝；显式恢复后gate/history/两库/材料/配置/制品匹配原检查点。
-- [ ] 运行 checkpoint/release 单元测试，首次缺实现失败；真实场景命令为 `python3 deploy/linux/verification/migration.py --run-id <唯一ID>`。
-- [ ] 实现状态顺序：读取冻结原gate→CAS MAINTENANCE→关闭入口/停全部writer→联动备份并真实恢复核验→记录迁移可能执行→validate/migrate/validate→核对v22/history/catalog/旧逐表事实→安装bundle→用实际revision做gateCAS→内部启动/原引导核对/健康→开放入口。联动检查点停写包含Keycloak身份写入进程，内部验收时再启动，不把两份运行中无关联备份称为一致检查点。迁移前单独校验旧41个history及对应字节，迁移后校验完整43个history；不能拿仅含旧41迁移的locations对已迁v22库执行Flyway validate。每个effect之前持久化意图。V1070新增目录种子单独核对，不把新role表计入“旧表必须字节相同”。
-- [ ] 实现unknown reconcile：实际history、gate、当前字节和原日志一致才推进；不猜revision、不覆盖他人release，冲突留在MAINTENANCE/BLOCKED。v21仅允许属于该日志的续跑；不创建新升级。checkpoint恢复包括两库、材料、密钥配置和旧制品，先隔离验证再切换。
-- [ ] 通过单元与真实v20事实保留/中断/激活失败/联动恢复场景；同schema入口再次确认schema变化拒绝。记录每种失败停留阶段，不只记录退出码。
-- [ ] 提交本项，消息 `feat: implement journaled v20 to v22 Linux migration`。
+- [x] 失败测试断言：`assert old_table_digests_after == old_table_digests_before`、`assert history_after[:len(history_before)] == history_before`、`assert appended_versions == ['1070', '1080']`。旧表摘要集仅排除单独核对的deployment_state/Flyway history；不排除身份、授权、业务、任务、审计表，新appointment_role种子另验。错版、旧41文件篡改、bundle不符、并发、缺备份/恢复证明、writer未停都拒绝。V1070后中断原resume只执行V1080；两项已提交但命令超时，resume不再迁移。旧JAR独立rollback拒绝；显式恢复后gate/history/两库/材料/配置/制品匹配原检查点。
+- [x] 运行 checkpoint/release 单元测试，首次缺实现失败；真实场景命令为 `python3 deploy/linux/verification/migration.py --run-id <唯一ID>`。
+- [x] 实现状态顺序：读取冻结原gate→CAS MAINTENANCE→关闭入口/停全部writer→联动备份并真实恢复核验→记录迁移可能执行→validate/migrate/validate→核对v22/history/catalog/旧逐表事实→安装bundle→用实际revision做gateCAS→内部启动/原引导核对/健康→开放入口。联动检查点停写包含Keycloak身份写入进程，内部验收时再启动，不把两份运行中无关联备份称为一致检查点。迁移前单独校验旧41个history及对应字节，迁移后校验完整43个history；不能拿仅含旧41迁移的locations对已迁v22库执行Flyway validate。每个effect之前持久化意图。V1070新增目录种子单独核对，不把新role表计入“旧表必须字节相同”。
+- [x] 实现unknown reconcile：实际history、gate、当前字节和原日志一致才推进；不猜revision、不覆盖他人release，冲突留在MAINTENANCE/BLOCKED。v21仅允许属于该日志的续跑；不创建新升级。checkpoint恢复包括两库、材料、密钥配置和旧制品，先隔离验证再切换。
+- [x] 通过单元与真实v20事实保留/中断/激活失败/联动恢复场景；同schema入口再次确认schema变化拒绝。记录每种失败停留阶段，不只记录退出码。
+- [x] 提交本项，消息 `feat: implement journaled v20 to v22 Linux migration`。
 
 ### Task 4: L04 HUMAN来源绑定和最终写入校验
 

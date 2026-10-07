@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import re
+import zlib
 from . import journal,runtime
 from .bundle import inventory,sha,GENERATED
 
@@ -22,9 +23,34 @@ def verify_sources(repo: Path):
         raise RuntimeError('Frozen migration prefix differs')
 
 
-def sql(root: Path, statement: str, identity=False) -> str:
+def migration_checksums(repo: Path,target=None) -> dict:
+    # Flyway 13.4.0 ChecksumCalculator: UTF-8 CRC32, BOM and CR/LF independent.
+    # https://github.com/flyway/flyway/blob/flyway-13.4.0/flyway-core/src/main/java/org/flywaydb/core/internal/resolver/ChecksumCalculator.java
+    directory=Path(repo)/GENERATED/'db/migration';result={}
+    for version in expected_versions(repo,target):
+        matches=list(directory.glob('V'+version+'__*.sql'))
+        if len(matches)!=1:raise RuntimeError('One reviewed SQL file per migration required')
+        path=matches[0];text=path.read_text(encoding='utf-8-sig').replace('\r\n','\n').replace('\r','\n')
+        checksum=zlib.crc32(''.join(text.split('\n')).encode('utf-8'))
+        result[version]={'script':path.name,'checksum':checksum if checksum<2**31 else checksum-2**32}
+    return result
+
+
+def verify_history(repo: Path,history: list,target=None):
+    checksums=migration_checksums(repo,target)
+    versioned=[row for row in history if row['version']]
+    unversioned=[row for row in history if not row['version']]
+    if [row['version'] for row in versioned]!=list(checksums) or len(unversioned)!=1 or unversioned[0].get('type')!='SCHEMA' or not all(row.get('success') is True for row in history):
+        raise RuntimeError('Unexpected exact Flyway history')
+    for row in versioned:
+        if row.get('type')!='SQL' or any(row.get(key)!=value for key,value in checksums[row['version']].items()):raise RuntimeError('Applied migration checksum or file differs')
+
+
+def sql(root: Path, statement: str, identity=False, *, containers=None) -> str:
     resources=runtime.load(root)
-    name=resources['containers']['identityDb' if identity else 'businessDb']
+    selected=containers if containers is not None else resources['containers']
+    name=selected['identityDb' if identity else 'businessDb']
+    if name not in resources['containers'].values():raise RuntimeError('Unregistered database target')
     runtime.owned(root,'container',name)
     result=runtime.run(['docker','exec','-i',name,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres',
                        '-d','keycloak' if identity else 'law_contract_runtime','-Atq'],statement.encode('utf-8'))
@@ -83,13 +109,14 @@ def flyway(root: Path, operation_id: str, action: str, target: str|None=None) ->
         return observed
 
 
-def observe(root: Path) -> dict:
-    exists=sql(root,"SELECT to_regclass('platform_meta.flyway_schema_history') IS NOT NULL")=='t'
+def observe(root: Path, *, containers=None) -> dict:
+    query=lambda statement:sql(root,statement,containers=containers)
+    exists=query("SELECT to_regclass('platform_meta.flyway_schema_history') IS NOT NULL")=='t'
     if not exists:return {'gate':None,'history':[],'tables':[]}
-    history=json.loads(sql(root,"SELECT coalesce(json_agg(h ORDER BY installed_rank),'[]'::json) FROM platform_meta.flyway_schema_history h"))
-    gate_exists=sql(root,"SELECT to_regclass('platform_meta.deployment_state') IS NOT NULL")=='t'
-    gate=json.loads(sql(root,"SELECT json_build_object('deployment_state_key',deployment_state_key,'operating_mode',operating_mode,'active_release_digest',encode(active_release_digest,'hex'),'active_manifest_hash',encode(active_manifest_hash,'hex'),'schema_contract_version',schema_contract_version,'revision',revision,'changed_at',changed_at) FROM platform_meta.deployment_state")) if gate_exists else None
-    tables=json.loads(sql(root,"SELECT coalesce(json_agg(schemaname||'.'||tablename ORDER BY schemaname,tablename),'[]'::json) FROM pg_tables WHERE schemaname IN ('identity','audit','responsibility','execution','external_action','evidence','party','lead','opportunity','conflict','contract','transfer','platform_meta')"))
+    history=json.loads(query("SELECT coalesce(json_agg(h ORDER BY installed_rank),'[]'::json) FROM platform_meta.flyway_schema_history h"))
+    gate_exists=query("SELECT to_regclass('platform_meta.deployment_state') IS NOT NULL")=='t'
+    gate=json.loads(query("SELECT json_build_object('deployment_state_key',deployment_state_key,'operating_mode',operating_mode,'active_release_digest',encode(active_release_digest,'hex'),'active_manifest_hash',encode(active_manifest_hash,'hex'),'schema_contract_version',schema_contract_version,'revision',revision,'changed_at',changed_at) FROM platform_meta.deployment_state")) if gate_exists else None
+    tables=json.loads(query("SELECT coalesce(json_agg(schemaname||'.'||tablename ORDER BY schemaname,tablename),'[]'::json) FROM pg_tables WHERE schemaname IN ('identity','audit','responsibility','execution','external_action','evidence','party','lead','opportunity','conflict','contract','transfer','platform_meta')"))
     return {'gate':gate,'history':history,'tables':tables}
 
 
@@ -112,6 +139,7 @@ def verify_schema(root: Path, target='1080') -> dict:
     resources=runtime.load(root);repo=Path(resources['repo']);observed=observe(root)
     history=observed['history'];versions=[r['version'] for r in history if r['version']]
     if versions!=expected_versions(repo,target) or not all(r['success'] for r in history):raise RuntimeError('Unexpected Flyway history')
+    verify_sources(repo);verify_history(repo,history,target)
     expected='52-plus-2-r2-v22' if target=='1080' else '52-plus-2-r2-v21' if target=='1070' else '52-plus-2-r2-v20'
     if observed['gate']['schema_contract_version']!=expected:raise RuntimeError('Schema gate differs from actual migration target')
     if target=='1080':

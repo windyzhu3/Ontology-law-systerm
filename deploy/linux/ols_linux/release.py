@@ -1,0 +1,395 @@
+"""Schema transitions reconcile immutable original facts, never guess a revision."""
+import json
+import datetime
+import os
+import re
+import zipfile
+from pathlib import Path
+from . import bundle,checkpoint,database,journal,runtime
+from .config import canonical,digest
+
+
+def require_same_schema(current: str,candidate: str):
+    if current!=candidate:raise RuntimeError('Byte publication refuses schema changes; use the reviewed upgrade operation')
+
+
+def reconcile_migrations(history: list,maintenance_gate: dict,observed: dict) -> str:
+    actual=observed['history']
+    if actual[:len(history)]!=history or not all(row['success'] for row in actual):raise RuntimeError('Original migration prefix or success state changed')
+    suffix=[r['version'] for r in actual[len(history):]]
+    targets={():('1060','52-plus-2-r2-v20'),('1070',):('1070','52-plus-2-r2-v21'),('1070','1080'):('1080','52-plus-2-r2-v22')}
+    if tuple(suffix) not in targets:raise RuntimeError('Unexpected successor migration history')
+    target,schema=targets[tuple(suffix)];gate=observed['gate']
+    expected=dict(maintenance_gate,schema_contract_version=schema,revision=maintenance_gate['revision']+len(suffix))
+    for name in ['schema_contract_version','revision','operating_mode','active_release_digest','active_manifest_hash']:
+        if gate.get(name)!=expected.get(name):raise RuntimeError('Observed gate does not belong to this original migration')
+    return target
+
+
+def status(root: Path) -> dict:
+    with journal.locked(root) as root:
+        op=journal.current(root)
+        return {'operationId':op['operationId'],'kind':op['kind'],'phase':op['phase'],'observed':database.observe(root)}
+
+
+def _candidate(directory: Path) -> dict:
+    directory=Path(directory).absolute()
+    if directory.resolve()!=directory:raise RuntimeError('Linked candidate bundle rejected')
+    descriptor=json.loads((directory/'release.json').read_text(encoding='utf-8'))
+    bundle.verify(descriptor,directory)
+    return descriptor
+
+
+def publish_bytes(root: Path,bundle_dir: Path) -> dict:
+    with journal.locked(root) as root:
+        descriptor=_candidate(bundle_dir)
+        require_same_schema(database.observe(root)['gate']['schema_contract_version'],descriptor['schemaVersion'])
+        return _publish_same_schema(root,bundle_dir,descriptor)
+
+
+def upgrade(root: Path,bundle_dir: Path) -> dict:
+    with journal.locked(root) as root:
+        descriptor=_candidate(bundle_dir);observed=database.verify_schema(root,'1060')
+        if observed['gate']['operating_mode']!='ACTIVE':raise RuntimeError('New upgrades require verified ACTIVE v20')
+        baseline=_installed(root,observed['gate'])
+        op=journal.begin(root,'upgrade',descriptor['descriptorDigest'])
+        journal._write(root,root/'operations'/(op['operationId']+'-inputs.json'),{
+            'bundleDirectory':str(Path(bundle_dir).absolute()),'descriptor':descriptor,'before':observed,'baseline':baseline})
+        return resume(root,op['operationId'])
+
+
+def resume(root: Path,operation_id: str) -> dict:
+    with journal.locked(root) as root:
+        op=journal.read(root,operation_id)
+        if journal.current(root)['operationId']!=operation_id or op['kind'] not in {'upgrade','publish-bytes'}:raise RuntimeError('Only the current original publication may resume')
+        if op['phase']=='COMPLETE':return status(root)
+        if (root/'restore-plan.json').exists() and journal._read(root,root/'restore-plan.json')['operationId']==operation_id:
+            raise RuntimeError('Original operation entered linked restore; continue its explicit restore command')
+        inputs=journal._read(root,root/'operations'/(operation_id+'-inputs.json'))
+        descriptor=_candidate(Path(inputs['bundleDirectory']))
+        if descriptor!=inputs['descriptor'] or descriptor['descriptorDigest']!=op['configDigest']:raise RuntimeError('Original candidate changed')
+        return _advance(root,op,inputs)
+
+
+def _advance(root: Path,op: dict,inputs: dict) -> dict:
+    operation_id=op['operationId'];phase=op['phase']
+    if phase in {'CREATED','MAINTENANCE_UNKNOWN'}:
+        _enter_maintenance(root,operation_id,inputs)
+        phase=journal.current(root)['phase']
+    if phase in {'MAINTENANCE','WRITERS_STOPPED','CHECKPOINT_CAPTURING'}:
+        runtime.stop_writers(root,operation_id)
+        directory=root/'checkpoints'/operation_id
+        if not (directory/'checkpoint.json').exists():checkpoint.capture(root,operation_id)
+        checkpoint.verify_restore(root,operation_id)
+        phase=journal.current(root)['phase']
+    if phase in {'CHECKPOINT_CAPTURED','CHECKPOINT_RESTORING_PROOF'}:
+        checkpoint.verify_restore(root,operation_id);phase=journal.current(root)['phase']
+    if phase in {'CHECKPOINT_VERIFIED','MIGRATION_UNKNOWN','MIGRATED','SCHEMA_VERIFIED'}:
+        cp=checkpoint.verified(root,operation_id)
+        if op['kind']=='publish-bytes':
+            observed=database.verify_schema(root)
+            if observed['history']!=cp['observed']['history'] or not _same_gate(observed['gate'],cp['observed']['gate']):raise RuntimeError('Same-schema publication gate or history changed')
+        else:
+            target=reconcile_migrations(cp['observed']['history'],cp['observed']['gate'],database.observe(root))
+            if target!='1080':
+                database.flyway(root,operation_id,'validate')
+                database.flyway(root,operation_id,'migrate')
+            database.flyway(root,operation_id,'validate')
+            observed=database.verify_schema(root)
+            reconcile_migrations(cp['observed']['history'],cp['observed']['gate'],observed)
+        checkpoint.assert_preserved(cp['businessFacts'],checkpoint.table_facts(root))
+        journal.record(root,operation_id,{'phase':'SCHEMA_VERIFIED','gate':observed['gate']})
+        phase='SCHEMA_VERIFIED'
+    if phase in {'SCHEMA_VERIFIED','INSTALL_UNKNOWN'}:
+        journal.record(root,operation_id,{'phase':'INSTALL_UNKNOWN','descriptorDigest':inputs['descriptor']['descriptorDigest']})
+        _install_bundle(root,Path(inputs['bundleDirectory']),inputs['descriptor'])
+        journal.record(root,operation_id,{'phase':'BUNDLE_INSTALLED','descriptorDigest':inputs['descriptor']['descriptorDigest']})
+        phase='BUNDLE_INSTALLED'
+    if phase in {'BUNDLE_INSTALLED','ACTIVATION_UNKNOWN','ACTIVATION_FAILED','RUNTIME_VERIFIED','INGRESS_OPEN'}:
+        return _activate(root,operation_id,inputs)
+    raise RuntimeError('Original operation requires explicit reconciliation of its recorded phase')
+
+
+def _install_bundle(root: Path,source: Path,descriptor: dict) -> Path:
+    directory=root/'releases'/descriptor['descriptorDigest']
+    if directory.resolve()!=directory:raise RuntimeError('Linked installed release rejected')
+    directory.mkdir(mode=0o700,parents=True,exist_ok=True)
+    files=dict(descriptor['files'])
+    files.update({descriptor['spa']+'/'+name:h for name,h in descriptor['spaFiles'].items()})
+    files.update({bundle.GENERATED+'/db/migration/'+name:h for name,h in descriptor['migrations'].items()})
+    unexpected=set(bundle.inventory(directory))-set(files)-{'release.json'}
+    if unexpected:raise RuntimeError('Unexpected bytes in original installation directory')
+    for name,expected in files.items():
+        target=directory/name
+        if target.exists():
+            if target.resolve()!=target.absolute() or bundle.sha(target)!=expected:raise RuntimeError('Original install bytes differ')
+        else:runtime.private_file(target,(source/name).read_bytes())
+    release_file=directory/'release.json'
+    if release_file.exists() and json.loads(release_file.read_text(encoding='utf-8'))!=descriptor:raise RuntimeError('Installed descriptor changed')
+    runtime.private_file(release_file,canonical(descriptor))
+    bundle.verify(descriptor,directory)
+    journal._write(root,root/'installed-candidate.json',{'directory':str(directory),'descriptor':descriptor})
+    return directory
+
+
+def _same_gate(first: dict,second: dict) -> bool:
+    left=dict(first);right=dict(second)
+    for value in [left,right]:
+        if value.get('changed_at'):value['changed_at']=datetime.datetime.fromisoformat(value['changed_at']).astimezone(datetime.timezone.utc)
+    return left==right
+
+
+def _cas_gate(root: Path,old: dict,new: dict) -> dict:
+    expected={'deployment_state_key','operating_mode','active_release_digest','active_manifest_hash','schema_contract_version','revision','changed_at'}
+    if set(old)!=expected or set(new)!=expected or old['deployment_state_key']!='PRIMARY' or new['deployment_state_key']!='PRIMARY' or new['revision']!=old['revision']+1 or new['schema_contract_version']!=old['schema_contract_version']:
+        raise RuntimeError('Exact same-schema gate CAS required')
+    literal=lambda value:"'"+str(value).replace("'","''")+"'"
+    clauses=[]
+    for key in expected:
+        if key in {'active_release_digest','active_manifest_hash'}:clauses.append(f"{key}=decode({literal(old[key])},'hex')")
+        elif key=='changed_at':clauses.append(f"{key}={literal(old[key])}::timestamptz")
+        else:clauses.append(f"{key}={literal(old[key])}")
+    setters=[f"{key}=decode({literal(new[key])},'hex')" for key in ['active_release_digest','active_manifest_hash']]
+    setters += [f"operating_mode={literal(new['operating_mode'])}",f"revision={new['revision']}",f"changed_at={literal(new['changed_at'])}::timestamptz"]
+    statement="BEGIN; SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='30s'; DO $gate$ DECLARE n integer; BEGIN UPDATE platform_meta.deployment_state SET "+','.join(setters)+' WHERE '+' AND '.join(clauses)+"; GET DIAGNOSTICS n=ROW_COUNT; IF n<>1 THEN RAISE EXCEPTION 'gate CAS conflict'; END IF; END $gate$; COMMIT;"
+    database.sql(root,statement)
+    actual=database.observe(root)['gate']
+    if not _same_gate(actual,new):raise RuntimeError('Gate result differs; original operation retained')
+    return actual
+
+
+def _enter_maintenance(root: Path,operation_id: str,inputs: dict):
+    old=inputs['before']['gate']
+    transition=root/'operations'/(operation_id+'-maintenance.json')
+    if transition.exists():new=journal._read(root,transition)
+    else:
+        new=dict(old,operating_mode='MAINTENANCE',revision=old['revision']+1,changed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='microseconds'))
+        journal._write(root,transition,new)
+    journal.record(root,operation_id,{'phase':'MAINTENANCE_UNKNOWN','expectedGate':new})
+    actual=database.observe(root)['gate']
+    if _same_gate(actual,old):actual=_cas_gate(root,old,new)
+    elif not _same_gate(actual,new):raise RuntimeError('Original maintenance CAS conflicts with observed gate')
+    journal.record(root,operation_id,{'phase':'MAINTENANCE','gate':actual})
+
+
+def _installed(root: Path,gate: dict) -> dict:
+    try:
+        pointer=journal._read(root,root/'current-release.json')
+        directory=Path(pointer['directory']);descriptor=pointer['descriptor']
+        if directory.resolve()!=directory.absolute() or directory.parent!=root/'releases' or directory.name!=descriptor['descriptorDigest']:
+            raise RuntimeError('Installed release path differs')
+        if descriptor['schemaVersion']!=gate['schema_contract_version'] or descriptor['manifestHash']!=gate['active_manifest_hash'] or descriptor['files'][descriptor['jar']]!=gate['active_release_digest']:
+            raise RuntimeError('Installed release does not match the database gate')
+        if descriptor['schemaVersion']=='52-plus-2-r2-v22':bundle.verify(descriptor,directory)
+        else:_verify_legacy(descriptor,directory)
+        return pointer
+    except (KeyError,TypeError,OSError,ValueError) as error:raise RuntimeError('Verified installed baseline unavailable') from error
+
+
+def _verify_legacy(descriptor: dict,directory: Path):
+    unsigned=dict(descriptor);seal=unsigned.pop('descriptorDigest')
+    if seal!=digest(unsigned) or descriptor['schemaVersion']!='52-plus-2-r2-v20' or not re.fullmatch('[a-f0-9]{40}',descriptor['commit']):raise RuntimeError('Invalid frozen v20 baseline')
+    frozen=json.loads((Path(__file__).resolve().parents[1]/'config/v20-migration-hashes.json').read_text(encoding='utf-8'))
+    if descriptor['migrations']!=frozen or bundle.inventory(directory/bundle.GENERATED/'db/migration')!=frozen:raise RuntimeError('Frozen v20 prefix differs')
+    for name,expected in descriptor['files'].items():
+        path=directory/name
+        if path.resolve()!=path.absolute() or not path.is_relative_to(directory) or not path.is_file() or bundle.sha(path)!=expected:raise RuntimeError('Frozen v20 baseline file differs')
+    manifest=directory/bundle.GENERATED/'schema-contract-manifest.json'
+    if bundle.sha(manifest)!=descriptor['manifestHash'] or json.loads(manifest.read_text(encoding='utf-8'))['contractVersion']!=descriptor['schemaVersion']:raise RuntimeError('Old manifest is not v20')
+    jar=directory/descriptor['jar']
+    try:
+        with zipfile.ZipFile(jar) as archive:
+            if archive.read('BOOT-INF/classes/schema-contract/schema-contract-manifest.json')!=manifest.read_bytes() or json.loads(archive.read('BOOT-INF/classes/schema-contract/build-source.json'))!={'commit':descriptor['commit'],'manifestHash':descriptor['manifestHash']} or b'JarLauncher' not in archive.read('META-INF/MANIFEST.MF'):
+                raise RuntimeError('Legacy JAR build evidence differs')
+    except (KeyError,zipfile.BadZipFile):raise RuntimeError('Executable frozen legacy JAR unavailable')
+    if bundle.inventory(directory/descriptor['spa'])!=descriptor['spaFiles'] or 'index.html' not in descriptor['spaFiles']:raise RuntimeError('Legacy SPA differs')
+    proof=json.loads((directory/'.artifacts/linux-build-proof.json').read_text(encoding='utf-8'))
+    if proof!={'commit':descriptor['commit'],'jarExitCode':0,'spaExitCode':0,'jarSha256':bundle.sha(jar),'spaFiles':descriptor['spaFiles']}:raise RuntimeError('Old successful build evidence unavailable')
+
+
+def _publish_same_schema(root: Path,bundle_dir: Path,descriptor: dict) -> dict:
+    observed=database.verify_schema(root)
+    if observed['gate']['operating_mode']!='ACTIVE':raise RuntimeError('Byte publication requires verified ACTIVE runtime')
+    baseline=_installed(root,observed['gate'])
+    op=journal.begin(root,'publish-bytes',descriptor['descriptorDigest'])
+    journal._write(root,root/'operations'/(op['operationId']+'-inputs.json'),{'bundleDirectory':str(Path(bundle_dir).absolute()),'descriptor':descriptor,'before':observed,'baseline':baseline})
+    return resume(root,op['operationId'])
+
+
+def _activate(root: Path,operation_id: str,inputs: dict) -> dict:
+    descriptor=inputs['descriptor'];activation_file=root/'operations'/(operation_id+'-activation.json')
+    journal.record(root,operation_id,{'phase':'ACTIVATION_UNKNOWN','descriptorDigest':descriptor['descriptorDigest']})
+    if not (root/'launch.json').exists():raise RuntimeError('Prepared native Linux runtime configuration unavailable; ingress stays closed')
+    launch=journal._read(root,root/'launch.json')
+    if launch['descriptorDigest']!=descriptor['descriptorDigest']:
+        # The trusted initialization assembly owns property/secret/UUID rebinding.
+        # It never imports a user-provided command or replays the bootstrap command.
+        try:from .initialize import bind_release
+        except ImportError:raise RuntimeError('Native runtime configuration binding unavailable; ingress stays closed')
+        bind_release(root,descriptor)
+        launch=journal._read(root,root/'launch.json')
+        if launch['descriptorDigest']!=descriptor['descriptorDigest']:raise RuntimeError('Prepared runtime release differs')
+    candidate=journal._read(root,root/'installed-candidate.json')
+    if candidate['descriptor']!=descriptor:raise RuntimeError('Installed candidate differs')
+    bundle.verify(descriptor,Path(candidate['directory']))
+    if activation_file.exists():activation=journal._read(root,activation_file)
+    else:
+        old=database.observe(root)['gate']
+        if old['schema_contract_version']!=descriptor['schemaVersion'] or old['operating_mode']!='MAINTENANCE':raise RuntimeError('Activation requires the verified maintained schema')
+        new=dict(old,operating_mode='ACTIVE',active_release_digest=descriptor['files'][descriptor['jar']],active_manifest_hash=descriptor['manifestHash'],revision=old['revision']+1,changed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='microseconds'))
+        activation={'before':old,'expected':new,'descriptorDigest':descriptor['descriptorDigest']}
+        journal._write(root,activation_file,activation)
+    actual=database.observe(root)['gate']
+    if activation.get('failed') and _same_gate(actual,activation['failed']):
+        activation['before']=actual;activation['expected']=dict(actual,operating_mode='ACTIVE',revision=actual['revision']+1,changed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='microseconds'))
+        activation.pop('failed');journal._write(root,activation_file,activation)
+    if _same_gate(actual,activation['before']):actual=_cas_gate(root,actual,activation['expected'])
+    elif not _same_gate(actual,activation['expected']):raise RuntimeError('Original activation gate conflicts')
+    try:
+        runtime.start_internal(root,descriptor)
+        try:from .verify import runtime_ready
+        except ImportError:raise RuntimeError('Actual Linux runtime verification unavailable')
+        evidence=runtime_ready(root,descriptor)
+        if evidence.get('status')!='PASS':raise RuntimeError('Runtime readiness refused')
+        journal._write(root,root/'current-release.json',candidate)
+        journal.record(root,operation_id,{'phase':'RUNTIME_VERIFIED','descriptorDigest':descriptor['descriptorDigest'],'evidenceDigest':digest(evidence)})
+        runtime.open_ingress(root,operation_id)
+        journal.record(root,operation_id,{'phase':'COMPLETE','descriptorDigest':descriptor['descriptorDigest']})
+        return {'operationId':operation_id,'kind':journal.read(root,operation_id)['kind'],'phase':'COMPLETE','descriptorDigest':descriptor['descriptorDigest']}
+    except Exception:
+        runtime.stop_writers(root,operation_id)
+        current=database.observe(root)['gate']
+        if not _same_gate(current,activation['expected']):raise RuntimeError('Activation failure gate conflicts; original state retained')
+        blocked=dict(current,operating_mode='BLOCKED',revision=current['revision']+1,changed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='microseconds'))
+        activation['failed']=blocked;journal._write(root,activation_file,activation)
+        _cas_gate(root,current,blocked)
+        journal.record(root,operation_id,{'phase':'ACTIVATION_FAILED','gate':blocked,'descriptorDigest':descriptor['descriptorDigest']})
+        raise RuntimeError('Runtime activation failed; writers stopped, ingress closed, original operation retained') from None
+
+
+def restore_checkpoint(root: Path,source_operation_id: str,value: dict) -> dict:
+    """Restore both databases into new owned volumes, verify, then switch names and assets."""
+    with journal.locked(root) as root:
+        cp_digest=digest(value);directory=root/'checkpoints'/source_operation_id
+        current=journal.current(root)
+        if current['phase']=='COMPLETE':current=journal.begin(root,'restore',cp_digest)
+        elif current['operationId']!=source_operation_id and not(current['kind']=='restore' and current['configDigest']==cp_digest):
+            raise RuntimeError('Another original operation is pending')
+        operation_id=current['operationId'];plan_path=root/'restore-plan.json'
+        if plan_path.exists():
+            plan=journal._read(root,plan_path)
+            if plan['operationId']!=operation_id or plan['checkpointDigest']!=cp_digest:raise RuntimeError('Original linked restore differs')
+        else:
+            resources=runtime.load(root);suffix=operation_id[:8]
+            plan={'operationId':operation_id,'sourceOperationId':source_operation_id,'checkpointDigest':cp_digest,
+                'before':database.observe(root),'sourceContainers':{k:resources['containers'][k] for k in ['businessDb','identityDb']},
+                'sourceVolumes':list(resources['volumes'][:2]),'replacementContainers':{},'replacementVolumes':{},'quarantineContainers':{}}
+            for key,short in [('businessDb','business'),('identityDb','identity')]:
+                plan['replacementContainers'][key]=resources['name']+'-restore-'+short+'-'+suffix
+                plan['replacementVolumes'][key]=resources['name']+'-restore-'+short+'-data-'+suffix
+                plan['quarantineContainers'][key]=resources['name']+'-before-restore-'+short+'-'+suffix
+                if any(runtime.inspect(kind,name) for kind,name in [('container',plan['replacementContainers'][key]),('container',plan['quarantineContainers'][key]),('volume',plan['replacementVolumes'][key])]):
+                    raise RuntimeError('Linked restore target names already exist; not adopted')
+            journal._write(root,plan_path,plan)
+        source_gate=plan['before']['gate']
+        if source_gate['operating_mode']!='MAINTENANCE' and current['phase'] not in {'RESTORE_REPLACEMENT_READY','RESTORE_SWITCH_UNKNOWN','RESTORE_ASSETS_UNKNOWN','RESTORED_MAINTENANCE'}:
+            if 'sourceMaintenanceGate' not in plan:
+                plan['sourceMaintenanceGate']=dict(source_gate,operating_mode='MAINTENANCE',revision=source_gate['revision']+1,changed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='microseconds'))
+                journal._write(root,plan_path,plan)
+            expected=plan['sourceMaintenanceGate']
+            journal.record(root,operation_id,{'phase':'RESTORE_MAINTENANCE_UNKNOWN','expectedGate':expected})
+            observed=database.observe(root)['gate']
+            if _same_gate(observed,source_gate):_cas_gate(root,source_gate,expected)
+            elif not _same_gate(observed,expected):raise RuntimeError('Original restore maintenance gate conflicts')
+        if current['phase']=='RESTORED_MAINTENANCE':
+            _assert_restored(root,value)
+            return {'status':'RESTORED_MAINTENANCE','operationId':operation_id,'schemaVersion':value['observed']['gate']['schema_contract_version']}
+        if current['phase'] not in {'RESTORE_REPLACEMENT_READY','RESTORE_SWITCH_UNKNOWN','RESTORE_ASSETS_UNKNOWN'}:
+            runtime.stop_writers(root,operation_id)
+            journal.record(root,operation_id,{'phase':'RESTORE_PREPARING','checkpointDigest':cp_digest})
+            resources=runtime.load(root)
+            for key in ['businessDb','identityDb']:
+                resources['containers']['restore'+key]=plan['replacementContainers'][key]
+                if plan['replacementVolumes'][key] not in resources['volumes']:resources['volumes'].append(plan['replacementVolumes'][key])
+            runtime.save(root,resources)
+            for key,db,secret in [('businessDb','law_contract_runtime','business-db.txt'),('identityDb','keycloak','identity-db.txt')]:
+                volume=plan['replacementVolumes'][key]
+                if runtime.inspect('volume',volume):runtime.owned(root,'volume',volume)
+                else:runtime.run(['docker','volume','create','--label','ols.instance='+resources['instanceId'],'--label','ols.operation='+operation_id,volume])
+                runtime.start_database(root,plan['replacementContainers'][key],volume,db,directory/'assets/secrets'/secret,directory/'assets/certs',operation_id)
+            selected=plan['replacementContainers']
+            observed=database.observe(root,containers=selected)
+            if observed['history']:
+                if observed!=value['observed'] or checkpoint.table_facts(root,True,containers=selected)!=value['identityFacts']:
+                    raise RuntimeError('Partial or conflicting original linked restore retained')
+            else:
+                journal.record(root,operation_id,{'phase':'RESTORE_DATA_UNKNOWN','checkpointDigest':cp_digest})
+                checkpoint._restore_databases(root,directory,containers=selected)
+            for key,identity,db in [('businessDb',False,'law_contract_runtime'),('identityDb',True,'keycloak')]:
+                owner=value['clusterFacts'][key]['databaseOwner']
+                if not __import__('re').fullmatch('[a-z][a-z0-9_]*',owner):raise RuntimeError('Unsupported checkpoint owner')
+                database.sql(root,f'ALTER DATABASE {db} OWNER TO {owner}',identity=identity,containers=selected)
+            _assert_restored(root,value,containers=selected,assets=False)
+            journal.record(root,operation_id,{'phase':'RESTORE_REPLACEMENT_READY','checkpointDigest':cp_digest})
+        resources=runtime.load(root)
+        journal.record(root,operation_id,{'phase':'RESTORE_SWITCH_UNKNOWN','checkpointDigest':cp_digest})
+        for index,(key,db,secret) in enumerate([('businessDb','law_contract_runtime','business-db.txt'),('identityDb','keycloak','identity-db.txt')]):
+            original=plan['sourceContainers'][key];quarantine=plan['quarantineContainers'][key]
+            resources['containers']['beforeRestore'+key]=quarantine;runtime.save(root,resources)
+            actual=runtime.inspect('container',original)
+            if actual:
+                actual=runtime.owned(root,'container',original)
+                volume_names={m.get('Name') for m in actual['Mounts'] if m.get('Type')=='volume'}
+                if plan['sourceVolumes'][index] in volume_names:
+                    if runtime.inspect('container',quarantine):raise RuntimeError('Quarantine name conflicts with original database')
+                    if actual['State']['Running']:runtime.run(['docker','stop','--time','15',original])
+                    runtime.run(['docker','rename',original,quarantine])
+                elif plan['replacementVolumes'][key] not in volume_names:raise RuntimeError('Database switch target differs')
+            if runtime.inspect('container',quarantine):
+                quarantined=runtime.owned(root,'container',quarantine)
+                if resources['network'] in quarantined['NetworkSettings']['Networks']:
+                    runtime.run(['docker','network','disconnect',resources['network'],quarantine])
+            temporary=plan['replacementContainers'][key]
+            if runtime.inspect('container',temporary):
+                runtime.owned(root,'container',temporary);runtime.run(['docker','stop','--time','15',temporary]);runtime.run(['docker','rm',temporary])
+            runtime.start_database(root,original,plan['replacementVolumes'][key],db,directory/'assets/secrets'/secret,directory/'assets/certs',operation_id,resources['ports'].get(key))
+        live_volumes=[plan['replacementVolumes'][key] for key in ['businessDb','identityDb']]
+        resources['volumes']=live_volumes+[volume for volume in resources['volumes'] if volume not in live_volumes]
+        runtime.save(root,resources)
+        journal.record(root,operation_id,{'phase':'RESTORE_ASSETS_UNKNOWN','checkpointDigest':cp_digest})
+        _restore_assets(root,directory,operation_id,value)
+        _assert_restored(root,value)
+        journal.record(root,operation_id,{'phase':'RESTORED_MAINTENANCE','checkpointDigest':cp_digest,'gate':value['observed']['gate']})
+        return {'status':'RESTORED_MAINTENANCE','operationId':operation_id,'schemaVersion':value['observed']['gate']['schema_contract_version']}
+
+
+def _assert_restored(root: Path,value: dict, *, containers=None,assets=True):
+    if database.observe(root,containers=containers)!=value['observed'] or checkpoint.table_facts(root,containers=containers)!=value['businessFacts'] or checkpoint.table_facts(root,True,containers=containers)!=value['identityFacts'] or checkpoint.cluster_facts(root,containers=containers)!=value['clusterFacts']:
+        raise RuntimeError('Linked restored database facts differ; ingress remains closed')
+    if assets:
+        actual={};expected={name[7:]:h for name,h in value['files'].items() if name.startswith('assets/')}
+        for name in {name.split('/')[0] for name in expected}:
+            path=root/name
+            if path.is_dir():actual.update({name+'/'+child:h for child,h in bundle.inventory(path).items()})
+            elif path.is_file() and path.resolve()==path.absolute():actual[name]=bundle.sha(path)
+        if actual!=expected:raise RuntimeError('Restored asset inventory differs')
+        for name,expected in value['files'].items():
+            if name.startswith('assets/'):
+                path=root/name[7:]
+                if path.resolve()!=path.absolute() or not path.is_file() or bundle.sha(path)!=expected:raise RuntimeError('Linked restored asset differs')
+
+
+def _restore_assets(root: Path,directory: Path,operation_id: str,value: dict):
+    controls={'instance.json','instance.lock','journal.key','resources.json','current-operation.json','operations','checkpoints','quarantine','restore-plan.json'}
+    expected_roots={name.split('/')[1] for name in value['files'] if name.startswith('assets/')}
+    archive=root/'quarantine'/operation_id/'assets'
+    if archive.resolve()!=archive.absolute() or not archive.is_relative_to(root):raise RuntimeError('Linked asset quarantine directory refused')
+    archive.mkdir(mode=0o700,parents=True,exist_ok=True)
+    for path in list(root.iterdir()):
+        if path.name in controls or path.name.endswith('.log') or path.name=='flyway.conf':continue
+        saved=archive/path.name
+        if path.resolve()!=path.absolute():raise RuntimeError('Linked live asset refused')
+        if saved.exists():
+            if path.name not in expected_roots:raise RuntimeError('Unexpected asset remains after original restore')
+        else:os.replace(path,saved)
+    checkpoint._copy(directory/'assets',root)

@@ -34,4 +34,8 @@ PY
 )
 cd "$source_root"
 python -m unittest discover -s deploy/linux/tests -v
-python deploy/linux/verification/empty_database.py --run-id "$run_id" --runtime-image "$3"
+if [ "${4:-empty}" = migration ]; then
+  python deploy/linux/verification/migration.py --run-id "$run_id"
+else
+  python deploy/linux/verification/empty_database.py --run-id "$run_id" --runtime-image "$3"
+fi

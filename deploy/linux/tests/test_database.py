@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import json
 
 LINUX=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(LINUX))
@@ -27,6 +28,16 @@ class DatabaseTest(unittest.TestCase):
     def test_empty_database_source_validation_is_not_manual_schema_creation(self):
         self.assertTrue(callable(getattr(self.m,'verify_sources',None)), 'fresh source preflight missing')
         self.m.verify_sources(LINUX.parents[1])
+
+    def test_history_checksums_and_scripts_are_checked_before_maintenance(self):
+        self.assertTrue(callable(getattr(self.m,'verify_history',None)), 'Exact history checksum preflight missing')
+        checksums=self.m.migration_checksums(LINUX.parents[1],'1060')
+        history=[{'version':None,'type':'SCHEMA','success':True}]+[{'version':version,'type':'SQL','success':True,'checksum':row['checksum'],'script':row['script']} for version,row in checksums.items()]
+        self.m.verify_history(LINUX.parents[1],history,'1060')
+        for field,value in [('checksum',0),('script','V999__unreviewed.sql'),('type','JDBC')]:
+            changed=json.loads(json.dumps(history));changed[1][field]=value
+            with self.assertRaises(RuntimeError):self.m.verify_history(LINUX.parents[1],changed,'1060')
+        with self.assertRaises(RuntimeError):self.m.verify_history(LINUX.parents[1],history+[history[0]],'1060')
 
 
 if __name__=='__main__':unittest.main()
