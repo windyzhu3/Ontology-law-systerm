@@ -33,6 +33,7 @@ abstract class R1HttpFixture extends ContactFlowFixture {
     java.util.function.UnaryOperator<java.sql.Connection> credentialConnection=java.util.function.UnaryOperator.identity();
     ActorContextResolver realHumanResolver;
     List<LeadIntakeSources.Source> intakeSources = List.of();
+    R1HumanSourceBinding humanIntakeBindings;
     io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection;
     R25AiModel aiModel=R25ResponsesAiModel.disabled();
     io.github.windyzhu3.ontologylaw.evidence.MaterialObjectStore materialStore;
@@ -73,7 +74,7 @@ abstract class R1HttpFixture extends ContactFlowFixture {
             var resolver=realHumanResolver!=null?realHumanResolver:new ActorContextResolver(()->credentialConnection.apply(runtimeDatabase.open()),new ExternalSubjectProtection(credentialKeys::get),List.of(new ActorContextResolver.Trust(ISSUER,AUDIENCE,(RSAPublicKey)signing.getPublic())),List.of(new ActorContextResolver.Registration(ISSUER,AUDIENCE,"FIXTURE",authenticated)),certificateBindings);
             var sourceBindings=entries.isEmpty()?null:new R1AssemblyValidationRuntime().validate(runtimeDatabase,c->R1ServiceSourceBinding.validate(c,entries,policies));
             var disclosureDatabase=new RuntimeDatabase(){public java.sql.Connection open()throws java.sql.SQLException{return disclosureConnection.apply(runtimeDatabase.open());}public boolean healthy(){return runtimeDatabase.healthy();}};
-            var services=new R1ApiServices(disclosureDatabase,policies,protection,sourceBindings,"HTTP_IT",new byte[32],intakeSources,opportunityProtection,materialStore==null?io.github.windyzhu3.ontologylaw.api.internal.storage.MaterialObjectStoreFactory.configured():materialStore,contractProtection,paymentWorkflow(),R1HttpFixture.this::transferDestination,aiModel);
+            var services=new R1ApiServices(disclosureDatabase,policies,protection,sourceBindings,"HTTP_IT",new byte[32],intakeSources,opportunityProtection,materialStore==null?io.github.windyzhu3.ontologylaw.api.internal.storage.MaterialObjectStoreFactory.configured():materialStore,contractProtection,paymentWorkflow(),R1HttpFixture.this::transferDestination,aiModel,humanIntakeBindings==null?new R1HumanSourceBinding(List.of(),policies):humanIntakeBindings);
             context=new SpringApplicationBuilder(OntologyLawApplication.class).initializers(c->{var beans=(GenericApplicationContext)c;beans.registerBean(ActorContextResolver.class,()->resolver);beans.registerBean(R1ApiServices.class,()->services);
                 beans.registerBean("httpRequestCounterFixture",org.springframework.boot.web.servlet.FilterRegistrationBean.class,()->{var registration=new org.springframework.boot.web.servlet.FilterRegistrationBean<jakarta.servlet.Filter>((request,response,chain)->{received.incrementAndGet();chain.doFilter(request,response);});registration.setOrder(Integer.MIN_VALUE);return registration;});})
                     .properties(properties.toArray(String[]::new)).run();

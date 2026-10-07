@@ -92,15 +92,15 @@
 
 ### Task 4: L04 HUMAN来源绑定和最终写入校验
 
-**Files:** 新建 `J/lead/R1HumanSourceBinding.java`、`JT/lead/HumanSourceBindingIT.java`；修改 `J/lead/{LeadIntakeSources,LeadCommands}.java`、`J/api/{R1ApiDeployment,R1ApiServices}.java`、`JT/api/LeadIntakeConfigurationTest.java`、`JT/api/LeadIntakeSourcesHttpIT.java`。
+**Files:** 新建 `J/lead/R1HumanSourceBinding.java`、`JT/lead/HumanSourceBindingIT.java`；修改 `J/lead/{LeadIntakeSources,LeadCommands}.java`、`J/api/{R1ApiDeployment,R1ApiServices,R1CommandService,R2OpportunityCommandRuntime}.java`、`JT/api/LeadIntakeConfigurationTest.java`、`JT/api/LeadIntakeSourcesHttpIT.java`、`JT/api/R1HttpFixture.java`。
 
 **Interfaces:** `R1HumanSourceBinding.Entry(UUID tenantId, UUID principalId, String sourceAccountCode)`；`R1HumanSourceBinding(List<Entry> entries, R1SourcePolicyRegistry sources)`；`boolean enabled(UUID tenantId)`；`boolean permits(Actor actor, String sourceAccountCode)`。未配置租户保留原行为；已配置租户的HUMAN无绑定拒绝，SERVICE保持原协议。R1ApiDeployment.Settings新增 `humanIntakeBindings: List<Entry>`，旧构造路径用空列表兼容。
 
-- [ ] 新IT断言本人目录只含本人source、跨账号伪造得到 `NOT_AUTHORIZED` 且无线索/任务新增；换任职仍同principal来源；撤权/跨租户/停任失败；SERVICE测试仍通过。同原键同正文重放 `assert replay.factRef().equals(original.factRef())`、`assert leadCountAfter == leadCountBefore`，不改已有receipt/source。重复绑定或未注册source启动失败。
-- [ ] `./mvnw -B -f backend/pom.xml -Pit '-Dit.test=HumanSourceBindingIT,LeadIntakeSourcesHttpIT,LeadIntakeSourcesIT,LeadAssignmentIT' verify`：首次缺类/缺绑定校验失败。
-- [ ] 实现可信设置解析、来源目录过滤和 `LeadCommands.Handler.validateBeforeWork` 的新捕获绑定检查，仍由既有Runtime完成授权锁、原回执判断、幂等和事实事务；不在HTTP层改写客户端原正文。原receipt查询/重放按现有当前授权规则处理，不用新来源覆盖旧结果。新增LeadCommands构造重载，旧构造保持未配置语义。
-- [ ] 通过上述IT及 `./mvnw -B -f backend/pom.xml '-Dtest=LeadIntakeConfigurationTest,ArchitectureTest' test`。
-- [ ] 提交本项，消息 `feat: bind human lead intake to authenticated principals`。
+- [x] 新IT断言本人目录只含本人source、跨账号伪造得到 `NOT_AUTHORIZED` 且无线索/任务新增；换任职仍同principal来源；撤权/跨租户/停任失败；SERVICE测试仍通过。同原键同正文重放 `assert replay.factRef().equals(original.factRef())`、`assert leadCountAfter == leadCountBefore`，不改已有receipt/source。重复绑定或未注册source启动失败。
+- [x] `./mvnw -B -f backend/pom.xml -Pit '-Dit.test=HumanSourceBindingIT,LeadIntakeSourcesHttpIT,LeadIntakeSourcesIT,LeadAssignmentIT' verify`：首次缺类/缺绑定校验失败。
+- [x] 实现可信设置解析、来源目录过滤和 `LeadCommands.Handler.validateBeforeWork` 的新捕获绑定检查，仍由既有Runtime完成授权锁、原回执判断、幂等和事实事务；不在HTTP层改写客户端原正文。原receipt查询/重放按现有当前授权规则处理，不用新来源覆盖旧结果。新增LeadCommands构造重载，旧构造保持未配置语义。
+- [x] 通过上述IT及 `./mvnw -B -f backend/pom.xml '-Dtest=LeadIntakeConfigurationTest,ArchitectureTest' test`。
+- [x] 提交本项，消息 `feat: bind human lead intake to authenticated principals`。
 
 ### Task 5: L05 自动来源的HTTP合同与导入界面
 

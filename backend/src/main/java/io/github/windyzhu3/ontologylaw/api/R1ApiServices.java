@@ -54,11 +54,14 @@ public final class R1ApiServices {
         this(database,sources,protection,services,node,cursorKey,intakeMetadata,opportunityProtection,materialStore,contractProtection,payments,transferDestinations,R25ResponsesAiModel.disabled());
     }
     public R1ApiServices(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,byte[] cursorKey,java.util.List<LeadIntakeSources.Source> intakeMetadata,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection,io.github.windyzhu3.ontologylaw.evidence.MaterialObjectStore materialStore,io.github.windyzhu3.ontologylaw.contract.ContractProtection contractProtection,io.github.windyzhu3.ontologylaw.payment.PaymentWorkflowService payments,java.util.function.Function<UUID,UUID> transferDestinations,R25AiModel aiModel) {
+        this(database,sources,protection,services,node,cursorKey,intakeMetadata,opportunityProtection,materialStore,contractProtection,payments,transferDestinations,aiModel,new R1HumanSourceBinding(java.util.List.of(),sources));
+    }
+    public R1ApiServices(RuntimeDatabase database,R1SourcePolicyRegistry sources,LeadProtection protection,R1ServiceSourceBinding services,String node,byte[] cursorKey,java.util.List<LeadIntakeSources.Source> intakeMetadata,io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection opportunityProtection,io.github.windyzhu3.ontologylaw.evidence.MaterialObjectStore materialStore,io.github.windyzhu3.ontologylaw.contract.ContractProtection contractProtection,io.github.windyzhu3.ontologylaw.payment.PaymentWorkflowService payments,java.util.function.Function<UUID,UUID> transferDestinations,R25AiModel aiModel,R1HumanSourceBinding humanSources) {
         this.opportunityEnabled=opportunityProtection!=null;
         var aiSources=opportunityProtection==null?null:new R25AiSourceReadService(cursorKey,protection,opportunityProtection,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node));
         this.aiCandidates=aiSources==null?null:new R25AiCandidateService(cursorKey,(actor,id,task)->{try(var connection=database.open()){return aiSources.read(connection,actor,id,task);}},aiModel,java.time.Clock.systemUTC());
         this.contractGeneration=new R2ContractGenerationService(materialStore,contractProtection);
-        this.intakeSources=new LeadIntakeSources(sources,intakeMetadata);
+        this.intakeSources=new LeadIntakeSources(sources,intakeMetadata,humanSources);
         this.database=java.util.Objects.requireNonNull(database);this.receipts=new CommandReceiptRecoveryService(sources,protection,services,node);
         var contracts=contractProtection==null||opportunityProtection==null?null:R2ContractServices.create(contractProtection,opportunityProtection,materialStore,payments);
 
@@ -72,7 +75,7 @@ public final class R1ApiServices {
         this.transferReads=transferPorts==null?null:new R2TransferReadService(contractProtection,opportunityProtection,contracts,new ContractWorkflowPorts(opportunityProtection,materialStore),transferPorts,io.github.windyzhu3.ontologylaw.audit.AuditAppender.databaseBacked(node));
         var transferRecovery=transferPorts==null?null:new R2TransferRecoveryService(transferPorts,opportunityProtection);
         this.contractDiscovery=contracts==null?null:new ContractPreparationDiscovery(contracts,cursorKey,transferRecovery);
-        this.commands=new R1CommandService(database,sources,protection,services,node,opportunityProtection,contracts,transfers,transferRecovery);
+        this.commands=new R1CommandService(database,sources,protection,services,node,opportunityProtection,contracts,transfers,transferRecovery,humanSources);
         this.cards=new CurrentWorkCardDisclosureService(protection,sources,node,opportunityProtection);
         this.readiness=new R1ProjectionReadinessService(sources);this.discovery=new DueR1TaskDiscoveryService(cursorKey,sources,protection);this.consumer=new R1ProjectionConsumer(sources);
         this.opportunityDiscovery=new R2OpportunityDiscoveryService(cursorKey);

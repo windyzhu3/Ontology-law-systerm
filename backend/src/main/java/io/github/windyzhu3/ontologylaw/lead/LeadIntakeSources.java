@@ -22,13 +22,18 @@ public final class LeadIntakeSources {
     }
     private final R1SourcePolicyRegistry policies;
     private final List<Source> configured;
+    private final R1HumanSourceBinding bindings;
     private final AuthorizationService authorization = AuthorizationService.databaseBacked();
     private final AuthorizationIdentityReader identity = AuthorizationIdentityReader.databaseBacked();
     private final R1AuthorityReader authorities = R1AuthorityReader.databaseBacked();
 
     /** No source configuration is accepted from a user command or browser request. */
     public LeadIntakeSources(R1SourcePolicyRegistry policies, List<Source> configured) {
+        this(policies,configured,new R1HumanSourceBinding(List.of(),policies));
+    }
+    public LeadIntakeSources(R1SourcePolicyRegistry policies,List<Source> configured,R1HumanSourceBinding bindings) {
         this.policies = Objects.requireNonNull(policies);
+        this.bindings=Objects.requireNonNull(bindings);
         Objects.requireNonNull(configured);
         if (configured.size() > 50) throw new IllegalArgumentException("Intake catalog is limited to 50 sources");
         var accounts = new HashSet<String>();
@@ -50,6 +55,7 @@ public final class LeadIntakeSources {
         authorization.lockForEvaluation(connection, actor.tenantId());
         var result = new ArrayList<Source>();
         for (var source : configured) {
+            if(!bindings.permits(actor,source.sourceAccountCode()))continue;
             var root = identity.organization(connection, actor.tenantId(), policies.find(source.sourceAccountCode()).sourceIntakeRootCode());
             if (root == null) continue;
             var request = authorities.select(connection, actor, root, root.id(), "SOURCE_INTAKE_OWNER", "LEAD_CAPTURE");

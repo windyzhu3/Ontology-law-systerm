@@ -6,11 +6,13 @@ import io.github.windyzhu3.ontologylaw.responsibility.*;
 import java.sql.*;import java.time.*;import java.util.*;
 import static io.github.windyzhu3.ontologylaw.execution.CommandHandler.Event.*;
 public final class LeadCommands {
+    private final R1HumanSourceBinding humanSources;
     private final R1SourcePolicyRegistry sources;private final LeadProtection protection;private final LeadIngressService leads;
     private final TaskFactory tasks=TaskFactory.databaseBacked();private final ActionDraftService drafts=ActionDraftService.databaseBacked();
     private final AuthorizationIdentityReader identity=AuthorizationIdentityReader.databaseBacked();private final R1AuthorityReader authorities=R1AuthorityReader.databaseBacked();
     private final AuthorizationService authorization=AuthorizationService.databaseBacked();private final AssignmentPolicy assignmentPolicy=new AssignmentPolicy();
-    public LeadCommands(R1SourcePolicyRegistry sources,LeadProtection protection) {this.sources=Objects.requireNonNull(sources);this.protection=Objects.requireNonNull(protection);this.leads=LeadIngressService.databaseBacked(protection);}
+    public LeadCommands(R1SourcePolicyRegistry sources,LeadProtection protection) {this(sources,protection,new R1HumanSourceBinding(List.of(),sources));}
+    public LeadCommands(R1SourcePolicyRegistry sources,LeadProtection protection,R1HumanSourceBinding humanSources) {this.sources=Objects.requireNonNull(sources);this.protection=Objects.requireNonNull(protection);this.leads=LeadIngressService.databaseBacked(protection);this.humanSources=Objects.requireNonNull(humanSources);}
     public List<CommandHandler> handlers(){var result=new ArrayList<CommandHandler>(List.of(new SourceRequestRepairCommand(sources,protection),new Handler(CommandEnvelope.Type.RECORD_SOURCE_REQUEST_CONTINUATION),new Handler(CommandEnvelope.Type.CAPTURE_LEAD),new Handler(CommandEnvelope.Type.RESOLVE_DUPLICATE_LEAD),new Handler(CommandEnvelope.Type.COMPLETE_LEAD_INGRESS),new Handler(CommandEnvelope.Type.ASSIGN_LEAD),new Handler(CommandEnvelope.Type.RECORD_ROUTING_DISPOSITION),new Handler(CommandEnvelope.Type.ACKNOWLEDGE_SOURCE_INTAKE_STOP_REQUEST)));result.addAll(new ContactCommands(sources,protection).handlers());result.addAll(new WaitLifecycleService(leads::lock,this::sourceRecovery).handlers());return List.copyOf(result);}
     public static Map<String,Object> candidate(CommandEnvelope.Type type,Map<String,Object> values){try{return LeadInputs.candidate(type,values);}catch(IllegalArgumentException|DateTimeException ex){throw new CommandHandler.Rejected("VALIDATION_FAILED");}}
     private void sourceRecovery(Connection c,UUID tenant,TaskFactory.Task task)throws SQLException{
@@ -62,7 +64,7 @@ public final class LeadCommands {
         }
         public void recoveryEligibility(Connection c,CommandEnvelope e,Context ctx){}
         public void validateBeforeWork(Connection c,CommandEnvelope e,Context ctx)throws SQLException{
-            if(type==CommandEnvelope.Type.CAPTURE_LEAD)return;
+            if(type==CommandEnvelope.Type.CAPTURE_LEAD){require(humanSources.permits(e.actor(),(String)capture(e).get("sourceAccountCode")),"NOT_AUTHORIZED");return;}
             var task=tasks.read(c,e.actor().tenantId(),ctx.scope().taskId());require(task!=null,"NOT_FOUND");require(!task.state().equals("DONE"),"TASK_ALREADY_COMPLETED");require(task.state().equals("OPEN"),"TASK_NOT_OPEN");
             require(e.taskPrecondition().ifMatch().equals(R1ResourceTags.task(e.actor(),task.selector(),task.state())),"STALE_TASK");
             var lead=leads.read(c,e.actor().tenantId(),task.lead().id());require(lead!=null&&lead.selector().equals(task.lead()),"STALE_SUBJECT");CommandHandler.nextRevision(task.selector().revision());

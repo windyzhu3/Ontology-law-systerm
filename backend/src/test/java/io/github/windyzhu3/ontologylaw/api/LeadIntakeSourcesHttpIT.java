@@ -35,6 +35,31 @@ class LeadIntakeSourcesHttpIT extends R1HttpFixture {
             assertEquals(List.of(),http.body(revoked).get("sources"));
         }
     }
+    @Test void bound_http_catalog_filters_other_accounts_and_does_not_mutate_facts() throws Exception {
+        checkBoundCatalog();
+    }
+    @Test void full_sales_runtime_also_checks_the_bound_source_at_write() throws Exception {
+        opportunityProtection=io.github.windyzhu3.ontologylaw.opportunity.OpportunityProgressProtection.aesGcm(tenant->new javax.crypto.spec.SecretKeySpec(new byte[32],"AES"));
+        try{checkBoundCatalog();}finally{opportunityProtection=null;}
+    }
+    private void checkBoundCatalog() throws Exception {
+        setupIntake();var policy=policies.find("FIXTURE");policies=new R1SourcePolicyRegistry(Map.of("FIXTURE",policy,"OTHER",policy));
+        intakeSources=List.of(intakeSources.getFirst(),new LeadIntakeSources.Source("OTHER","其他来源","MANUAL","CONSULTATION","CN","NORMAL"));
+        humanIntakeBindings=new R1HumanSourceBinding(List.of(new R1HumanSourceBinding.Entry(seed.tenant(),seed.request().actor().principalId(),"FIXTURE")),policies);
+        try(var http=new HttpHarness()) {
+            var before=counts();var response=http.request("GET",PATH,null,Map.of());
+            assertEquals(200,response.statusCode(),response.body());
+            assertEquals(1,((List<?>)http.body(response).get("sources")).size());
+            assertFalse(response.body().contains("其他来源"));assertEquals(before,counts());
+            var leadCount=scalar("select count(*) from lead.lead where tenant_id=?",seed.tenant());
+            var taskCount=scalar("select count(*) from responsibility.task_occurrence where tenant_id=?",seed.tenant());
+            var forged=new TreeMap<String,Object>(input(false));forged.put("sourceAccountCode","OTHER");forged.put("sourceRecordKey","forged-http-source");
+            var rejected=http.request("POST","/api/v1/leads",forged,Map.of("Idempotency-Key",UUID.randomUUID().toString()));
+            assertEquals(403,rejected.statusCode(),rejected.body());assertEquals("NOT_AUTHORIZED",http.body(rejected).get("code"));
+            assertEquals(leadCount,scalar("select count(*) from lead.lead where tenant_id=?",seed.tenant()));
+            assertEquals(taskCount,scalar("select count(*) from responsibility.task_occurrence where tenant_id=?",seed.tenant()));
+        }
+    }
     @Test void no_credentials_and_service_actor_cannot_read_human_intake_catalog() throws Exception {
         setupIntake();
         var service = credentialActor(PrincipalKind.SERVICE,"source-service","LEAD_CAPTURE");
