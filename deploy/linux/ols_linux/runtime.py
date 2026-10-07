@@ -110,6 +110,11 @@ def prepare(root: Path, settings: dict) -> dict:
         operation=journal.current(root)
         if operation['kind']!='initialize' or operation['phase'] not in {'CREATED','PREPARING','INFRASTRUCTURE_READY'}:
             raise RuntimeError('Infrastructure requires the original initialization operation')
+        certs=root/'certs'
+        if certs.resolve()!=certs.absolute() or certs.is_symlink() or (certs.exists() and not certs.is_dir()):
+            raise RuntimeError('Instance certificate directory escapes controlled runtime')
+        if certs.exists() and os.name!='nt' and (certs.stat().st_uid!=os.getuid() or certs.stat().st_mode & 0o077):
+            raise RuntimeError('Certificate directory must be owned and private')
         prefix=settings['name'];repo=Path(settings['repo']).absolute()
         from . import public_runtime
         public_tls=public_runtime.inputs(settings)
@@ -169,8 +174,9 @@ def prepare(root: Path, settings: dict) -> dict:
         return resources
 
 
-def stop_writers(root: Path, operation_id: str) -> None:
+def stop_writers(root: Path, operation_id: str, *, phase='WRITERS_STOPPED') -> None:
     with journal.locked(root) as root:
+        if phase not in {'WRITERS_STOPPED','ACTIVATION_FAILING'}:raise ValueError('Unsupported stopped-writer phase')
         journal.read(root,operation_id)
         resources=load(root)
         names=([resources['ingress']] if resources.get('ingress') else [])+resources['writers']
@@ -184,7 +190,7 @@ def stop_writers(root: Path, operation_id: str) -> None:
             db='keycloak' if identity else 'law_contract_runtime'
             count=database.sql(root,f"SELECT count(*) FROM pg_stat_activity WHERE datname='{db}' AND backend_type='client backend' AND pid<>pg_backend_pid()",identity=identity)
             if count!='0':raise RuntimeError('Unregistered database sessions remain; not stopped by the controller')
-        journal.record(root,operation_id,{'phase':'WRITERS_STOPPED','writers':names})
+        journal.record(root,operation_id,{'phase':phase,'writers':names})
 
 
 def start_database(root: Path,name: str,volume: str,db: str,secret: Path,certs: Path,operation_id: str,port=None):

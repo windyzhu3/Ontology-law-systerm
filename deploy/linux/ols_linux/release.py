@@ -106,7 +106,7 @@ def _advance(root: Path,op: dict,inputs: dict) -> dict:
         _install_bundle(root,Path(inputs['bundleDirectory']),inputs['descriptor'])
         journal.record(root,operation_id,{'phase':'BUNDLE_INSTALLED','descriptorDigest':inputs['descriptor']['descriptorDigest']})
         phase='BUNDLE_INSTALLED'
-    if phase in {'BUNDLE_INSTALLED','ACTIVATION_UNKNOWN','ACTIVATION_FAILED','RUNTIME_VERIFIED','INGRESS_OPEN'}:
+    if phase in {'BUNDLE_INSTALLED','ACTIVATION_UNKNOWN','ACTIVATION_FAILING','ACTIVATION_FAILED','RUNTIME_VERIFIED','INGRESS_OPEN'}:
         if phase=='BUNDLE_INSTALLED' and inputs['descriptor'].get('version')==2:
             from .deployment import bind_release
             bind_release(root,inputs['descriptor'])
@@ -229,6 +229,10 @@ def _publish_same_schema(root: Path,bundle_dir: Path,descriptor: dict) -> dict:
 
 def _activate(root: Path,operation_id: str,inputs: dict, *, restored=False) -> dict:
     descriptor=inputs['descriptor'];activation_file=root/'operations'/(operation_id+('-restored-activation.json' if restored else '-activation.json'))
+    if journal.read(root,operation_id)['phase']=='ACTIVATION_FAILING':
+        activation=journal._read(root,activation_file)
+        if activation['descriptorDigest']!=descriptor['descriptorDigest']:raise RuntimeError('Original failing activation differs')
+        _finish_activation_failure(root,operation_id,descriptor,activation_file,activation)
     journal.record(root,operation_id,{'phase':'ACTIVATION_UNKNOWN','descriptorDigest':descriptor['descriptorDigest']})
     if not (root/'launch.json').exists():raise RuntimeError('Prepared native Linux runtime configuration unavailable; ingress stays closed')
     launch=journal._read(root,root/'launch.json')
@@ -271,14 +275,22 @@ def _activate(root: Path,operation_id: str,inputs: dict, *, restored=False) -> d
         journal.record(root,operation_id,{'phase':'COMPLETE','descriptorDigest':descriptor['descriptorDigest']})
         return {'operationId':operation_id,'kind':journal.read(root,operation_id)['kind'],'phase':'COMPLETE','descriptorDigest':descriptor['descriptorDigest']}
     except Exception:
-        runtime.stop_writers(root,operation_id)
-        current=database.observe(root)['gate']
-        if not _same_gate(current,activation['expected']):raise RuntimeError('Activation failure gate conflicts; original state retained')
-        blocked=dict(current,operating_mode='BLOCKED',revision=current['revision']+1,changed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='microseconds'))
-        activation['failed']=blocked;journal._write(root,activation_file,activation)
-        _cas_gate(root,current,blocked)
-        journal.record(root,operation_id,{'phase':'ACTIVATION_FAILED','gate':blocked,'descriptorDigest':descriptor['descriptorDigest']})
+        journal.record(root,operation_id,{'phase':'ACTIVATION_FAILING','descriptorDigest':descriptor['descriptorDigest']})
+        _finish_activation_failure(root,operation_id,descriptor,activation_file,activation)
         raise RuntimeError('Runtime activation failed; writers stopped, ingress closed, original operation retained') from None
+
+
+def _finish_activation_failure(root,operation_id,descriptor,activation_file,activation):
+    runtime.stop_writers(root,operation_id,phase='ACTIVATION_FAILING')
+    current=database.observe(root)['gate']
+    if 'failed' not in activation:
+        if not _same_gate(current,activation['expected']):raise RuntimeError('Activation failure gate conflicts; original state retained')
+        activation['failed']=dict(current,operating_mode='BLOCKED',revision=current['revision']+1,changed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='microseconds'))
+        journal._write(root,activation_file,activation)
+    blocked=activation['failed']
+    if _same_gate(current,activation['expected']):_cas_gate(root,current,blocked)
+    elif not _same_gate(current,blocked):raise RuntimeError('Original failed activation gate conflicts')
+    journal.record(root,operation_id,{'phase':'ACTIVATION_FAILED','gate':blocked,'descriptorDigest':descriptor['descriptorDigest']})
 
 
 def _retain_completed_restore_plan(root,operation_id,checkpoint_digest):
@@ -347,13 +359,8 @@ def restore_checkpoint(root: Path,source_operation_id: str,value: dict) -> dict:
                 else:runtime.run(['docker','volume','create','--label','ols.instance='+resources['instanceId'],'--label','ols.operation='+operation_id,volume])
                 runtime.start_database(root,plan['replacementContainers'][key],volume,db,directory/'assets/secrets'/secret,directory/'assets/certs',operation_id)
             selected=plan['replacementContainers']
-            observed=database.observe(root,containers=selected)
-            if observed['history']:
-                if observed!=value['observed'] or checkpoint.table_facts(root,True,containers=selected)!=value['identityFacts']:
-                    raise RuntimeError('Partial or conflicting original linked restore retained')
-            else:
-                journal.record(root,operation_id,{'phase':'RESTORE_DATA_UNKNOWN','checkpointDigest':cp_digest})
-                checkpoint._restore_databases(root,directory,containers=selected)
+            journal.record(root,operation_id,{'phase':'RESTORE_DATA_UNKNOWN','checkpointDigest':cp_digest})
+            checkpoint._restore_databases(root,directory,containers=selected,value=value)
             checkpoint.restore_owners_and_acl(root,directory,value['clusterFacts'],containers=selected)
             _assert_restored(root,value,containers=selected,assets=False)
             journal.record(root,operation_id,{'phase':'RESTORE_REPLACEMENT_READY','checkpointDigest':cp_digest})
@@ -447,7 +454,7 @@ def stop(root: Path) -> dict:
 def start(root: Path) -> dict:
     with journal.locked(root) as root:
         op=journal.current(root);restored=False
-        if (root/'restore-plan.json').exists() and journal._read(root,root/'restore-plan.json')['operationId']==op['operationId'] and op['phase'] in {'RESTORED_MAINTENANCE','ACTIVATION_UNKNOWN','ACTIVATION_FAILED'}:
+        if (root/'restore-plan.json').exists() and journal._read(root,root/'restore-plan.json')['operationId']==op['operationId'] and op['phase'] in {'RESTORED_MAINTENANCE','ACTIVATION_UNKNOWN','ACTIVATION_FAILING','ACTIVATION_FAILED'}:
             plan=journal._read(root,root/'restore-plan.json')
             if plan['operationId']!=op['operationId']:raise RuntimeError('Start belongs to another restore')
             value=checkpoint.verified(root,plan['sourceOperationId'])
@@ -455,7 +462,7 @@ def start(root: Path) -> dict:
             if op['phase']=='RESTORED_MAINTENANCE':_assert_restored(root,value)
             _restore_runtime_registry(root);restored=True
         elif op['phase'] not in {'COMPLETE','STOP_REQUESTED','WRITERS_STOPPED','STOPPED'} and not(op['kind']=='runtime-control' and op['phase']=='CREATED') and not (
-            op['phase'] in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILED'} and
+            op['phase'] in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILING','ACTIVATION_FAILED'} and
             (root/'operations'/(op['operationId']+'-manual-stop.json')).exists()):
             raise RuntimeError('Unknown publication phase cannot start writers')
         current=journal._read(root,root/'current-release.json')
@@ -471,7 +478,7 @@ def start(root: Path) -> dict:
                 journal._write(root,anchor,{'operationId':op['operationId'],'descriptorDigest':descriptor['descriptorDigest']})
             if gate['operating_mode']!='ACTIVE':
                 activation=journal._read(root,root/'operations'/(op['operationId']+'-activation.json'))
-                if op['phase'] not in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILED'} or activation['descriptorDigest']!=descriptor['descriptorDigest'] or not _same_gate(gate,activation.get('failed',{})):
+                if op['phase'] not in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILING','ACTIVATION_FAILED'} or activation['descriptorDigest']!=descriptor['descriptorDigest'] or not any(_same_gate(gate,g) for g in [activation.get('failed',{}),activation.get('expected',{})] if g):
                     raise RuntimeError('Manual start cannot change an unrecognized deployment gate')
             if op['phase']!='COMPLETE':
                 saved=journal._read(root,root/'operations'/(op['operationId']+'-manual-stop.json'))

@@ -176,18 +176,48 @@ def capture(root: Path,operation_id: str) -> dict:
         return value
 
 
-def _restore_databases(target: Path,directory: Path, *, containers=None):
+def _restore_databases(target: Path,directory: Path, *, containers=None,value=None):
+    # Each cluster is reconciled independently. A successful first database is
+    # never evidence that the second database or its roles were restored.
+    if value is None:value=journal._read(directory.parents[1],directory/'checkpoint.json')
     resources=runtime.load(target)
+    selected=containers if containers is not None else resources['containers']
+    binding={'checkpointDigest':digest(value),'containers':{key:selected[key] for key in ['businessDb','identityDb']},
+             'archives':{key:sha(directory/key) for key in ['businessDb.dump','identityDb.dump','businessDb-roles.sql','identityDb-roles.sql']}}
+    state_path=target/'operations'/(journal.current(target)['operationId']+'-databases-'+digest(binding)+'.json')
+    if state_path.exists():
+        state=journal._read(target,state_path)
+        if state['binding']!=binding:raise RuntimeError('Original database restore binding changed')
+    else:state={'binding':binding,'rolesBefore':{}}
     for key,db in [('businessDb','law_contract_runtime'),('identityDb','keycloak')]:
-        name=(containers if containers is not None else resources['containers'])[key]
+        name=selected[key];identity=key=='identityDb'
         if name not in resources['containers'].values():raise RuntimeError('Unregistered restore database')
         runtime.owned(target,'container',name)
-        runtime.run(['docker','exec','-i',name,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-d',db],role_restore_sql((directory/(key+'-roles.sql')).read_bytes()))
+        expected=value['identityFacts' if identity else 'businessFacts']
+        actual=table_facts(target,identity,containers=selected)
+        observed=database.observe(target,containers=selected) if not identity else None
+        complete=actual==expected and (identity or observed==value['observed'])
+        roles=lambda facts:{k:facts[key][k] for k in ['rolesDigest','membersDigest']}
+        original_roles=roles(value['clusterFacts']);actual_roles=roles(cluster_facts(target,containers=selected))
+        if complete:
+            if actual_roles!=original_roles:raise RuntimeError('Completed original database roles differ')
+            continue
+        if actual or (observed and observed['history']):raise RuntimeError('Partial or conflicting original restore retained')
+        if actual_roles!=original_roles:
+            if key not in state['rolesBefore']:
+                state['rolesBefore'][key]=actual_roles;journal._write(target,state_path,state)
+            elif actual_roles!=state['rolesBefore'][key]:raise RuntimeError('Unknown original role restore conflicts; target retained')
+            # PostgreSQL role DDL is transactional. An interrupted import is
+            # either the exact before state or the original complete role state.
+            runtime.run(['docker','exec','-i',name,'psql','-X','--single-transaction','-v','ON_ERROR_STOP=1','-U','postgres','-d',db],role_restore_sql((directory/(key+'-roles.sql')).read_bytes()))
+            if roles(cluster_facts(target,containers=selected))!=original_roles:raise RuntimeError('Original restored roles differ')
         # New target databases are empty; no clean/repair/down migration is used.
         with (directory/(key+'.dump')).open('rb') as source:
-            result=subprocess.run(['docker','exec','-i',name,'pg_restore','-U','postgres','-d',db,'--exit-on-error'],stdin=source,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=300,
+            result=subprocess.run(['docker','exec','-i',name,'pg_restore','-U','postgres','-d',db,'--single-transaction','--exit-on-error'],stdin=source,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=300,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
         if result.returncode:raise RuntimeError('Checkpoint database restore failed; isolated target retained')
+        if table_facts(target,identity,containers=selected)!=expected or (not identity and database.observe(target,containers=selected)!=value['observed']):
+            raise RuntimeError('Original database restore facts differ; target retained')
     restore_database_acl(target,directory,containers=containers)
 
 
@@ -220,10 +250,7 @@ def verify_restore(root: Path,operation_id: str) -> dict:
         journal.record(root,operation_id,{'phase':'CHECKPOINT_RESTORING_PROOF','target':str(target),'targetInstanceId':target_op['instanceId']})
         proof_resources=runtime.prepare(target,{'name':name,'repo':resources['repo']})
         proof_resources['verification']=True;runtime.save(target,proof_resources)
-        target_state=database.observe(target)
-        if target_state['history']:
-            if target_state!=value['observed'] or table_facts(target,True)!=value['identityFacts']:raise RuntimeError('Partial or conflicting original restore retained')
-        else:_restore_databases(target,directory)
+        _restore_databases(target,directory,value=value)
         restore_owners_and_acl(target,directory,value['clusterFacts'])
         if database.observe(target)!=value['observed'] or table_facts(target)!=value['businessFacts'] or table_facts(target,True)!=value['identityFacts']:
             raise RuntimeError('Restored facts differ; isolated target retained')
