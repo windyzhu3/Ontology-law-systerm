@@ -130,6 +130,17 @@ class IdentityTest(unittest.TestCase):
         self.assertIn('NOSUPERUSER NOCREATEDB NOCREATEROLE',statement)
         self.assertIn('ols_identity_login',statement)
 
+    def test_publication_restarts_original_identity_login_without_reset(self):
+        self.m.prepare(self.root,self.cfg,self.password)
+        with patch.object(self.m.database,'sql',return_value='0'):self.m._database_login(self.root)
+        before=(self.root/'secrets/identity-app.txt').read_bytes()
+        old=self.j.current(self.root);self.j.record(self.root,old['operationId'],{'phase':'COMPLETE'})
+        self.j.begin(self.root,'publish-bytes','b'*64)
+        with patch.object(self.m.database,'sql',return_value='1') as sql:
+            self.m._database_login(self.root)
+            self.assertTrue(all('CREATE ROLE' not in call.args[1] and 'ALTER ROLE' not in call.args[1] for call in sql.call_args_list))
+        self.assertEqual(before,(self.root/'secrets/identity-app.txt').read_bytes())
+
     def test_original_bootstrap_not_dispatched_can_resume_only_after_confirmed_absence(self):
         self.assertTrue(callable(getattr(self.m,'_bootstrap_absent',None)), 'Authoritative original bootstrap absence check missing')
         self.m.prepare(self.root,self.cfg,self.password)

@@ -65,6 +65,12 @@ def create_args(args):
     return ['docker','create',*args[3:]]
 
 
+def final_names(prefix,descriptor_digest):
+    if not re.fullmatch('[a-f0-9]{64}',descriptor_digest):raise RuntimeError('Exact descriptor required')
+    suffix=descriptor_digest[:12]
+    return {role:prefix+'-'+role+'-'+suffix for role in ('api','worker','entry','scanner')}
+
+
 def bind_release(root,descriptor):
     with journal.locked(root) as root:
         if descriptor.get('version')!=2:raise RuntimeError('Full activation requires a sealed runtime payload bundle')
@@ -88,7 +94,7 @@ def bind_release(root,descriptor):
         worker=worker_properties(root,descriptor,plan,service,api,identity.secret_file(root/'secrets/worker-db.txt'),trust)
         worker['ols.worker.bindings[0].certificate-sha256']=hashlib.sha256(ssl.PEM_cert_to_DER_cert((root/'certs/service.crt').read_text())).hexdigest()
         prefix=resources['name'];suffix=descriptor['descriptorDigest'][:12]
-        names={'api':prefix+'-api-'+suffix,'worker':prefix+'-worker-'+suffix,'entry':prefix+'-entry-'+suffix,'scanner':prefix+'-scanner'}
+        names=final_names(prefix,descriptor['descriptorDigest'])
         config_dir=root/'deployments'/descriptor['descriptorDigest']
         scanner=json.loads((directory/'deploy/linux/runtime/scanner.lock.json').read_text())
         if scanner['image']!='clamav/clamav@sha256:9cb27d7660bdf66e9878c832cb433dd8aa152cfbe16f3c2c0084c80b04ae22b4' or scanner['servicePort']!=3310 or scanner['hostPort'] is not None:

@@ -117,12 +117,18 @@ def _copy_files(container, destination, files, uid=1000):
 
 def _database_login(root):
     path=root/'identity/db-login.json';password_path=root/'secrets/identity-app.txt'
+    original=journal.current(root)
+    if (root/'identity/plan.json').exists():
+        identity_plan=journal._read(root,root/'identity/plan.json')
+        original=journal.read(root,identity_plan['operationId'])
+        if identity_plan['instanceId']!=journal._owner(root)['instanceId']:raise RuntimeError('Original identity instance differs')
+    if original['kind']!='initialize':raise RuntimeError('Original identity initialization login required')
     if not path.exists():
         if database.sql(root,"SELECT count(*) FROM pg_roles WHERE rolname='ols_identity_login'",identity=True)!='0':raise RuntimeError('Existing identity login is not adopted')
         runtime.private_file(password_path,secrets.token_urlsafe(32).encode())
-        journal._write(root,path,{'operationId':journal.current(root)['operationId'],'passwordDigest':sha(password_path)})
+        journal._write(root,path,{'operationId':original['operationId'],'passwordDigest':sha(password_path)})
     plan=journal._read(root,path)
-    if plan['operationId']!=journal.current(root)['operationId'] or sha(password_path)!=plan['passwordDigest']:raise RuntimeError('Original identity database login changed')
+    if plan['operationId']!=original['operationId'] or sha(password_path)!=plan['passwordDigest']:raise RuntimeError('Original identity database login changed')
     count=database.sql(root,"SELECT count(*) FROM pg_roles WHERE rolname='ols_identity_login'",identity=True)
     if count=='0':
         password=secret_file(password_path)

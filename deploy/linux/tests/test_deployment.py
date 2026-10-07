@@ -79,3 +79,9 @@ class DeploymentTests(unittest.TestCase):
         self.assertFalse(self.module().worker_ready(ready+'R1_WORKER_UNAVAILABLE\n'))
         self.assertFalse(self.module().worker_ready('R1_WORKER_READY\n'))
         self.assertFalse(self.module().worker_ready(''))
+
+    def test_changed_binding_never_reuses_prior_scanner_launch_name(self):
+        m=self.module()
+        old=m.final_names('ols-private','a'*64);new=m.final_names('ols-private','b'*64)
+        self.assertNotEqual(old['scanner'],new['scanner'])
+        self.assertEqual(old,m.final_names('ols-private','a'*64))

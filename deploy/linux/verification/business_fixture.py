@@ -34,6 +34,11 @@ def prepare(root,parent,repo):
         value={alias:{'username':name,'password':passwords[name],'appointmentId':state['appointments'][name],'passwordUpdated':False} for alias,name in ALIASES.items()}
         runtime.private_file(credentials,config.canonical(value))
         runtime.private_file(root/'account-map.json',config.canonical({'users':{alias:{'appointmentId':state['appointments'][name],'principalId':state['principals'][name]} for alias,name in ALIASES.items()}}))
+    values=json.loads(credentials.read_text())
+    for alias,name in ALIASES.items():
+        if values[alias]['username']!=name or values[alias]['appointmentId']!=state['appointments'][name]:raise RuntimeError('Original browser actor changed')
+        values[alias]['sourceAccount']=next(source['account'] for source in state['config']['intakeSources'] if source['username']==name)
+    runtime.private_file(credentials,config.canonical(values))
     grants=root/'verification/independent-assignment.json'
     records=journal._read(root,grants) if grants.exists() else {}
     actor={'username':'dingqiming','appointmentId':state['appointments']['dingqiming_bootstrap']}
