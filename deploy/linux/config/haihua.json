@@ -1,0 +1,1739 @@
+{
+  "version": 1,
+  "tenantName": "海华律师事务所总所",
+  "organizations": [
+    {
+      "code": "ROOT",
+      "name": "海华律师事务所总所",
+      "parent": null
+    },
+    {
+      "code": "SALES_1",
+      "name": "销售一部",
+      "parent": "ROOT"
+    },
+    {
+      "code": "SALES_2",
+      "name": "销售二部",
+      "parent": "ROOT"
+    },
+    {
+      "code": "CASE_ADMIN",
+      "name": "案管部",
+      "parent": "ROOT"
+    },
+    {
+      "code": "EXECUTION",
+      "name": "执行部",
+      "parent": "ROOT"
+    },
+    {
+      "code": "GENERAL_LEGAL",
+      "name": "综法部",
+      "parent": "ROOT"
+    },
+    {
+      "code": "FINANCE",
+      "name": "财务部",
+      "parent": "ROOT"
+    }
+  ],
+  "roles": [
+    {
+      "code": "IDENTITY_ADMIN",
+      "name": "身份管理员"
+    },
+    {
+      "code": "SALES_MANAGER",
+      "name": "销售主管"
+    },
+    {
+      "code": "SALES_REPRESENTATIVE",
+      "name": "销售员"
+    },
+    {
+      "code": "FINANCE_OPERATOR",
+      "name": "财务人员"
+    },
+    {
+      "code": "CASE_ADMINISTRATOR",
+      "name": "案管员"
+    },
+    {
+      "code": "DIRECTOR",
+      "name": "主任律师"
+    },
+    {
+      "code": "FINANCE_SUPERVISOR",
+      "name": "财务主管"
+    },
+    {
+      "code": "CASE_SUPERVISOR",
+      "name": "案管主管"
+    }
+  ],
+  "people": [
+    {
+      "name": "万和峰",
+      "username": "wanhefeng",
+      "appointments": [
+        {
+          "key": "wanhefeng",
+          "organization": "SALES_1",
+          "role": "SALES_MANAGER",
+          "grants": [
+            {
+              "authority": "CONTRACT_APPROVE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CONTRACT_EXECUTION_VERIFY",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CONTRACT_PREPARATION_DECIDE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CONTRACT_PREPARE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CONTRACT_TERMINATION_REVIEW",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CUSTOMER_REQUIREMENTS_MANAGE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "LEAD_CAPTURE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "LEAD_INGRESS_COMPLETE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "LEAD_INGRESS_RESOLVE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "LEAD_MANAGEMENT_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "LEAD_ROUTING_DECIDE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "LEAD_VALIDITY_REVIEW",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "MATERIALS_MANAGE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "MATERIALS_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "OPPORTUNITY_CLOSE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "OPPORTUNITY_LEDGER_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "PARTY_PROFILE_MANAGE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "PAYMENT_LEDGER_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "PAYMENT_SUBMIT",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "QUOTE_APPROVE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "QUOTE_DELIVER",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "QUOTE_PREPARE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "QUOTE_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "QUOTE_RESPONSE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "SALES_CONTACT_OWNER",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "SALES_OPPORTUNITY_OWNER",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "SOURCE_INTAKE_REQUEST_ACK",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "TEAM_TASK_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "TRANSFER_LEDGER_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "TRANSFER_SUBMIT",
+              "scope": "SALES_1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "何龙",
+      "username": "helong",
+      "appointments": [
+        {
+          "key": "helong",
+          "organization": "SALES_1",
+          "role": "SALES_REPRESENTATIVE",
+          "grants": [
+            {
+              "authority": "LEAD_CAPTURE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "SALES_CONTACT_OWNER",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "SALES_OPPORTUNITY_OWNER",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "OPPORTUNITY_CLOSE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CUSTOMER_REQUIREMENTS_MANAGE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "PARTY_PROFILE_MANAGE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "MATERIALS_MANAGE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "MATERIALS_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "QUOTE_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "QUOTE_PREPARE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "QUOTE_DELIVER",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "QUOTE_RESPONSE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CONTRACT_PREPARE",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CONTRACT_EXECUTION_VERIFY",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "PAYMENT_SUBMIT",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "PAYMENT_LEDGER_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "TRANSFER_SUBMIT",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "TRANSFER_LEDGER_READ",
+              "scope": "SALES_1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "耿唐琪",
+      "username": "gengtangqi",
+      "appointments": [
+        {
+          "key": "gengtangqi",
+          "organization": "SALES_2",
+          "role": "SALES_MANAGER",
+          "grants": [
+            {
+              "authority": "CONTRACT_APPROVE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_EXECUTION_VERIFY",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_PREPARATION_DECIDE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_PREPARE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_TERMINATION_REVIEW",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CUSTOMER_REQUIREMENTS_MANAGE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "LEAD_CAPTURE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "LEAD_INGRESS_COMPLETE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "LEAD_INGRESS_RESOLVE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "LEAD_MANAGEMENT_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "LEAD_ROUTING_DECIDE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "LEAD_VALIDITY_REVIEW",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "MATERIALS_MANAGE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "MATERIALS_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "OPPORTUNITY_CLOSE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "OPPORTUNITY_LEDGER_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PARTY_PROFILE_MANAGE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PAYMENT_LEDGER_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PAYMENT_SUBMIT",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_APPROVE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_DELIVER",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_PREPARE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_RESPONSE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "SALES_CONTACT_OWNER",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "SALES_OPPORTUNITY_OWNER",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "SOURCE_INTAKE_REQUEST_ACK",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "TEAM_TASK_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "TRANSFER_LEDGER_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "TRANSFER_SUBMIT",
+              "scope": "SALES_2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "殷樱",
+      "username": "yinying",
+      "appointments": [
+        {
+          "key": "yinying",
+          "organization": "SALES_2",
+          "role": "SALES_REPRESENTATIVE",
+          "grants": [
+            {
+              "authority": "LEAD_CAPTURE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "SALES_CONTACT_OWNER",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "SALES_OPPORTUNITY_OWNER",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "OPPORTUNITY_CLOSE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CUSTOMER_REQUIREMENTS_MANAGE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PARTY_PROFILE_MANAGE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "MATERIALS_MANAGE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "MATERIALS_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_PREPARE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_DELIVER",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_RESPONSE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_PREPARE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_EXECUTION_VERIFY",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PAYMENT_SUBMIT",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PAYMENT_LEDGER_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "TRANSFER_SUBMIT",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "TRANSFER_LEDGER_READ",
+              "scope": "SALES_2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "薛明明",
+      "username": "xuemingming",
+      "appointments": [
+        {
+          "key": "xuemingming",
+          "organization": "SALES_2",
+          "role": "SALES_REPRESENTATIVE",
+          "grants": [
+            {
+              "authority": "LEAD_CAPTURE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "SALES_CONTACT_OWNER",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "SALES_OPPORTUNITY_OWNER",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "OPPORTUNITY_CLOSE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CUSTOMER_REQUIREMENTS_MANAGE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PARTY_PROFILE_MANAGE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "MATERIALS_MANAGE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "MATERIALS_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_PREPARE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_DELIVER",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_RESPONSE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_PREPARE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_EXECUTION_VERIFY",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PAYMENT_SUBMIT",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PAYMENT_LEDGER_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "TRANSFER_SUBMIT",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "TRANSFER_LEDGER_READ",
+              "scope": "SALES_2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "余小伟",
+      "username": "yuxiaowei",
+      "appointments": [
+        {
+          "key": "yuxiaowei",
+          "organization": "SALES_2",
+          "role": "SALES_REPRESENTATIVE",
+          "grants": [
+            {
+              "authority": "LEAD_CAPTURE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "SALES_CONTACT_OWNER",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "SALES_OPPORTUNITY_OWNER",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "OPPORTUNITY_CLOSE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CUSTOMER_REQUIREMENTS_MANAGE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PARTY_PROFILE_MANAGE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "MATERIALS_MANAGE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "MATERIALS_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_PREPARE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_DELIVER",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "QUOTE_RESPONSE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_PREPARE",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_EXECUTION_VERIFY",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PAYMENT_SUBMIT",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PAYMENT_LEDGER_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "TRANSFER_SUBMIT",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "TRANSFER_LEDGER_READ",
+              "scope": "SALES_2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "杨胜",
+      "username": "yangsheng",
+      "appointments": [
+        {
+          "key": "yangsheng",
+          "organization": "CASE_ADMIN",
+          "role": "CASE_SUPERVISOR",
+          "grants": [
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "TRANSFER_REVIEW",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "TRANSFER_ACCEPT",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "MATTER_CLASSIFY",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "MATTER_RECEIVE",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "TRANSFER_LEDGER_READ",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "TEAM_TASK_READ",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CONTRACT_REVIEW",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CONTRACT_SIGNATURE_VERIFY",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_REVIEW",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "CONTRACT_SIGNATURE_VERIFY",
+              "scope": "SALES_2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "金慧君",
+      "username": "jinhuijun",
+      "appointments": [
+        {
+          "key": "jinhuijun",
+          "organization": "CASE_ADMIN",
+          "role": "CASE_ADMINISTRATOR",
+          "grants": []
+        }
+      ]
+    },
+    {
+      "name": "王慧",
+      "username": "wanghui",
+      "appointments": [
+        {
+          "key": "wanghui",
+          "organization": "CASE_ADMIN",
+          "role": "CASE_ADMINISTRATOR",
+          "grants": []
+        }
+      ]
+    },
+    {
+      "name": "吴惊殊",
+      "username": "wujingshu",
+      "appointments": [
+        {
+          "key": "wujingshu",
+          "organization": "CASE_ADMIN",
+          "role": "CASE_ADMINISTRATOR",
+          "grants": []
+        }
+      ]
+    },
+    {
+      "name": "侯晓凡",
+      "username": "houxiaofan",
+      "appointments": [
+        {
+          "key": "houxiaofan",
+          "organization": "CASE_ADMIN",
+          "role": "CASE_ADMINISTRATOR",
+          "grants": []
+        }
+      ]
+    },
+    {
+      "name": "胡业茹",
+      "username": "huyeru",
+      "appointments": [
+        {
+          "key": "huyeru",
+          "organization": "CASE_ADMIN",
+          "role": "CASE_ADMINISTRATOR",
+          "grants": []
+        }
+      ]
+    },
+    {
+      "name": "陈路",
+      "username": "chenlu",
+      "appointments": [
+        {
+          "key": "chenlu",
+          "organization": "FINANCE",
+          "role": "FINANCE_SUPERVISOR",
+          "grants": [
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "PAYMENT_LEDGER_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "TEAM_TASK_READ",
+              "scope": "ROOT"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "孙荣慧",
+      "username": "sunronghui",
+      "appointments": [
+        {
+          "key": "sunronghui",
+          "organization": "FINANCE",
+          "role": "FINANCE_OPERATOR",
+          "grants": [
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "PAYMENT_CONFIRM",
+              "scope": "SALES_1"
+            },
+            {
+              "authority": "PAYMENT_LEDGER_READ",
+              "scope": "SALES_1"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "焦玮琦",
+      "username": "jiaoweiqi",
+      "appointments": [
+        {
+          "key": "jiaoweiqi",
+          "organization": "FINANCE",
+          "role": "FINANCE_OPERATOR",
+          "grants": [
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PAYMENT_CONFIRM",
+              "scope": "SALES_2"
+            },
+            {
+              "authority": "PAYMENT_LEDGER_READ",
+              "scope": "SALES_2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "丁启明",
+      "username": "dingqiming",
+      "appointments": [
+        {
+          "key": "dingqiming_bootstrap",
+          "organization": "ROOT",
+          "role": "IDENTITY_ADMIN",
+          "grants": [
+            {
+              "authority": "IDENTITY_PRINCIPAL_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "IDENTITY_ORGANIZATION_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "IDENTITY_APPOINTMENT_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "IDENTITY_AUTHORITY_MANAGE",
+              "scope": "ROOT"
+            }
+          ]
+        },
+        {
+          "key": "dingqiming_director",
+          "organization": "ROOT",
+          "role": "DIRECTOR",
+          "grants": [
+            {
+              "authority": "AUDIT_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "LEAD_MANAGEMENT_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "TEAM_TASK_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "LEAD_CAPTURE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "LEAD_INGRESS_RESOLVE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "LEAD_INGRESS_COMPLETE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "LEAD_ROUTING_DECIDE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "SOURCE_INTAKE_REQUEST_ACK",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "SALES_CONTACT_OWNER",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "LEAD_VALIDITY_REVIEW",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "SALES_OPPORTUNITY_OWNER",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "OPPORTUNITY_LEDGER_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "OPPORTUNITY_CLOSE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CUSTOMER_REQUIREMENTS_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "PARTY_PROFILE_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "MATERIALS_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "MATERIALS_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "QUOTE_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "QUOTE_PREPARE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "QUOTE_APPROVE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "QUOTE_SELF_AUTHORIZE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "QUOTE_DELIVER",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "QUOTE_RESPONSE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "PAYMENT_LEDGER_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "TRANSFER_LEDGER_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_PREPARE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_PREPARATION_DECIDE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_REVIEW",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_APPROVE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_SIGNATURE_VERIFY",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_EXECUTION_VERIFY",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "PAYMENT_CONFIRM",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "PAYMENT_SUBMIT",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_TERMINATION_REVIEW",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "TRANSFER_SUBMIT",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "TRANSFER_REVIEW",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "TRANSFER_ACCEPT",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "MATTER_CLASSIFY",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "MATTER_RECEIVE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "IDENTITY_PRINCIPAL_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "IDENTITY_ORGANIZATION_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "IDENTITY_APPOINTMENT_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "IDENTITY_AUTHORITY_MANAGE",
+              "scope": "ROOT"
+            }
+          ]
+        },
+        {
+          "key": "dingqiming_case",
+          "organization": "CASE_ADMIN",
+          "role": "DIRECTOR",
+          "grants": [
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "TRANSFER_REVIEW",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "TRANSFER_ACCEPT",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "MATTER_CLASSIFY",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "MATTER_RECEIVE",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "TRANSFER_LEDGER_READ",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "TEAM_TASK_READ",
+              "scope": "CASE_ADMIN"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "黄雪雪",
+      "username": "huangxuexue",
+      "appointments": [
+        {
+          "key": "huangxuexue_director",
+          "organization": "ROOT",
+          "role": "DIRECTOR",
+          "grants": [
+            {
+              "authority": "AUDIT_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "LEAD_MANAGEMENT_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "TEAM_TASK_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "LEAD_CAPTURE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "LEAD_INGRESS_RESOLVE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "LEAD_INGRESS_COMPLETE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "LEAD_ROUTING_DECIDE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "SOURCE_INTAKE_REQUEST_ACK",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "SALES_CONTACT_OWNER",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "LEAD_VALIDITY_REVIEW",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "SALES_OPPORTUNITY_OWNER",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_DISCOVER",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_RESOLVE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "OPPORTUNITY_OWNER_EXCEPTION_OPERATIONS_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "OPPORTUNITY_LEDGER_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "OPPORTUNITY_CLOSE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CUSTOMER_REQUIREMENTS_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "PARTY_PROFILE_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "MATERIALS_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "MATERIALS_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "QUOTE_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "QUOTE_PREPARE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "QUOTE_APPROVE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "QUOTE_SELF_AUTHORIZE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "QUOTE_DELIVER",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "QUOTE_RESPONSE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "PAYMENT_LEDGER_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "TRANSFER_LEDGER_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_PREPARE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_PREPARATION_DECIDE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_REVIEW",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_APPROVE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_SIGNATURE_VERIFY",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_EXECUTION_VERIFY",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "PAYMENT_CONFIRM",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "PAYMENT_SUBMIT",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "CONTRACT_TERMINATION_REVIEW",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "TRANSFER_SUBMIT",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "TRANSFER_REVIEW",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "TRANSFER_ACCEPT",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "MATTER_CLASSIFY",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "MATTER_RECEIVE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "IDENTITY_PRINCIPAL_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "IDENTITY_ORGANIZATION_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "IDENTITY_APPOINTMENT_MANAGE",
+              "scope": "ROOT"
+            },
+            {
+              "authority": "IDENTITY_AUTHORITY_MANAGE",
+              "scope": "ROOT"
+            }
+          ]
+        },
+        {
+          "key": "huangxuexue_case",
+          "organization": "CASE_ADMIN",
+          "role": "DIRECTOR",
+          "grants": [
+            {
+              "authority": "CONTRACT_READ",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "TRANSFER_REVIEW",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "TRANSFER_ACCEPT",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "MATTER_CLASSIFY",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "MATTER_RECEIVE",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "TRANSFER_LEDGER_READ",
+              "scope": "CASE_ADMIN"
+            },
+            {
+              "authority": "TEAM_TASK_READ",
+              "scope": "CASE_ADMIN"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "defaults": {
+    "firm": "海华律师事务所总所",
+    "address": "安徽省合肥市工人文化宫安徽海华律师事务所",
+    "phone": "待补",
+    "receiptLabel": "海华律师事务所验收收款账户",
+    "bankName": null,
+    "bankAccount": null,
+    "representative": "dingqiming"
+  },
+  "passwordPolicy": {
+    "minimumLength": 8,
+    "temporary": true,
+    "requiredAction": "UPDATE_PASSWORD",
+    "notUsername": true,
+    "notEmail": true
+  },
+  "leadAssignment": {
+    "authority": "LEAD_ASSIGN",
+    "appointment": null,
+    "status": "PENDING_ADMIN_DESIGNATION"
+  },
+  "intakeSources": [
+    {
+      "username": "wanhefeng",
+      "account": "HH_wanhefeng",
+      "name": "万和峰录入",
+      "organization": "SALES_1",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "helong",
+      "account": "HH_helong",
+      "name": "何龙录入",
+      "organization": "SALES_1",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "gengtangqi",
+      "account": "HH_gengtangqi",
+      "name": "耿唐琪录入",
+      "organization": "SALES_2",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "yinying",
+      "account": "HH_yinying",
+      "name": "殷樱录入",
+      "organization": "SALES_2",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "xuemingming",
+      "account": "HH_xuemingming",
+      "name": "薛明明录入",
+      "organization": "SALES_2",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "yuxiaowei",
+      "account": "HH_yuxiaowei",
+      "name": "余小伟录入",
+      "organization": "SALES_2",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "yangsheng",
+      "account": "HH_yangsheng",
+      "name": "杨胜录入",
+      "organization": "CASE_ADMIN",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "jinhuijun",
+      "account": "HH_jinhuijun",
+      "name": "金慧君录入",
+      "organization": "CASE_ADMIN",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "wanghui",
+      "account": "HH_wanghui",
+      "name": "王慧录入",
+      "organization": "CASE_ADMIN",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "wujingshu",
+      "account": "HH_wujingshu",
+      "name": "吴惊殊录入",
+      "organization": "CASE_ADMIN",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "houxiaofan",
+      "account": "HH_houxiaofan",
+      "name": "侯晓凡录入",
+      "organization": "CASE_ADMIN",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "huyeru",
+      "account": "HH_huyeru",
+      "name": "胡业茹录入",
+      "organization": "CASE_ADMIN",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "chenlu",
+      "account": "HH_chenlu",
+      "name": "陈路录入",
+      "organization": "FINANCE",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "sunronghui",
+      "account": "HH_sunronghui",
+      "name": "孙荣慧录入",
+      "organization": "FINANCE",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "jiaoweiqi",
+      "account": "HH_jiaoweiqi",
+      "name": "焦玮琦录入",
+      "organization": "FINANCE",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "dingqiming",
+      "account": "HH_dingqiming",
+      "name": "丁启明录入",
+      "organization": "ROOT",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    },
+    {
+      "username": "huangxuexue",
+      "account": "HH_huangxuexue",
+      "name": "黄雪雪录入",
+      "organization": "ROOT",
+      "channel": "MANUAL",
+      "category": "GENERAL_INTAKE",
+      "jurisdiction": "CN",
+      "urgency": "NORMAL",
+      "assignmentMode": "MANUAL"
+    }
+  ],
+  "approvalPolicies": [
+    {
+      "organization": "SALES_1",
+      "quoteCode": "R2_QUOTE_APPROVAL_V1",
+      "contractCode": "R2_CONTRACT_APPROVAL_V1",
+      "approvers": [
+        "wanhefeng"
+      ]
+    },
+    {
+      "organization": "SALES_2",
+      "quoteCode": "R2_QUOTE_APPROVAL_V1",
+      "contractCode": "R2_CONTRACT_APPROVAL_V1",
+      "approvers": [
+        "gengtangqi"
+      ]
+    }
+  ],
+  "responsibilityRoutes": [
+    {
+      "sourceOrganization": "SALES_1",
+      "stage": "AWAIT_REVIEW",
+      "appointment": "yangsheng"
+    },
+    {
+      "sourceOrganization": "SALES_1",
+      "stage": "AWAIT_VERIFICATION",
+      "appointment": "yangsheng"
+    },
+    {
+      "sourceOrganization": "SALES_1",
+      "stage": "ARCHIVE",
+      "appointment": "yangsheng"
+    },
+    {
+      "sourceOrganization": "SALES_1",
+      "stage": "CHECK_RECEIPT",
+      "appointment": "sunronghui"
+    },
+    {
+      "sourceOrganization": "SALES_1",
+      "stage": "REVIEW_TRANSFER",
+      "appointment": "yangsheng"
+    },
+    {
+      "sourceOrganization": "SALES_1",
+      "stage": "INTAKE",
+      "appointment": "yangsheng"
+    },
+    {
+      "sourceOrganization": "SALES_1",
+      "stage": "CLASSIFY",
+      "appointment": "yangsheng"
+    },
+    {
+      "sourceOrganization": "SALES_2",
+      "stage": "AWAIT_REVIEW",
+      "appointment": "yangsheng"
+    },
+    {
+      "sourceOrganization": "SALES_2",
+      "stage": "AWAIT_VERIFICATION",
+      "appointment": "yangsheng"
+    },
+    {
+      "sourceOrganization": "SALES_2",
+      "stage": "ARCHIVE",
+      "appointment": "yangsheng"
+    },
+    {
+      "sourceOrganization": "SALES_2",
+      "stage": "CHECK_RECEIPT",
+      "appointment": "jiaoweiqi"
+    },
+    {
+      "sourceOrganization": "SALES_2",
+      "stage": "REVIEW_TRANSFER",
+      "appointment": "yangsheng"
+    },
+    {
+      "sourceOrganization": "SALES_2",
+      "stage": "INTAKE",
+      "appointment": "yangsheng"
+    },
+    {
+      "sourceOrganization": "SALES_2",
+      "stage": "CLASSIFY",
+      "appointment": "yangsheng"
+    }
+  ],
+  "contractTemplates": [
+    "consulting",
+    "civil-litigation",
+    "enforcement"
+  ]
+}

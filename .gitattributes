@@ -1,0 +1,2 @@
+# Candidate assets and their digest references must retain their validated bytes.
+/deploy/linux/templates/* -text whitespace=cr-at-eol

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 标准库、Docker Linux 容器、PostgreSQL18、Flyway13.4.0、Keycloak26.7.3、Java25.0.4.1+1、Maven Wrapper、Node24.20.0/npm11.9.0、React、Vitest、Playwright1.63.0；镜像摘要和依赖沿用仓库锁文件。
 
-**Spec:** [已确认设计](../specs/2026-10-07-linux-v22-initialization-design.md)。用户已确认17人/20个人类任职；执行方式保留此前选择的“当前会话逐项实施”。本计划待评审，所有执行步骤尚未完成。
+**Spec:** [已确认设计](../specs/2026-10-07-linux-v22-initialization-design.md)。用户已确认17人/20个人类任职；执行方式保留此前选择的“当前会话逐项实施”。用户已确认计划，现由当前会话实施；完成步骤按实际证据更新。
 
 ## Global Constraints
 
@@ -48,7 +48,7 @@
 
 先编写失败测试，确认失败原因是新能力缺失，再实现并通过测试；文档/候选文件不额外编造镜像式测试。提交使用本项列出的准确路径；提交前 `git diff --check`，不加入无关用户文件。L01→L02→L03；L04→L05；L06→L07；L01/L02/L04/L07→L08；全部完成后L09→L10。
 
-### L01：公开配置、候选模板、制品与原操作日志
+### Task 1: L01 公开配置、候选模板、制品与原操作日志
 
 **Files:** 新建 `deploy/linux/ols_linux/{config,journal,bundle}.py`、`deploy/linux/config/{haihua.json,haihua.schema.json}`、`deploy/linux/templates/manifest.json`、`deploy/linux/tests/{test_config,test_journal,test_bundle}.py`；复制已验证的三组 DOCX/PDF/fields.json 为 `templates/{consulting,civil-litigation,enforcement}.{docx,pdf,fields.json}`，复制原官方来源清单为 `templates/sources.json`。不复制资料 ZIP、凭据或私密制作脚本。
 
@@ -57,13 +57,13 @@
 - `journal.begin(runtime: Path, kind: str, config_digest: str) -> dict`：独占生成原 operationId、阶段和实例归属；`journal.record(runtime: Path, operation_id: str, event: dict) -> None` 原子持久化；`journal.read(runtime: Path, operation_id: str) -> dict` 只读。
 - `bundle.describe(repo: Path, jar: Path, spa: Path, commit: str) -> dict`、`bundle.verify(descriptor: dict, directory: Path) -> None`：记录 commit、JAR/SPA/配置/manifest/43迁移及锁文件摘要、schema版本和构建结果，拒绝缺项。
 
-- [ ] 写上述测试，包括 `assert len(config['people']) == 17`、`assert sum(len(p['appointments']) for p in config['people']) == 20`、`assert len(config['organizations']) == 7`；主管授权无 `LEAD_ASSIGN`，陈路无 `PAYMENT_CONFIRM`，普通案管授权为空；重复账号/非法scope/未知authority拒绝。日志并发二次 begin 拒绝；中文空格路径通过，外部 symlink/其他实例/秘密字段拒绝，不能泄露秘密正文。release/start使用同一实例锁，不能与迁移抢占启动writer。
-- [ ] 运行 `python3 -m unittest discover -s deploy/linux/tests -p 'test_config.py' -v`，以及 journal/bundle 同名测试；首次应缺新模块而失败。
-- [ ] 实现上述接口；config包含已确认姓名账号、角色、明确当前 HUMAN authority和scope、默认值及独立分配待指派条件。role/scope可复用数据，配置展开后输出逐任职权项；不得通配或自动接纳未来authority。journal采用0600文件/0700目录、fsync与原子替换、持有进程锁；路径和配置摘要不匹配拒绝。模板manifest记录候选状态、来源、版本和准确摘要，字段仍为八项。
-- [ ] 运行三组测试并核对候选字节与既有已验证输出一致；生成 bundle 不启动应用。`git diff --check` 通过。
-- [ ] 提交本项，消息 `feat: define Linux release and Haihua initialization inputs`。
+- [x] 写上述测试，包括 `assert len(config['people']) == 17`、`assert sum(len(p['appointments']) for p in config['people']) == 20`、`assert len(config['organizations']) == 7`；主管授权无 `LEAD_ASSIGN`，陈路无 `PAYMENT_CONFIRM`，普通案管授权为空；重复账号/非法scope/未知authority拒绝。日志并发二次 begin 拒绝；中文空格路径通过，外部 symlink/其他实例/秘密字段拒绝，不能泄露秘密正文。release/start使用同一实例锁，不能与迁移抢占启动writer。
+- [x] 运行 `python3 -m unittest discover -s deploy/linux/tests -p 'test_config.py' -v`，以及 journal/bundle 同名测试；首次应缺新模块而失败。
+- [x] 实现上述接口；config包含已确认姓名账号、角色、明确当前 HUMAN authority和scope、默认值及独立分配待指派条件。role/scope可复用数据，配置展开后输出逐任职权项；不得通配或自动接纳未来authority。journal采用0600文件/0700目录、fsync与原子替换、持有进程锁；路径和配置摘要不匹配拒绝。模板manifest记录候选状态、来源、版本和准确摘要，字段仍为八项。
+- [x] 运行三组测试并核对候选字节与既有已验证输出一致；生成 bundle 不启动应用。`git diff --check` 通过。
+- [x] 提交本项，消息 `feat: define Linux release and Haihua initialization inputs`。
 
-### L02：独立 Linux 基础设施和空库迁移能力
+### Task 2: L02 独立 Linux 基础设施和空库迁移能力
 
 **Files:** 新建 `deploy/linux/ols_linux/{runtime,database}.py`、`deploy/linux/runtime/{Dockerfile.app,server.mjs,toolchain.lock.json}`、`deploy/linux/tests/{test_runtime,test_database}.py`、`deploy/linux/verification/{harness.py,empty_database.py}`。复用现有数据库角色 bootstrap 和锁文件，不重写历史 SQL；新toolchain文件仅补现有锁未覆盖的Linux JDK/Node同版本制品、平台与SHA256，已有数据库/身份镜像不复制另一版本来源。
 
@@ -76,7 +76,7 @@
 - [ ] 通过单元测试与真实空库43迁移/schema/数据库角色检查；记录Linux版本、镜像摘要及结果。此项只证明数据库基础能力，不宣称初始化完成。
 - [ ] 提交本项，消息 `feat: add isolated Linux runtime and schema preparation`。
 
-### L03：v20→v22状态机、检查点、原操作恢复
+### Task 3: L03 v20→v22状态机、检查点、原操作恢复
 
 **Files:** 新建 `deploy/linux/ols_linux/{checkpoint,release}.py`、`deploy/linux/tests/{test_checkpoint,test_release}.py`、`deploy/linux/verification/{migration.py,fixtures/v20_facts.sql}`。fixtures只写独立v20测试库，不用于上线初始化。
 
@@ -90,7 +90,7 @@
 - [ ] 通过单元与真实v20事实保留/中断/激活失败/联动恢复场景；同schema入口再次确认schema变化拒绝。记录每种失败停留阶段，不只记录退出码。
 - [ ] 提交本项，消息 `feat: implement journaled v20 to v22 Linux migration`。
 
-### L04：HUMAN来源绑定和最终写入校验
+### Task 4: L04 HUMAN来源绑定和最终写入校验
 
 **Files:** 新建 `J/lead/R1HumanSourceBinding.java`、`JT/lead/HumanSourceBindingIT.java`；修改 `J/lead/{LeadIntakeSources,LeadCommands}.java`、`J/api/{R1ApiDeployment,R1ApiServices}.java`、`JT/api/LeadIntakeConfigurationTest.java`、`JT/api/LeadIntakeSourcesHttpIT.java`。
 
@@ -102,7 +102,7 @@
 - [ ] 通过上述IT及 `./mvnw -B -f backend/pom.xml '-Dtest=LeadIntakeConfigurationTest,ArchitectureTest' test`。
 - [ ] 提交本项，消息 `feat: bind human lead intake to authenticated principals`。
 
-### L05：自动来源的HTTP合同与导入界面
+### Task 5: L05 自动来源的HTTP合同与导入界面
 
 **Files:** 修改 `contracts/openapi/ontology-law-api.yaml`、`apps/workbench/src/generated/api/schema.d.ts`、`J/api/R1ApiServices.java`、`apps/workbench/src/features/lead-intake/{leadIntakeApi,LeadIntakeApplication}.ts*`及各自已有测试；新增 `docs/baseline/LINUX-HUMAN-INTAKE-BINDING-V1.md`，更新 `docs/contracts/r2-lead-intake-sources-v1.md`。Java API模型使用既有Maven生成路径，不手写生成类。
 
@@ -114,7 +114,7 @@
 - [ ] `npm run openapi:generate` 后通过上述测试、`npm run openapi:check`、`npm run typecheck` 和 HTTP IT；不删除旧模式反例。
 - [ ] 提交本项，消息 `feat: show bound intake sources in the shared workbench`。
 
-### L06：真实IdP账号、首次改密与原引导
+### Task 6: L06 真实IdP账号、首次改密与原引导
 
 **Files:** 新建 `deploy/linux/ols_linux/identity.py`、`deploy/linux/tests/test_identity.py`、`deploy/linux/verification/identity_login.mjs`。读取 `deploy/identity/realm-template.json`，仅在新环境私密派生realm中设置min8，不降低已有环境默认。
 
@@ -126,7 +126,7 @@
 - [ ] 在独立Linux IdP验证：未改密不得进入业务，8位合规新密码通过；保留7位/用户名/邮箱反例；两位管理员改密成功，其他15仍待改密。无password grant、token日志泄露或原环境realm变化。
 - [ ] 提交本项，消息 `feat: prepare Haihua identity with required password updates`。
 
-### L07：通过真实HUMAN管理命令建立任职与授权
+### Task 7: L07 通过真实HUMAN管理命令建立任职与授权
 
 **Files:** 新建 `deploy/linux/ols_linux/{admin,initialize,verify}.py`、`deploy/linux/tests/{test_admin,test_initialize}.py`、`deploy/linux/verification/initialization.py`。
 
@@ -141,7 +141,7 @@
 - [ ] 通过真实初始化及重复/未知响应反例；verify只读，不取得新candidate、不重置密码、不补授权。报告分别显示初始化结构PASS、待改密人数、LEAD_ASSIGN待指派、模板待审核。
 - [ ] 提交本项，消息 `feat: initialize Haihua appointments through human administration`。
 
-### L08：有界责任路由和已有审批策略配置
+### Task 8: L08 有界责任路由和已有审批策略配置
 
 **Files:** 新建 `J/api/BusinessResponsibilityRouting.java`、`JT/api/BusinessResponsibilityRoutingIT.java`、`deploy/linux/ols_linux/business_config.py`、`deploy/linux/tests/test_business_config.py`；修改 `J/api/{R1ApiDeployment,R1ApiServices,ContractWorkflowPorts,PaymentWorkflowPorts,TransferWorkflowPorts}.java`、`J/contract/ContractWorkflowService.java`、`J/contract/internal/persistence/{JdbcContractWorkflowService,JdbcManualSignatureWorkflow}.java`；新增 `docs/baseline/LINUX-BUSINESS-RESPONSIBILITY-V1.md`。
 
@@ -156,7 +156,7 @@
 - [ ] 通过上述IT、ArchitectureTest和Python测试；核对source绑定、路由、审批成员及收款默认值均引用本实例准确UUID，无额外DDL/历史任务改派。
 - [ ] 提交本项，消息 `feat: configure bounded business responsibility routing`。
 
-### L09：真实 Linux 端到端、四组合与故障验收
+### Task 9: L09 真实 Linux 端到端、四组合与故障验收
 
 **Files:** 新建 `deploy/linux/verification/{acceptance.py,business_chain.mjs}`，扩充已有本计划harness/identity_login/migration/initialization，新增 `docs/evidence/linux-v22-initialization/verification-matrix.md` 和去秘密 `report.md`。
 
@@ -169,7 +169,7 @@
 - [ ] 完成all场景，保存runId、commit、镜像/制品/配置/模板摘要、真实计数、案例与原命令引用、失败裁定及restore证据。仅公开去秘密结果；真实令牌和材料正文保持私密。
 - [ ] 提交本项，消息 `test: verify Linux migration and Haihua initialization end to end`。
 
-### L10：唯一 CLI、操作文档、构建回归和交付
+### Task 10: L10 唯一 CLI、操作文档、构建回归和交付
 
 **Files:** 新建 `deploy/linux/linux.py`、`deploy/linux/README.md`、`deploy/linux/tests/test_cli.py`；按必要范围更新根 `README.md` 的 Linux 入口，更新本计划状态与去秘密验证报告。所有前项模块经唯一 CLI 调用。
 
