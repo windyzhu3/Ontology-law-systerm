@@ -83,6 +83,19 @@ def restore_database_acl(target,directory,*,containers=None):
         if sql.strip():runtime.run(['docker','exec','-i',name,'psql','-X','-v','ON_ERROR_STOP=1','-U','postgres','-d',db],('BEGIN;\n'+sql+'COMMIT;\n').encode())
 
 
+def restore_owners_and_acl(target,directory,expected,*,containers=None):
+    if set(expected)!={'businessDb','identityDb'}:raise RuntimeError('Both original database owners required')
+    owners={key:value['databaseOwner'] for key,value in expected.items()}
+    if any(not re.fullmatch('[a-z][a-z0-9_]*',owner) for owner in owners.values()):raise RuntimeError('Unsupported original database owner')
+    actual=cluster_facts(target,containers=containers)
+    if any(actual[key]['databaseOwner'] not in {'postgres',owner} for key,owner in owners.items()):raise RuntimeError('Original restore database ownership conflicts')
+    for key,identity,db in [('businessDb',False,'law_contract_runtime'),('identityDb',True,'keycloak')]:
+        if actual[key]['databaseOwner']!=owners[key]:database.sql(target,f'ALTER DATABASE {db} OWNER TO {owners[key]}',identity=identity,containers=containers)
+    # ALTER OWNER can replace the default ACL. Apply the bounded SQL from the
+    # same original archive afterwards, before checking the exact ACL digest.
+    restore_database_acl(target,directory,containers=containers)
+
+
 def _directory(root,operation_id):
     journal.read(root,operation_id)
     directory=root/'checkpoints'/operation_id
@@ -211,12 +224,7 @@ def verify_restore(root: Path,operation_id: str) -> dict:
         if target_state['history']:
             if target_state!=value['observed'] or table_facts(target,True)!=value['identityFacts']:raise RuntimeError('Partial or conflicting original restore retained')
         else:_restore_databases(target,directory)
-        for key,identity,db in [('businessDb',False,'law_contract_runtime'),('identityDb',True,'keycloak')]:
-            expected=value['clusterFacts'][key]['databaseOwner']
-            if not re.fullmatch('[a-z][a-z0-9_]*',expected):raise RuntimeError('Unsupported original database owner')
-            current=cluster_facts(target)[key]['databaseOwner']
-            if current not in {'postgres',expected}:raise RuntimeError('Original restore database ownership conflicts')
-            if current!=expected:database.sql(target,f'ALTER DATABASE {db} OWNER TO {expected}',identity=identity)
+        restore_owners_and_acl(target,directory,value['clusterFacts'])
         if database.observe(target)!=value['observed'] or table_facts(target)!=value['businessFacts'] or table_facts(target,True)!=value['identityFacts']:
             raise RuntimeError('Restored facts differ; isolated target retained')
         assert_cluster_facts(value['clusterFacts'],cluster_facts(target))

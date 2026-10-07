@@ -354,10 +354,7 @@ def restore_checkpoint(root: Path,source_operation_id: str,value: dict) -> dict:
             else:
                 journal.record(root,operation_id,{'phase':'RESTORE_DATA_UNKNOWN','checkpointDigest':cp_digest})
                 checkpoint._restore_databases(root,directory,containers=selected)
-            for key,identity,db in [('businessDb',False,'law_contract_runtime'),('identityDb',True,'keycloak')]:
-                owner=value['clusterFacts'][key]['databaseOwner']
-                if not __import__('re').fullmatch('[a-z][a-z0-9_]*',owner):raise RuntimeError('Unsupported checkpoint owner')
-                database.sql(root,f'ALTER DATABASE {db} OWNER TO {owner}',identity=identity,containers=selected)
+            checkpoint.restore_owners_and_acl(root,directory,value['clusterFacts'],containers=selected)
             _assert_restored(root,value,containers=selected,assets=False)
             journal.record(root,operation_id,{'phase':'RESTORE_REPLACEMENT_READY','checkpointDigest':cp_digest})
         resources=runtime.load(root)

@@ -72,6 +72,18 @@ class CheckpointTest(unittest.TestCase):
         changed=json.loads(json.dumps(expected));changed['businessDb']['databaseAclDigest']='d'*64
         with self.assertRaises(RuntimeError):self.m.assert_cluster_facts(expected,changed)
 
+    def test_original_database_acl_is_applied_after_restored_owner(self):
+        self.assertTrue(callable(getattr(self.m,'restore_owners_and_acl',None)), 'Owner transition can reset a previously restored DATABASE ACL')
+        expected={'businessDb':{'databaseOwner':'law_schema_migrator'},'identityDb':{'databaseOwner':'ols_identity_login'}}
+        actual={key:{'databaseOwner':'postgres'} for key in expected};events=[]
+        with patch('ols_linux.checkpoint.cluster_facts',return_value=actual),patch('ols_linux.database.sql',side_effect=lambda *a,**kw:events.append(a[1])),patch('ols_linux.checkpoint.restore_database_acl',side_effect=lambda *a,**kw:events.append('ARCHIVE_ACL')):
+            self.m.restore_owners_and_acl(self.root,self.root/'checkpoints',expected)
+        self.assertEqual(events,['ALTER DATABASE law_contract_runtime OWNER TO law_schema_migrator','ALTER DATABASE keycloak OWNER TO ols_identity_login','ARCHIVE_ACL'])
+        invalid=json.loads(json.dumps(expected));invalid['identityDb']['databaseOwner']='postgres; DROP DATABASE other'
+        with patch('ols_linux.checkpoint.cluster_facts',return_value=actual),patch('ols_linux.database.sql') as writes:
+            with self.assertRaises(RuntimeError):self.m.restore_owners_and_acl(self.root,self.root/'checkpoints',invalid)
+            writes.assert_not_called()
+
     def test_fact_digest_batches_queries_without_merging_tables(self):
         from ols_linux.config import digest
         rows=[{'name':'identity.appointment','rows':[{'id':'one','state':'ACTIVE'}]},
