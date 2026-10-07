@@ -151,12 +151,12 @@
 - ContractWorkflowService.Ports新增默认 `Optional<UUID> routingTarget(UUID tenantId, UUID sourceOrganizationId, String stageCode)` 和 `boolean routingEnabled(UUID tenantId)`，默认空/false；具体ports注入上述配置，旧构造保留。
 - `business_config.install(runtime: Path, operation_id: str, config: dict) -> dict` 从已核对UUID生成私密可信设置及现有quote/contract policy/members，持久化原策略版本和准确摘要；重复按原记录核对，不写任何审批完成事实。
 
-- [ ] 真实IT断言主任均有全所业务权时，新合同审查/签署核验归档owner=杨、两部核款owner=孙/焦，报价/合同审批成员=万/耿；`assert incumbentAfterConfigChange == incumbentBefore`。目标停任/撤权/跨租户/缺项、与提交人同principal导致既有阻断，不降级首候选/主任。旧无配置环境仍使用唯一合法候选；既有审批冻结成员不被改写。
-- [ ] `./mvnw -B -f backend/pom.xml -Pit '-Dit.test=BusinessResponsibilityRoutingIT,R2ContractAuthorityRecoveryIT,R2ContractPaymentHttpIT,R2TransferWorkflowIT,R2TransferRecoveryIT' verify`；首次缺路由实现失败。Python business_config测试首次缺模块失败。
-- [ ] 实现固定阶段白名单：合同AWAIT_REVIEW→CONTRACT_REVIEW、签署AWAIT_VERIFICATION/ARCHIVE→CONTRACT_SIGNATURE_VERIFY、付款CHECK_RECEIPT→PAYMENT_CONFIRM、转案REVIEW_TRANSFER/INTAKE/CLASSIFY→TRANSFER_REVIEW/TRANSFER_ACCEPT/MATTER_CLASSIFY。字段使用现有阶段/authority准确代码，在具名增量合同记录，不允许配置新阶段；归档复用当前核验权限，不新增归档权限代码。审批继续由既有策略表控制，不改为通用路由完成审批。
-- [ ] 在“新责任选择”处接线：有效既有责任和冻结审批成员先保留；其他情况只选配置目标并完整验证权限、组织和独立性。付款SUPPLEMENT_RECEIPT、合同准备/签署采集、转案PREPARE/SUPPLEMENT及销售交接执行核验保持既有销售责任，不被杨的案管路由替换。Transfer按req.from查路由但按req.to验证隶属；默认主任案管任职提供合法办理资格，仍不越过TaskOwner。
-- [ ] 通过上述IT、ArchitectureTest和Python测试；核对source绑定、路由、审批成员及收款默认值均引用本实例准确UUID，无额外DDL/历史任务改派。
-- [ ] 提交本项，消息 `feat: configure bounded business responsibility routing`。
+- [x] 真实IT断言主任均有全所业务权时，新合同审查/签署核验归档owner=杨、两部核款owner=孙/焦，报价/合同审批成员=万/耿；`assert incumbentAfterConfigChange == incumbentBefore`。目标停任/撤权/跨租户/缺项、与提交人同principal导致既有阻断，不降级首候选/主任。旧无配置环境仍使用唯一合法候选；既有审批冻结成员不被改写。
+- [x] `./mvnw -B -f backend/pom.xml -Pit '-Dit.test=BusinessResponsibilityRoutingIT,R2ContractAuthorityRecoveryIT,R2ContractPaymentHttpIT,R2TransferWorkflowIT,R2TransferRecoveryIT' verify`；首次缺路由实现失败。Python business_config测试首次缺模块失败。
+- [x] 实现固定阶段白名单：合同AWAIT_REVIEW→CONTRACT_REVIEW、签署AWAIT_VERIFICATION/ARCHIVE→CONTRACT_SIGNATURE_VERIFY、付款CHECK_RECEIPT→PAYMENT_CONFIRM、转案REVIEW_TRANSFER/INTAKE/CLASSIFY→TRANSFER_REVIEW/TRANSFER_ACCEPT/MATTER_CLASSIFY。字段使用现有阶段/authority准确代码，在具名增量合同记录，不允许配置新阶段；归档复用当前核验权限，不新增归档权限代码。审批继续由既有策略表控制，不改为通用路由完成审批。
+- [x] 在“新责任选择”处接线：有效既有责任和冻结审批成员先保留；其他情况只选配置目标并完整验证权限、组织和独立性。付款SUPPLEMENT_RECEIPT、合同准备/签署采集、转案PREPARE/SUPPLEMENT及销售交接执行核验保持既有销售责任，不被杨的案管路由替换。Transfer按req.from查路由但按req.to验证隶属；默认主任案管任职提供合法办理资格，仍不越过TaskOwner。
+- [x] 通过上述IT、ArchitectureTest和Python测试；核对source绑定、路由、审批成员及收款默认值均引用本实例准确UUID，无额外DDL/历史任务改派。
+- [x] 提交本项，消息 `feat: configure bounded business responsibility routing`。
 
 ### Task 9: L09 真实 Linux 端到端、四组合与故障验收
 

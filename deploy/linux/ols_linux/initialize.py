@@ -131,3 +131,46 @@ def resume(root: Path, operation_id: str, sessions: dict[str,Path]) -> dict:
         if op['kind']!='initialize' or journal.current(root)['operationId']!=operation_id:raise RuntimeError('Original initialization only')
         state=journal._read(root,root/'initialization.json')
         return run(root,state['config'],sessions)
+
+
+def bind_release(root: Path,descriptor: dict) -> dict:
+    from .deployment import bind_release as bind
+    return bind(root,descriptor)
+
+
+def finish(root: Path,bundle_directory: Path,config: dict) -> dict:
+    """Activate the final original initialization bytes, preserving bootstrap evidence."""
+    from . import business_config,release,runtime,verify
+    with journal.locked(root) as root:
+        op=journal.current(root)
+        if op['kind']!='initialize' or op['configDigest']!=digest(config):raise RuntimeError('Original initialization required')
+        descriptor=release._candidate(bundle_directory)
+        if descriptor.get('version')!=2 or descriptor['schemaVersion']!='52-plus-2-r2-v22':raise RuntimeError('Final initialization requires a sealed v22 payload')
+        path=root/'initialization-final-release.json'
+        if path.exists():
+            inputs=journal._read(root,path)
+            if inputs['operationId']!=op['operationId'] or inputs['descriptor']!=descriptor or inputs['bundleDirectory']!=str(Path(bundle_directory).absolute()):
+                raise RuntimeError('Original final initialization candidate changed')
+        else:
+            if op['phase']!='BUSINESS_CONFIG_READY':raise RuntimeError('Exact roster and business configuration must be verified first')
+            verify.initialization(root,config);business_config.verify_configuration(root,config)
+            before=database.observe(root)['gate']
+            if before['schema_contract_version']!=descriptor['schemaVersion'] or before['operating_mode']!='ACTIVE' or runtime.load(root)['ingress']:
+                raise RuntimeError('Only the internally active original management initialization may finish')
+            maintained=dict(before,operating_mode='MAINTENANCE',revision=before['revision']+1,changed_at=datetime.now(timezone.utc).isoformat(timespec='microseconds'))
+            inputs={'operationId':op['operationId'],'bundleDirectory':str(Path(bundle_directory).absolute()),'descriptor':descriptor,'before':before,'maintained':maintained}
+            journal._write(root,path,inputs)
+        if op['phase']=='COMPLETE':
+            return {'operationId':op['operationId'],'phase':'COMPLETE','health':verify.runtime_ready(root,descriptor)}
+        activation=root/'operations'/(op['operationId']+'-activation.json')
+        if not activation.exists():
+            journal.record(root,op['operationId'],{'phase':'INITIALIZATION_MAINTENANCE_UNKNOWN'})
+            observed=database.observe(root)['gate']
+            if release._same_gate(observed,inputs['before']):release._cas_gate(root,observed,inputs['maintained'])
+            elif not release._same_gate(observed,inputs['maintained']):raise RuntimeError('Original initialization maintenance gate conflicts')
+            runtime.stop_writers(root,op['operationId'])
+            journal.record(root,op['operationId'],{'phase':'INITIALIZATION_INSTALL_UNKNOWN'})
+            release._install_bundle(root,bundle_directory,descriptor)
+            bind_release(root,descriptor)
+            journal.record(root,op['operationId'],{'phase':'BUNDLE_INSTALLED'})
+        return release._activate(root,op['operationId'],inputs)

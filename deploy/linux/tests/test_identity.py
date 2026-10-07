@@ -141,5 +141,16 @@ class IdentityTest(unittest.TestCase):
             self.m.bootstrap(self.root,self.cfg)
         self.assertEqual(['verify','execute','verify'],[call.args[1] for call in command.call_args_list])
 
+    def test_published_http_helper_is_bound_to_installed_inventory_and_tamper_is_refused(self):
+        from ols_linux.runtime import private_file
+        from ols_linux.bundle import sha
+        directory=self.root/'releases'/('b'*64);helper=directory/'deploy/linux/runtime/https-json.mjs'
+        private_file(helper,b'original immutable helper')
+        descriptor={'version':2,'descriptorDigest':'b'*64,'files':{'deploy/linux/runtime/https-json.mjs':sha(helper)}}
+        self.j._write(self.root,self.root/'installed-candidate.json',{'directory':str(directory),'descriptor':descriptor})
+        self.assertEqual(self.m.http_helper(self.root),str(helper))
+        helper.write_bytes(b'changed')
+        with self.assertRaises(RuntimeError):self.m.http_helper(self.root)
+
 
 if __name__ == '__main__': unittest.main()

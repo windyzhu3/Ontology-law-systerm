@@ -187,12 +187,23 @@ def _start(root, plan):
         time.sleep(.5)
 
 
+def http_helper(root):
+    path=root/'installed-candidate.json'
+    if not path.exists():return '/opt/ols/runtime/https-json.mjs'
+    installed=journal._read(root,path);descriptor=installed['descriptor']
+    if descriptor.get('version')!=2:return '/opt/ols/runtime/https-json.mjs'
+    directory=Path(installed['directory']);name='deploy/linux/runtime/https-json.mjs';helper=directory/name
+    if directory.parent!=root/'releases' or directory.name!=descriptor['descriptorDigest'] or helper.resolve()!=helper.absolute() or sha(helper)!=descriptor['files'].get(name):
+        raise RuntimeError('Installed HTTPS helper differs from sealed release')
+    return str(helper)
+
+
 def http(root, url, *, method='GET', headers=None, body=None, client_certificate=False):
     plan=journal._read(root,root/'identity/plan.json');runtime.owned(root,'container',plan['pod'])
     request={'url':url,'method':method,'headers':headers or {},'body':body,'ca':str(root/'certs/ca.pem')}
     if client_certificate:
         request.update(certificate=str(root/'certs/service.crt'),privateKey=str(root/'certs/service.key'))
-    result=runtime.run(['docker','exec','-i',plan['pod'],'node','/opt/ols/runtime/https-json.mjs'],canonical(request),timeout=25)
+    result=runtime.run(['docker','exec','-i',plan['pod'],'node',http_helper(root)],canonical(request),timeout=25)
     return json.loads(result.stdout)
 
 

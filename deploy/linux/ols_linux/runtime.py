@@ -159,6 +159,7 @@ def stop_writers(root: Path, operation_id: str) -> None:
         resources=load(root)
         names=([resources['ingress']] if resources.get('ingress') else [])+resources['writers']
         for name in dict.fromkeys(names):
+            if inspect('container',name) is None:continue
             actual=owned(root,'container',name)
             if actual['State']['Running']: run(['docker','stop','--time','15',name],timeout=30)
             if owned(root,'container',name)['State']['Running']: raise RuntimeError('Writer did not stop')
@@ -213,7 +214,14 @@ def start_internal(root: Path, descriptor: dict) -> dict:
         if launch['descriptorDigest']!=descriptor['descriptorDigest']: raise RuntimeError('Launch bytes differ from the verified release')
         for entry in launch['containers']:
             name=entry['name']
-            if name not in resources['writers'] or entry['role'] not in {'api','worker','identity'}: raise RuntimeError('Unregistered writer launch')
+            if name not in resources['writers'] or entry['role'] not in {'api','worker','identity','scanner'}: raise RuntimeError('Unregistered writer launch')
+            if entry['role']=='identity':
+                from . import identity
+                plan=journal._read(root,root/'identity/plan.json')
+                if name!=plan['identity'] or entry['digest']!=digest(plan) or entry['args']:
+                    raise RuntimeError('Original identity launch differs')
+                identity._start(root,plan)
+                continue
             if inspect('container',name):
                 actual=owned(root,'container',name)
                 if actual['Config']['Labels'].get('ols.launch')!=entry['digest']: raise RuntimeError('Container launch configuration changed')

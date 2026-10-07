@@ -82,5 +82,24 @@ class RuntimeTest(unittest.TestCase):
             with self.assertRaises(RuntimeError):self.m.stop_writers(self.root,self.op['operationId'])
         self.assertEqual(self.j.current(self.root)['phase'],'CREATED')
 
+    def test_final_identity_launch_checks_original_plan_and_keeps_import_unchanged(self):
+        plan={'identity':'own-identity','instanceId':self.op['instanceId'],'operationId':self.op['operationId']}
+        from ols_linux.config import digest
+        self.m.save(self.root,{'writers':['own-identity']})
+        self.j._write(self.root,self.root/'identity/plan.json',plan)
+        self.j._write(self.root,self.root/'launch.json',{'descriptorDigest':'b'*64,'containers':[{'name':'own-identity','role':'identity','digest':digest(plan),'args':[]}]})
+        with patch.object(self.m,'validate_tls'),patch('ols_linux.identity._start') as start:
+            self.m.start_internal(self.root,{'descriptorDigest':'b'*64})
+            start.assert_called_once_with(self.root,plan)
+        changed=dict(plan,identity='different-identity');self.j._write(self.root,self.root/'identity/plan.json',changed)
+        with patch.object(self.m,'validate_tls'),patch('ols_linux.identity._start',side_effect=AssertionError('Changed plan must not start')):
+            with self.assertRaises(RuntimeError):self.m.start_internal(self.root,{'descriptorDigest':'b'*64})
+
+    def test_confirmed_absent_registered_writer_is_stopped_but_database_clients_still_block(self):
+        self.m.save(self.root,{'writers':['own-not-created-yet'],'ingress':None})
+        with patch.object(self.m,'inspect',return_value=None),patch.object(self.m,'run',side_effect=AssertionError('No unregistered stop')),patch('ols_linux.database.sql',return_value='0'):
+            self.m.stop_writers(self.root,self.op['operationId'])
+        self.assertEqual(self.j.current(self.root)['phase'],'WRITERS_STOPPED')
+
 
 if __name__=='__main__':unittest.main()

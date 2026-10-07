@@ -24,7 +24,7 @@ def inventory(directory: Path) -> dict:
     return result
 
 
-def describe(repo: Path, jar: Path, spa: Path, commit: str) -> dict:
+def describe(repo: Path, jar: Path, spa: Path, commit: str, *, include_runtime=False) -> dict:
     repo, jar, spa = Path(repo).absolute(), Path(jar).absolute(), Path(spa).absolute()
     if not re.fullmatch('[a-f0-9]{40}', commit): raise RuntimeError('Exact source commit required')
     if jar.is_symlink() or not jar.is_file() or not zipfile.is_zipfile(jar): raise RuntimeError('Executable application JAR required')
@@ -56,9 +56,14 @@ def describe(repo: Path, jar: Path, spa: Path, commit: str) -> dict:
     config_dir = repo / 'deploy/linux/config'
     paths += [config_dir / name for name in inventory(config_dir)]
     if (repo / 'deploy/linux/runtime/toolchain.lock.json').is_file(): paths += [repo / 'deploy/linux/runtime/toolchain.lock.json']
+    if include_runtime:
+        for directory in ('deploy/linux/templates','deploy/linux/runtime','deploy/linux/ols_linux'):
+            paths += [repo/directory/name for name in inventory(repo/directory)]
+        paths += [repo/name for name in ('deploy/identity/realm-template.json','contracts/openapi/ontology-law-api.yaml','backend/src/test/resources/db/bootstrap-runtime-logins.sql')]
+        if (repo/'deploy/linux/linux.py').is_file():paths.append(repo/'deploy/linux/linux.py')
     try: files = {path.relative_to(repo).as_posix(): sha(path) for path in paths}
     except ValueError as error: raise RuntimeError('Release bytes must be staged within the bundle root') from error
-    result = {'version': 1, 'commit': commit, 'schemaVersion': value['contractVersion'], 'manifestHash': sha(manifest),
+    result = {'version': 2 if include_runtime else 1, 'commit': commit, 'schemaVersion': value['contractVersion'], 'manifestHash': sha(manifest),
               'jar': jar.relative_to(repo).as_posix(), 'spa': spa.relative_to(repo).as_posix(),
               'files': files, 'spaFiles': tree, 'migrations': migrations}
     result['descriptorDigest'] = digest(result)
@@ -69,10 +74,11 @@ def verify(descriptor: dict, directory: Path) -> None:
     value = dict(descriptor)
     seal = value.pop('descriptorDigest', None)
     if seal != digest(value): raise RuntimeError('Release descriptor was modified')
+    if descriptor.get('version') not in {1,2}:raise RuntimeError('Unknown release descriptor version')
     root = Path(directory).absolute()
     for name, expected in descriptor['files'].items():
         path = root / name
         if path.resolve() != path.absolute() or not path.resolve().is_relative_to(root) or not path.is_file() or sha(path) != expected:
             raise RuntimeError('Release file missing, linked or modified')
-    actual = describe(root, root / descriptor['jar'], root / descriptor['spa'], descriptor['commit'])
+    actual = describe(root, root / descriptor['jar'], root / descriptor['spa'], descriptor['commit'],include_runtime=descriptor['version']==2)
     if actual != descriptor: raise RuntimeError('Release inventory or contract differs')

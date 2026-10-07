@@ -44,3 +44,19 @@ class InitializationTests(unittest.TestCase):
     def test_all_create_routes_exist_in_the_closed_http_contract(self):
         module=self.module();contract=(Path(__file__).resolve().parents[3]/'contracts/openapi/ontology-law-api.yaml').read_text(encoding='utf-8')
         for endpoint in module.ENDPOINT.values():self.assertIn('\n  /api/v1/admin/identity/'+endpoint+':\n',contract)
+
+    def test_final_activation_refuses_other_original_candidate_without_writes(self):
+        import tempfile
+        from unittest.mock import patch
+        from ols_linux import journal,release,runtime
+        from ols_linux.config import digest
+        module=self.module();config={'bounded':'original'}
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)/'private';op=journal.begin(root,'initialize',digest(config))
+            journal.record(root,op['operationId'],{'phase':'BUSINESS_CONFIG_READY'})
+            original={'operationId':op['operationId'],'bundleDirectory':str(root/'original'),'descriptor':{'version':2,'schemaVersion':'52-plus-2-r2-v22','descriptorDigest':'a'*64}}
+            journal._write(root,root/'initialization-final-release.json',original)
+            foreign={'version':2,'schemaVersion':'52-plus-2-r2-v22','descriptorDigest':'b'*64}
+            with patch.object(release,'_candidate',return_value=foreign),patch.object(runtime,'run',side_effect=AssertionError('Candidate mismatch must not mutate')):
+                with self.assertRaises(RuntimeError):module.finish(root,root/'foreign',config)
+            self.assertEqual(journal._read(root,root/'initialization-final-release.json'),original)

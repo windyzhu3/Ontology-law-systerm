@@ -59,6 +59,26 @@ class ReleaseTest(unittest.TestCase):
             ingress.assert_not_called()
             self.assertEqual(journal.current(root)['phase'],'ACTIVATION_UNKNOWN')
 
+    def test_opened_entry_failure_blocks_same_original_release_instead_of_complete(self):
+        from ols_linux import journal,verify,runtime,database,bundle
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)/'runtime';op=journal.begin(root,'upgrade','a'*64)
+            descriptor={'descriptorDigest':'a'*64,'schemaVersion':'52-plus-2-r2-v22','jar':'app.jar','files':{'app.jar':'b'*64},'manifestHash':'c'*64}
+            journal._write(root,root/'launch.json',{'descriptorDigest':'a'*64})
+            journal._write(root,root/'installed-candidate.json',{'directory':str(root/'release'),'descriptor':descriptor})
+            observed=[{'deployment_state_key':'PRIMARY','schema_contract_version':descriptor['schemaVersion'],'operating_mode':'MAINTENANCE','revision':2,
+                'active_release_digest':'d'*64,'active_manifest_hash':'e'*64,'changed_at':'2026-10-07T00:00:00+00:00'}]
+            def cas(root,old,new):
+                self.assertEqual(old,observed[0]);observed[0]=new;return new
+            def open_entry(root,opid):
+                self.assertEqual(journal.current(root)['phase'],'RUNTIME_VERIFIED')
+                journal.record(root,opid,{'phase':'INGRESS_OPEN'})
+            with patch.object(database,'observe',side_effect=lambda r:{'gate':observed[0]}),patch.object(self.m,'_cas_gate',side_effect=cas),patch.object(bundle,'verify'),patch.object(runtime,'start_internal'),patch.object(runtime,'stop_writers'),patch.object(runtime,'open_ingress',side_effect=open_entry),patch.object(verify,'runtime_ready',return_value={'status':'PASS'}),patch.object(verify,'ingress_ready',side_effect=RuntimeError('Real entry failed'),create=True):
+                with self.assertRaises(RuntimeError):self.m._activate(root,op['operationId'],{'descriptor':descriptor})
+            self.assertEqual(observed[0]['operating_mode'],'BLOCKED')
+            self.assertEqual(journal.current(root)['operationId'],op['operationId'])
+            self.assertEqual(journal.current(root)['phase'],'ACTIVATION_FAILED')
+
     def test_unbound_legacy_baseline_refused(self):
         self.assertTrue(callable(getattr(self.m,'_installed',None)))
         from ols_linux import journal

@@ -43,6 +43,23 @@ public interface ContractWorkflowService {
         List<Subject> transferFacts(Connection c,UUID tenant,UUID opportunity)throws SQLException;
         boolean permitted(Connection c,Actor actor,UUID organization,List<Subject> facts,String authority)throws SQLException;
         List<UUID> eligible(Connection c,UUID tenant,UUID organization,List<Subject> facts,String authority)throws SQLException;
+        default Optional<UUID> routingTarget(UUID tenantId,UUID sourceOrganizationId,String stageCode){return Optional.empty();}
+        default boolean routingEnabled(UUID tenantId){return false;}
+        default UUID responsibilityOwner(Connection c,UUID tenant,UUID organization,List<Subject> facts,String stage,String authority,UUID incumbent)throws SQLException{
+            var qualified=eligible(c,tenant,organization,facts,authority);
+            if(incumbent!=null&&qualified.contains(incumbent))return incumbent;
+            if(routingEnabled(tenant))return routingTarget(tenant,organization,stage).filter(qualified::contains).orElse(null);
+            return qualified.size()==1?qualified.getFirst():null;
+        }
+        default UUID preparationDecisionOwner(Connection c,UUID tenant,UUID organization,List<Subject> facts)throws SQLException{
+            var qualified=eligible(c,tenant,organization,facts,"CONTRACT_PREPARATION_DECIDE");
+            if(routingEnabled(tenant)){
+                var policy=approvalPolicy(c,tenant,organization,facts);
+                if(policy==null)return null;
+                qualified=policy.approvers().stream().filter(qualified::contains).distinct().toList();
+            }
+            return qualified.size()==1?qualified.getFirst():null;
+        }
         ApprovalPolicy approvalPolicy(Connection c,UUID tenant,UUID organization,List<Subject> facts)throws SQLException;
         Task read(Connection c,UUID tenant,UUID id)throws SQLException;
         Task currentTask(Connection c,UUID tenant,UUID originalId)throws SQLException;

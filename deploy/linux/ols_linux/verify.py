@@ -3,6 +3,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 from pathlib import Path
 import uuid
 from . import database,identity,journal,runtime
@@ -40,8 +41,11 @@ def technical(root,plan,state):
 
 def business_empty(root):
     schemas=('party','lead','opportunity','conflict','contract','transfer','responsibility','external_action','evidence')
-    names=[name for name in database.observe(root)['tables'] if name.split('.')[0] in schemas]
-    if any(database.sql(root,'SELECT count(*) FROM '+name)!='0' for name in names):raise RuntimeError('Initialization has unexpected business facts')
+    configuration={'opportunity.quote_approval_policy','opportunity.quote_approval_policy_signer','contract.approval_policy','contract.approval_policy_member'}
+    names=[name for name in database.observe(root)['tables'] if name.split('.')[0] in schemas and name not in configuration]
+    if any(not re.fullmatch(r'[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*',name) for name in names):raise RuntimeError('Unexpected business catalog identifier')
+    # One read-only statement gives all transaction counts the same snapshot.
+    if names and database.sql(root,'SELECT coalesce(sum(n),0) FROM ('+' UNION ALL '.join('SELECT count(*) AS n FROM '+name for name in names)+') t')!='0':raise RuntimeError('Initialization has unexpected business facts')
     return True
 
 
@@ -75,6 +79,26 @@ def runtime_ready(root: Path,descriptor: dict) -> dict:
         plan=journal._read(root,root/'identity/plan.json');observed=database.verify_schema(root,assert_role_boundaries=False)
         gate=observed['gate']
         if gate['operating_mode']!='ACTIVE' or gate['active_release_digest']!=descriptor['files'][descriptor['jar']] or gate['active_manifest_hash']!=descriptor['manifestHash']:raise RuntimeError('Actual active release gate differs')
-        from .assembly import service_ready
-        if not service_ready(root,plan):raise RuntimeError('Actual verified TLS runtime health unavailable')
-        return {'status':'PASS','schemaVersion':descriptor['schemaVersion'],'descriptorDigest':descriptor['descriptorDigest']}
+        from .deployment import verify_ready
+        full=verify_ready(root,descriptor)
+        return {'status':'PASS','schemaVersion':descriptor['schemaVersion'],'descriptorDigest':descriptor['descriptorDigest'],'fullRuntime':full}
+
+
+def ingress_ready(root: Path,descriptor: dict) -> dict:
+    from . import runtime
+    import time
+    with journal.locked(root) as root:
+        plan=journal._read(root,root/'identity/plan.json');launch=journal._read(root,root/'launch.json');resources=runtime.load(root)
+        entry=launch['ingress']
+        if launch['descriptorDigest']!=descriptor['descriptorDigest'] or resources['ingress']!=entry['name']:raise RuntimeError('Current HTTPS ingress differs')
+        deadline=time.monotonic()+30
+        while True:
+            value=runtime.owned(root,'container',entry['name'])
+            if value['Config']['Labels'].get('ols.launch')!=entry['digest'] or not value['State']['Running']:raise RuntimeError('Current ingress launch failed')
+            try:
+                response=identity.http(root,plan['origin']+'/')
+                if response['status']==200 and hashlib.sha256(response['body'].encode('utf-8')).hexdigest()==descriptor['spaFiles']['index.html']:
+                    return {'status':'PASS','entry':'VERIFIED_TLS_EXACT_SPA','descriptorDigest':descriptor['descriptorDigest']}
+            except RuntimeError:pass
+            if time.monotonic()>deadline:raise RuntimeError('Actual HTTPS ingress readiness unknown')
+            time.sleep(.25)

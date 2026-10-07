@@ -37,6 +37,7 @@ class BundleTest(unittest.TestCase):
             (repo / path).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(REPO / path, repo / path)
         shutil.copytree(LINUX / 'config', repo / 'deploy/linux/config')
+        shutil.copytree(LINUX / 'runtime', repo / 'deploy/linux/runtime')
         jar = repo / 'app.jar'
         with zipfile.ZipFile(jar, 'w') as z:
             z.writestr('BOOT-INF/classes/schema-contract/schema-contract-manifest.json', (repo / source / 'schema-contract-manifest.json').read_bytes())
@@ -55,6 +56,19 @@ class BundleTest(unittest.TestCase):
         self.assertEqual(descriptor['schemaVersion'], '52-plus-2-r2-v22')
         self.assertEqual(len(descriptor['migrations']), 43)
         self.m.verify(descriptor, repo)
+        for name in ('templates','runtime','ols_linux'):
+            shutil.copytree(LINUX/name,repo/'deploy/linux'/name,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
+        for name in ('deploy/identity/realm-template.json','contracts/openapi/ontology-law-api.yaml','backend/src/test/resources/db/bootstrap-runtime-logins.sql'):
+            (repo/name).parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(REPO/name,repo/name)
+        extended=self.m.describe(repo,jar,dist,'a'*40,include_runtime=True)
+        self.assertEqual(extended['version'],2)
+        for name in ('deploy/linux/templates/consulting.pdf','deploy/linux/runtime/server.mjs','deploy/linux/ols_linux/identity.py','deploy/identity/realm-template.json','backend/src/test/resources/db/bootstrap-runtime-logins.sql'):
+            self.assertIn(name,extended['files'])
+        self.m.verify(extended,repo)
+        candidate=repo/'deploy/linux/templates/consulting.pdf';original=candidate.read_bytes();candidate.write_bytes(b'foreign-template')
+        with self.assertRaises(RuntimeError):self.m.verify(extended,repo)
+        candidate.write_bytes(original)
+        self.m.verify(descriptor,repo)  # Existing v1 installations remain verifiable.
         proof['jarExitCode'] = 1
         (repo / '.artifacts/linux-build-proof.json').write_text(json.dumps(proof))
         with self.assertRaises(RuntimeError): self.m.describe(repo, jar, dist, 'a'*40)

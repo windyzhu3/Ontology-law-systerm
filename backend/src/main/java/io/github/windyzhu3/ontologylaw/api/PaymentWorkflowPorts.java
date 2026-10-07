@@ -11,7 +11,8 @@ import java.sql.*;import java.time.*;import java.util.*;import java.util.functio
 /** Trusted composition for finance; no caller-supplied account or deduplication namespace. */
 public final class PaymentWorkflowPorts implements PaymentWorkflowService.Ports {
  private final ContractWorkflowPorts contracts;private final ContractProtection protection;private final TaskFactory tasks=TaskFactory.databaseBacked();private final Function<UUID,Account> accounts;
- public PaymentWorkflowPorts(ContractProtection protection,OpportunityProgressProtection materials,MaterialObjectStore objects,Function<UUID,Account> accounts){this.protection=Objects.requireNonNull(protection);this.contracts=new ContractWorkflowPorts(materials,objects);this.accounts=Objects.requireNonNull(accounts);}
+ public PaymentWorkflowPorts(ContractProtection protection,OpportunityProgressProtection materials,MaterialObjectStore objects,Function<UUID,Account> accounts){this(protection,materials,objects,accounts,new BusinessResponsibilityRouting(List.of()));}
+ public PaymentWorkflowPorts(ContractProtection protection,OpportunityProgressProtection materials,MaterialObjectStore objects,Function<UUID,Account> accounts,BusinessResponsibilityRouting routing){this.protection=Objects.requireNonNull(protection);this.contracts=new ContractWorkflowPorts(materials,objects,routing);this.accounts=Objects.requireNonNull(accounts);}
  public void lockAuthority(Connection c,Actor actor)throws SQLException{AuthorizationService.databaseBacked().lockForEvaluation(c,actor.tenantId());}
  public Instant now(Connection c)throws SQLException{return tasks.now(c);}
  public Instant due(Instant start){return contracts.signatureDue(start,ZoneId.of("Asia/Shanghai"));}
@@ -27,6 +28,7 @@ public final class PaymentWorkflowPorts implements PaymentWorkflowService.Ports 
   var candidates=new LinkedHashSet<>(contracts.eligible(c,tenant,sales.organization(),fs,authority));candidates.retainAll(contracts.eligible(c,tenant,sales.organization(),fs,"CONTRACT_READ"));
   if(stage.equals("SUPPLEMENT_RECEIPT"))return candidates.contains(sales.owner())?sales.owner():null;
   if(incumbent!=null&&candidates.contains(incumbent))return incumbent;
+  if(contracts.routingEnabled(tenant))return contracts.routingTarget(tenant,sales.organization(),stage).filter(candidates::contains).orElse(null);
   return candidates.size()==1?candidates.iterator().next():null;
  }
  private static Task neutral(TaskFactory.Task t){return t==null?null:new Task(t.selector(),t.owner(),t.state());}

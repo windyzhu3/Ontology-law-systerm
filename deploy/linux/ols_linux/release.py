@@ -254,6 +254,8 @@ def _activate(root: Path,operation_id: str,inputs: dict) -> dict:
         journal._write(root,root/'current-release.json',candidate)
         journal.record(root,operation_id,{'phase':'RUNTIME_VERIFIED','descriptorDigest':descriptor['descriptorDigest'],'evidenceDigest':digest(evidence)})
         runtime.open_ingress(root,operation_id)
+        from .verify import ingress_ready
+        ingress_ready(root,descriptor)
         journal.record(root,operation_id,{'phase':'COMPLETE','descriptorDigest':descriptor['descriptorDigest']})
         return {'operationId':operation_id,'kind':journal.read(root,operation_id)['kind'],'phase':'COMPLETE','descriptorDigest':descriptor['descriptorDigest']}
     except Exception:

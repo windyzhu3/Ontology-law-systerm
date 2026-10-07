@@ -12,7 +12,8 @@ import java.sql.*;import java.time.*;import java.util.*;import java.util.functio
 public final class TransferWorkflowPorts implements TransferWorkflowService.Ports,TransferSubmissionService.Ports {
  private final ContractWorkflowPorts contracts;private final ContractProtection protection;private final OpportunityProgressProtection materials;
  private final TaskFactory tasks=TaskFactory.databaseBacked();private final Function<UUID,UUID> destinations;
- public TransferWorkflowPorts(ContractProtection protection,OpportunityProgressProtection materials,MaterialObjectStore objects,Function<UUID,UUID> destinations){this.protection=Objects.requireNonNull(protection);this.materials=Objects.requireNonNull(materials);this.contracts=new ContractWorkflowPorts(materials,objects);this.destinations=Objects.requireNonNull(destinations);}
+ public TransferWorkflowPorts(ContractProtection protection,OpportunityProgressProtection materials,MaterialObjectStore objects,Function<UUID,UUID> destinations){this(protection,materials,objects,destinations,new BusinessResponsibilityRouting(List.of()));}
+ public TransferWorkflowPorts(ContractProtection protection,OpportunityProgressProtection materials,MaterialObjectStore objects,Function<UUID,UUID> destinations,BusinessResponsibilityRouting routing){this.protection=Objects.requireNonNull(protection);this.materials=Objects.requireNonNull(materials);this.contracts=new ContractWorkflowPorts(materials,objects,routing);this.destinations=Objects.requireNonNull(destinations);}
  public void lockAuthority(Connection c,Actor a)throws SQLException{AuthorizationService.databaseBacked().lockForEvaluation(c,a.tenantId());}
  public Instant now(Connection c)throws SQLException{return tasks.now(c);}
  public Instant due(Instant trigger){return contracts.signatureDue(trigger,ZoneId.of("Asia/Shanghai"));}
@@ -60,7 +61,9 @@ public final class TransferWorkflowPorts implements TransferWorkflowService.Port
   var identity=AuthorizationIdentityReader.databaseBacked();var submitted=submitter==null?null:identity.owner(c,actor.tenantId(),submitter,now(c));
   var qualified=new LinkedHashSet<UUID>();for(var candidate:candidates){var person=identity.owner(c,actor.tenantId(),candidate,now(c));if(person==null||!person.active())continue;if(!salesStage&&!affiliated(c,actor.tenantId(),candidate,req.to()))continue;if(submitted!=null&&Set.of("REVIEW_TRANSFER","INTAKE").contains(stage)&&submitted.principalId().equals(person.principalId()))continue;qualified.add(candidate);}
   if(salesStage){var sales=contracts.responsibility(c,actor.tenantId(),opportunity);return sales!=null&&qualified.contains(sales.owner())?sales.owner():null;}
-  if(incumbent!=null&&qualified.contains(incumbent))return incumbent;return qualified.size()==1?qualified.iterator().next():null;
+  if(incumbent!=null&&qualified.contains(incumbent))return incumbent;
+  if(contracts.routingEnabled(actor.tenantId()))return contracts.routingTarget(actor.tenantId(),req.from(),stage).filter(qualified::contains).orElse(null);
+  return qualified.size()==1?qualified.iterator().next():null;
  }
  private static Task neutral(TaskFactory.Task task){return task==null?null:new Task(task.selector(),task.owner(),task.state());}
  public Task task(Connection c,UUID tenant,UUID id)throws SQLException{return neutral(tasks.read(c,tenant,id));}

@@ -9,8 +9,11 @@ import java.sql.*;import java.time.*;import java.util.*;
 /** Trusted composition; all Owner ports share the caller's fenced transaction. */
 public class ContractWorkflowPorts implements ContractWorkflowService.Ports {
  private final TaskFactory tasks=TaskFactory.databaseBacked();
- private final OpportunityProgressProtection protection;private final MaterialObjectStore objects;
- public ContractWorkflowPorts(OpportunityProgressProtection protection,MaterialObjectStore objects){this.protection=Objects.requireNonNull(protection);this.objects=objects;}
+ private final OpportunityProgressProtection protection;private final MaterialObjectStore objects;private final BusinessResponsibilityRouting routing;
+ public ContractWorkflowPorts(OpportunityProgressProtection protection,MaterialObjectStore objects){this(protection,objects,new BusinessResponsibilityRouting(List.of()));}
+ public ContractWorkflowPorts(OpportunityProgressProtection protection,MaterialObjectStore objects,BusinessResponsibilityRouting routing){this.protection=Objects.requireNonNull(protection);this.objects=objects;this.routing=Objects.requireNonNull(routing);}
+ public Optional<UUID> routingTarget(UUID tenantId,UUID sourceOrganizationId,String stageCode){return routing.target(tenantId,sourceOrganizationId,stageCode);}
+ public boolean routingEnabled(UUID tenantId){return routing.enabled(tenantId);}
  public ContractWorkflowService.DocumentObject documentObject(Connection c,UUID tenant,UUID materialVersion)throws SQLException {
   var v=OpportunityMaterials.databaseBacked().version(c,tenant,materialVersion);if(v==null)throw new ContractWorkflowService.Blocked("STALE_EVIDENCE");var b=R2LedgerSourceFacts.materialBasis(c,tenant,v.upload());
   if(b==null||!documentUsable(c,tenant,materialVersion,b.sha256()))throw new ContractWorkflowService.Blocked("STALE_EVIDENCE");return new ContractWorkflowService.DocumentObject(b.objectVersion(),b.sha256());

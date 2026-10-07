@@ -1,0 +1,7 @@
+{
+  "image": "clamav/clamav@sha256:9cb27d7660bdf66e9878c832cb433dd8aa152cfbe16f3c2c0084c80b04ae22b4",
+  "servicePort": 3310,
+  "source": "docs/evidence/r2/t06-runtime.md",
+  "signatureUpdates": "enabled",
+  "hostPort": null
+}
