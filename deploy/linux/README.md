@@ -146,7 +146,7 @@ python3 deploy/linux/linux.py --runtime "$RUNTIME" health
 
 `origins` 必须与原实例完全一致。候选必须匹配私钥、覆盖原 SAN、具备服务器用途、链至代码审核准入的根，剩余有效期至少 7 天且到期日晚于当前证书。上传的中间证书不能自动成为根信任。`approvedAnchors` 的内容还须通过仓库准入表校验。
 
-`proxies` 为 `{ "version": 1, "services": [...] }`。每个服务必须完整提供 `role`（nginx 或 caddy）、`transport`（docker 或 systemd）、`name`、`identity`、`image`、`config`、`configSha256`、`tlsPaths`。配置必须已经登记在运行目录的 `proxy/` 下；Docker 服务须原本按原路径挂载运行目录，身份为实际容器 ID 与 image ID。systemd 身份绑定 unit 属性与固定可执行文件哈希。`tlsPaths` 只允许 certificate/privateKey/httpTrust 的现有绝对路径。外层 nginx 必须是获准暂停的独立服务；控制器不会自动改挂载、采用未知服务或安装代理。各 transport 的真实验证范围见验收报告。
+`proxies` 为 `{ "version": 1, "services": [...] }`。每个服务必须完整提供 `role`（nginx 或 caddy）、`transport`（docker 或 systemd）、`name`、`identity`、`image`、`config`、`configSha256`、`tlsPaths`。配置必须已经登记在运行目录的 `proxy/` 下；Docker 服务须原本按原路径挂载运行目录，身份为实际容器 ID 与 image ID。systemd 身份绑定 unit 属性与固定可执行文件哈希。`tlsPaths` 只允许 certificate/privateKey/httpTrust 的现有绝对路径。外层 nginx 必须是获准暂停的独立服务；控制器不会自动改挂载、采用未知服务或安装代理。本轮受限维护仅准入 Docker nginx 的准确 `nginx -c <登记配置> -g "daemon off;"` 启动、无运行目录嵌套挂载、两个原 IPv4 TLS 监听及已登记 Caddy localhost 桥接。systemd 和其他配置形式在维护前拒绝，不应视为已支持。各 transport 的真实验证范围见验收报告。
 
 `probeTargets` 明确登记 bridgeIdentity、bridgeEntry、publicIdentity、publicEntry 四个目标，每项提供 role/connectHost/connectPort/verifyHost；桥接端口可显式增加 `tlsIdentity: "internal"`，仅指原封存的 `certs/server.crt` 与其 localhost 身份。公网及原生端点的 verifyHost 必须保留原 origin 的主机/IP 身份，不能改成 localhost 来通过验证；connectHost 限原主机或本机回环。两个 native 目标取自原身份计划。两段代理 TLS 校验均须保留。
 
@@ -157,7 +157,7 @@ python3 -B deploy/linux/linux.py --runtime /absolute/private/runtime rotate-publ
 python3 -B deploy/linux/linux.py --runtime /absolute/private/runtime public-tls-status
 ```
 
-轮换使用实例锁与原操作日志，维护期间关闭外层入口并停止原生写入者，更新原生身份容器证书及 API/Worker/入口信任配置。原生与桥接检查通过后才开放外层，再核对公开入口。发生异常应保留现场并使用返回的原 ID 续跑；不得换输入另开操作。回退仅适用于仍有效且完整的旧代次，结果仍属于原轮换操作。重复完全相同的已部署产物仅在实际探测通过时返回 `UNCHANGED`，保留原 ID；不同代理绑定不会被当作重复成功。
+轮换使用实例锁与原操作日志，维护先停止外层代理和原生写入者，更新原生身份容器证书及 API/Worker/入口信任配置。激活时复用原监听，只允许本机回环及原 pod 的准确地址访问原 realm 的 GET JWKS 和 POST introspection；其他身份和业务路由均返回 503。两段 TLS 和原客户端认证不变。失败清理仍停止整个外层代理。原生与桥接检查通过后才开放外层，再核对公开入口。发生异常应保留现场并使用返回的原 ID 续跑；不得换输入另开操作。回退仅适用于仍有效且完整的旧代次，结果仍属于原轮换操作。重复完全相同的已部署产物仅在实际探测通过时返回 `UNCHANGED`，保留原 ID；不同代理绑定不会被当作重复成功。
 
 默认到期阈值为 30 天 WARNING、14 天 ACTION_REQUIRED、7 天 CRITICAL；到期或指纹失败为 BLOCKED。退出码：0=OK，2=需关注，1=BLOCKED，4=UNKNOWN。未配置历史检查或超过 26 小时无成功证据时明确返回 UNKNOWN；首次实时探测结果仍单独显示。状态命令不修改运行时，输出的 `checkEvidence` 带实例签名，历史证据须放运行目录之外的私密文件，通过 `--previous-check-file` 传回。未来时间、错误签名及其他实例证据均拒绝。
 

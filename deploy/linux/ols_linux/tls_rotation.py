@@ -88,7 +88,9 @@ def _prepare(root,opid,data):
     deployment=tls_deployment.prepare(root,opid,data['candidate'],trust)
     deployment['probeTargets']=data['probeTargets']
     generation=tls_generation.seal(root,opid,data['candidate'],trust,deployment)
-    tls_proxy.prepare(root,opid,data['proxies'],generation['paths'])
+    proxy=tls_proxy.prepare(root,opid,data['proxies'],generation['paths'])
+    from . import tls_maintenance
+    tls_maintenance.prepare(root,opid,proxy['services'],data['probeTargets'],generation['paths'])
     data['generationId']=generation['generationId'];_save(root,opid,data)
     return generation
 
@@ -116,6 +118,11 @@ def _fail(root,opid,data):
 
 
 def _start(root,opid,generation,data):
+    from . import tls_maintenance
+    rollback=journal.current(root)['phase']=='ROLLBACK_ACTIVATING'
+    tls_proxy.apply(root,opid,'rollback' if rollback else 'switch')
+    proxy=journal._read(root,root/'operations'/(opid+'-proxy.json'))
+    tls_maintenance.start(root,opid,proxy['services'],data['probeTargets'],generation['paths'])
     runtime.start_internal(root,data['release']['descriptor'])
     launch=journal._read(root,root/'launch.json');entry=launch['ingress']
     actual=runtime.owned(root,'container',entry['name'])

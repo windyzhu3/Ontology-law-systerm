@@ -1,0 +1,124 @@
+"""Restricted issuer health access on the existing nginx listeners.
+
+Only the owned pod's exact IPv4 address and host loopback may use the two
+already-public issuer health paths. Authentication and strict upstream TLS stay
+unchanged. All other paths return 503, including identity administration.
+"""
+import ipaddress
+import re
+from pathlib import Path
+from urllib.parse import urlsplit
+from . import journal,runtime,tls_material
+
+
+def render(*,listeners,identity_port,realm,sources,upstream_port,certificate,private_key,trust):
+    if not re.fullmatch('[A-Za-z0-9_-]+',realm):raise ValueError('Exact realm required')
+    if len(listeners)!=2 or len(set(listeners))!=2:raise ValueError('Two original listeners required')
+    for token in listeners:
+        if not re.fullmatch(r'(?:[0-9.]+:)?[0-9]+',token):raise ValueError('Explicit IPv4 listener required')
+        if ':' in token:ipaddress.IPv4Address(token.rsplit(':',1)[0])
+        if not 1<=int(token.rsplit(':',1)[-1])<=65535:raise ValueError('Invalid listener')
+    if sum(int(x.rsplit(':',1)[-1])==identity_port for x in listeners)!=1:raise ValueError('Original identity listener required')
+    if type(upstream_port)!=int or not 1<=upstream_port<=65535:raise ValueError('Exact upstream port required')
+    if not sources or len(set(sources))!=len(sources):raise ValueError('Exact source addresses required')
+    for source in sources:ipaddress.IPv4Address(source)
+    for path in [certificate,private_key,trust]:
+        if not re.fullmatch('/[A-Za-z0-9_./-]+',path) or '..' in Path(path).parts:raise ValueError('Unsafe TLS path')
+    blocks=[]
+    for listener in listeners:
+        locations='location / { return 503; }'
+        if int(listener.rsplit(':',1)[-1])==identity_port:
+            for method,path in [('GET','certs'),('POST','token/introspect')]:
+                locations+=f'''\nlocation = /realms/{realm}/protocol/openid-connect/{path} {{
+if ($request_method != {method}) {{ return 405; }}
+{''.join('allow '+s+'; ' for s in sources)}deny all;
+proxy_pass https://127.0.0.1:{upstream_port};
+proxy_ssl_verify on; proxy_ssl_protocols TLSv1.3;
+proxy_ssl_server_name on; proxy_ssl_name localhost;
+proxy_ssl_trusted_certificate {trust};
+proxy_set_header Host $http_host; proxy_set_header X-Forwarded-Proto https;
+proxy_connect_timeout 3s; proxy_read_timeout 3s; client_max_body_size 64k;
+}}'''
+        blocks.append(f'''server {{
+listen {listener} ssl;
+ssl_protocols TLSv1.3;
+ssl_certificate {certificate}; ssl_certificate_key {private_key};
+{locations}
+}}''')
+    return 'events {}\nhttp {\naccess_log off; server_tokens off;\n'+ '\n'.join(blocks)+'\n}\n'
+
+
+def validate_start(service,actual,root):
+    # systemd needs its own qualified argv/loaded-process profile; it must not
+    # silently inherit the Docker evidence or restart a wrapper command.
+    if service['transport']!='docker':raise RuntimeError('Restricted maintenance currently requires qualified Docker nginx')
+    for mount in actual.get('Mounts',[]):
+        destination=Path(mount['Destination'])
+        if destination!=root and destination.is_relative_to(root):raise RuntimeError('Nested mount shadows maintenance runtime')
+    cfg=actual['Config']
+    if cfg.get('Entrypoint')!=['nginx'] or cfg.get('Cmd')!=['-c',service['config'],'-g','daemon off;']:
+        raise RuntimeError('Actual nginx startup configuration differs')
+
+
+def prepare(root,opid,rows,targets,paths):
+    """Bind the exact owned pod and original listeners before any maintenance effect."""
+    from . import tls_proxy
+    saved=root/'operations'/(opid+'-issuer-maintenance.json')
+    plan=journal._read(root,root/'identity/plan.json')
+    resources=runtime.load(root);pod=runtime.owned(root,'container',plan['pod'])
+    network=pod['NetworkSettings']['Networks'].get(resources['network'])
+    if not network or not network.get('IPAddress'):raise RuntimeError('Original pod address unavailable')
+    source=network['IPAddress'];ipaddress.IPv4Address(source)
+    outer=next(r for r in rows if r['service']['role']=='nginx')
+    observed=tls_proxy._service(outer['service'])
+    validate_start(outer['service'],observed.get('actual',{}),root)
+    original=outer.get('before',outer.get('configuration'))
+    # This bounded profile supports the existing IPv4 two-listener Caddy topology.
+    # Unsupported syntax is refused rather than rewritten heuristically.
+    original=re.sub(r'#[^\n]*','',original)
+    listeners=re.findall(r'\blisten\s+([^;]+);',original)
+    if any(not re.fullmatch(r'(?:[0-9.]+:)?[0-9]+\s+ssl',x.strip()) for x in listeners):raise RuntimeError('Unsupported original maintenance listener profile')
+    listeners=[x.split()[0] for x in listeners]
+    issuer=urlsplit(plan['issuer']);origin=urlsplit(plan['origin'])
+    if sorted(int(x.rsplit(':',1)[-1]) for x in listeners)!=sorted([issuer.port or 443,origin.port or 443]):raise RuntimeError('Original public listeners differ')
+    bridge=[t for t in targets if t['role']=='bridgeIdentity']
+    if len(bridge)!=1 or bridge[0].get('tlsIdentity')!='internal' or bridge[0]['verifyHost']!='localhost' or bridge[0]['connectHost']!='127.0.0.1':raise RuntimeError('Original verified Caddy identity bridge required')
+    if not any(r['service']['role']=='caddy' for r in rows):raise RuntimeError('Registered Caddy required')
+    text=render(listeners=listeners,identity_port=issuer.port or 443,realm=issuer.path.removeprefix('/realms/'),sources=sorted(set(['127.0.0.1',source])),upstream_port=bridge[0]['connectPort'],certificate=paths['certificate'],private_key=paths['privateKey'],trust=str(root/'certs/ca.pem'))
+    value={'podId':pod['Id'],'podAddress':source,'configuration':text,'service':outer['service']}
+    # Forward/rollback may select different bytes; retain each exact version.
+    from .config import digest
+    candidate=root/'proxy'/('maintenance-'+digest(value)+'.conf')
+    if candidate.exists() and tls_material.read_private(candidate)!=text.encode():raise RuntimeError('Maintenance candidate differs')
+    if not candidate.exists():runtime.private_file(candidate,text.encode())
+    tls_proxy._check(outer['service'],candidate)
+    value['candidate']=str(candidate)
+    if saved.exists():
+        before=journal._read(root,saved)
+        if before['podId']!=pod['Id'] or before['podAddress']!=source:raise RuntimeError('Original maintenance pod changed')
+    journal._write(root,saved,value)
+    return value
+
+
+def start(root,opid,rows,targets,paths):
+    from . import tls_proxy
+    op=journal.current(root)
+    if op['operationId']!=opid or op['phase'] not in {'ACTIVATING','ROLLBACK_ACTIVATING','ACTIVATION_UNKNOWN'}:raise RuntimeError('Original maintenance activation required')
+    value=prepare(root,opid,rows,targets,paths);service=value['service']
+    # Stop/start, rather than reload, removes old workers and proves which config
+    # the owned process read. If interrupted, the exact intent remains replayable.
+    if tls_proxy._service(service)['running']:tls_proxy._action(service,'stop')
+    if tls_proxy._service(service)['running']:raise RuntimeError('Maintenance stop unconfirmed')
+    runtime.private_file(Path(service['config']),value['configuration'].encode())
+    tls_proxy._action(service,'start')
+    if not tls_proxy._service(service)['running']:raise RuntimeError('Maintenance start unconfirmed')
+    effective=runtime.run(['docker','exec',service['name'],'cat',service['config']]).stdout
+    if effective!=value['configuration'].encode():raise RuntimeError('Maintenance effective configuration differs')
+    return value
+
+
+def configured(root,opid,service):
+    path=root/'operations'/(opid+'-issuer-maintenance.json')
+    if not path.exists():return False
+    value=journal._read(root,path)
+    return value['service']==service and tls_material.read_private(service['config'])==value['configuration'].encode()

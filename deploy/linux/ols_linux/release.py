@@ -475,6 +475,9 @@ def start(root: Path) -> dict:
             value=checkpoint.verified(root,plan['sourceOperationId'])
             if digest(value)!=plan['checkpointDigest']:raise RuntimeError('Linked original restore changed')
             if op['phase']=='RESTORED_MAINTENANCE':_assert_restored(root,value)
+            else:
+                from . import tls_restore
+                tls_restore.reconcile_maintenance(root,value)
             if (root/'certs/public.crt').exists():
                 import time
                 from . import tls_generation

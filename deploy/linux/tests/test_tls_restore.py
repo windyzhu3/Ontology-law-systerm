@@ -46,7 +46,28 @@ class TlsRestoreTests(unittest.TestCase):
         self.prepare();journal.record(self.root,self.op['operationId'],{'phase':'ACTIVATION_UNKNOWN'})
         generation={'generationId':'old','version':0,'paths':{'certificate':'/restored/cert'},'candidate':{'notAfter':100}}
         state={'running':False};events=[]
-        with patch.object(self.m.tls_generation,'resolve',return_value=generation),patch.object(self.m.tls_proxy,'_service',return_value=state),patch.object(self.m.tls_proxy,'_check',side_effect=lambda *a:events.append('validate')),patch.object(self.m,'_legacy_context'):
+        with patch.object(self.m.tls_generation,'resolve',return_value=generation),patch.object(self.m.tls_proxy,'_service',return_value=state),patch.object(self.m.tls_proxy,'_check',side_effect=lambda *a:events.append('validate')),patch.object(self.m,'_legacy_context'),patch('ols_linux.tls_maintenance.start') as maintenance:
             self.m.activate(self.root,now=1)
         self.assertEqual((self.root/'proxy/nginx.conf').read_text(),'cert /restored/cert;')
         self.assertEqual(events,['validate'])
+        maintenance.assert_called_once()
+    def test_restore_reconciles_exact_maintenance_bytes_before_checkpoint_validation(self):
+        from ols_linux import tls_maintenance
+        import hashlib
+        self.prepare();opid=self.op['operationId'];journal.record(self.root,opid,{'phase':'ACTIVATION_UNKNOWN'})
+        state=self.m._state(self.root);state['activatedProxies']=[{'service':self.service,'configuration':'checkpoint-config'}]
+        journal._write(self.root,self.m._path(self.root,opid),state)
+        runtime.private_file(Path(self.service['config']),b'maintenance-config')
+        journal._write(self.root,self.root/'operations'/(opid+'-issuer-maintenance.json'),{'service':self.service,'configuration':'maintenance-config'})
+        value={'files':{'assets/proxy/nginx.conf':hashlib.sha256(b'checkpoint-config').hexdigest()}}
+        self.assertTrue(callable(getattr(self.m,'reconcile_maintenance',None)),'Restore maintenance reconciliation missing')
+        running=[True]
+        with patch.object(self.m.tls_proxy,'_service',side_effect=lambda s:{'running':running[0]}),patch.object(self.m.tls_proxy,'_action',side_effect=lambda s,a:running.__setitem__(0,False)):
+            self.m.reconcile_maintenance(self.root,value)
+        self.assertFalse(running[0]);self.assertEqual(Path(self.service['config']).read_bytes(),b'checkpoint-config')
+        self.assertEqual(journal.current(self.root)['operationId'],opid)
+    def test_restore_maintenance_uses_checkpoint_bridge_targets(self):
+        self.assertTrue(callable(getattr(self.m,'_targets',None)),'Checkpoint bridge target selection missing')
+        state={'target':{'probeTargets':[{'connectPort':24846}]},'before':{'probeTargets':[{'connectPort':25846}]}}
+        self.assertEqual(self.m._targets(state),state['target']['probeTargets'])
+        self.assertEqual(self.m._targets(dict(state,target=None)),state['before']['probeTargets'])

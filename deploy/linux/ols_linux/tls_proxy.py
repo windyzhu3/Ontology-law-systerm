@@ -85,8 +85,10 @@ def observe(root: Path,operation_id: str) -> dict:
     for row in value['services']:
         service=row['service'];state=_service(service)
         data=tls_material.read_private(service['config'])
-        if data not in [row['before'].encode(),row['after'].encode()]:raise RuntimeError('Live proxy configuration conflicts')
-        states[service['role']]={'running':state['running'],'configuration':'candidate' if data==row['after'].encode() else 'previous'}
+        from . import tls_maintenance
+        maintenance=tls_maintenance.configured(root,operation_id,service) if service['role']=='nginx' else False
+        if data not in [row['before'].encode(),row['after'].encode()] and not maintenance:raise RuntimeError('Live proxy configuration conflicts')
+        states[service['role']]={'running':state['running'],'configuration':'maintenance' if maintenance else 'candidate' if data==row['after'].encode() else 'previous'}
     return {'closed':not states['nginx']['running'],'services':states}
 
 
@@ -95,10 +97,14 @@ def apply(root: Path,operation_id: str,action: str) -> dict:
     with journal.locked(root) as root:
         op=journal.current(root)
         if op['operationId']!=operation_id or op['kind']!='rotate-public-tls' or op['phase']=='COMPLETE':raise RuntimeError('Original proxy operation required')
-        phases={'close':{'STOPPING','FAILING','ROLLBACK_STOPPING','ROLLBACK_FAILING'},'switch':{'PROXY_SWITCHING'},'rollback':{'ROLLBACK_SWITCHING'},'open':{'OPENING','ROLLBACK_OPENING'}}
+        phases={'close':{'STOPPING','FAILING','ROLLBACK_STOPPING','ROLLBACK_FAILING'},'switch':{'PROXY_SWITCHING','ACTIVATING'},'rollback':{'ROLLBACK_SWITCHING','ROLLBACK_ACTIVATING'},'open':{'OPENING','ROLLBACK_OPENING'}}
         if op['phase'] not in phases[action]:raise RuntimeError('Original proxy phase does not permit action')
         value=journal._read(root,root/'operations'/(operation_id+'-proxy.json'))
         observed=observe(root,operation_id)
+        if action in {'switch','rollback'} and observed['services']['nginx']['configuration']=='maintenance':
+            outer=next(row['service'] for row in value['services'] if row['service']['role']=='nginx')
+            if _service(outer)['running']:_action(outer,'stop')
+            observed=observe(root,operation_id)
         if action in {'switch','rollback'} and not observed['closed']:raise RuntimeError('Outer proxy must be observed closed')
         if action in {'switch','rollback'}:
             for row in value['services']:
@@ -112,5 +118,11 @@ def apply(root: Path,operation_id: str,action: str) -> dict:
                 if service['role']=='caddy':_action(service,'reload' if _service(service)['running'] else 'start')
         else:
             outer=next(row['service'] for row in value['services'] if row['service']['role']=='nginx')
+            if action=='open' and observed['services']['nginx']['configuration']=='maintenance':
+                if _service(outer)['running']:_action(outer,'stop')
+                if _service(outer)['running']:raise RuntimeError('Maintenance stop unconfirmed')
+                row=next(r for r in value['services'] if r['service']['role']=='nginx')
+                desired=row['before' if op['phase']=='ROLLBACK_OPENING' else 'after']
+                runtime.private_file(Path(outer['config']),desired.encode())
             if _service(outer)['running']!=(action=='open'):_action(outer,'start' if action=='open' else 'stop')
         return observe(root,operation_id)

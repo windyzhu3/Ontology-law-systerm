@@ -1,5 +1,6 @@
 """Strict TLS observations of each registered native and proxy hop."""
 import hashlib
+import json
 import socket
 import ssl
 from pathlib import Path
@@ -32,6 +33,16 @@ def summarize(targets,consumers,*,scope):
     return 'PASS'
 
 
+def same_denial(first,second):
+    if first['status']!=401 or second['status']!=401:return False
+    import re
+    bodies=[json.loads(x['body']) for x in [first,second]]
+    for body in bodies:
+        if body.get('code')!='UNAUTHENTICATED' or body.get('status')!=401 or body.get('type')!='urn:ontology-law:problem:UNAUTHENTICATED':return False
+        if not re.fullmatch('/problems/[0-9a-f-]{36}',body.pop('instance','')):return False
+    return bodies[0]==bodies[1]
+
+
 def collect(root: Path,generation: dict,*,scope: str,now: int) -> dict:
     if scope not in {'native','proxy','bridge','all'}:raise RuntimeError('Named TLS probe scope required')
     with journal.locked(root) as root:
@@ -57,13 +68,34 @@ def collect(root: Path,generation: dict,*,scope: str,now: int) -> dict:
             if target.get('tlsIdentity')=='internal':expected=tls_material.fingerprint(tls_material.certificates(tls_material.read_private(root/'certs/server.crt'))[0])
             connection={key:value for key,value in target.items() if key!='tlsIdentity'}
             evidence[role]=handshake(connection,Path(generation['paths']['httpTrust']),expected,now=now)
-        consumers={}
+        consumers={};http_evidence={}
         if scope not in {'proxy','bridge'}:
             try:
                 if generation['version']==1:tls_generation.verify_trust(root,generation['trust'])
                 from . import verify
                 descriptor=journal._read(root,root/'current-release.json')['descriptor']
                 result=verify.runtime_ready(root,descriptor)
-                if result['status']=='PASS':consumers={name:'PASS' for name in CONSUMERS}
+                full=result.get('fullRuntime',{})
+                expected={'identity':'VERIFIED_TLS_DISCOVERY','api':'AUTHENTICATED_MTLS_READY','worker':'CURRENT_BOOT_READY','scanner':'REAL_PONG'}
+                consumers={name:'PASS' for name,value in expected.items() if full.get(name)==value}
+                if consumers.get('api')=='PASS':consumers['javaTrust']='PASS'
+                from . import identity
+                forwarded=identity.http(root,plan['origin']+'/api/v1/session/context')
+                direct=identity.http(root,plan['apiOrigin']+'/api/v1/session/context')
+                if same_denial(forwarded,direct):
+                    consumers['nodeTrust']='PASS'
+                    http_evidence['nativeEntryApi']='VERIFIED_TLS_UNAUTHENTICATED_API_RESPONSE'
             except (RuntimeError,ValueError,KeyError,OSError):pass
-        return {'status':summarize(evidence,consumers,scope=scope),'observedAt':now,'generationId':generation['generationId'],'targets':evidence,'consumers':consumers}
+        public_ok=True
+        if scope in {'all','proxy'}:
+            try:
+                from . import identity
+                descriptor=journal._read(root,root/'current-release.json')['descriptor']
+                discovery=identity.http(root,plan['issuer']+'/.well-known/openid-configuration',public=True)
+                entry=identity.http(root,plan['origin']+'/',public=True)
+                forwarded=identity.http(root,plan['origin']+'/api/v1/session/context',public=True)
+                direct=identity.http(root,plan['apiOrigin']+'/api/v1/session/context')
+                public_ok=(discovery['status']==entry['status']==200 and json.loads(discovery['body'])['issuer']==plan['issuer'] and hashlib.sha256(entry['body'].encode()).hexdigest()==descriptor['spaFiles']['index.html'] and same_denial(forwarded,direct))
+            except (RuntimeError,ValueError,KeyError,OSError):public_ok=False
+            http_evidence['publicRoutes']='PASS' if public_ok else 'BLOCKED'
+        return {'status':summarize(evidence,consumers,scope=scope) if public_ok else 'BLOCKED','observedAt':now,'generationId':generation['generationId'],'targets':evidence,'consumers':consumers,'http':http_evidence}

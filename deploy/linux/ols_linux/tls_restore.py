@@ -34,6 +34,9 @@ def prepare(root: Path,value: dict):
         journal._write(root,path,{'checkpointDigest':digest(value),'before':before,'target':value.get('tlsBinding')})
 
 
+def _targets(state):return (state.get('target') or {}).get('probeTargets',state['before'].get('probeTargets',[]))
+
+
 def _rows(state):return (state.get('target') or {}).get('proxies',state['before'].get('proxies',[]))
 
 
@@ -63,7 +66,7 @@ def _legacy_context(root,generation,state):
     if helper.exists() and helper.read_bytes()!=data:raise RuntimeError('Restored helper conflicts')
     if not helper.exists():runtime.private_file(helper,data)
     journal._write(root,path,{'generationId':generation['generationId'],'helperSha256':sha(helper),
-        'deployment':{'httpHelper':str(helper),'probeTargets':state['before'].get('probeTargets',[])},
+        'deployment':{'httpHelper':str(helper),'probeTargets':_targets(state)},
         'proxies':_rows(state)})
 
 
@@ -91,7 +94,13 @@ def activate(root: Path,*,now: int):
         for service,path,data in desired:
             if not path.exists() or path.read_text()!=data:runtime.private_file(path,data.encode())
             if service['role']=='caddy':tls_proxy._action(service,'reload' if tls_proxy._service(service)['running'] else 'start')
-        _legacy_context(root,generation,dict(state,target={'proxies':[{'service':service,'configuration':data} for service,path,data in desired]}))
+        activated=[{'service':service,'configuration':data} for service,path,data in desired]
+        state['activatedProxies']=activated
+        journal._write(root,_path(root,journal.current(root)['operationId']),state)
+        _legacy_context(root,generation,dict(state,target=dict(state.get('target') or {},proxies=activated)))
+        if activated:
+            from . import tls_maintenance
+            tls_maintenance.start(root,journal.current(root)['operationId'],activated,generation.get('deployment',{}).get('probeTargets',_targets(state)),generation['paths'])
 
 
 def open_verified(root: Path,*,now: int):
@@ -102,9 +111,36 @@ def open_verified(root: Path,*,now: int):
         for scope in ['native','bridge']:
             proof=tls_probe.collect(root,generation,scope=scope,now=now)
             if proof['status']!='PASS':raise RuntimeError('Restored TLS '+scope+' proof unavailable')
-        for row in _rows(state):
+        from . import tls_maintenance
+        for row in state.get('activatedProxies',_rows(state)):
             service=row['service'];actual=tls_proxy._service(service)
-            if service['role']=='nginx' and not actual['running']:tls_proxy._action(service,'start')
+            if service['role']=='nginx':
+                if tls_maintenance.configured(root,journal.current(root)['operationId'],service):
+                    if actual['running']:tls_proxy._action(service,'stop')
+                    if tls_proxy._service(service)['running']:raise RuntimeError('Restored maintenance stop unconfirmed')
+                    runtime.private_file(Path(service['config']),row['configuration'].encode())
+                if not tls_proxy._service(service)['running']:tls_proxy._action(service,'start')
         proof=tls_probe.collect(root,generation,scope='all',now=now)
         if proof['status']!='PASS':raise RuntimeError('Restored public TLS proof unavailable')
         journal._write(root,root/'operations'/(journal.current(root)['operationId']+'-restore-tls-proof.json'),proof)
+
+
+def reconcile_maintenance(root,value):
+    """Close/reconcile exact original transient bytes before strict checkpoint checks."""
+    from . import tls_maintenance
+    import hashlib
+    state=_state(root)
+    if not state:return
+    opid=journal.current(root)['operationId']
+    for row in state.get('activatedProxies',[]):
+        service=row['service']
+        if service['role']!='nginx' or not tls_maintenance.configured(root,opid,service):continue
+        path=Path(service['config'])
+        if path.resolve()!=path.absolute() or not path.is_relative_to(root/'proxy'):raise RuntimeError('Original restored proxy path differs')
+        expected=value['files'].get('assets/'+str(path.relative_to(root)))
+        desired=row['configuration'].encode()
+        if expected is not None and hashlib.sha256(desired).hexdigest()!=expected:raise RuntimeError('Desired restore proxy differs from checkpoint')
+        if expected is None and (value.get('tlsBinding') or {}).get('version',0)!=0:raise RuntimeError('Restored proxy missing from checkpoint')
+        if tls_proxy._service(service)['running']:tls_proxy._action(service,'stop')
+        if tls_proxy._service(service)['running']:raise RuntimeError('Restored maintenance stop unconfirmed')
+        runtime.private_file(path,desired)

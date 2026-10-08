@@ -33,3 +33,9 @@ During real fixture setup, a separate `tls_generation` local-import shadowing er
 ## Remaining work
 
 See the [verification matrix](verification-matrix.md). The planned all-scenario acceptance driver, complete application fixture, same-CA/cross-CA/expired-old rotations, real failure recovery and linked checkpoint restoration are not complete. systemd transport has no live-environment acceptance evidence. The [independent review and bounded corrections](independent-review.md) record the completed one-review/one-fix pass. Public HTTP forwarding and individual consumer proof remain open, alongside the architecture blocker. No successful integration status should be inferred from unit coverage or this report.
+
+## Authorized maintenance follow-up
+
+The parent authorized a minimal restricted-maintenance implementation. See [the follow-up and evidence](maintenance-follow-up.md). The dependency fix is implemented and the rendered nginx boundary passed real HTTP/TLS checks; full API-under-maintenance, rotation and business acceptance remain pending. The original initialization progressed beyond bootstrap and both administrator real PKCE ceremonies passed. Earlier fixture failure evidence is retained rather than replaced by a new initialization ID.
+
+Latest checkpoint regression: 233 Python tests passed. Full initialization remains active under the original operation; no actual rotation success is recorded. See the maintenance follow-up for current partial progress and qualified evidence.

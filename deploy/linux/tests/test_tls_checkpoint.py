@@ -120,7 +120,7 @@ class TlsCheckpointTests(unittest.TestCase):
         journal._write(self.root,self.root/'restore-plan.json',plan)
         journal._write(self.root,self.root/'current-release.json',{'directory':str(self.root),'descriptor':descriptor})
         journal._write(self.root,self.root/'operations'/(self.op['operationId']+'-restored-activation.json'),{'descriptorDigest':'a'*64,'expected':gate})
-        journal._write(self.root,self.root/'operations'/(self.op['operationId']+'-restore-tls.json'),{})
+        journal._write(self.root,self.root/'operations'/(self.op['operationId']+'-restore-tls.json'),{'checkpointDigest':digest(self.value)})
         journal.record(self.root,self.op['operationId'],{'phase':'INGRESS_OPEN'})
         with patch.object(checkpoint,'verified',return_value=self.value),patch('time.time',return_value=self.fixture['now']+3*86400),patch.object(tls_restore,'close',side_effect=[RuntimeError('close response lost'),None]) as close,patch.object(runtime,'stop_writers') as stop,patch.object(database,'observe',return_value={'gate':gate}),patch.object(release,'_cas_gate') as cas:
             with self.assertRaisesRegex(RuntimeError,'close response lost'):release.start(self.root)

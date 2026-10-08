@@ -201,8 +201,8 @@ def _start(root, plan):
         time.sleep(.5)
 
 
-def http_helper(root):
-    if tls_generation.managed(root):
+def http_helper(root,*,public=False):
+    if tls_generation.managed(root) and not public:
         from .tls_generation import resolve
         return resolve(root)['deployment']['httpHelper']
     path=root/'installed-candidate.json'
@@ -215,7 +215,7 @@ def http_helper(root):
     return str(helper)
 
 
-def http(root, url, *, method='GET', headers=None, body=None, client_certificate=False):
+def http(root, url, *, method='GET', headers=None, body=None, client_certificate=False, public=False):
     plan=journal._read(root,root/'identity/plan.json');runtime.owned(root,'container',plan['pod'])
     allowed=list({urlsplit(plan[name]).scheme+'://'+urlsplit(plan[name]).netloc for name in ('origin','issuer','apiOrigin')})
     parsed=urlsplit(url)
@@ -229,10 +229,10 @@ def http(root, url, *, method='GET', headers=None, body=None, client_certificate
         selected=urlsplit(url)
         identity_origin=urlsplit(plan['issuer'])
         port=plan['ports']['identity'] if selected.netloc==identity_origin.netloc else plan['ports']['entry'] if selected.netloc==urlsplit(plan['origin']).netloc else plan['ports']['api']
-        request.update(connectHost='127.0.0.1',connectPort=port)
+        if not public:request.update(connectHost='127.0.0.1',connectPort=port)
     if client_certificate:
         request.update(certificate=str(root/'certs/service.crt'),privateKey=str(root/'certs/service.key'))
-    result=runtime.run(['docker','exec','-i',plan['pod'],'node',http_helper(root)],canonical(request),timeout=25)
+    result=runtime.run(['docker','exec','-i',plan['pod'],'node',http_helper(root,public=public)],canonical(request),timeout=25)
     return json.loads(result.stdout)
 
 

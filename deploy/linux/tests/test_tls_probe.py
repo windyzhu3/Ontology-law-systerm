@@ -74,3 +74,21 @@ class ProbeTests(unittest.TestCase):
             generation['deployment']['probeTargets']=[dict(targets[0],role='publicIdentity')]
             with patch.object(self.m.tls_generation,'resolve',return_value=generation):
                 with self.assertRaises(RuntimeError):self.m.collect(root,generation,scope='proxy',now=self.f['now'])
+    def test_correct_tls_but_failed_public_http_cannot_pass(self):
+        from unittest.mock import patch
+        from ols_linux import journal,runtime,identity,verify
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)/'runtime';journal.begin(root,'initialize','a'*64)
+            plan={'issuer':'https://127.0.0.1:25443/realms/test','origin':'https://127.0.0.1:25444','ports':{'identity':24843,'entry':24844}}
+            journal._write(root,root/'identity/plan.json',plan);journal._write(root,root/'current-release.json',{'descriptor':{'spaFiles':{'index.html':'a'*64}}})
+            generation={'version':0,'generationId':'test','paths':{'httpTrust':str(self.f['old'])},'candidate':{'leafDerSha256':'x'},'deployment':{'probeTargets':[dict(self.target,role=r,connectPort=p) for r,p in [('bridgeIdentity',24846),('bridgeEntry',24847),('publicIdentity',25443),('publicEntry',25444)]]}}
+            with patch.object(self.m.tls_generation,'resolve',return_value=generation),patch.object(self.m,'handshake',return_value={'status':'PASS'}),patch.object(verify,'runtime_ready',return_value={'status':'PASS'}),patch.object(identity,'http',return_value={'status':502,'body':'upstream failed'}):
+                result=self.m.collect(root,generation,scope='all',now=self.f['now'])
+            self.assertNotEqual(result['status'],'PASS')
+    def test_forwarded_api_proof_compares_contract_not_random_problem_id(self):
+        import json
+        self.assertTrue(callable(getattr(self.m,'same_denial',None)),'API denial contract comparison missing')
+        body={'code':'UNAUTHENTICATED','status':401,'type':'urn:ontology-law:problem:UNAUTHENTICATED','instance':'/problems/00000000-0000-0000-0000-000000000001'}
+        a={'status':401,'body':json.dumps(body)};b={'status':401,'body':json.dumps(dict(body,instance='/problems/00000000-0000-0000-0000-000000000002'))}
+        self.assertTrue(self.m.same_denial(a,b));self.assertFalse(self.m.same_denial(a,{'status':502,'body':'bad gateway'}))
+        self.assertFalse(self.m.same_denial(a,{'status':401,'body':'{}'}))
