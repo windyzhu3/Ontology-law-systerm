@@ -50,7 +50,12 @@ def prepare(root: Path,operation_id: str,candidate: dict,trust: dict) -> dict:
         if not path.exists():journal._write(root,path,record)
         files[str(path.relative_to(root))]=sha(path)
         launch.update(binding=str(path),bindingDigest=digest(record),tlsGenerationId=gid)
-        return {'launch':launch,'files':files,'parentLaunch':original}
+        helper=Path(layout['paths']['certificate']).parent/'https-json.mjs'
+        data=(Path(__file__).parents[1]/'runtime/tls-https-json.mjs').read_bytes()
+        if helper.exists() and helper.read_bytes()!=data:raise RuntimeError('Original TLS helper differs')
+        if not helper.exists():runtime.private_file(helper,data)
+        files[str(helper.relative_to(root))]=sha(helper)
+        return {'launch':launch,'files':files,'parentLaunch':original,'httpHelper':str(helper)}
 
 
 def copy_identity(root,name,generation):

@@ -202,6 +202,9 @@ def _start(root, plan):
 
 
 def http_helper(root):
+    if (root/'tls/active.json').exists():
+        from .tls_generation import resolve
+        return resolve(root)['deployment']['httpHelper']
     path=root/'installed-candidate.json'
     if not path.exists():return '/opt/ols/runtime/https-json.mjs'
     installed=journal._read(root,path);descriptor=installed['descriptor']
@@ -223,6 +226,10 @@ def http(root, url, *, method='GET', headers=None, body=None, client_certificate
     if (root/'tls/active.json').exists():
         from .public_runtime import effective_paths
         request['ca']=effective_paths(root)['httpTrust']
+        selected=urlsplit(url)
+        identity_origin=urlsplit(plan['issuer'])
+        port=plan['ports']['identity'] if selected.netloc==identity_origin.netloc else plan['ports']['entry'] if selected.netloc==urlsplit(plan['origin']).netloc else plan['ports']['api']
+        request.update(connectHost='127.0.0.1',connectPort=port)
     if client_certificate:
         request.update(certificate=str(root/'certs/service.crt'),privateKey=str(root/'certs/service.key'))
     result=runtime.run(['docker','exec','-i',plan['pod'],'node',http_helper(root)],canonical(request),timeout=25)
