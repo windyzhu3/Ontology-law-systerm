@@ -55,3 +55,10 @@ def install(root,settings,expected):
     path=root/'certs/http-trust.pem'
     if path.exists() and path.read_bytes()!=combined:raise RuntimeError('Original HTTP trust changed')
     if not path.exists():runtime.private_file(path,combined)
+
+
+def effective_paths(root):
+    from . import tls_generation
+    if (root/'tls/active.json').exists():return tls_generation.paths(root,tls_generation.resolve(root))
+    return {'certificate':str(root/'certs/public.crt'),'privateKey':str(root/'certs/public.key'),
+            'httpTrust':str(root/'certs/http-trust.pem'),'javaTrustStore':str(root/'certs/identity-trust.p12')}

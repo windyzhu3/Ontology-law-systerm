@@ -104,6 +104,10 @@ def validate_tls(root: Path):
                 public.load_cert_chain(str(root/'certs/public.crt'),str(root/'certs/public.key'))
             except (ssl.SSLError,OSError) as error:raise RuntimeError('Invalid original public certificate/key pair') from error
 
+    if (root/'tls/active.json').exists():
+        from .tls_generation import resolve
+        resolve(root)
+
 
 def prepare(root: Path, settings: dict) -> dict:
     with journal.locked(root) as root:

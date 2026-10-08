@@ -161,7 +161,7 @@ def _start(root, plan):
         if not pod['State']['Running']:runtime.run(['docker','start',plan['pod']])
     ports=runtime.owned(root,'container',plan['pod'])['NetworkSettings'].get('Ports',{})
     if any(ports.get(str(port)+'/tcp')!=[{'HostIp':'127.0.0.1','HostPort':str(port)}] for port in plan['ports'].values()):raise RuntimeError('Published identity/runtime port unavailable')
-    _database_login(root)
+    if not (root/'tls/active.json').exists():_database_login(root)
     existing=runtime.inspect('container',plan['identity'])
     if not existing:
         env={'KC_DB':'postgres','KC_DB_URL':'jdbc:postgresql://'+resources['containers']['identityDb']+':5432/keycloak?sslmode=verify-full&sslrootcert=/opt/keycloak/conf/ca.pem',
@@ -179,12 +179,16 @@ def _start(root, plan):
     actual=runtime.owned(root,'container',plan['identity'])
     if not actual['State']['Running']:
         # Recopy only the original sealed import/secret bytes into the registered stopped container.
-        public=bool(resources.get('publicTlsHashes'))
-        _copy_files(plan['identity'],'/opt/keycloak/conf',{'ca.pem':(root/'certs/ca.pem').read_bytes(),
-            'server.crt':(root/'certs'/('public.crt' if public else 'server.crt')).read_bytes(),
-            'server.key':(root/'certs'/('public.key' if public else 'server.key')).read_bytes(),
-            'db-password':(root/'secrets/identity-app.txt').read_bytes()})
-        _copy_files(plan['identity'],'/opt/keycloak/data/import',{plan['realm']+'-realm.json':(root/'identity/realm.json').read_bytes()})
+        if (root/'tls/active.json').exists():
+            from . import tls_deployment,tls_generation
+            tls_deployment.copy_identity(root,plan['identity'],tls_generation.resolve(root))
+        else:
+            public=bool(resources.get('publicTlsHashes'))
+            _copy_files(plan['identity'],'/opt/keycloak/conf',{'ca.pem':(root/'certs/ca.pem').read_bytes(),
+                'server.crt':(root/'certs'/('public.crt' if public else 'server.crt')).read_bytes(),
+                'server.key':(root/'certs'/('public.key' if public else 'server.key')).read_bytes(),
+                'db-password':(root/'secrets/identity-app.txt').read_bytes()})
+            _copy_files(plan['identity'],'/opt/keycloak/data/import',{plan['realm']+'-realm.json':(root/'identity/realm.json').read_bytes()})
         runtime.run(['docker','start',plan['identity']])
     deadline=time.monotonic()+150
     while True:
@@ -216,6 +220,9 @@ def http(root, url, *, method='GET', headers=None, body=None, client_certificate
         raise RuntimeError('Only the original registered HTTPS origins are allowed')
     request={'url':url,'method':method,'headers':headers or {},'body':body,'allowedOrigins':allowed,
              'ca':str(root/('certs/http-trust.pem' if runtime.load(root).get('publicTlsHashes') else 'certs/ca.pem'))}
+    if (root/'tls/active.json').exists():
+        from .public_runtime import effective_paths
+        request['ca']=effective_paths(root)['httpTrust']
     if client_certificate:
         request.update(certificate=str(root/'certs/service.crt'),privateKey=str(root/'certs/service.key'))
     result=runtime.run(['docker','exec','-i',plan['pod'],'node',http_helper(root)],canonical(request),timeout=25)

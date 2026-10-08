@@ -96,8 +96,13 @@ def bind_release(root,descriptor):
         else:
             original=root/'config/initial-admin.properties'
         api=api_properties(read_properties(original),descriptor)
+        if (root/'tls/active.json').exists():
+            from .public_runtime import effective_paths
+            selected=effective_paths(root)
+            for key in ('server.ssl.trust-store','ols.api.identity-trust-store-path'):api[key]=selected['javaTrustStore']
         trust=identity.secret_file(root/'secrets/trust-password.txt')
         worker=worker_properties(root,descriptor,plan,service,api,identity.secret_file(root/'secrets/worker-db.txt'),trust)
+        if (root/'tls/active.json').exists():worker['ols.worker.bindings[0].trust-store-path']=selected['javaTrustStore']
         worker['ols.worker.bindings[0].certificate-sha256']=hashlib.sha256(ssl.PEM_cert_to_DER_cert((root/'certs/service.crt').read_text())).hexdigest()
         prefix=resources['name'];suffix=descriptor['descriptorDigest'][:12]
         names=final_names(prefix,descriptor['descriptorDigest'])
@@ -110,6 +115,7 @@ def bind_release(root,descriptor):
             'privateKey':str(root/'certs/server.key'),'spaFiles':descriptor['spaFiles'],'port':plan['ports']['entry']}
         if resources.get('publicTlsHashes'):
             entry.update(ca=str(root/'certs/http-trust.pem'),certificate=str(root/'certs/public.crt'),privateKey=str(root/'certs/public.key'))
+        if (root/'tls/active.json').exists():entry.update(ca=selected['httpTrust'],certificate=selected['certificate'],privateKey=selected['privateKey'])
         files={config_dir/'api.properties':property_bytes(api),config_dir/'worker.properties':property_bytes(worker),config_dir/'entry.json':canonical(entry)}
         file_hashes={str(path.relative_to(root)):hashlib.sha256(data).hexdigest() for path,data in files.items()}
         record={'descriptorDigest':descriptor['descriptorDigest'],'files':file_hashes,'names':names,'originalIdentityPlanDigest':digest(plan),'originalServiceDigest':digest(service)}
