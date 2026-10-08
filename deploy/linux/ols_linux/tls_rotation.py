@@ -117,14 +117,52 @@ def _fail(root,opid,data):
     _phase(root,opid,'BLOCKED')
 
 
+def _prepare_entry(root,opid,generation,data):
+    """Recreate only the exact sealed entry; never adopt an unowned namesake."""
+    from .config import digest
+    from .bundle import sha
+    from .deployment import create_args
+    op=tls_generation.current(root,opid)
+    if op['phase'] not in {'ACTIVATING','ROLLBACK_ACTIVATING'}:raise RuntimeError('TLS activation phase required')
+    selected=tls_generation.resolve(root)
+    if (selected['version'],selected['generationId'])!=(generation['version'],generation['generationId']):
+        raise RuntimeError('TLS entry generation differs')
+    expected=data['previousLaunch'] if op['phase']=='ROLLBACK_ACTIVATING' else selected['deployment']['launch']
+    launch=journal._read(root,root/'launch.json')
+    if launch!=expected or launch['descriptorDigest']!=data['release']['descriptor']['descriptorDigest']:
+        raise RuntimeError('TLS entry sealed launch differs')
+    path=Path(launch['binding'])
+    if not path.is_relative_to(root/'deployments') or path.resolve()!=path.absolute():raise RuntimeError('TLS entry binding path differs')
+    binding=journal._read(root,path)
+    if digest(binding)!=launch['bindingDigest'] or binding['descriptorDigest']!=launch['descriptorDigest']:
+        raise RuntimeError('TLS entry binding differs')
+    for name,expected_hash in binding['files'].items():
+        path=root/name
+        if not path.is_relative_to(root) or '..' in path.parts or path.resolve()!=path.absolute() or sha(path)!=expected_hash:
+            raise RuntimeError('TLS entry configuration differs')
+    entry=launch['ingress'];resources=runtime.load(root)
+    if entry['role']!='entry' or any(name!=entry['name'] for name in [binding['names']['entry'],resources['ingress'],resources['containers']['entry']]):
+        raise RuntimeError('TLS entry registration differs')
+    if runtime.inspect('container',entry['name']) is None:runtime.run(create_args(entry['args']))
+    actual=runtime.owned(root,'container',entry['name'])
+    if actual['Config']['Labels'].get('ols.launch')!=entry['digest']:raise RuntimeError('TLS entry launch differs')
+    return entry
+
+
 def _start(root,opid,generation,data):
+    with journal.locked(root) as root:
+        _start_locked(root,opid,generation,data)
+
+
+def _start_locked(root,opid,generation,data):
     from . import tls_maintenance
+    runtime.validate_tls(root)
+    entry=_prepare_entry(root,opid,generation,data)
     rollback=journal.current(root)['phase']=='ROLLBACK_ACTIVATING'
     tls_proxy.apply(root,opid,'rollback' if rollback else 'switch')
     proxy=journal._read(root,root/'operations'/(opid+'-proxy.json'))
     tls_maintenance.start(root,opid,proxy['services'],data['probeTargets'],generation['paths'])
     runtime.start_internal(root,data['release']['descriptor'])
-    launch=journal._read(root,root/'launch.json');entry=launch['ingress']
     actual=runtime.owned(root,'container',entry['name'])
     if actual['Config']['Labels'].get('ols.launch')!=entry['digest']:raise RuntimeError('TLS entry launch differs')
     if not actual['State']['Running']:runtime.run(['docker','start',entry['name']])

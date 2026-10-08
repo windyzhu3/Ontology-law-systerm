@@ -37,7 +37,7 @@ class MaintenanceTests(unittest.TestCase):
             journal.record(root,op['operationId'],{'phase':'ACTIVATING'})
             journal._write(root,root/'operations'/(op['operationId']+'-proxy.json'),{'services':[]})
             journal._write(root,root/'launch.json',{'ingress':{'name':'entry','digest':'d'}})
-            with patch.object(r.tls_proxy,'apply',side_effect=lambda *a:events.append(a[-1])),patch.object(self.module(),'start',side_effect=lambda *a:events.append('restricted')),patch.object(r.runtime,'start_internal',side_effect=lambda *a:events.append('native')),patch.object(r.runtime,'owned',return_value={'Config':{'Labels':{'ols.launch':'d'}},'State':{'Running':True}}):
+            with patch.object(r.runtime,'validate_tls'),patch.object(r,'_prepare_entry',return_value={'name':'entry','digest':'d'}),patch.object(r.tls_proxy,'apply',side_effect=lambda *a:events.append(a[-1])),patch.object(self.module(),'start',side_effect=lambda *a:events.append('restricted')),patch.object(r.runtime,'start_internal',side_effect=lambda *a:events.append('native')),patch.object(r.runtime,'owned',return_value={'Config':{'Labels':{'ols.launch':'d'}},'State':{'Running':True}}):
                 r._start(root,op['operationId'],{'paths':{},'deployment':{'probeTargets':[]}}, {'release':{'descriptor':{}},'probeTargets':[]})
             self.assertLess(events.index('restricted') if 'restricted' in events else 999,events.index('native'))
     def test_public_http_does_not_silently_use_native_route(self):
