@@ -104,7 +104,7 @@ def validate_tls(root: Path):
                 public.load_cert_chain(str(root/'certs/public.crt'),str(root/'certs/public.key'))
             except (ssl.SSLError,OSError) as error:raise RuntimeError('Invalid original public certificate/key pair') from error
 
-    if (root/'tls/active.json').exists():
+    if any((root/name).exists() for name in ['tls/active.json','tls-restored.json','tls-selection.json']):
         from .tls_generation import resolve
         resolve(root)
 

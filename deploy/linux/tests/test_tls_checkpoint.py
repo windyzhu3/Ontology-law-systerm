@@ -79,3 +79,23 @@ class TlsCheckpointTests(unittest.TestCase):
         result=self.binding()
         self.assertTrue(result['canActivate']);self.assertEqual(result['generationId'],generation['generationId'])
         self.assertEqual(tls_generation.resolve(self.root)['generationId'],generation['generationId'])
+    def test_restore_start_resumes_after_native_ingress_open_response_loss(self):
+        plan={'operationId':self.op['operationId'],'sourceOperationId':'b'*32,'checkpointDigest':digest(self.value)}
+        journal._write(self.root,self.root/'restore-plan.json',plan)
+        journal._write(self.root,self.root/'current-release.json',{'directory':str(self.root),'descriptor':{}})
+        journal.record(self.root,self.op['operationId'],{'phase':'INGRESS_OPEN'})
+        with patch('ols_linux.bundle.verify'),patch.object(checkpoint,'verified',return_value=self.value),patch.object(release,'_restore_runtime_registry'),patch.object(release,'_activate',return_value={'operationId':self.op['operationId']}) as activate:
+            self.assertEqual(release.start(self.root)['operationId'],self.op['operationId'])
+        self.assertTrue(activate.call_args.kwargs['restored'])
+    def test_legacy_native_probe_context_preserves_checkpoint_certificate_bytes(self):
+        from ols_linux import tls_restore,identity
+        before=(self.root/'certs/public.crt').read_bytes()
+        state={'before':{'probeTargets':[]},'target':{'proxies':[{'service':{'role':'nginx'},'configuration':'fixture'}]}}
+        tls_restore._legacy_context(self.root,self.legacy,state)
+        selected=tls_generation.resolve(self.root)
+        self.assertEqual(selected['generationId'],self.legacy['generationId'])
+        self.assertEqual(identity.http_helper(self.root),selected['deployment']['httpHelper'])
+        self.assertEqual((self.root/'certs/public.crt').read_bytes(),before)
+        self.assertTrue(self.binding()['canActivate'])
+        Path(selected['deployment']['httpHelper']).write_bytes(b'changed')
+        with self.assertRaisesRegex(RuntimeError,'helper'):tls_generation.resolve(self.root)

@@ -59,6 +59,6 @@ def install(root,settings,expected):
 
 def effective_paths(root):
     from . import tls_generation
-    if (root/'tls/active.json').exists():return tls_generation.paths(root,tls_generation.resolve(root))
+    if tls_generation.managed(root):return tls_generation.paths(root,tls_generation.resolve(root))
     return {'certificate':str(root/'certs/public.crt'),'privateKey':str(root/'certs/public.key'),
             'httpTrust':str(root/'certs/http-trust.pem'),'javaTrustStore':str(root/'certs/identity-trust.p12')}

@@ -10,7 +10,7 @@ import tarfile
 import time
 import uuid
 from urllib.parse import urlencode,urlsplit
-from . import journal, runtime, database
+from . import journal, runtime, database, tls_generation
 from .config import canonical, digest
 from .bundle import sha
 
@@ -161,7 +161,7 @@ def _start(root, plan):
         if not pod['State']['Running']:runtime.run(['docker','start',plan['pod']])
     ports=runtime.owned(root,'container',plan['pod'])['NetworkSettings'].get('Ports',{})
     if any(ports.get(str(port)+'/tcp')!=[{'HostIp':'127.0.0.1','HostPort':str(port)}] for port in plan['ports'].values()):raise RuntimeError('Published identity/runtime port unavailable')
-    if not (root/'tls/active.json').exists():_database_login(root)
+    if not tls_generation.managed(root):_database_login(root)
     existing=runtime.inspect('container',plan['identity'])
     if not existing:
         env={'KC_DB':'postgres','KC_DB_URL':'jdbc:postgresql://'+resources['containers']['identityDb']+':5432/keycloak?sslmode=verify-full&sslrootcert=/opt/keycloak/conf/ca.pem',
@@ -179,7 +179,7 @@ def _start(root, plan):
     actual=runtime.owned(root,'container',plan['identity'])
     if not actual['State']['Running']:
         # Recopy only the original sealed import/secret bytes into the registered stopped container.
-        if (root/'tls/active.json').exists():
+        if tls_generation.managed(root):
             from . import tls_deployment,tls_generation
             tls_deployment.copy_identity(root,plan['identity'],tls_generation.resolve(root))
         else:
@@ -202,7 +202,7 @@ def _start(root, plan):
 
 
 def http_helper(root):
-    if (root/'tls/active.json').exists():
+    if tls_generation.managed(root):
         from .tls_generation import resolve
         return resolve(root)['deployment']['httpHelper']
     path=root/'installed-candidate.json'
@@ -223,7 +223,7 @@ def http(root, url, *, method='GET', headers=None, body=None, client_certificate
         raise RuntimeError('Only the original registered HTTPS origins are allowed')
     request={'url':url,'method':method,'headers':headers or {},'body':body,'allowedOrigins':allowed,
              'ca':str(root/('certs/http-trust.pem' if runtime.load(root).get('publicTlsHashes') else 'certs/ca.pem'))}
-    if (root/'tls/active.json').exists():
+    if tls_generation.managed(root):
         from .public_runtime import effective_paths
         request['ca']=effective_paths(root)['httpTrust']
         selected=urlsplit(url)

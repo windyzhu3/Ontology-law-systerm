@@ -49,3 +49,15 @@ class GenerationTests(unittest.TestCase):
         Path(g['paths']['certificate']).write_bytes(b'changed')
         journal.record(self.root,op['operationId'],{'phase':'SWITCHING'})
         with self.assertRaises(RuntimeError):self.m.select(self.root,op['operationId'],old['generationId'],g['generationId'])
+    def test_selection_intent_response_loss_recovers_without_legacy_fallback(self):
+        from unittest.mock import patch
+        old,op,g=self.prepare();journal.record(self.root,op['operationId'],{'phase':'SWITCHING'})
+        write=journal._write
+        def lost(root,path,payload):
+            write(root,path,payload)
+            if path.name=='tls-selection.json':raise SystemExit('intent persisted, pointer not written')
+        with patch.object(journal,'_write',side_effect=lost):
+            with self.assertRaises(SystemExit):self.m.select(self.root,op['operationId'],old['generationId'],g['generationId'])
+        with self.assertRaises(RuntimeError):self.m.resolve(self.root)
+        self.m.select(self.root,op['operationId'],old['generationId'],g['generationId'])
+        self.assertEqual(self.m.resolve(self.root)['generationId'],g['generationId'])

@@ -23,7 +23,17 @@ def resolve(root: Path) -> dict:
         marker=root/'tls-selection.json'
         if marker.exists() and journal._read(root,marker).get('legacyGenerationId')!=value['generationId']:
             raise RuntimeError('Selected TLS reference is missing')
+        context=root/'tls-restored.json'
+        if context.exists():
+            saved=journal._read(root,context)
+            helper=Path(saved['deployment']['httpHelper'])
+            if saved['generationId']!=value['generationId'] or not helper.is_relative_to(root/'tls-restored') or helper.resolve()!=helper.absolute() or sha(helper)!=saved['helperSha256']:raise RuntimeError('Restored TLS helper binding differs')
+            value=dict(value,deployment=saved['deployment'])
         return value
+
+
+def managed(root):
+    return (root/'tls/active.json').exists() or (root/'tls-restored.json').exists()
 
 
 def _legacy(root):
@@ -175,7 +185,7 @@ def verify_trust(root: Path,trust: dict) -> None:
 
 def checkpoint_binding(root: Path) -> dict:
     """Capture the selected generation and registered proxy config, never infer from resources."""
-    value=resolve(root);result={'version':value['version'],'generationId':value['generationId']}
+    value=resolve(root);result={'version':value['version'],'generationId':value['generationId'],'paths':value['paths'],'probeTargets':value.get('deployment',{}).get('probeTargets',[])}
     pointer=root/'tls/active.json'
     if pointer.exists():
         selected=journal._read(root,pointer)
@@ -185,6 +195,13 @@ def checkpoint_binding(root: Path) -> dict:
             tls_proxy.observe(root,selected['operationId'])
             plan=journal._read(root,proxy)
             result['proxies']=[{'service':row['service'],'configuration':tls_material.read_private(row['service']['config']).decode()} for row in plan['services']]
+    elif (root/'tls-restored.json').exists():
+        from . import tls_proxy
+        rows=journal._read(root,root/'tls-restored.json')['proxies']
+        for row in rows:
+            tls_proxy._service(row['service'])
+            if tls_material.read_private(row['service']['config']).decode()!=row['configuration']:raise RuntimeError('Restored proxy configuration changed')
+        result['proxies']=rows
     return result
 
 
@@ -192,12 +209,12 @@ def restore_binding(root: Path, checkpoint_value: dict, *, now: int) -> dict:
     """Validate already restored bytes and select their exact interpretation, keeping restore pending."""
     with journal.locked(root) as root:
         op=journal.current(root)
-        if op['phase'] not in {'RESTORE_ASSETS_UNKNOWN','RESTORED_MAINTENANCE','ACTIVATION_UNKNOWN','ACTIVATION_FAILING','ACTIVATION_FAILED'}:
+        if op['phase'] not in {'RESTORE_ASSETS_UNKNOWN','RESTORED_MAINTENANCE','ACTIVATION_UNKNOWN','ACTIVATION_FAILING','ACTIVATION_FAILED','RUNTIME_VERIFIED','INGRESS_OPEN'}:
             raise RuntimeError('Original pending checkpoint restore required')
         expected=checkpoint_value.get('tlsBinding')
         files=checkpoint_value['files']
         for name,h in files.items():
-            if name.startswith('assets/') and name.split('/')[1] in {'certs','tls','deployments','launch.json','proxy'}:
+            if name.startswith('assets/') and name.split('/')[1] in {'certs','tls','deployments','launch.json','proxy','tls-restored','tls-restored.json'}:
                 relative=Path(name[7:]);path=root/relative
                 if '..' in relative.parts or path.resolve()!=path.absolute() or not path.is_file() or sha(path)!=h:
                     raise RuntimeError('Restored TLS checkpoint bytes differ')
