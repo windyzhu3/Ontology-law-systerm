@@ -58,3 +58,19 @@ class ProbeTests(unittest.TestCase):
             denied=subprocess.run(['node',str(helper)],input=json.dumps(request).encode(),capture_output=True)
             self.assertNotEqual(denied.returncode,0)
         finally:server.shutdown();server.server_close()
+    def test_registered_internal_bridge_keeps_its_original_tls_identity(self):
+        from unittest.mock import patch
+        from ols_linux import journal,runtime
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)/'runtime';journal.begin(root,'initialize','a'*64)
+            runtime.private_file(root/'certs/server.crt',self.f['old-leaf'].read_bytes())
+            journal._write(root,root/'identity/plan.json',{'issuer':'https://127.0.0.1:25443/realms/test','origin':'https://127.0.0.1:25444','ports':{'identity':24843,'entry':24844}})
+            targets=[{'role':role,'connectHost':'127.0.0.1','connectPort':port,'verifyHost':'localhost','tlsIdentity':'internal'} for role,port in [('bridgeIdentity',24846),('bridgeEntry',24847)]]
+            generation={'generationId':'fixture','paths':{'httpTrust':str(self.f['old'])},'candidate':{'leafDerSha256':'new-public-leaf'},'deployment':{'probeTargets':targets}}
+            with patch.object(self.m.tls_generation,'resolve',return_value=generation),patch.object(self.m,'handshake',return_value={'status':'PASS'}) as handshake:
+                result=self.m.collect(root,generation,scope='bridge',now=self.f['now'])
+            self.assertEqual(result['status'],'PASS')
+            self.assertTrue(all(call.args[2]==self.f['fingerprint'](self.f['old-leaf']) for call in handshake.call_args_list))
+            generation['deployment']['probeTargets']=[dict(targets[0],role='publicIdentity')]
+            with patch.object(self.m.tls_generation,'resolve',return_value=generation):
+                with self.assertRaises(RuntimeError):self.m.collect(root,generation,scope='proxy',now=self.f['now'])

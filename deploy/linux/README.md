@@ -148,7 +148,7 @@ python3 deploy/linux/linux.py --runtime "$RUNTIME" health
 
 `proxies` 为 `{ "version": 1, "services": [...] }`。每个服务必须完整提供 `role`（nginx 或 caddy）、`transport`（docker 或 systemd）、`name`、`identity`、`image`、`config`、`configSha256`、`tlsPaths`。配置必须已经登记在运行目录的 `proxy/` 下；Docker 服务须原本按原路径挂载运行目录，身份为实际容器 ID 与 image ID。systemd 身份绑定 unit 属性与固定可执行文件哈希。`tlsPaths` 只允许 certificate/privateKey/httpTrust 的现有绝对路径。外层 nginx 必须是获准暂停的独立服务；控制器不会自动改挂载、采用未知服务或安装代理。各 transport 的真实验证范围见验收报告。
 
-`probeTargets` 明确登记 bridgeIdentity、bridgeEntry、publicIdentity、publicEntry 四个目标，每项只含 role/connectHost/connectPort/verifyHost。verifyHost 必须保留原 origin 的主机/IP 身份，不能改成 localhost 来通过验证；connectHost 限原主机或本机回环。两个 native 目标取自原身份计划。两段代理 TLS 校验均须保留。
+`probeTargets` 明确登记 bridgeIdentity、bridgeEntry、publicIdentity、publicEntry 四个目标，每项提供 role/connectHost/connectPort/verifyHost；桥接端口可显式增加 `tlsIdentity: "internal"`，仅指原封存的 `certs/server.crt` 与其 localhost 身份。公网及原生端点的 verifyHost 必须保留原 origin 的主机/IP 身份，不能改成 localhost 来通过验证；connectHost 限原主机或本机回环。两个 native 目标取自原身份计划。两段代理 TLS 校验均须保留。
 
 ```sh
 python3 -B deploy/linux/linux.py --runtime /absolute/private/runtime rotate-public-tls --inputs-file /absolute/private/rotation.json

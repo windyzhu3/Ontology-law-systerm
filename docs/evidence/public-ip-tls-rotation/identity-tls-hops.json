@@ -1,0 +1,34 @@
+{
+  "evidenceLevel": "REAL_IDENTITY_TLS_HOPS_ONLY",
+  "operationId": "da6898aa6e024e288dd6cc4fd0d57d03",
+  "phase": "IDENTITY_IMPORT_UNKNOWN",
+  "humanAccounts": 17,
+  "targets": {
+    "nativeIdentity": {
+      "status": "PASS",
+      "leafDerSha256": "ad27a150381d7f45f47a12ea55994704365de8c104f551486874382195028a9f",
+      "chainVerified": true,
+      "notAfter": 1791629543,
+      "httpStatus": 200,
+      "issuerMatches": true
+    },
+    "bridgeIdentity": {
+      "status": "PASS",
+      "leafDerSha256": "1131618fda52e25b8a15079cfa1a092896e118ca2acdbeace40fa0df0111a250",
+      "chainVerified": true,
+      "notAfter": 1822992746,
+      "httpStatus": 200,
+      "issuerMatches": true
+    },
+    "publicIdentity": {
+      "status": "PASS",
+      "leafDerSha256": "ad27a150381d7f45f47a12ea55994704365de8c104f551486874382195028a9f",
+      "chainVerified": true,
+      "notAfter": 1791629543,
+      "httpStatus": 200,
+      "issuerMatches": true
+    }
+  },
+  "fullApplication": "NOT_READY",
+  "rotation": "NOT_EXECUTED"
+}

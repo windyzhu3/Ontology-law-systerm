@@ -180,7 +180,7 @@ def _start(root, plan):
     if not actual['State']['Running']:
         # Recopy only the original sealed import/secret bytes into the registered stopped container.
         if tls_generation.managed(root):
-            from . import tls_deployment,tls_generation
+            from . import tls_deployment
             tls_deployment.copy_identity(root,plan['identity'],tls_generation.resolve(root))
         else:
             public=bool(resources.get('publicTlsHashes'))
