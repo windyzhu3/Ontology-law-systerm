@@ -18,9 +18,11 @@ import org.springframework.security.authentication.BadCredentialsException;
 
 class ClientCertificateIT extends PostgresIntegrationTest {
     @TempDir Path directory;
-    @Test void real_tls_certificate_is_the_only_internal_credential_and_public_routes_still_require_bearer() throws Exception {
-        var tls=new TlsFixture(directory);var server=tls.key("server");var worker=tls.key("worker");var unmapped=tls.key("unmapped");var rogue=tls.key("rogue");
-        var serverTrust=tls.trust("server-trust",worker,unmapped);var clientTrust=tls.trust("client-trust",server);
+    @Test void real_tls_certificate_is_the_only_internal_credential_and_public_routes_still_require_bearer() throws Exception { verifyScenario(false); }
+    @Test void newly_trusted_ca_does_not_register_client_identity() throws Exception { verifyScenario(true); }
+    private void verifyScenario(boolean rootTransition) throws Exception {
+        var tls=new TlsFixture(directory);var server=tls.key("server");var worker=tls.key("worker");var newRoot=rootTransition?tls.ca("new-public-root"):null;var unmapped=rootTransition?tls.signedKey("unmapped",newRoot,"clientAuth"):tls.key("unmapped");var rogue=tls.key("rogue");
+        var serverTrust=tls.trust("server-trust",worker,rootTransition?newRoot:unmapped);var clientTrust=tls.trust("client-trust",server);
         var seed=AuthorizationServiceIT.seed(database,"SERVICE");var actor=new AuthorizationService.Actor(seed.tenant(),seed.principal(),seed.appointment(),null,null,AuthorizationService.PrincipalKind.SERVICE);
         var key=KeyPairGenerator.getInstance("RSA");key.initialize(2048);var publicKey=(RSAPublicKey)key.generateKeyPair().getPublic();
         var resolver=new ActorContextResolver(database::apiConnection,new ExternalSubjectProtection(t->new byte[32]),List.of(new ActorContextResolver.Trust("https://test.example","r1",publicKey)),List.of(new ActorContextResolver.Registration("https://test.example","r1","FIXTURE",actor)),List.of(new ActorContextResolver.CertificateRegistration(tls.sha256(worker),"FIXTURE",actor)));

@@ -111,6 +111,9 @@ def stage(root: Path, inputs: dict, *, now: int) -> dict:
 
 
 def verify(directory: Path, expected: dict, *, now: int) -> dict:
+    root=next((p for p in directory.parents if (p/'instance.json').is_file()),None)
+    if root is None:raise RuntimeError('Registered material runtime required')
+    execute=lambda *args,data=None:tool(root,'openssl',list(args),data=data)
     if type(now)!=int:raise RuntimeError('UTC epoch required')
     for name,value in expected['files'].items():
         if Path(name).name!=name or hashlib.sha256(read_private(directory/name)).hexdigest()!=value:raise RuntimeError('Staged TLS bytes changed')
@@ -124,16 +127,33 @@ def verify(directory: Path, expected: dict, *, now: int) -> dict:
             if not any(kind=='IP Address' and ipaddress.ip_address(value)==address for kind,value in san):raise RuntimeError('IP SAN missing')
         except ValueError:
             if not any(kind=='DNS' and ssl._dnsname_match(value,host) for kind,value in san):raise RuntimeError('DNS SAN missing')
-    public=openssl('x509','-pubkey','-noout',data=chain[0])
-    private=openssl('pkey','-in',directory/'private.key','-pubout','-passin','pass:')
+    public=execute('x509','-pubkey','-noout',data=chain[0])
+    private=execute('pkey','-in',directory/'private.key','-pubout','-passin','pass:')
     if public!=private:raise RuntimeError('Certificate and private key differ')
     with tempfile.TemporaryDirectory(dir=directory) as work:
         leaf=Path(work)/'leaf.pem';leaf.write_bytes(chain[0])
         intermediate=Path(work)/'chain.pem';intermediate.write_bytes(b''.join(chain[1:]))
         args=['verify','-no-CApath','-no-CAstore','-CAfile',directory/'anchors.pem','-purpose','sslserver','-attime',str(now)]
         if len(chain)>1:args+=['-untrusted',intermediate]
-        openssl(*args,leaf)
+        execute(*args,leaf)
         for anchor in certificates(read_private(directory/'anchors.pem')):
-            text=openssl('x509','-text','-noout',data=anchor)
+            text=execute('x509','-text','-noout',data=anchor)
             if b'CA:TRUE' not in text:raise RuntimeError('Trust anchor is not a CA')
     return {'leafDerSha256':fingerprint(chain[0]),'notBefore':before,'notAfter':after}
+
+
+def tool(root: Path, binary: str, args: list, *, data=None, writable=None):
+    """Production validation uses the instance's locked images, never host PATH."""
+    resources=runtime.load(root)
+    if binary not in {'openssl','keytool'}:raise RuntimeError('Unsupported TLS tool')
+    if resources.get('verification') is True:
+        return runtime.run([binary,*args],data=data).stdout
+    image=resources['postgresImage' if binary=='openssl' else 'runtimeImage']
+    if not re.search(r'(?:@|^)sha256:[a-f0-9]{64}$',image):raise RuntimeError('Locked TLS tool image required')
+    command=['docker','run','--rm','-i','--network','none','--user',str(os.getuid())+':'+str(os.getgid()),
+             '--label',runtime.LABEL+'='+resources['instanceId'],'--mount',f'type=bind,source={root},target={root},readonly']
+    if writable:
+        writable=Path(writable)
+        if writable.resolve()!=writable.absolute() or not writable.is_relative_to(root):raise RuntimeError('TLS output escapes instance')
+        command+=['--mount',f'type=bind,source={writable},target={writable}']
+    return runtime.run([*command,'--entrypoint',binary,image,*args],data=data).stdout

@@ -83,3 +83,71 @@ def paths(root: Path,generation: dict) -> dict:
     value=read(root,generation['generationId']) if generation['version']==1 else resolve(root)
     if value!=generation:raise RuntimeError('TLS generation differs')
     return dict(value['paths'])
+
+
+def build_trust(root: Path,candidate: dict,output: Path) -> dict:
+    with journal.locked(root) as root:
+        if output.resolve()!=output.absolute() or not output.is_relative_to(root):raise RuntimeError('Unsafe trust output')
+        saved=output/'trust.json'
+        if saved.exists():
+            trust=journal._read(root,saved)
+            if trust['inputDigest']!=candidate['inputDigest']:raise RuntimeError('Trust candidate differs')
+            verify_trust(root,trust);return trust
+        output.mkdir(mode=0o700,parents=True,exist_ok=True)
+        anchors={}
+        for data in [tls_material.read_private(root/'certs/ca.pem'),tls_material.read_private(root/'certs/public-ca.pem'),
+                     tls_material.read_private(Path(candidate['directory'])/'anchors.pem')]:
+            for cert in tls_material.certificates(data):anchors[tls_material.fingerprint(cert)]=cert
+        for fp in anchors:
+            if fp not in tls_material.approved(root):raise RuntimeError('Trust contains unapproved anchor')
+        secret=root/'secrets/trust-password.txt'
+        if not secret.exists():
+            if runtime.load(root).get('verification') is not True:raise RuntimeError('Original trust password missing')
+            runtime.private_file(secret,b'verification-only-password')
+        pem=output/'http-trust.pem';store=output/'identity-trust.p12'
+        intent={'inputDigest':candidate['inputDigest'],'anchors':sorted(anchors)}
+        intent_path=output/'trust-intent.json'
+        if intent_path.exists():
+            if journal._read(root,intent_path)!=intent:raise RuntimeError('Original trust intent differs')
+        else:
+            if pem.exists() or store.exists():raise RuntimeError('Unregistered partial trust')
+            journal._write(root,intent_path,intent)
+        combined=b''.join(anchors[k] for k in sorted(anchors))
+        if pem.exists() and tls_material.read_private(pem)!=combined:raise RuntimeError('Original PEM trust differs')
+        if not pem.exists():runtime.private_file(pem,combined)
+        for fp,cert in sorted(anchors.items()):
+            source=output/(fp+'.pem');runtime.private_file(source,cert)
+            if store.exists():
+                try:
+                    observed=tls_material.tool(root,'keytool',['-exportcert','-alias','ols-'+fp,'-keystore',store,'-storetype','PKCS12','-storepass:file',secret])
+                except RuntimeError:observed=None
+                if observed is not None:
+                    import hashlib
+                    if hashlib.sha256(observed).hexdigest()!=fp:raise RuntimeError('Existing trust alias differs')
+                    continue
+            tls_material.tool(root,'keytool',['-importcert','-noprompt','-alias','ols-'+fp,'-file',source,
+                '-keystore',store,'-storetype','PKCS12','-storepass:file',secret],writable=output)
+        store.chmod(0o600)
+        files={str(p.relative_to(root)):sha(p) for p in [pem,store]}
+        trust={'inputDigest':candidate['inputDigest'],'httpTrust':str(pem),'javaTrustStore':str(store),
+               'anchorFingerprints':sorted(anchors),'files':files}
+        verify_trust(root,trust)
+        journal._write(root,saved,trust)
+        return trust
+
+
+def verify_trust(root: Path,trust: dict) -> None:
+    for name,h in trust['files'].items():
+        if '..' in Path(name).parts or Path(name).is_absolute() or sha(root/name)!=h:raise RuntimeError('Trust store bytes differ')
+    pem=tls_material.read_private(trust['httpTrust'])
+    fingerprints=sorted(tls_material.fingerprint(p) for p in tls_material.certificates(pem))
+    if fingerprints!=trust['anchorFingerprints']:raise RuntimeError('PEM anchor inventory differs')
+    secret=root/'secrets/trust-password.txt';store=Path(trust['javaTrustStore'])
+    base=['-keystore',store,'-storetype','PKCS12','-storepass:file',secret]
+    listing=tls_material.tool(root,'keytool',['-list',*base]).decode('utf-8')
+    aliases=re.findall(r'(?m)^(ols-[a-f0-9]{64}),',listing)
+    if sorted(aliases)!=['ols-'+fp for fp in fingerprints]:raise RuntimeError('Java trust alias inventory differs')
+    for fp in fingerprints:
+        der=tls_material.tool(root,'keytool',['-exportcert','-alias','ols-'+fp,*base])
+        import hashlib
+        if hashlib.sha256(der).hexdigest()!=fp:raise RuntimeError('Java trust certificate differs')

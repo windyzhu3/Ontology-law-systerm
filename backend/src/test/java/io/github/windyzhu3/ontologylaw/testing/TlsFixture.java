@@ -22,6 +22,22 @@ public final class TlsFixture {
         try(var output=process.getInputStream()){output.transferTo(java.io.OutputStream.nullOutputStream());}if(process.waitFor()!=0)throw new IllegalStateException("TEST_KEYTOOL_FAILED");
         var store=KeyStore.getInstance("PKCS12");try(var input=Files.newInputStream(path)){store.load(input,password);}return new Key(alias,path,store);
     }
+    public Key ca(String alias)throws Exception { return key(alias,"bc=ca:true"); }
+    public Key signedKey(String alias,Key ca,String eku)throws Exception {
+        var leaf=key(alias);var csr=directory.resolve(alias+".csr");var cert=directory.resolve(alias+".crt");var root=directory.resolve(ca.alias()+".crt");
+        tool("-certreq","-alias",alias,"-keystore",leaf.path().toString(),"-file",csr.toString());
+        tool("-gencert","-alias",ca.alias(),"-keystore",ca.path().toString(),"-infile",csr.toString(),"-outfile",cert.toString(),"-rfc","-validity","2","-ext","bc=ca:false","-ext","eku="+eku,"-ext","SAN=dns:localhost,ip:127.0.0.1");
+        tool("-exportcert","-alias",ca.alias(),"-keystore",ca.path().toString(),"-file",root.toString(),"-rfc");
+        tool("-importcert","-noprompt","-alias",ca.alias(),"-keystore",leaf.path().toString(),"-file",root.toString());
+        tool("-importcert","-noprompt","-alias",alias,"-keystore",leaf.path().toString(),"-file",cert.toString());
+        var store=KeyStore.getInstance("PKCS12");try(var input=Files.newInputStream(leaf.path())){store.load(input,password);}return new Key(alias,leaf.path(),store);
+    }
+    private void tool(String... args)throws Exception {
+        var command=new ArrayList<String>();command.add(Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name").startsWith("Windows")?"keytool.exe":"keytool").toString());
+        command.addAll(List.of(args));command.addAll(List.of("-storepass:env","TASK92_TEST_KEYSTORE_PASSWORD","-keypass:env","TASK92_TEST_KEYSTORE_PASSWORD"));
+        var builder=new ProcessBuilder(command).redirectErrorStream(true);builder.environment().put("TASK92_TEST_KEYSTORE_PASSWORD",new String(password));var process=builder.start();
+        try(var output=process.getInputStream()){output.transferTo(java.io.OutputStream.nullOutputStream());}if(process.waitFor()!=0)throw new IllegalStateException("TEST_KEYTOOL_FAILED");
+    }
     public Key trust(String name,Key... trusted)throws Exception {
         var store=KeyStore.getInstance("PKCS12");store.load(null,password);for(var key:trusted)store.setCertificateEntry(key.alias(),key.store().getCertificate(key.alias()));
         var path=directory.resolve(name+".p12");try(var output=Files.newOutputStream(path)){store.store(output,password);}return new Key(name,path,store);
@@ -45,5 +61,5 @@ public final class TlsFixture {
         var tm=TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());tm.init(trust.store());var context=SSLContext.getInstance("TLS");context.init(new KeyManager[]{manager},tm.getTrustManagers(),null);return context;
     }
     public String sha256(Key key)throws Exception{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(key.store().getCertificate(key.alias()).getEncoded()));}
-    public X509Certificate[] chain(Key key)throws Exception{return new X509Certificate[]{(X509Certificate)key.store().getCertificate(key.alias())};}
+    public X509Certificate[] chain(Key key)throws Exception{return Arrays.stream(key.store().getCertificateChain(key.alias())).map(c->(X509Certificate)c).toArray(X509Certificate[]::new);}
 }
