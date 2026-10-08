@@ -29,6 +29,7 @@ def materials(directory: Path, *, expired_old=False):
         command('x509','-req','-in',csr,'-CA',result[ca],'-CAkey',directory/(ca+'.key'),'-set_serial',str(10+days+(1 if name=='rsa-leaf' else 0)),'-days',str(days),'-extfile',ext,'-out',cert)
         result[name]=cert
     for p in directory.iterdir():p.chmod(0o600)
+    result['now']=int(time.time())
     result['fingerprint']=lambda p:hashlib.sha256(ssl.PEM_cert_to_DER_cert(p.read_text())).hexdigest()
     return result
 
