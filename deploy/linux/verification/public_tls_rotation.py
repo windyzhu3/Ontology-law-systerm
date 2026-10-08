@@ -54,6 +54,31 @@ def authenticated_forwarding(root):
     return {'status':'PASS','path':'/api/v1/session/context','originalAppointment':True}
 
 
+def match_operation(record,data):
+    if record['candidateInputDigest']!=data['candidate']['inputDigest'] or record['previousGeneration']!=data['previousGeneration']['generationId']:
+        raise RuntimeError('Acceptance continuation belongs to another original candidate')
+
+
+def finish(root,scenario,operation_id):
+    with journal.locked(root) as root:
+        if runtime.load(root).get('verification') is not True:raise RuntimeError('Verification instance required')
+        path=root/'verification'/('tls-'+scenario+'-acceptance.json');record=journal._read(root,path)
+        op=journal.current(root)
+        if op['operationId']!=operation_id or op['kind']!='rotate-public-tls':raise RuntimeError('Exact original TLS operation required')
+        match_operation(record,journal._read(root,root/'operations'/(operation_id+'-tls.json')))
+        if op['phase']!='COMPLETE':tls_rotation.resume(root,operation_id,now=int(time.time()))
+        generation=tls_generation.resolve(root)
+        if generation['candidate']['inputDigest']!=record['candidateInputDigest']:raise RuntimeError('Original candidate is not selected')
+        proof=tls_probe.collect(root,generation,scope='all',now=int(time.time()));require_proof(proof)
+        forwarding=authenticated_forwarding(root);after=facts(root)
+        if record['before']!=after:raise RuntimeError('Protected identity or business facts changed')
+        report={'status':'PASS','scenario':scenario,'operationId':operation_id,'generationId':generation['generationId'],'preservation':True,'authenticatedForwarding':forwarding,'proof':proof}
+        for key in ['processExit','faultPhase','closedObserved']:
+            if key in record:report[key]=record[key]
+        if scenario=='crash':require_crash(report.get('processExit'),report.get('closedObserved'))
+        journal._write(root,path,dict(record,**report,after=after));return report
+
+
 def rotate(root,scenario,inputs_file):
     if scenario not in {'same-ca','cross-ca','expired-old'}:raise RuntimeError('This runner requires a named implemented rotation scenario')
     with journal.locked(root) as root:
@@ -67,16 +92,49 @@ def rotate(root,scenario,inputs_file):
         before=facts(root)
         path=root/'verification'/('tls-'+scenario+'-acceptance.json')
         if path.exists():raise RuntimeError('Original scenario evidence exists; do not overwrite it')
-        journal._write(root,path,{'status':'RUNNING','scenario':scenario,'before':before,'previousGeneration':old['generationId']})
+        journal._write(root,path,{'status':'RUNNING','scenario':scenario,'before':before,'previousGeneration':old['generationId'],'candidateInputDigest':candidate['inputDigest']})
         result=tls_rotation.begin(root,inputs,now=now)
-        proof=tls_probe.collect(root,tls_generation.resolve(root),scope='all',now=int(time.time()));require_proof(proof)
-        forwarding=authenticated_forwarding(root);after=facts(root)
-        if before!=after:raise RuntimeError('Protected identity or business facts changed')
-        report={'status':'PASS','scenario':scenario,'operationId':result['operationId'],'generationId':result['generationId'],'preservation':True,'authenticatedForwarding':forwarding,'proof':proof}
-        journal._write(root,path,dict(report,before=before,after=after));return report
+        return finish(root,scenario,result['operationId'])
+
+
+def require_crash(returncode,closed):
+    if returncode!=-9 or closed is not True:raise RuntimeError('Actual SIGKILL and observed closed writers required')
+
+
+def crash_rotate(root,inputs_file):
+    import subprocess,os
+    root=require_fixture(root);before=facts(root);previous=tls_generation.resolve(root)['generationId']
+    path=root/'verification/tls-crash-acceptance.json'
+    if path.exists():raise RuntimeError('Original crash evidence exists; continue its operation explicitly')
+    candidate=tls_material.freeze(root,json.loads(tls_material.read_private(inputs_file))['materials'])['candidate']
+    journal._write(root,path,{'status':'RUNNING','before':before,'previousGeneration':previous,'candidateInputDigest':candidate['inputDigest']})
+    code="""import os,signal,json,sys,time
+from pathlib import Path
+from ols_linux import tls_rotation,tls_material,runtime
+root=Path(sys.argv[1]);assert runtime.load(root)['verification'] is True
+original=tls_rotation._phase
+def interrupt(root,opid,phase,**evidence):
+    original(root,opid,phase,**evidence)
+    if phase=='SWITCHED':os.kill(os.getpid(),signal.SIGKILL)
+tls_rotation._phase=interrupt
+tls_rotation.begin(root,json.loads(tls_material.read_private(Path(sys.argv[2]))),now=int(time.time()))
+"""
+    env=dict(os.environ,PYTHONPATH=str(Path(__file__).resolve().parents[1]))
+    child=subprocess.run([sys.executable,'-c',code,str(root),str(inputs_file)],env=env,capture_output=True)
+    runtime.private_file(root/'verification/tls-crash-child.stderr',child.stderr)
+    op=journal.current(root)
+    if op['kind']!='rotate-public-tls' or op['phase']!='SWITCHED':raise RuntimeError('Expected original switch interruption absent')
+    from ols_linux import tls_proxy
+    closed=tls_proxy.observe(root,op['operationId'])['closed'];resources=runtime.load(root)
+    for name in set(resources['writers'])|{resources['ingress']}:
+        if runtime.inspect('container',name) and runtime.owned(root,'container',name)['State']['Running']:closed=False
+    require_crash(child.returncode,closed)
+    record=journal._read(root,path);record.update(processExit=child.returncode,faultPhase='SWITCHED',closedObserved=closed)
+    journal._write(root,path,record)
+    return finish(root,'crash',op['operationId'])
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--runtime',type=Path,required=True);p.add_argument('--scenario',choices=sorted(SCENARIOS),required=True);p.add_argument('--inputs-file',type=Path,required=True);a=p.parse_args()
-    try:print(json.dumps(rotate(a.runtime,a.scenario,a.inputs_file)))
+    p=argparse.ArgumentParser();p.add_argument('--runtime',type=Path,required=True);p.add_argument('--scenario',choices=sorted(SCENARIOS),required=True);p.add_argument('--inputs-file',type=Path);p.add_argument('--operation-id');a=p.parse_args()
+    try:print(json.dumps(finish(a.runtime,a.scenario,a.operation_id) if a.operation_id else crash_rotate(a.runtime,a.inputs_file) if a.scenario=='crash' else rotate(a.runtime,a.scenario,a.inputs_file)))
     except Exception:print(json.dumps({'status':'INCOMPLETE','scenario':a.scenario,'reason':'Original private evidence retained; reconcile original operation'}));raise SystemExit(1)
