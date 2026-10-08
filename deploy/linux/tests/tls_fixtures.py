@@ -21,7 +21,7 @@ def materials(directory: Path, *, expired_old=False):
         key=directory/(name+'.key');cert=directory/(name+'.pem')
         command('req','-x509','-newkey','ec','-pkeyopt','ec_paramgen_curve:P-256','-nodes','-keyout',key,'-out',cert,'-days','365','-subj','/CN='+name,'-addext','basicConstraints=critical,CA:TRUE','-addext','keyUsage=critical,keyCertSign,cRLSign')
         result[name]=cert
-    for name,ca,days in [('old-leaf','old',-1 if expired_old else 2),('new-leaf','new',30),('rsa-leaf','new',30)]:
+    for name,ca,days in [('old-leaf','old',2),('new-leaf','new',30),('rsa-leaf','new',30)]:
         key=directory/(name+'.key');csr=directory/(name+'.csr');cert=directory/(name+'.pem');ext=directory/(name+'.ext')
         ext.write_text('basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=IP:127.0.0.1,DNS:localhost\n')
         algo=['rsa:2048'] if name=='rsa-leaf' else ['ec','-pkeyopt','ec_paramgen_curve:P-256']
@@ -29,7 +29,7 @@ def materials(directory: Path, *, expired_old=False):
         command('x509','-req','-in',csr,'-CA',result[ca],'-CAkey',directory/(ca+'.key'),'-set_serial',str(10+days+(1 if name=='rsa-leaf' else 0)),'-days',str(days),'-extfile',ext,'-out',cert)
         result[name]=cert
     for p in directory.iterdir():p.chmod(0o600)
-    result['now']=int(time.time())
+    result['now']=int(time.time())+(3*86400 if expired_old else 0)
     result['fingerprint']=lambda p:hashlib.sha256(ssl.PEM_cert_to_DER_cert(p.read_text())).hexdigest()
     return result
 

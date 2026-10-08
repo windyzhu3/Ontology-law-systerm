@@ -108,7 +108,7 @@ def _read(root, path):
         raise RuntimeError('Original operation unavailable or invalid') from error
 
 
-def begin(runtime: Path, kind: str, config_digest: str) -> dict:
+def begin(runtime: Path, kind: str, config_digest: str, *, operation_id: str | None = None) -> dict:
     if kind not in {'initialize', 'upgrade', 'publish-bytes', 'restore', 'runtime-control', 'rotate-public-tls'} or not re.fullmatch('[a-f0-9]{64}', config_digest):
         raise ValueError('Valid operation kind and input digest required')
     root = safe_root(runtime)
@@ -129,7 +129,16 @@ def begin(runtime: Path, kind: str, config_digest: str) -> dict:
             operation = _read(root, root / 'operations' / (previous['operationId'] + '.json'))
             if operation['kind'] == 'initialize' and kind == 'initialize' or operation['phase'] != 'COMPLETE':
                 raise RuntimeError('Original operation exists; use its explicit resume or verification command')
-        operation = {'operationId': uuid.uuid4().hex, 'instanceId': _owner(root)['instanceId'], 'kind': kind,
+        if (root/'tls-pending.json').exists() and operation_id is None:
+            pending=_read(root,root/'tls-pending.json')
+            pending_path=root/'operations'/(pending['operationId']+'.json')
+            if not pending_path.exists() or _read(root,pending_path)['phase']!='COMPLETE':
+                raise RuntimeError('Original pending TLS operation requires reconciliation')
+        if operation_id is not None:
+            pending=_read(root,root/'tls-pending.json')
+            if kind!='rotate-public-tls' or not _ID.fullmatch(operation_id) or pending['operationId']!=operation_id or pending['configDigest']!=config_digest:raise RuntimeError('Exact pending TLS registration required')
+            if (root/'operations'/(operation_id+'.json')).exists():raise RuntimeError('Existing pending TLS operation must be reconciled')
+        operation = {'operationId': operation_id or uuid.uuid4().hex, 'instanceId': _owner(root)['instanceId'], 'kind': kind,
                      'configDigest': config_digest, 'phase': 'CREATED', 'events': [], 'createdAt': time.time()}
         _write(root, root / 'operations' / (operation['operationId'] + '.json'), operation)
         _write(root, current, {'operationId': operation['operationId']})

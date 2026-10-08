@@ -16,8 +16,11 @@ def _service(service):
     if hashlib.sha256(value).hexdigest()!=service['identity']:raise RuntimeError('Registered proxy unit differs')
     binary=Path('/usr/sbin/nginx' if service['role']=='nginx' else '/usr/bin/caddy')
     if sha(binary)!=service['image'].removeprefix('sha256:'):raise RuntimeError('Registered proxy executable differs')
-    state=runtime.run(['systemctl','is-active',service['name']],check=False)
-    return {'running':state.returncode==0}
+    state=runtime.run(['systemctl','show',service['name'],'--property=ActiveState,SubState,MainPID'],check=False)
+    fields=dict(line.split('=',1) for line in state.stdout.decode().splitlines() if '=' in line)
+    if state.returncode==0 and fields.get('ActiveState')=='active' and fields.get('SubState')=='running' and fields.get('MainPID','0').isdigit() and int(fields['MainPID'])>0:return {'running':True}
+    if state.returncode==0 and fields=={'ActiveState':'inactive','SubState':'dead','MainPID':'0'}:return {'running':False}
+    raise RuntimeError('Registered proxy process state unknown')
 
 
 def validate_registration(root: Path,registration: dict) -> dict:
@@ -92,8 +95,11 @@ def apply(root: Path,operation_id: str,action: str) -> dict:
     with journal.locked(root) as root:
         op=journal.current(root)
         if op['operationId']!=operation_id or op['kind']!='rotate-public-tls' or op['phase']=='COMPLETE':raise RuntimeError('Original proxy operation required')
+        phases={'close':{'STOPPING','FAILING','ROLLBACK_STOPPING','ROLLBACK_FAILING'},'switch':{'PROXY_SWITCHING'},'rollback':{'ROLLBACK_SWITCHING'},'open':{'OPENING','ROLLBACK_OPENING'}}
+        if op['phase'] not in phases[action]:raise RuntimeError('Original proxy phase does not permit action')
         value=journal._read(root,root/'operations'/(operation_id+'-proxy.json'))
-        observe(root,operation_id)
+        observed=observe(root,operation_id)
+        if action in {'switch','rollback'} and not observed['closed']:raise RuntimeError('Outer proxy must be observed closed')
         if action in {'switch','rollback'}:
             for row in value['services']:
                 service=row['service'];candidate=Path(row['candidate'])

@@ -10,6 +10,11 @@ def resolve(root: Path) -> dict:
     with journal.locked(root) as root:
         if (root/'tls/active.json').exists():
             selected=journal._read(root,root/'tls/active.json')
+            if 'legacy' in selected:
+                value=selected['legacy']
+                for name,h in value['files'].items():
+                    if '..' in Path(name).parts or Path(name).is_absolute() or sha(root/name)!=h:raise RuntimeError('Legacy TLS bytes differ')
+                return value
             return read(root,selected['generationId'])
         resources=runtime.load(root)
         for name,value in resources.get('publicTlsHashes',{}).items():

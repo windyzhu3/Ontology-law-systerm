@@ -25,15 +25,15 @@ def handshake(target: dict,trust_path: Path,expected_leaf_sha256: str,*,now: int
 
 
 def summarize(targets,consumers,*,scope):
-    required={'nativeIdentity','nativeEntry'} if scope=='native' else ROLES-{'nativeIdentity','nativeEntry'} if scope=='proxy' else ROLES
+    required={'nativeIdentity','nativeEntry'} if scope=='native' else {'bridgeIdentity','bridgeEntry'} if scope=='bridge' else ROLES-{'nativeIdentity','nativeEntry'} if scope=='proxy' else ROLES
     if any(v.get('status')=='BLOCKED' for v in targets.values()):return 'BLOCKED'
     if not required<=targets.keys() or any(targets[k].get('status')!='PASS' for k in required):return 'UNKNOWN'
-    if scope!='proxy' and (set(consumers)!=CONSUMERS or any(v!='PASS' for v in consumers.values())):return 'UNKNOWN'
+    if scope not in {'proxy','bridge'} and (set(consumers)!=CONSUMERS or any(v!='PASS' for v in consumers.values())):return 'UNKNOWN'
     return 'PASS'
 
 
 def collect(root: Path,generation: dict,*,scope: str,now: int) -> dict:
-    if scope not in {'native','proxy','all'}:raise RuntimeError('Named TLS probe scope required')
+    if scope not in {'native','proxy','bridge','all'}:raise RuntimeError('Named TLS probe scope required')
     with journal.locked(root) as root:
         current=tls_generation.resolve(root)
         if current['generationId']!=generation['generationId']:raise RuntimeError('Probe generation is not active')
@@ -49,9 +49,10 @@ def collect(root: Path,generation: dict,*,scope: str,now: int) -> dict:
         evidence={}
         for role,target in targets.items():
             if scope=='native' and not role.startswith('native') or scope=='proxy' and role.startswith('native'):continue
+            if scope=='bridge' and not role.startswith('bridge'):continue
             evidence[role]=handshake(target,Path(generation['paths']['httpTrust']),generation['candidate']['leafDerSha256'],now=now)
         consumers={}
-        if scope!='proxy':
+        if scope not in {'proxy','bridge'}:
             try:
                 if generation['version']==1:tls_generation.verify_trust(root,generation['trust'])
                 from . import verify
