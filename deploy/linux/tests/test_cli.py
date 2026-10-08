@@ -63,3 +63,20 @@ class CliTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):m.dispatch(args)
             self.assertFalse((root/'cli-initialization.json').exists())
 
+    def test_tls_commands_require_explicit_original_operation_and_private_inputs(self):
+        m=self.module()
+        for name in ['rotate-public-tls-resume','rotate-public-tls-rollback']:
+            with self.assertRaises(SystemExit):m.parser().parse_args(['--runtime','/private',name])
+            args=m.parser().parse_args(['--runtime','/private',name,'--operation-id','a'*32])
+            function='resume' if name.endswith('resume') else 'rollback'
+            with patch.object(m.tls_rotation,function,return_value={'phase':'COMPLETE'}) as action:m.dispatch(args)
+            self.assertEqual(action.call_args.args,(Path('/private'),'a'*32))
+        args=m.parser().parse_args(['--runtime','/private','rotate-public-tls','--inputs-file','relative.json'])
+        with patch.object(m.tls_rotation,'begin') as begin:
+            with self.assertRaises(RuntimeError):m.dispatch(args)
+            begin.assert_not_called()
+    def test_tls_status_exit_codes_preserve_unknown_and_expiry(self):
+        m=self.module()
+        for status,code in [('OK',0),('WARNING',2),('ACTION_REQUIRED',2),('CRITICAL',2),('BLOCKED',1),('UNKNOWN',4)]:
+            with patch.object(m,'dispatch',return_value={'status':status}),patch('builtins.print'):
+                self.assertEqual(m.main(['--runtime','/private','public-tls-status']),code)

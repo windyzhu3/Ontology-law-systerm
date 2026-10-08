@@ -5,9 +5,10 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 sys.dont_write_bytecode=True
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from ols_linux import assembly,build,bundle,business_config,checkpoint,config,identity,initialize,journal,release,runtime,verify
+from ols_linux import tls_rotation,tls_status,tls_material,assembly,build,bundle,business_config,checkpoint,config,identity,initialize,journal,release,runtime,verify
 
 
 def parser():
@@ -31,6 +32,10 @@ def parser():
     resume=commands.add_parser('upgrade-resume');resume.add_argument('--operation-id',required=True)
     restore=commands.add_parser('restore-checkpoint');restore.add_argument('--operation-id',required=True)
     for name in ('release-status','start','stop','health'):commands.add_parser(name)
+    status=commands.add_parser('public-tls-status');status.add_argument('--previous-check-file',type=Path)
+    rotate=commands.add_parser('rotate-public-tls');rotate.add_argument('--inputs-file',type=Path,required=True)
+    for name in ('rotate-public-tls-resume','rotate-public-tls-rollback'):
+        command=commands.add_parser(name);command.add_argument('--operation-id',required=True)
     return p
 
 
@@ -75,6 +80,10 @@ def original_initialization(root,inputs,sessions_file,capture_admin=None):
 
 def dispatch(args):
     root=args.runtime;name=args.command
+    if name=='public-tls-status':return tls_status.status(root,now=int(time.time()),previous_check=args.previous_check_file)
+    if name=='rotate-public-tls':return tls_rotation.begin(root,json.loads(tls_material.read_private(args.inputs_file)),now=int(time.time()))
+    if name=='rotate-public-tls-resume':return tls_rotation.resume(root,args.operation_id,now=int(time.time()))
+    if name=='rotate-public-tls-rollback':return tls_rotation.rollback(root,args.operation_id,now=int(time.time()))
     if name=='release-status':return release.status(root)
     if name=='health':return release.health(root)
     if name=='stop':return release.stop(root)
@@ -130,6 +139,7 @@ def main(argv=None):
     try:
         if os.name=='nt' or not args.runtime.is_absolute():raise RuntimeError('Linux and an absolute private runtime are required')
         result=dispatch(args);print(json.dumps(result,ensure_ascii=False))
+        if args.command=='public-tls-status':return {'OK':0,'WARNING':2,'ACTION_REQUIRED':2,'CRITICAL':2,'BLOCKED':1,'UNKNOWN':4}.get(result.get('status'),4)
         return 3 if result.get('phase')=='HUMAN_SESSIONS_REQUIRED' else 0
     except (RuntimeError,ValueError,KeyError,OSError):
         output={'status':'BLOCKED_OR_UNKNOWN','reason':'Operation refused or result unknown; original private evidence retained'}
