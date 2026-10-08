@@ -2,7 +2,7 @@
 from datetime import datetime,timezone
 from pathlib import Path
 import uuid
-from . import journal,runtime,release,database,tls_material,tls_generation,tls_deployment,tls_proxy,tls_probe
+from . import journal,runtime,release,database,tls_material,tls_generation,tls_deployment,tls_proxy,tls_probe,tls_import
 from .config import digest
 
 
@@ -37,11 +37,19 @@ def begin(root: Path,inputs: dict,*,now: int) -> dict:
         reconcile_pending(root)
         current=journal.current(root)
         if current['phase']!='COMPLETE':raise RuntimeError('Resume the current original operation')
-        if set(inputs)!={'materials','proxies','probeTargets'}:raise RuntimeError('Exact TLS rotation inputs required')
+        if not isinstance(inputs,dict) or set(inputs)!={'materials','proxies','probeTargets'}:raise RuntimeError('Exact TLS rotation inputs required')
+        materials=tls_import.normalize(root,inputs['materials'],now=now)
+        frozen=tls_material.freeze(root,materials)
+        selected=tls_generation.resolve(root)
+        if selected.get('version')==1 and selected['candidate']['inputDigest']==frozen['candidate']['inputDigest']:
+            original=journal.read(root,selected['operationId']);saved=journal._read(root,_path(root,original['operationId']))
+            if original['phase']!='COMPLETE' or original['kind']!='rotate-public-tls' or saved['proxies']!=inputs['proxies'] or saved['probeTargets']!=inputs['probeTargets']:raise RuntimeError('Duplicate delivery original binding differs')
+            if selected['candidate']['notAfter']<=now or tls_probe.collect(root,selected,scope='all',now=now)['status']!='PASS':raise RuntimeError('Duplicate delivery is not an observed healthy active generation')
+            return {'operationId':original['operationId'],'kind':'rotate-public-tls','phase':'COMPLETE','outcome':'UNCHANGED','generationId':selected['generationId']}
         runtime.validate_tls(root);before=database.observe(root)
         if before['gate']['operating_mode']!='ACTIVE':raise RuntimeError('TLS rotation requires original ACTIVE gate')
         release._installed(root,before['gate'])
-        candidate=tls_material.stage(root,inputs['materials'],now=now)
+        candidate=tls_material.stage(root,materials,now=now,frozen=frozen)
         tls_proxy.validate_registration(root,inputs['proxies'])
         old=tls_generation.resolve(root);opid=uuid.uuid4().hex
         data={'candidate':candidate,'previousGeneration':old,'before':before,'proxies':inputs['proxies'],

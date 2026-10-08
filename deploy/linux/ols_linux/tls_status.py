@@ -4,7 +4,7 @@ import hmac
 import json
 import ssl
 from pathlib import Path
-from . import journal,tls_generation,tls_material,tls_probe
+from . import journal,tls_generation,tls_material,tls_probe,tls_import
 from .config import canonical
 
 
@@ -50,5 +50,5 @@ def status(root: Path,*,now: int,previous_check: Path | None=None) -> dict:
         success=now if probe['status']=='PASS' and now>=before else previous
         payload={'instanceId':op['instanceId'],'generationId':generation['generationId'],'checkedAt':now,'probeStatus':probe['status'],'lastSuccessfulCheckAt':success}
         result.update(operationId=op['operationId'],phase=op['phase'],generationId=generation['generationId'],notAfter=generation['candidate']['notAfter'],
-                      probe=probe,lastSuccessfulCheckAt=success,checkEvidence=sign(root,payload),issuance={'state':'MANUAL_REQUIRED'})
+                      probe=probe,lastSuccessfulCheckAt=success,checkEvidence=sign(root,payload),issuance=tls_import.issuance_status(root,now=now))
         return result

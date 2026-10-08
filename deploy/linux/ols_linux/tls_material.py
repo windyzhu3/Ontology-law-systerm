@@ -74,32 +74,38 @@ def approved(root):
     return result
 
 
-def stage(root: Path, inputs: dict, *, now: int) -> dict:
+def freeze(root: Path,inputs: dict) -> dict:
+    if set(inputs)!={'certificate','privateKey','intermediates','approvedAnchors','origins','provenance'}:raise RuntimeError('Exact TLS input fields required')
+    resources=runtime.load(root)
+    expected=[resources['publicOrigin'],resources['identityOrigin']]
+    if inputs['origins']!=expected:raise RuntimeError('Original HTTPS origins required')
+    from .public_runtime import origin
+    hosts=[urlsplit(origin(o)).hostname for o in expected]
+    if not isinstance(inputs['intermediates'],list) or not isinstance(inputs['approvedAnchors'],list) or not inputs['approvedAnchors']:raise RuntimeError('Explicit certificate chain inputs required')
+    certs=certificates(read_private(inputs['certificate']))
+    for p in inputs['intermediates']:certs+=certificates(read_private(p))
+    key=read_private(inputs['privateKey']);anchors={}
+    allowed=approved(root)
+    for path in inputs['approvedAnchors']:
+        data=read_private(path);fp=fingerprint(data)
+        if fp not in allowed:raise RuntimeError('Unapproved public trust anchor')
+        anchors[fp]=certificates(data)[0]
+    files={'certificate.pem':b''.join(certs),'private.key':key,'anchors.pem':b''.join(anchors[k] for k in sorted(anchors))}
+    candidate={'version':1,'originHosts':hosts,'anchorFingerprints':sorted(anchors),
+               'files':{n:hashlib.sha256(d).hexdigest() for n,d in files.items()},'provenanceDigest':digest(inputs['provenance'])}
+    candidate['inputDigest']=digest(candidate)
+    return {'candidate':candidate,'bytes':files}
+
+
+def stage(root: Path, inputs: dict, *, now: int, frozen: dict | None=None) -> dict:
     with journal.locked(root) as root:
-        if set(inputs)!={'certificate','privateKey','intermediates','approvedAnchors','origins','provenance'}:raise RuntimeError('Exact TLS input fields required')
-        resources=runtime.load(root)
-        expected=[resources['publicOrigin'],resources['identityOrigin']]
-        if inputs['origins']!=expected:raise RuntimeError('Original HTTPS origins required')
-        from .public_runtime import origin
-        hosts=[urlsplit(origin(o)).hostname for o in expected]
-        if not isinstance(inputs['intermediates'],list) or not isinstance(inputs['approvedAnchors'],list) or not inputs['approvedAnchors']:raise RuntimeError('Explicit certificate chain inputs required')
-        certs=certificates(read_private(inputs['certificate']))
-        for p in inputs['intermediates']:certs+=certificates(read_private(p))
-        key=read_private(inputs['privateKey']);anchors={}
-        allowed=approved(root)
-        for path in inputs['approvedAnchors']:
-            data=read_private(path);fp=fingerprint(data)
-            if fp not in allowed:raise RuntimeError('Unapproved public trust anchor')
-            anchors[fp]=certificates(data)[0]
+        frozen=freeze(root,inputs) if frozen is None else frozen
         base=root/'tls/staging'
         if base.resolve()!=base.absolute():raise RuntimeError('Unsafe staging directory')
         base.mkdir(mode=0o700,parents=True,exist_ok=True)
         directory=Path(tempfile.mkdtemp(prefix='candidate-',dir=base))
-        files={'certificate.pem':b''.join(certs),'private.key':key,'anchors.pem':b''.join(anchors[k] for k in sorted(anchors))}
-        for name,data in files.items():runtime.private_file(directory/name,data)
-        candidate={'version':1,'directory':str(directory),'originHosts':hosts,'anchorFingerprints':sorted(anchors),
-                   'files':{n:hashlib.sha256(d).hexdigest() for n,d in files.items()},'provenanceDigest':digest(inputs['provenance'])}
-        candidate['inputDigest']=digest({k:v for k,v in candidate.items() if k!='directory'})
+        for name,data in frozen['bytes'].items():runtime.private_file(directory/name,data)
+        candidate=dict(frozen['candidate'],directory=str(directory))
         info=verify(directory,candidate,now=now)
         candidate.update(info)
         previous=metadata(root/'certs/public.crt')
