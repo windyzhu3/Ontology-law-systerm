@@ -392,6 +392,10 @@ def restore_checkpoint(root: Path,source_operation_id: str,value: dict) -> dict:
         journal.record(root,operation_id,{'phase':'RESTORE_ASSETS_UNKNOWN','checkpointDigest':cp_digest})
         _restore_assets(root,directory,operation_id,value)
         _assert_restored(root,value)
+        if (root/'certs/public.crt').exists():
+            import time
+            from . import tls_generation
+            tls_generation.restore_binding(root,value,now=int(time.time()))
         if (root/'launch.json').exists():_restore_runtime_registry(root)
         journal.record(root,operation_id,{'phase':'RESTORED_MAINTENANCE','checkpointDigest':cp_digest,'gate':value['observed']['gate']})
         return {'status':'RESTORED_MAINTENANCE','operationId':operation_id,'schemaVersion':value['observed']['gate']['schema_contract_version']}
@@ -460,6 +464,11 @@ def start(root: Path) -> dict:
             value=checkpoint.verified(root,plan['sourceOperationId'])
             if digest(value)!=plan['checkpointDigest']:raise RuntimeError('Linked original restore changed')
             if op['phase']=='RESTORED_MAINTENANCE':_assert_restored(root,value)
+            if (root/'certs/public.crt').exists():
+                import time
+                from . import tls_generation
+                binding=tls_generation.restore_binding(root,value,now=int(time.time()))
+                if not binding['canActivate']:raise RuntimeError('Restored TLS blocked: '+binding['reasonCode'])
             _restore_runtime_registry(root);restored=True
         elif op['phase'] not in {'COMPLETE','STOP_REQUESTED','WRITERS_STOPPED','STOPPED'} and not(op['kind']=='runtime-control' and op['phase']=='CREATED') and not (
             op['phase'] in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILING','ACTIVATION_FAILED'} and

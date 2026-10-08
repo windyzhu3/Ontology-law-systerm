@@ -221,6 +221,7 @@ def rollback(root: Path,operation_id: str,*,now: int) -> dict:
                 resources=runtime.load(root);prior=data['previousResources']
                 for role in ['api','worker','identity','scanner','entry']:resources['containers'][role]=prior['containers'][role]
                 resources['ingress']=prior['ingress'];runtime.save(root,resources)
+                journal._write(root,root/'tls-selection.json',{'generationId':old['generationId'],'operationId':opid})
                 if old['version']==0:
                     journal._write(root,root/'tls/active.json',{'legacy':old,'operationId':opid})
                 else:journal._write(root,root/'tls/active.json',{'generationId':old['generationId'],'operationId':opid})

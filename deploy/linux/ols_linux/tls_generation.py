@@ -10,23 +10,33 @@ def resolve(root: Path) -> dict:
     with journal.locked(root) as root:
         if (root/'tls/active.json').exists():
             selected=journal._read(root,root/'tls/active.json')
+            marker=root/'tls-selection.json'
+            gid=selected.get('generationId',selected.get('legacy',{}).get('generationId'))
+            if marker.exists() and journal._read(root,marker).get('generationId')!=gid:raise RuntimeError('Selected TLS reference conflicts')
             if 'legacy' in selected:
                 value=selected['legacy']
                 for name,h in value['files'].items():
                     if '..' in Path(name).parts or Path(name).is_absolute() or sha(root/name)!=h:raise RuntimeError('Legacy TLS bytes differ')
                 return value
             return read(root,selected['generationId'])
-        resources=runtime.load(root)
-        for name,value in resources.get('publicTlsHashes',{}).items():
-            if sha(root/name)!=value:raise RuntimeError('Original public TLS changed')
-        paths={'certificate':str(root/'certs/public.crt'),'privateKey':str(root/'certs/public.key'),
-               'httpTrust':str(root/'certs/http-trust.pem'),'javaTrustStore':str(root/'certs/identity-trust.p12')}
-        info=tls_material.metadata(Path(paths['certificate']))
-        import ssl
-        original={n:sha(root/'certs'/n) for n in ['public.crt','public.key','public-ca.pem']}
-        return {'version':0,'generationId':digest(original),'paths':paths,'candidate':{'notAfter':int(ssl.cert_time_to_seconds(info['notAfter'])),
-            'leafDerSha256':tls_material.fingerprint(tls_material.certificates(Path(paths['certificate']).read_bytes())[0])},'files':{'certs/'+n:h for n,h in original.items()}}
+        value=_legacy(root)
+        marker=root/'tls-selection.json'
+        if marker.exists() and journal._read(root,marker).get('legacyGenerationId')!=value['generationId']:
+            raise RuntimeError('Selected TLS reference is missing')
+        return value
 
+
+def _legacy(root):
+    resources=runtime.load(root)
+    for name,value in resources.get('publicTlsHashes',{}).items():
+        if sha(root/name)!=value:raise RuntimeError('Original public TLS changed')
+    paths={'certificate':str(root/'certs/public.crt'),'privateKey':str(root/'certs/public.key'),
+           'httpTrust':str(root/'certs/http-trust.pem'),'javaTrustStore':str(root/'certs/identity-trust.p12')}
+    info=tls_material.metadata(Path(paths['certificate']))
+    import ssl
+    original={n:sha(root/'certs'/n) for n in ['public.crt','public.key','public-ca.pem']}
+    return {'version':0,'generationId':digest(original),'paths':paths,'candidate':{'notAfter':int(ssl.cert_time_to_seconds(info['notAfter'])),
+        'leafDerSha256':tls_material.fingerprint(tls_material.certificates(Path(paths['certificate']).read_bytes())[0])},'files':{'certs/'+n:h for n,h in original.items()}}
 
 def current(root,operation_id):
     op=journal.current(root)
@@ -79,8 +89,13 @@ def select(root: Path, operation_id: str, expected_parent: str, generation_id: s
     with journal.locked(root) as root:
         op=current(root,operation_id)
         if op['phase'] not in {'SWITCHING','SWITCHED'}:raise RuntimeError('Stopped TLS switch required')
-        value=read(root,generation_id);old=resolve(root)['generationId']
+        value=read(root,generation_id)
+        marker=root/'tls-selection.json'
+        if not (root/'tls/active.json').exists() and marker.exists() and journal._read(root,marker)=={'generationId':generation_id,'operationId':operation_id}:
+            old=expected_parent
+        else:old=resolve(root)['generationId']
         if value['operationId']!=operation_id or value['parentGenerationId']!=expected_parent or old not in {expected_parent,generation_id}:raise RuntimeError('TLS parent conflict')
+        journal._write(root,root/'tls-selection.json',{'generationId':generation_id,'operationId':operation_id})
         journal._write(root,root/'tls/active.json',{'generationId':generation_id,'operationId':operation_id})
 
 
@@ -156,3 +171,53 @@ def verify_trust(root: Path,trust: dict) -> None:
         der=tls_material.tool(root,'keytool',['-exportcert','-alias','ols-'+fp,*base])
         import hashlib
         if hashlib.sha256(der).hexdigest()!=fp:raise RuntimeError('Java trust certificate differs')
+
+
+def checkpoint_binding(root: Path) -> dict:
+    """Capture the selected generation and registered proxy config, never infer from resources."""
+    value=resolve(root);result={'version':value['version'],'generationId':value['generationId']}
+    pointer=root/'tls/active.json'
+    if pointer.exists():
+        selected=journal._read(root,pointer)
+        proxy=root/'operations'/(selected['operationId']+'-proxy.json')
+        if proxy.exists():
+            from . import tls_proxy
+            tls_proxy.observe(root,selected['operationId'])
+            plan=journal._read(root,proxy)
+            result['proxies']=[{'service':row['service'],'configuration':tls_material.read_private(row['service']['config']).decode()} for row in plan['services']]
+    return result
+
+
+def restore_binding(root: Path, checkpoint_value: dict, *, now: int) -> dict:
+    """Validate already restored bytes and select their exact interpretation, keeping restore pending."""
+    with journal.locked(root) as root:
+        op=journal.current(root)
+        if op['phase'] not in {'RESTORE_ASSETS_UNKNOWN','RESTORED_MAINTENANCE','ACTIVATION_UNKNOWN','ACTIVATION_FAILING','ACTIVATION_FAILED'}:
+            raise RuntimeError('Original pending checkpoint restore required')
+        expected=checkpoint_value.get('tlsBinding')
+        files=checkpoint_value['files']
+        for name,h in files.items():
+            if name.startswith('assets/') and name.split('/')[1] in {'certs','tls','deployments','launch.json','proxy'}:
+                relative=Path(name[7:]);path=root/relative
+                if '..' in relative.parts or path.resolve()!=path.absolute() or not path.is_file() or sha(path)!=h:
+                    raise RuntimeError('Restored TLS checkpoint bytes differ')
+        pointer=root/'tls/active.json'
+        if pointer.exists():
+            if 'assets/tls/active.json' not in files:raise RuntimeError('TLS reference not present in checkpoint')
+            selected=journal._read(root,pointer)
+            value=selected['legacy'] if 'legacy' in selected else read(root,selected['generationId'])
+        else:value=_legacy(root)
+        if expected is None:
+            if value['version']!=0:raise RuntimeError('Legacy checkpoint cannot select a later TLS generation')
+        elif (expected['version'],expected['generationId'])!=(value['version'],value['generationId']):
+            raise RuntimeError('TLS checkpoint generation differs')
+        for name,h in value['files'].items():
+            if files.get('assets/'+name)!=h or sha(root/name)!=h:raise RuntimeError('TLS generation not sealed by checkpoint')
+        marker={'generationId':value['generationId'],'operationId':op['operationId']}
+        if not pointer.exists():marker['legacyGenerationId']=value['generationId']
+        journal._write(root,root/'tls-selection.json',marker)
+        import ssl
+        info=tls_material.metadata(Path(value['paths']['certificate']))
+        before=int(ssl.cert_time_to_seconds(info['notBefore']));after=int(ssl.cert_time_to_seconds(info['notAfter']))
+        reason='CERTIFICATE_NOT_YET_VALID' if now<before else 'CERTIFICATE_EXPIRED' if now>=after else 'VALID'
+        return {'version':value['version'],'generationId':value['generationId'],'canActivate':reason=='VALID','reasonCode':reason}
