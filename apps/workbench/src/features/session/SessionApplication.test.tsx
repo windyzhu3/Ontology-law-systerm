@@ -866,6 +866,56 @@ it("keeps no-appointment and unqualified identity states distinct from an empty 
   expect(f.requests).toHaveLength(0);
 });
 
+it.each(['/admin/identity/principals', '/admin/audit-records'])('leaves %s when switching to a business appointment without inheriting admin admission', async path => {
+  history.replaceState(null, '', path);
+  vi.stubGlobal('fetch', async () => jsonResponse({items: []}));
+  const f = fixture({context: init => {
+    const business = new Headers(init.headers).get('X-Appointment-Id') === selectorId;
+    return {...context, canEnterIdentityAdmin: !business, canReadAuditRecords: !business,
+      appointmentChoices: [{id: taskId, label: '总所 · 身份管理员'}, {id: selectorId, label: '案管部 · 主任律师'}],
+      selectedAppointmentId: business ? selectorId : taskId,
+      actorScopeKey: business ? `ask1.${'b'.repeat(43)}` : scope};
+  }});
+  const identity = identityFixture('/admin/identity/principals', {recovery: f.controller.recovery});
+  render(<SessionApplication controller={f.controller} api={f.api} identityApi={identity.api}/>);
+  const confirm = await screen.findByRole('button', {name: '确认本次身份'});
+  await waitFor(() => expect(confirm).toBeEnabled()); fireEvent.click(confirm);
+  await screen.findByRole('button', {name: '切换任职'});
+  fireEvent.click(screen.getByRole('button', {name: '切换任职'}));
+  expect(location.pathname).toBe('/workbench');
+  expect(screen.queryByRole('heading', {name: path === '/admin/audit-records' ? '审计记录' : '用户与身份主体'})).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('本人任职'), {target: {value: selectorId}});
+  fireEvent.click(screen.getByRole('button', {name: '更换任职'}));
+  await waitFor(() => expect(f.controller.getSnapshot().context?.selectedAppointmentId).toBe(selectorId));
+  const nextConfirm = screen.getByRole('button', {name: '确认本次身份'});
+  await waitFor(() => expect(nextConfirm).toBeEnabled());
+  expect(screen.queryByRole('button', {name: '进入身份管理'})).not.toBeInTheDocument();
+  expect(f.requests).toHaveLength(0);
+  fireEvent.click(nextConfirm);
+  await screen.findByRole('main', {name: '责任工作台'});
+  expect(f.requests[0].headers.get('X-Appointment-Id')).toBe(selectorId);
+  expect(screen.queryByText('当前任职不能进入身份管理；请确认本人任职具备管理资格。')).not.toBeInTheDocument();
+});
+
+it('offers the explicit admin entry again after leaving administration with a management-only appointment', async () => {
+  history.replaceState(null, '', '/admin/identity/principals');
+  const f = fixture({context: {...context, canEnterWorkbench: false, canEnterIdentityAdmin: true}});
+  const identity = identityFixture('/admin/identity/principals', {recovery: f.controller.recovery});
+  render(<SessionApplication controller={f.controller} api={f.api} identityApi={identity.api}/>);
+  const confirm = await screen.findByRole('button', {name: '确认本次身份'});
+  await waitFor(() => expect(confirm).toBeEnabled()); fireEvent.click(confirm);
+  await screen.findByRole('heading', {name: '用户与身份主体'});
+  fireEvent.click(screen.getByRole('button', {name: '切换任职'}));
+  expect(location.pathname).toBe('/workbench');
+  const adminEntry = await screen.findByRole('button', {name: '进入身份管理'});
+  expect(adminEntry).toBeEnabled();
+  expect(f.requests).toHaveLength(0);
+  fireEvent.click(adminEntry);
+  const nextConfirm = await screen.findByRole('button', {name: '确认本次身份'});
+  await waitFor(() => expect(nextConfirm).toBeEnabled()); fireEvent.click(nextConfirm);
+  await screen.findByRole('heading', {name: '用户与身份主体'});
+});
+
 it("removes old card and waits for final confirmation again on a requested identity switch", async () => {
   const f = fixture();
   await enter(f);
