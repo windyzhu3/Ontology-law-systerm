@@ -41,3 +41,24 @@ class TrustTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):g.build_trust(self.root,self.c,self.output)
         trust=g.build_trust(self.root,self.c,self.output)
         self.assertIsNone(g.verify_trust(self.root,trust))
+    def test_unexpected_alias_in_partial_store_is_refused(self):
+        from unittest.mock import patch
+        real=tls_material.tool;count=[0]
+        def interrupt(root,binary,args,**kwargs):
+            if '-importcert' in args:
+                count[0]+=1
+                if count[0]==2:raise RuntimeError('interrupted')
+            return real(root,binary,args,**kwargs)
+        with patch.object(tls_material,'tool',side_effect=interrupt):
+            with self.assertRaises(RuntimeError):g.build_trust(self.root,self.c,self.output)
+        real(self.root,'keytool',['-importcert','-noprompt','-alias','unexpected-root','-file',self.f['untrusted'],'-keystore',self.output/'identity-trust.p12','-storetype','PKCS12','-storepass:file',self.root/'secrets/trust-password.txt'])
+        with self.assertRaisesRegex(RuntimeError,'inventory'):g.build_trust(self.root,self.c,self.output)
+    def test_next_trust_keeps_verified_active_anchors(self):
+        from unittest.mock import patch
+        from ols_linux import runtime
+        trust=g.build_trust(self.root,self.c,self.output)
+        candidate=dict(self.c,directory=str(self.root/'next-candidate'),inputDigest='b'*64)
+        runtime.private_file(Path(candidate['directory'])/'anchors.pem',self.f['old'].read_bytes())
+        with patch.object(g,'resolve',return_value={'version':1,'trust':trust}):
+            next_trust=g.build_trust(self.root,candidate,self.root/'tls/next-trust')
+        self.assertEqual(next_trust['anchorFingerprints'],trust['anchorFingerprints'])

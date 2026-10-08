@@ -101,8 +101,17 @@ def select(root: Path, operation_id: str, expected_parent: str, generation_id: s
         if op['phase'] not in {'SWITCHING','SWITCHED'}:raise RuntimeError('Stopped TLS switch required')
         value=read(root,generation_id)
         marker=root/'tls-selection.json'
-        if not (root/'tls/active.json').exists() and marker.exists() and journal._read(root,marker)=={'generationId':generation_id,'operationId':operation_id}:
-            old=expected_parent
+        if marker.exists() and journal._read(root,marker)=={'generationId':generation_id,'operationId':operation_id}:
+            pointer=root/'tls/active.json'
+            if pointer.exists():
+                selected=journal._read(root,pointer)
+                if 'legacy' in selected:
+                    previous=selected['legacy']
+                    for name,h in previous['files'].items():
+                        if Path(name).is_absolute() or '..' in Path(name).parts or sha(root/name)!=h:raise RuntimeError('Legacy TLS bytes differ')
+                else:previous=read(root,selected['generationId'])
+                old=previous['generationId']
+            else:old=_legacy(root)['generationId']
         else:old=resolve(root)['generationId']
         if value['operationId']!=operation_id or value['parentGenerationId']!=expected_parent or old not in {expected_parent,generation_id}:raise RuntimeError('TLS parent conflict')
         journal._write(root,root/'tls-selection.json',{'generationId':generation_id,'operationId':operation_id})
@@ -125,7 +134,12 @@ def build_trust(root: Path,candidate: dict,output: Path) -> dict:
             verify_trust(root,trust);return trust
         output.mkdir(mode=0o700,parents=True,exist_ok=True)
         anchors={}
-        for data in [tls_material.read_private(root/'certs/ca.pem'),tls_material.read_private(root/'certs/public-ca.pem'),
+        active=resolve(root)
+        retained=[]
+        if active['version']==1:
+            verify_trust(root,active['trust'])
+            retained=[tls_material.read_private(active['trust']['httpTrust'])]
+        for data in retained+[tls_material.read_private(root/'certs/ca.pem'),tls_material.read_private(root/'certs/public-ca.pem'),
                      tls_material.read_private(Path(candidate['directory'])/'anchors.pem')]:
             for cert in tls_material.certificates(data):anchors[tls_material.fingerprint(cert)]=cert
         for fp in anchors:
@@ -174,8 +188,11 @@ def verify_trust(root: Path,trust: dict) -> None:
     if fingerprints!=trust['anchorFingerprints']:raise RuntimeError('PEM anchor inventory differs')
     secret=root/'secrets/trust-password.txt';store=Path(trust['javaTrustStore'])
     base=['-keystore',store,'-storetype','PKCS12','-storepass:file',secret]
-    listing=tls_material.tool(root,'keytool',['-list',*base]).decode('utf-8')
-    aliases=re.findall(r'(?m)^(ols-[a-f0-9]{64}),',listing)
+    listing=tls_material.tool(root,'keytool',['-J-Duser.language=en','-J-Duser.country=US','-list','-v',*base]).decode('utf-8')
+    aliases=re.findall(r'(?m)^Alias name: (.+)$',listing)
+    types=re.findall(r'(?m)^Entry type: (.+)$',listing)
+    counts=re.findall(r'Your keystore contains (\d+) entr(?:y|ies)',listing)
+    if counts!=[str(len(fingerprints))] or types!=['trustedCertEntry']*len(fingerprints):raise RuntimeError('Java trust entry inventory differs')
     if sorted(aliases)!=['ols-'+fp for fp in fingerprints]:raise RuntimeError('Java trust alias inventory differs')
     for fp in fingerprints:
         der=tls_material.tool(root,'keytool',['-exportcert','-alias','ols-'+fp,*base])

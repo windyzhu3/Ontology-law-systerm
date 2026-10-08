@@ -99,3 +99,35 @@ class TlsCheckpointTests(unittest.TestCase):
         self.assertTrue(self.binding()['canActivate'])
         Path(selected['deployment']['httpHelper']).write_bytes(b'changed')
         with self.assertRaisesRegex(RuntimeError,'helper'):tls_generation.resolve(self.root)
+    def test_expired_late_restore_completes_failure_cleanup(self):
+        plan={'operationId':self.op['operationId'],'sourceOperationId':'b'*32,'checkpointDigest':digest(self.value)}
+        journal._write(self.root,self.root/'restore-plan.json',plan)
+        descriptor={'descriptorDigest':'a'*64}
+        journal._write(self.root,self.root/'current-release.json',{'directory':str(self.root),'descriptor':descriptor})
+        activation_file=self.root/'operations'/(self.op['operationId']+'-restored-activation.json')
+        journal._write(self.root,activation_file,{'descriptorDigest':'a'*64})
+        for phase in ['INGRESS_OPEN','ACTIVATION_FAILING','ACTIVATION_UNKNOWN','RUNTIME_VERIFIED']:
+            journal.record(self.root,self.op['operationId'],{'phase':phase})
+            with patch.object(checkpoint,'verified',return_value=self.value),patch.object(release,'_finish_activation_failure') as cleanup,patch('time.time',return_value=self.fixture['now']+3*86400):
+                with self.assertRaisesRegex(RuntimeError,'CERTIFICATE_EXPIRED'):release.start(self.root)
+                cleanup.assert_called_once()
+                self.assertEqual(journal.current(self.root)['operationId'],self.op['operationId'])
+                self.assertEqual(journal.current(self.root)['phase'],'ACTIVATION_FAILING')
+    def test_expired_restore_retries_interrupted_close_before_blocking(self):
+        from ols_linux import tls_restore,database
+        descriptor={'descriptorDigest':'a'*64};gate={'operating_mode':'ACTIVE','revision':4}
+        plan={'operationId':self.op['operationId'],'sourceOperationId':'b'*32,'checkpointDigest':digest(self.value)}
+        journal._write(self.root,self.root/'restore-plan.json',plan)
+        journal._write(self.root,self.root/'current-release.json',{'directory':str(self.root),'descriptor':descriptor})
+        journal._write(self.root,self.root/'operations'/(self.op['operationId']+'-restored-activation.json'),{'descriptorDigest':'a'*64,'expected':gate})
+        journal._write(self.root,self.root/'operations'/(self.op['operationId']+'-restore-tls.json'),{})
+        journal.record(self.root,self.op['operationId'],{'phase':'INGRESS_OPEN'})
+        with patch.object(checkpoint,'verified',return_value=self.value),patch('time.time',return_value=self.fixture['now']+3*86400),patch.object(tls_restore,'close',side_effect=[RuntimeError('close response lost'),None]) as close,patch.object(runtime,'stop_writers') as stop,patch.object(database,'observe',return_value={'gate':gate}),patch.object(release,'_cas_gate') as cas:
+            with self.assertRaisesRegex(RuntimeError,'close response lost'):release.start(self.root)
+            self.assertEqual(journal.current(self.root)['phase'],'ACTIVATION_FAILING')
+            stop.assert_not_called()
+            with self.assertRaisesRegex(RuntimeError,'CERTIFICATE_EXPIRED'):release.start(self.root)
+            self.assertEqual(close.call_count,2);stop.assert_called_once();cas.assert_called_once()
+            self.assertEqual(cas.call_args.args[2]['operating_mode'],'BLOCKED')
+        self.assertEqual(journal.current(self.root)['phase'],'ACTIVATION_FAILED')
+        self.assertEqual(journal.current(self.root)['operationId'],self.op['operationId'])

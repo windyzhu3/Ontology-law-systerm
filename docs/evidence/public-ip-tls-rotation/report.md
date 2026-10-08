@@ -4,7 +4,7 @@ Status: **INCOMPLETE / NOT DEPLOYMENT READY**. No production connection, product
 
 The isolated build used source commit `450490a8ecc9d9c016690e38cc3d8c5d5545fbe1`. Its SPA and executable JAR were rebuilt from the exact Git archive, with the existing locked Node 24.20.0/npm 11.9.0/JDK 25.0.4.1 toolchain. Bundle descriptor: `b837dbc9665ec6b7b328d387376355e8db88e2c3d064c9f578d798085d97f92a`. The initial npm install failed; the original build directory was retained, and both builds subsequently succeeded offline using existing package caches. Separately, forwarding the existing environment proxy produced HTTP 200 from the registry, without disabling TLS verification.
 
-Current controller checks: 212 Python tests passed, zero failures/errors/skips. The existing Node tests passed 2/2 inside the locked runtime image. Earlier Java ClientCertificateIT/ActorContextResolverIT evidence records 14 integration tests passed; backend source/tests have not changed since that run. These results do not establish complete rotation acceptance.
+Current controller checks after the bounded review corrections: 217 Python tests passed, zero failures/errors/skips. The existing Node tests passed 2/2 inside the locked runtime image. Earlier Java ClientCertificateIT/ActorContextResolverIT evidence records 14 integration tests passed; backend source/tests have not changed since that run. These results do not establish complete rotation acceptance.
 
 ## Real container evidence
 
@@ -32,4 +32,4 @@ During real fixture setup, a separate `tls_generation` local-import shadowing er
 
 ## Remaining work
 
-See the [verification matrix](verification-matrix.md). The planned all-scenario acceptance driver, complete application fixture, same-CA/cross-CA/expired-old rotations, real failure recovery and linked checkpoint restoration are not complete. systemd transport has no live-environment acceptance evidence. Independent whole-branch review results will be recorded separately; no successful integration status should be inferred from unit coverage or this report.
+See the [verification matrix](verification-matrix.md). The planned all-scenario acceptance driver, complete application fixture, same-CA/cross-CA/expired-old rotations, real failure recovery and linked checkpoint restoration are not complete. systemd transport has no live-environment acceptance evidence. The [independent review and bounded corrections](independent-review.md) record the completed one-review/one-fix pass. Public HTTP forwarding and individual consumer proof remain open, alongside the architecture blocker. No successful integration status should be inferred from unit coverage or this report.

@@ -61,3 +61,18 @@ class GenerationTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):self.m.resolve(self.root)
         self.m.select(self.root,op['operationId'],old['generationId'],g['generationId'])
         self.assertEqual(self.m.resolve(self.root)['generationId'],g['generationId'])
+    def test_second_selection_intent_loss_recovers(self):
+        from unittest.mock import patch
+        old,op,g=self.prepare();journal.record(self.root,op['operationId'],{'phase':'SWITCHING'})
+        self.m.select(self.root,op['operationId'],old['generationId'],g['generationId'])
+        with patch.object(tls_material,'stage',return_value=g['candidate']):old,op,g=self.prepare()
+        journal.record(self.root,op['operationId'],{'phase':'SWITCHING'})
+        write=journal._write
+        def lost(root,path,payload):
+            write(root,path,payload)
+            if path.name=='tls-selection.json':raise SystemExit('lost')
+        with patch.object(journal,'_write',side_effect=lost):
+            with self.assertRaises(SystemExit):self.m.select(self.root,op['operationId'],old['generationId'],g['generationId'])
+        with self.assertRaises(RuntimeError):self.m.resolve(self.root)
+        self.m.select(self.root,op['operationId'],old['generationId'],g['generationId'])
+        self.assertEqual(self.m.resolve(self.root),g)

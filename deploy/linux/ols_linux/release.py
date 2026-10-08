@@ -479,7 +479,16 @@ def start(root: Path) -> dict:
                 import time
                 from . import tls_generation
                 binding=tls_generation.restore_binding(root,value,now=int(time.time()))
-                if not binding['canActivate']:raise RuntimeError('Restored TLS blocked: '+binding['reasonCode'])
+                if not binding['canActivate']:
+                    if op['phase'] in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILING','RUNTIME_VERIFIED','INGRESS_OPEN'}:
+                        current=journal._read(root,root/'current-release.json')
+                        descriptor=current['descriptor']
+                        activation_file=root/'operations'/(op['operationId']+'-restored-activation.json')
+                        activation=journal._read(root,activation_file)
+                        if activation['descriptorDigest']!=descriptor['descriptorDigest']:raise RuntimeError('Original failing activation differs')
+                        journal.record(root,op['operationId'],{'phase':'ACTIVATION_FAILING','descriptorDigest':descriptor['descriptorDigest']})
+                        _finish_activation_failure(root,op['operationId'],descriptor,activation_file,activation)
+                    raise RuntimeError('Restored TLS blocked: '+binding['reasonCode'])
             _restore_runtime_registry(root);restored=True
         elif op['phase'] not in {'COMPLETE','STOP_REQUESTED','WRITERS_STOPPED','STOPPED'} and not(op['kind']=='runtime-control' and op['phase']=='CREATED') and not (
             op['phase'] in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILING','ACTIVATION_FAILED'} and
