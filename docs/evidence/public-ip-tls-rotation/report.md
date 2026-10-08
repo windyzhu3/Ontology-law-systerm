@@ -43,3 +43,15 @@ The earlier checkpoint had 233 Python tests passing. The original initialization
 ## Current checkpoint — 2026-10-08 12:05 UTC
 
 [Full initialization and first rotation attempt](full-stack-checkpoint.md) supersedes the partial initialization status above. The original initialization is COMPLETE. The first same-CA rotation is BLOCKED with observed closed ingress and stopped writers after the test disk filled. This is failure-closure evidence, not a successful rotation or recovery qualification.
+
+## Same-CA recovery — 2026-10-08 13:32 UTC
+
+The original rotation `d8af209106bb46858efaff73dcd43511` is now COMPLETE. [Real recovery evidence](same-ca-recovery.json) supersedes its earlier BLOCKED checkpoint: all six TLS targets, all six consumers, authenticated public forwarding and the selected stable identity/business facts comparison passed. The exact original initialization inventory also passed (7 organizations, 17 HUMAN principals, 20 HUMAN appointments, 280 HUMAN grants).
+
+The user approved removal of exactly four stopped old test containers after their metadata/logs were preserved. No data volume was removed. Actual free blocks increased by 3,650,052,096 bytes; the same operation then proceeded, without a replacement initialization or candidate. A genuine startup race was reproduced: nativeEntry returned UNKNOWN before its listener became ready even though later consumer checks all passed. The fingerprint observation loop now runs after runtime readiness and entry-to-API checks. The regression first failed, then 24 targeted probe/rotation/recovery tests passed. A bounded review found no new authorization/TLS bypass; an exceptionally slow entry can still fail closed rather than pass falsely.
+
+The long test pause expired the administrator session. A new real browser PKCE S256 ceremony used the existing account/password, exact original issuer/subject and actual public callback; no profile, password or grant was changed. The original acceptance record was continued.
+
+Two additional real checks passed without new containers: unadmitted issuer input had no gate/container/proxy/operation effects; an unregistered client certificate under the admitted fixture public root received HTTP 401 both with and without spoofed headers, while the original registered SERVICE certificate received 204 over strict TLS.
+
+Remaining: cross-CA, actually expired-old, injected stale native, actual SIGKILL recovery, linked checkpoint restore and four business workflows. About 910MiB remains user-available; another full three-container generation would require approximately 3.36GB based on the measured vfs container copies, before operational margin. No next rotation was started. CI results for the prior PR HEAD do not cover this later local fix. Overall remains INCOMPLETE / NOT DEPLOYMENT READY.

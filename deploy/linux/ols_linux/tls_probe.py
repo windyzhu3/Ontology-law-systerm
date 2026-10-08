@@ -60,14 +60,6 @@ def collect(root: Path,generation: dict,*,scope: str,now: int) -> dict:
             if identity not in {'public','internal'} or identity=='internal' and not role.startswith('bridge'):raise RuntimeError('Only registered bridges may use the original internal TLS identity')
             if role not in ROLES-{'nativeIdentity','nativeEntry'} or target.get('verifyHost')!=expected_host or target.get('connectHost') not in {'127.0.0.1','::1',hosts[suffix]}:raise RuntimeError('Unregistered probe target')
             targets[role]=target
-        evidence={}
-        for role,target in targets.items():
-            if scope=='native' and not role.startswith('native') or scope=='proxy' and role.startswith('native'):continue
-            if scope=='bridge' and not role.startswith('bridge'):continue
-            expected=generation['candidate']['leafDerSha256']
-            if target.get('tlsIdentity')=='internal':expected=tls_material.fingerprint(tls_material.certificates(tls_material.read_private(root/'certs/server.crt'))[0])
-            connection={key:value for key,value in target.items() if key!='tlsIdentity'}
-            evidence[role]=handshake(connection,Path(generation['paths']['httpTrust']),expected,now=now)
         consumers={};http_evidence={}
         if scope not in {'proxy','bridge'}:
             try:
@@ -86,6 +78,15 @@ def collect(root: Path,generation: dict,*,scope: str,now: int) -> dict:
                     consumers['nodeTrust']='PASS'
                     http_evidence['nativeEntryApi']='VERIFIED_TLS_UNAUTHENTICATED_API_RESPONSE'
             except (RuntimeError,ValueError,KeyError,OSError):pass
+        # Observe native listeners only after startup/readiness has converged.
+        evidence={}
+        for role,target in targets.items():
+            if scope=='native' and not role.startswith('native') or scope=='proxy' and role.startswith('native'):continue
+            if scope=='bridge' and not role.startswith('bridge'):continue
+            expected=generation['candidate']['leafDerSha256']
+            if target.get('tlsIdentity')=='internal':expected=tls_material.fingerprint(tls_material.certificates(tls_material.read_private(root/'certs/server.crt'))[0])
+            connection={key:value for key,value in target.items() if key!='tlsIdentity'}
+            evidence[role]=handshake(connection,Path(generation['paths']['httpTrust']),expected,now=now)
         public_ok=True
         if scope in {'all','proxy'}:
             try:

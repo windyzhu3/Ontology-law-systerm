@@ -92,3 +92,22 @@ class ProbeTests(unittest.TestCase):
         a={'status':401,'body':json.dumps(body)};b={'status':401,'body':json.dumps(dict(body,instance='/problems/00000000-0000-0000-0000-000000000002'))}
         self.assertTrue(self.m.same_denial(a,b));self.assertFalse(self.m.same_denial(a,{'status':502,'body':'bad gateway'}))
         self.assertFalse(self.m.same_denial(a,{'status':401,'body':'{}'}))
+    def test_native_fingerprints_are_observed_after_runtime_startup(self):
+        from unittest.mock import patch
+        from ols_linux import journal,identity,verify
+        import json
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)/'runtime';journal.begin(root,'initialize','a'*64)
+            plan={'issuer':'https://127.0.0.1:25443/realms/test','origin':'https://127.0.0.1:25444','apiOrigin':'https://localhost:24845','ports':{'identity':24843,'entry':24844}}
+            journal._write(root,root/'identity/plan.json',plan);journal._write(root,root/'current-release.json',{'descriptor':{}})
+            generation={'version':0,'generationId':'test','paths':{'httpTrust':str(self.f['old'])},'candidate':{'leafDerSha256':'expected'}}
+            started=False
+            def ready(*args):
+                nonlocal started
+                started=True
+                return {'fullRuntime':{'identity':'VERIFIED_TLS_DISCOVERY','api':'AUTHENTICATED_MTLS_READY','worker':'CURRENT_BOOT_READY','scanner':'REAL_PONG'}}
+            def handshake(*args,**kwargs):
+                return {'status':'PASS' if started else 'UNKNOWN'}
+            denial={'status':401,'body':json.dumps({'code':'UNAUTHENTICATED','status':401,'type':'urn:ontology-law:problem:UNAUTHENTICATED','instance':'/problems/00000000-0000-0000-0000-000000000001'})}
+            with patch.object(self.m.tls_generation,'resolve',return_value=generation),patch.object(verify,'runtime_ready',side_effect=ready),patch.object(identity,'http',return_value=denial),patch.object(self.m,'handshake',side_effect=handshake):
+                self.assertEqual(self.m.collect(root,generation,scope='native',now=self.f['now'])['status'],'PASS')

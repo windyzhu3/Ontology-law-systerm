@@ -27,3 +27,7 @@ Validation of this checkpoint: 235 Python tests passed in 31.659 seconds; `git d
 Saving this checkpoint as a Git commit was also blocked: Git could not create its temporary object (`No space left on device`). HEAD remains `406bf14bc9aeaea5f53c386c10e7841efed065e4`; driver, tests and evidence changes remain uncommitted and have an additional patch copy in the test environment temporary filesystem.
 
 The user subsequently authorized preservation through a draft PR. A temporary Git copy on tmpfs was used to commit the checked pending source/evidence changes without modifying or relocating the runtime. This resolves source delivery only; storage and all real acceptance gaps above remain. The draft must not be merged or deployed.
+
+## Later recovery
+
+The same operation subsequently reached COMPLETE after the explicitly approved cleanup and a bounded startup-probe ordering fix. See [same-CA evidence](same-ca-recovery.json) and [current report](report.md). The earlier failures remain historical evidence; the complete acceptance matrix is still incomplete.
