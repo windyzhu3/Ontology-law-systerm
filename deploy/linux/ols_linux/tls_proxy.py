@@ -12,32 +12,52 @@ def _service(service):
         actual=runtime.inspect('container',service['name'])
         if not actual or actual['Id']!=service['identity'] or actual['Image']!=service['image']:raise RuntimeError('Registered proxy identity differs')
         return {'running':actual['State']['Running'],'actual':actual}
-    value=runtime.run(['systemctl','show',service['name'],'--property=FragmentPath,ExecStart,User,Group']).stdout
-    if hashlib.sha256(value).hexdigest()!=service['identity']:raise RuntimeError('Registered proxy unit differs')
-    binary=Path('/usr/sbin/nginx' if service['role']=='nginx' else '/usr/bin/caddy')
-    if sha(binary)!=service['image'].removeprefix('sha256:'):raise RuntimeError('Registered proxy executable differs')
-    state=runtime.run(['systemctl','show',service['name'],'--property=ActiveState,SubState,MainPID'],check=False)
-    fields=dict(line.split('=',1) for line in state.stdout.decode().splitlines() if '=' in line)
-    if state.returncode==0 and fields.get('ActiveState')=='active' and fields.get('SubState')=='running' and fields.get('MainPID','0').isdigit() and int(fields['MainPID'])>0:return {'running':True}
-    if state.returncode==0 and fields=={'ActiveState':'inactive','SubState':'dead','MainPID':'0'}:return {'running':False}
-    raise RuntimeError('Registered proxy process state unknown')
+    from . import tls_systemd
+    return tls_systemd.observe_service(service)
 
 
 def validate_registration(root: Path,registration: dict) -> dict:
-    if set(registration)!={'version','services'} or registration['version']!=1 or not isinstance(registration['services'],list):raise RuntimeError('Explicit proxy registration required')
+    version=registration.get('version')
+    expected={'version','services'}|({'qualification'} if version==2 else set())
+    if set(registration)!=expected or version not in {1,2} or not isinstance(registration['services'],list):raise RuntimeError('Explicit proxy registration required')
+    if version==2:
+        from . import tls_systemd_qualification
+        tls_systemd_qualification.require(root,registration)
     roles=[]
     for service in registration['services']:
-        if set(service)!={'role','transport','name','identity','image','config','configSha256','tlsPaths'}:raise RuntimeError('Unexpected proxy registration field')
+        fields={'role','transport','name','identity','image','config','configSha256','tlsPaths'}|({'systemd'} if version==2 else set())
+        if set(service)!=fields:raise RuntimeError('Unexpected proxy registration field')
         if service['role'] not in {'nginx','caddy'} or service['transport'] not in {'docker','systemd'} or not re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.@-]{0,127}',service['name']):raise RuntimeError('Unsupported proxy service')
         roles.append(service['role']);path=Path(service['config'])
-        if not path.is_relative_to(root/'proxy') or path.resolve()!=path.absolute() or sha(path)!=service['configSha256']:raise RuntimeError('Proxy configuration must be sealed under the runtime proxy directory')
-        tls_material.read_private(path)
+        if version==2:
+            from . import tls_systemd
+            if service['transport']!='systemd':raise RuntimeError('Version 2 is the qualified systemd profile')
+            tls_systemd.verify_files(service['systemd']['immutableFiles']);tls_systemd.verify_includes(service['systemd']['includes'])
+            if sha(path)!=service['configSha256']:raise RuntimeError('Original systemd configuration differs')
+            tls_systemd.read_configuration(service)
+        else:
+            if not path.is_relative_to(root/'proxy') or path.resolve()!=path.absolute() or sha(path)!=service['configSha256']:raise RuntimeError('Proxy configuration must be sealed under the runtime proxy directory')
+            tls_material.read_private(path)
         if not set(service['tlsPaths'])<={'certificate','privateKey','httpTrust'}:raise RuntimeError('Unknown proxy TLS path')
         actual=_service(service)
         if service['transport']=='docker' and not any(m.get('Type')=='bind' and m.get('Source')==str(root) and m.get('Destination')==str(root) for m in actual['actual'].get('Mounts',[])):
             raise RuntimeError('Proxy must already mount the registered runtime at its original path')
     if len(set(roles))!=len(roles) or 'nginx' not in roles:raise RuntimeError('One registered outer nginx required')
     return registration
+
+
+def _read_config(service):
+    if service['transport']=='systemd':
+        from . import tls_systemd
+        return tls_systemd.read_configuration(service)
+    return tls_material.read_private(service['config'])
+
+
+def _write_config(service,data,allowed):
+    if service['transport']=='systemd':
+        from . import tls_systemd
+        tls_systemd.write_configuration(service,data,allowed=allowed)
+    else:runtime.private_file(Path(service['config']),data)
 
 
 def prepare(root: Path,operation_id: str,registration: dict,generation_paths: dict) -> dict:
@@ -50,8 +70,11 @@ def prepare(root: Path,operation_id: str,registration: dict,generation_paths: di
         validate_registration(root,registration)
         services=[]
         for service in registration['services']:
-            before=tls_material.read_private(service['config']);after=before
-            for name,old in service['tlsPaths'].items():
+            before=_read_config(service);after=before
+            if service['transport']=='systemd':
+                from . import tls_systemd
+                after=tls_systemd.replace_public_paths(service,before,generation_paths)
+            for name,old in (service['tlsPaths'].items() if service['transport']=='docker' else []):
                 new=generation_paths[name]
                 if not all(re.fullmatch('/[a-zA-Z0-9_./-]+',p) for p in [old,new]):raise RuntimeError('Unsafe proxy TLS path token')
                 if old.encode() not in before:raise RuntimeError('Declared TLS reference missing')
@@ -59,7 +82,12 @@ def prepare(root: Path,operation_id: str,registration: dict,generation_paths: di
             candidate=root/'proxy'/(operation_id+'-'+service['role']+'.conf')
             if candidate.exists() and candidate.read_bytes()!=after:raise RuntimeError('Proxy candidate differs')
             if not candidate.exists():runtime.private_file(candidate,after)
-            services.append({'service':service,'before':before.decode('utf-8'),'after':after.decode('utf-8'),'candidate':str(candidate)})
+            row={'service':service,'before':before.decode('utf-8'),'after':after.decode('utf-8'),'candidate':str(candidate)}
+            if service['transport']=='systemd' and service['role']=='caddy':
+                observed=_service(service)
+                if not observed['running'] or not observed['credentials']:raise RuntimeError('Original loaded Caddy credentials required')
+                row['beforeCredentials']=observed['credentials']
+            services.append(row)
         value={'operationId':operation_id,'registration':registration,'paths':generation_paths,'services':services}
         journal._write(root,saved,value);return value
 
@@ -71,7 +99,11 @@ def _check(service,candidate):
                      '--entrypoint',arguments[0],service['image'],*arguments[1:]])
     else:
         from . import tls_systemd
-        runtime.run(tls_systemd.start_commands(service['role'],str(candidate))['check'])
+        if service['role']=='nginx':
+            complete=tls_systemd.nginx_candidate(service,candidate)
+            runtime.run(tls_systemd.start_commands('nginx',str(complete))['check'])
+        elif tls_material.read_private(candidate)!=_read_config(service):
+            raise RuntimeError('Caddy configuration must remain unchanged; new credentials validate in ExecStartPre')
 
 
 def _action(service,action):
@@ -84,12 +116,29 @@ def _action(service,action):
         runtime.run(['systemctl',action,service['name']])
 
 
+def _allowed_config(root,operation_id,row):
+    values=[row['before'].encode(),row['after'].encode()]
+    path=root/'operations'/(operation_id+'-issuer-maintenance.json')
+    if row['service']['role']=='nginx' and path.exists():
+        saved=journal._read(root,path)
+        if saved['service']!=row['service']:raise RuntimeError('Original maintenance service differs')
+        values.append(saved['configuration'].encode())
+    return values
+
+
+def _state(root,operation_id,service):
+    if service['transport']=='systemd':
+        from . import tls_systemd
+        return _service(tls_systemd.operation_service(root,operation_id,service))
+    return _service(service)
+
+
 def observe(root: Path,operation_id: str) -> dict:
     value=journal._read(root,root/'operations'/(operation_id+'-proxy.json'))
     states={}
     for row in value['services']:
-        service=row['service'];state=_service(service)
-        data=tls_material.read_private(service['config'])
+        service=row['service'];state=_state(root,operation_id,service)
+        data=_read_config(service)
         from . import tls_maintenance
         maintenance=tls_maintenance.configured(root,operation_id,service) if service['role']=='nginx' else False
         if data not in [row['before'].encode(),row['after'].encode()] and not maintenance:raise RuntimeError('Live proxy configuration conflicts')
@@ -105,10 +154,13 @@ def apply(root: Path,operation_id: str,action: str) -> dict:
         phases={'close':{'STOPPING','FAILING','ROLLBACK_STOPPING','ROLLBACK_FAILING'},'switch':{'PROXY_SWITCHING','ACTIVATING'},'rollback':{'ROLLBACK_SWITCHING','ROLLBACK_ACTIVATING'},'open':{'OPENING','ROLLBACK_OPENING'}}
         if op['phase'] not in phases[action]:raise RuntimeError('Original proxy phase does not permit action')
         value=journal._read(root,root/'operations'/(operation_id+'-proxy.json'))
+        if action in {'switch','rollback'}:
+            from . import tls_systemd
+            tls_systemd.reconcile_manager(root,operation_id)
         observed=observe(root,operation_id)
         if action in {'switch','rollback'} and observed['services']['nginx']['configuration']=='maintenance':
             outer=next(row['service'] for row in value['services'] if row['service']['role']=='nginx')
-            if _service(outer)['running']:_action(outer,'stop')
+            if _state(root,operation_id,outer)['running']:_action(outer,'stop')
             observed=observe(root,operation_id)
         if action in {'switch','rollback'} and not observed['closed']:raise RuntimeError('Outer proxy must be observed closed')
         if action in {'switch','rollback'}:
@@ -119,15 +171,28 @@ def apply(root: Path,operation_id: str,action: str) -> dict:
                     candidate=candidate.with_suffix('.rollback.conf');runtime.private_file(candidate,desired)
                 _check(service,candidate)
             for row in value['services']:
-                service=row['service'];runtime.private_file(Path(service['config']),row['after' if action=='switch' else 'before'].encode())
-                if service['role']=='caddy':_action(service,'reload' if _service(service)['running'] else 'start')
+                service=row['service'];desired=row['after' if action=='switch' else 'before'].encode()
+                _write_config(service,desired,_allowed_config(root,operation_id,row))
+                if service['role']=='caddy':
+                    if service['transport']=='systemd':
+                        from . import tls_systemd
+                        generation_id=Path(value['paths']['httpTrust']).parent.name
+                        tls_systemd.switch_credential_sources(root,operation_id,service,generation_id,'forward' if action=='switch' else 'rollback')
+                        expected=dict(row['beforeCredentials'])
+                        if action=='switch':expected['issuer-ca.pem']=sha(Path(value['paths']['httpTrust']))
+                        tls_systemd.control(root,operation_id,service,'load',expected)
+                    else:_action(service,'reload' if _service(service)['running'] else 'start')
         else:
             outer=next(row['service'] for row in value['services'] if row['service']['role']=='nginx')
             if action=='open' and observed['services']['nginx']['configuration']=='maintenance':
-                if _service(outer)['running']:_action(outer,'stop')
-                if _service(outer)['running']:raise RuntimeError('Maintenance stop unconfirmed')
+                if _state(root,operation_id,outer)['running']:_action(outer,'stop')
+                if _state(root,operation_id,outer)['running']:raise RuntimeError('Maintenance stop unconfirmed')
                 row=next(r for r in value['services'] if r['service']['role']=='nginx')
                 desired=row['before' if op['phase']=='ROLLBACK_OPENING' else 'after']
-                runtime.private_file(Path(outer['config']),desired.encode())
-            if _service(outer)['running']!=(action=='open'):_action(outer,'start' if action=='open' else 'stop')
+                _write_config(outer,desired.encode(),_allowed_config(root,operation_id,row))
+            if _state(root,operation_id,outer)['running']!=(action=='open'):
+                _action(outer,'start' if action=='open' else 'stop')
+                if action=='open' and outer['transport']=='systemd':
+                    from . import tls_systemd
+                    tls_systemd.await_started(outer,root=root,operation_id=operation_id)
         return observe(root,operation_id)

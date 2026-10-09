@@ -5,7 +5,7 @@ import socket
 import ssl
 from pathlib import Path
 from urllib.parse import urlsplit
-from . import journal,runtime,tls_generation,tls_material
+from . import journal,runtime,tls_generation,tls_material,tls_original
 
 ROLES={'nativeIdentity','nativeEntry','bridgeIdentity','bridgeEntry','publicIdentity','publicEntry'}
 CONSUMERS={'identity','api','worker','scanner','javaTrust','nodeTrust'}
@@ -48,6 +48,8 @@ def collect(root: Path,generation: dict,*,scope: str,now: int) -> dict:
     with journal.locked(root) as root:
         current=tls_generation.resolve(root)
         if current['generationId']!=generation['generationId']:raise RuntimeError('Probe generation is not active')
+        if current.get('originalPublicBindingDigest')!=generation.get('originalPublicBindingDigest'):
+            raise RuntimeError('Probe original public identity binding differs from active selection')
         plan=journal._read(root,root/'identity/plan.json');hosts={
             'Identity':urlsplit(plan['issuer']).hostname,'Entry':urlsplit(plan['origin']).hostname}
         targets={}
@@ -83,7 +85,7 @@ def collect(root: Path,generation: dict,*,scope: str,now: int) -> dict:
         for role,target in targets.items():
             if scope=='native' and not role.startswith('native') or scope=='proxy' and role.startswith('native'):continue
             if scope=='bridge' and not role.startswith('bridge'):continue
-            expected=generation['candidate']['leafDerSha256']
+            expected=tls_original.expected_leaf(generation,role)
             if target.get('tlsIdentity')=='internal':expected=tls_material.fingerprint(tls_material.certificates(tls_material.read_private(root/'certs/server.crt'))[0])
             connection={key:value for key,value in target.items() if key!='tlsIdentity'}
             evidence[role]=handshake(connection,Path(generation['paths']['httpTrust']),expected,now=now)

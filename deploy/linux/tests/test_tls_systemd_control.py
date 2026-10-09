@@ -84,3 +84,9 @@ class SystemdControlTests(unittest.TestCase):
         with patch.object(tls_systemd,'observe') as observe,patch.object(runtime,'run') as run:
             with self.assertRaisesRegex(RuntimeError,'intent'):self.control(expected={'issuer-ca.pem':'c'*64})
             observe.assert_not_called();run.assert_not_called()
+
+    def test_identical_credentials_still_require_new_process_on_first_load(self):
+        fresh=dict(self.new,credentials=self.old['credentials'])
+        with patch.object(tls_systemd,'observe',side_effect=[self.old,self.stopped,fresh]),patch.object(runtime,'run') as run:
+            self.assertEqual(self.control(expected=self.old['credentials']),fresh)
+            self.assertEqual(run.call_count,2)

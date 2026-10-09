@@ -110,3 +110,12 @@ class MaintenanceTests(unittest.TestCase):
             value={'service':service,'configuration':'restricted'};running=[False]
             with patch.object(module,'prepare',return_value=value),patch.object(tls_proxy,'_service',side_effect=lambda s:{'running':running[0]}),patch.object(tls_proxy,'_action',side_effect=lambda s,a:running.__setitem__(0,a=='start')),patch.object(runtime,'run',return_value=SimpleNamespace(stdout=b'other-config')):
                 with self.assertRaisesRegex(RuntimeError,'effective'):module.start(root,op['operationId'],[],[],{})
+
+    def test_systemd_fragment_preserves_single_default_listener_and_rejects_raw_paths(self):
+        args=dict(self.args(),listeners=['29848'],identity_port=29848)
+        text=self.module().render(**args,fragment=True,default_server=True,public_host='127.0.0.1')
+        self.assertIn('listen 29848 ssl default_server;',text)
+        self.assertNotIn('events {}',text);self.assertNotIn('http {',text)
+        self.assertIn('if ($host != 127.0.0.1)',text)
+        self.assertIn('$request_uri',text)
+        self.assertEqual(self.module().original_listeners('listen 443 ssl default_server;',443,443),['443'])

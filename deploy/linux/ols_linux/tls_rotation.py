@@ -2,7 +2,7 @@
 from datetime import datetime,timezone
 from pathlib import Path
 import uuid
-from . import journal,runtime,release,database,tls_material,tls_generation,tls_deployment,tls_proxy,tls_probe,tls_import
+from . import journal,runtime,release,database,tls_material,tls_generation,tls_deployment,tls_proxy,tls_probe,tls_import,tls_original
 from .config import digest
 
 
@@ -51,7 +51,9 @@ def begin(root: Path,inputs: dict,*,now: int) -> dict:
         release._installed(root,before['gate'])
         candidate=tls_material.stage(root,materials,now=now,frozen=frozen)
         tls_proxy.validate_registration(root,inputs['proxies'])
-        old=tls_generation.resolve(root);opid=uuid.uuid4().hex
+        old=tls_original.capture(tls_generation.resolve(root),inputs['proxies'])
+        tls_original.require_newer(old,candidate)
+        opid=uuid.uuid4().hex
         data={'candidate':candidate,'previousGeneration':old,'before':before,'proxies':inputs['proxies'],
               'probeTargets':inputs['probeTargets'],'previousResources':runtime.load(root),
               'previousLaunch':journal._read(root,root/'launch.json'),'release':journal._read(root,root/'current-release.json')}
@@ -248,6 +250,10 @@ def rollback(root: Path,operation_id: str,*,now: int) -> dict:
         if old['candidate']['notAfter']<=now:
             if phase.startswith('ROLLBACK'):_rollback_fail(root,opid,data)
             raise RuntimeError('Expired old certificate cannot reopen service')
+        try:tls_original.validate(old,now=now)
+        except Exception:
+            if phase.startswith('ROLLBACK'):_rollback_fail(root,opid,data)
+            raise
         if 'generationId' not in data:raise RuntimeError('Original prepared rollback unavailable')
         if phase=='ROLLBACK_FAILING':
             _rollback_fail(root,opid,data);phase='ROLLBACK_BLOCKED'
@@ -287,6 +293,7 @@ def rollback(root: Path,operation_id: str,*,now: int) -> dict:
                 _start(root,opid,old,data);_probe(root,opid,old,'native',now)
                 _phase(root,opid,'ROLLBACK_OPENING');phase='ROLLBACK_OPENING'
             if phase=='ROLLBACK_OPENING':
+                tls_original.validate(old,now=now)
                 tls_proxy.apply(root,opid,'open');_probe(root,opid,old,'all',now)
                 _phase(root,opid,'COMPLETE',outcome='ROLLED_BACK',generationId=old['generationId'])
                 return {'operationId':opid,'kind':'rotate-public-tls','phase':'COMPLETE','outcome':'ROLLED_BACK','generationId':old['generationId']}

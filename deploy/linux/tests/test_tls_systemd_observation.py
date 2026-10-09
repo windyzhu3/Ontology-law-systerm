@@ -25,14 +25,14 @@ class SystemdObservationTests(unittest.TestCase):
                       'mainConfig':str(self.config),'properties':self.properties,
                       'process':{'executable':'/usr/sbin/nginx','argv':['nginx: master process '+commands['ExecStart']],
                                  'uid':os.geteuid(),'gid':os.getegid(),'cgroup':'/system.slice/fixture.service'},
-                      'credentialNames':[]}
+                      'credentialNames':[],'listeners':[{'address':'127.0.0.1','port':29848}]}
         self.service={'transport':'systemd','role':'nginx','name':'fixture.service','identity':self.profile['unitFile']['sha256'],'image':'sha256:'+'a'*64,'systemd':self.profile}
         self.process=dict(self.profile['process'],pid=41,startTicks=123)
         self.state={'ActiveState':'active','SubState':'running','MainPID':'41','ControlPID':'0','ControlGroup':'/system.slice/fixture.service','NeedDaemonReload':'no'}
 
     def observation(self,properties=None,state=None,pids=None):
         self.assertTrue(callable(getattr(tls_systemd,'observe_service',None)),'Qualified systemd observation missing')
-        with patch.object(tls_systemd,'unit_snapshot',return_value={'properties':properties or self.properties,'state':state or self.state}),patch.object(tls_systemd,'read_process',return_value=self.process),patch.object(tls_systemd,'cgroup_pids',return_value=[41] if pids is None else pids),patch.object(tls_systemd,'_binary_sha',return_value='a'*64):
+        with patch.object(tls_systemd,'unit_snapshot',return_value={'properties':properties or self.properties,'state':state or self.state}),patch.object(tls_systemd,'read_process',return_value=self.process),patch.object(tls_systemd,'cgroup_pids',return_value=[41] if pids is None else pids),patch.object(tls_systemd,'_binary_sha',return_value='a'*64),patch.object(tls_systemd,'verify_listeners'),patch.object(tls_systemd,'verify_configuration_graph'):
             return tls_systemd.observe_service(self.service)
 
     def test_exact_profile_produces_live_process_proof(self):
@@ -54,7 +54,7 @@ class SystemdObservationTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):self.observation(state=dict(self.state,NeedDaemonReload='yes'))
         self.assertTrue(callable(getattr(tls_systemd,'observe_service',None)),'Qualified systemd observation missing')
         before={'properties':self.properties,'state':self.state};after={'properties':self.properties,'state':dict(self.state,MainPID='42')}
-        with patch.object(tls_systemd,'unit_snapshot',side_effect=[before,after]),patch.object(tls_systemd,'read_process',return_value=self.process),patch.object(tls_systemd,'cgroup_pids',return_value=[41]),patch.object(tls_systemd,'_binary_sha',return_value='a'*64):
+        with patch.object(tls_systemd,'unit_snapshot',side_effect=[before,after]),patch.object(tls_systemd,'read_process',return_value=self.process),patch.object(tls_systemd,'cgroup_pids',return_value=[41]),patch.object(tls_systemd,'_binary_sha',return_value='a'*64),patch.object(tls_systemd,'verify_listeners'),patch.object(tls_systemd,'verify_configuration_graph'):
             with self.assertRaises(RuntimeError):tls_systemd.observe_service(self.service)
 
     def test_registered_process_cannot_point_to_a_different_configuration(self):

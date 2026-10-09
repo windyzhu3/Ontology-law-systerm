@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 import re
 import stat
+import socket
+import time
 
 
 def _path(value):
@@ -138,15 +140,15 @@ def read_process(pid):
     return first
 
 
-def observe(service):
+def observe(service,*,root=None,operation_id=None):
     """Consume a qualified transport observation, never infer it from ActiveState.
 
-    The current systemd transport lacks the complete process/credential proof and
-    therefore remains blocked. Its qualification adapter must supply these facts
-    before this controller can cause any service effect.
+    The transport supplies file, manager, process, listener and loaded-credential
+    proof. Separate real-systemd qualification remains required for admission.
     """
     from . import tls_proxy
-    value=tls_proxy._service(service)
+    selected=operation_service(root,operation_id,service) if root is not None and 'immutableFiles' in service.get('systemd',{}) else service
+    value=tls_proxy._service(selected)
     if set(value)!={'running','process','credentials'}:
         raise RuntimeError('Qualified systemd process and credential observation missing')
     return value
@@ -180,18 +182,20 @@ def control(root,operation_id,service,action,expected_credentials):
         if saved and saved['intent']!=identity:raise RuntimeError('Original credential load intent differs')
         if not tls_proxy.observe(root,operation_id)['closed']:
             raise RuntimeError('Outer proxy must be observed closed before credential load')
-        before=observe(service)
+        before=observe(service,root=root,operation_id=operation_id)
         if saved is None:
             saved={'intent':identity,'before':before};journal._write(root,path,saved)
         if before['running'] and before['credentials']==expected_credentials:
-            # On response loss this is the same original intent, not a fresh load.
-            if saved['before']['credentials']!=expected_credentials:verify_restart(saved['before'],before)
-            return before
+            # A new load still requires a fresh process when source paths change,
+            # even when the selected trust bytes happen to be identical.
+            try:verify_restart(saved['before'],before)
+            except RuntimeError:pass
+            else:return before
         if before['running']:
             runtime.run(['systemctl','stop',service['name']])
-            if observe(service)['running']:raise RuntimeError('Systemd stop unconfirmed')
+            if observe(service,root=root,operation_id=operation_id)['running']:raise RuntimeError('Systemd stop unconfirmed')
         runtime.run(['systemctl','start',service['name']])
-        after=observe(service)
+        after=await_started(service,root=root,operation_id=operation_id)
         verify_restart(saved['before'],after)
         if after['credentials']!=expected_credentials:
             raise RuntimeError('Loaded credentials differ from original intent')
@@ -232,12 +236,12 @@ def credential_override(root,generation_id,sources):
 
 # Manager properties are compared after removing transient timestamps embedded in
 # Exec* output. Comparing raw ExecStart output would break after every restart.
-UNIT_PROPERTIES=('FragmentPath','DropInPaths','Type','User','Group','ExecStart','ExecStartPre','ExecReload',
+UNIT_PROPERTIES=('FragmentPath','DropInPaths','Type','User','Group','ExecStart','ExecStartPre','ExecReload','ExecStartPost','ExecStop','ExecStopPost','ExecCondition',
                  'LoadCredential','KillMode','KillSignal','TimeoutStopUSec','Restart','RestartUSec',
                  'NoNewPrivileges','PrivateTmp','PrivateDevices','ProtectHome','ProtectSystem',
                  'ProtectKernelTunables','ProtectKernelModules','ProtectControlGroups',
                  'RestrictAddressFamilies','CapabilityBoundingSet','UMask','StateDirectory',
-                 'StateDirectoryMode','Environment','MemoryMax','RootDirectory','RootImage',
+                 'StateDirectoryMode','Environment','EnvironmentFiles','WorkingDirectory','SupplementaryGroups','PrivateNetwork','NetworkNamespacePath','MemoryMax','RootDirectory','RootImage',
                  'ReadWritePaths','ReadOnlyPaths','InaccessiblePaths','BindPaths','BindReadOnlyPaths')
 STATE_PROPERTIES=('ActiveState','SubState','MainPID','ControlPID','ControlGroup','NeedDaemonReload')
 
@@ -257,6 +261,7 @@ def unit_snapshot(name,properties):
             if any(ignored!='no' or not argv.startswith(path.strip()+' ') for path,argv,ignored in commands):
                 raise RuntimeError('Ignored or indirect systemd executable is unsupported')
             value='\n'.join(argv for _,argv,_ in commands)
+        if key=='LoadCredential':value=' '.join(sorted(value.split()))
         rows[key]=value
     if set(rows)!=set(UNIT_PROPERTIES)|set(STATE_PROPERTIES):raise RuntimeError('Incomplete systemd property response')
     return {'properties':{k:rows[k] for k in UNIT_PROPERTIES},'state':{k:rows[k] for k in STATE_PROPERTIES}}
@@ -283,15 +288,107 @@ def cgroup_pids(group):
     return sorted(values)
 
 
+class Starting(RuntimeError):
+    """Only an absent owned listener may be retried during bounded startup."""
+
+
+def _sockets(kind):
+    rows=[]
+    for suffix,family in (('',socket.AF_INET),('6',socket.AF_INET6)):
+        path=Path('/proc/net')/(kind+suffix)
+        for line in path.read_text().splitlines()[1:]:
+            fields=line.split()
+            if kind=='tcp' and fields[3]!='0A':continue
+            address,port=fields[1].split(':');raw=bytes.fromhex(address)
+            raw=b''.join(raw[i:i+4][::-1] for i in range(0,len(raw),4))
+            rows.append((socket.inet_ntop(family,raw),int(port,16),fields[9]))
+    return rows
+
+
+def verify_listeners(expected,pids,running):
+    """Prove every TCP listener belongs to the registered cgroup in this netns."""
+    wanted=set()
+    for row in expected:
+        if set(row)!={'address','port'} or type(row['port']) is not int or not 0<row['port']<65536:
+            raise RuntimeError('Exact registered listeners required')
+        try:socket.inet_pton(socket.AF_INET6 if ':' in row['address'] else socket.AF_INET,row['address'])
+        except (OSError,TypeError):raise RuntimeError('Literal listener address required')
+        wanted.add((row['address'],row['port']))
+    if not wanted or len(wanted)!=len(expected):raise RuntimeError('Nonempty unique listener set required')
+    owned=set();namespace=os.stat('/proc/self/ns/net')
+    try:
+        for pid in pids:
+            if type(pid) is not int or pid<=0:raise RuntimeError('Exact cgroup PID required')
+            actual=os.stat(f'/proc/{pid}/ns/net')
+            if (actual.st_dev,actual.st_ino)!=(namespace.st_dev,namespace.st_ino):raise RuntimeError('Proxy network namespace differs')
+            for fd in Path(f'/proc/{pid}/fd').iterdir():
+                try:target=os.readlink(fd)
+                except FileNotFoundError:continue
+                if re.fullmatch(r'socket:\[[0-9]+\]',target):owned.add(target[8:-1])
+        tcp=_sockets('tcp');udp=_sockets('udp')
+    except OSError as error:raise RuntimeError('Kernel listener observation unavailable') from error
+    ports={port for _,port in wanted}
+    # A foreign or wildcard listener on a registered port cannot establish closure
+    # or startup, even if another owned listener happens to answer our probe.
+    if any(port in ports and inode not in owned for _,port,inode in tcp):
+        raise RuntimeError('Foreign listener occupies registered port')
+    actual={(address,port) for address,port,inode in tcp if inode in owned}
+    if any(inode in owned for _,_,inode in udp):raise RuntimeError('Unregistered proxy UDP listener')
+    if not running:
+        if actual or any(port in ports for _,port,_ in tcp):raise RuntimeError('Proxy listener remains after stop')
+        return
+    if actual-wanted:raise RuntimeError('Proxy owns an unregistered listener')
+    if actual!=wanted:raise Starting('Registered proxy listeners not ready')
+
+
+def await_started(service,*,root=None,operation_id=None,timeout=5):
+    deadline=time.monotonic()+timeout
+    while True:
+        try:
+            value=observe(service,root=root,operation_id=operation_id)
+            if not value['running']:raise Starting('Registered proxy has not started')
+            return value
+        except Starting:
+            if time.monotonic()>=deadline:raise RuntimeError('Registered proxy startup timed out')
+            time.sleep(.1)
+
+
+def verify_configuration_graph(service):
+    """The reviewed profile has no nested nginx includes or Caddy imports."""
+    profile=service['systemd'];main=profile['mainConfig']
+    files={row['path'] for row in profile['immutableFiles']}
+    if main not in files or service['config'] not in files:raise RuntimeError('Primary configuration graph missing')
+    def text(path):return re.sub(r'#[^\n]*','',_read(path)[0].decode())
+    if service['role']=='caddy':
+        if main!=service['config'] or profile['includes'] or re.search(r'(?m)^\s*import\s',text(main)):
+            raise RuntimeError('Caddy import or external configuration is unsupported')
+        return
+    if len(profile['includes'])!=1:raise RuntimeError('One closed nginx include directory required')
+    pattern,members=next(iter(profile['includes'].items()))
+    if len(members)!=2 or service['config'] not in members or any(path not in files for path in members):
+        raise RuntimeError('Exact HTTP/HTTPS fragment graph required')
+    content=text(main)
+    if re.search(r'\bload_module\s',content):raise RuntimeError('External nginx modules are unsupported')
+    includes=re.findall(r'\binclude\s+([^;]+);',content)
+    if includes.count(pattern)!=1 or len(includes)!=2:raise RuntimeError('Exact main configuration include graph required')
+    literals=[path for path in includes if path!=pattern]
+    if len(literals)!=1 or literals[0] not in files or literals[0] in members or literals[0]==main:
+        raise RuntimeError('Exact registered MIME include required')
+    for path in [*members,*literals]:
+        if re.search(r'\b(?:include|load_module)\s',text(path)):
+            raise RuntimeError('Nested nginx includes/modules are unsupported')
+
+
 def observe_service(service):
     """Observe a fully bound profile. Registration/loaded TLS qualification is separate."""
     profile=service.get('systemd')
-    required={'unitFile','immutableFiles','includes','mainConfig','properties','process','credentialNames'}
+    required={'unitFile','immutableFiles','includes','mainConfig','properties','process','credentialNames','listeners'}
     if not isinstance(profile,dict) or set(profile)!=required:
-        raise RuntimeError('Qualified systemd observation profile missing')
+        raise RuntimeError('Qualified systemd observation profile missing; process state unknown')
     if set(profile['properties'])!=set(UNIT_PROPERTIES):raise RuntimeError('Complete loaded unit property binding required')
     if profile['unitFile']['sha256']!=service.get('identity'):raise RuntimeError('Original unit file identity differs')
     verify_files([profile['unitFile'],*profile['immutableFiles']]);verify_includes(profile['includes'])
+    verify_configuration_graph(service)
     process_profile=profile['process'];commands=start_commands(service['role'],profile['mainConfig'])
     if profile['properties']['ExecStart']!=' '.join(commands['start']) or profile['properties']['ExecStartPre']!=' '.join(commands['check']):
         raise RuntimeError('Registered startup does not use the fixed proxy commands')
@@ -315,7 +412,9 @@ def observe_service(service):
     # must still be checked for surviving workers before reporting closure.
     if state['ActiveState']=='inactive' and state['SubState']=='dead' and not state['ControlGroup']:
         state['ControlGroup']=process_profile['cgroup']
-    value=verify_process(process_profile,state,process,cgroup_pids(process_profile['cgroup']))
+    pids=cgroup_pids(process_profile['cgroup'])
+    value=verify_process(process_profile,state,process,pids)
+    verify_listeners(profile['listeners'],pids,value['running'])
     value['credentials']={}
     if value['running'] and profile['credentialNames']:
         value['credentials']=loaded_credentials(service['name'],process,profile['credentialNames'])
@@ -444,3 +543,141 @@ def switch_credential_sources(root,operation_id,service,generation_id,action):
         record=dict(intent['metadata'],path=str(destination),sha256=hashlib.sha256(after.encode()).hexdigest())
         updated['immutableFiles']=[r for r in profile['immutableFiles'] if r['path']!=str(destination)]+[record]
         return selected
+
+
+def _configuration_record(service):
+    records=[r for r in service['systemd']['immutableFiles'] if r['path']==service['config']]
+    if len(records)!=1:raise RuntimeError('Exact primary configuration record required')
+    return records[0]
+
+
+def read_configuration(service):
+    data,info=_read(service['config']);record=_configuration_record(service)
+    if (info.st_uid,info.st_gid,stat.S_IMODE(info.st_mode))!=(record['uid'],record['gid'],record['mode']):
+        raise RuntimeError('Registered configuration ownership or mode differs')
+    return data
+
+
+def write_configuration(service,data,*,allowed):
+    if read_configuration(service) not in allowed:raise RuntimeError('Live configuration differs from original operation')
+    _atomic_file(Path(service['config']),data,_configuration_record(service))
+    if read_configuration(service)!=data:raise RuntimeError('Configuration installation not observed')
+
+
+def replace_public_paths(service,data,paths):
+    if service['role']=='caddy':
+        if service['tlsPaths']:raise RuntimeError('Systemd Caddy trust must use registered credentials')
+        return data
+    if set(service['tlsPaths'])!={'certificate','privateKey'}:raise RuntimeError('Exact public nginx TLS references required')
+    for name,directive in [('certificate','ssl_certificate'),('privateKey','ssl_certificate_key')]:
+        old=service['tlsPaths'][name];new=paths[name]
+        for value in (old,new):
+            if not re.fullmatch('/[A-Za-z0-9_./-]+',value):raise RuntimeError('Literal public TLS path required')
+            _path(value)
+        pattern=rb'(?m)^(\s*'+directive.encode()+rb'\s+)([^;\n]+)(;)'
+        matches=list(re.finditer(pattern,data))
+        if len(matches)!=1 or matches[0].group(2)!=old.encode():raise RuntimeError('Declared public TLS directive differs')
+        data=re.sub(pattern,lambda match:match.group(1)+new.encode()+match.group(3),data)
+    return data
+
+
+def nginx_candidate(service,candidate):
+    """Validate the HTTPS fragment in its complete, closed original include graph."""
+    from . import runtime
+    profile=service['systemd'];candidate=_path(candidate)
+    verify_configuration_graph(service)
+    if re.search(rb'\b(?:include|load_module)\s',re.sub(rb'#[^\n]*',b'',_read(candidate)[0])):raise RuntimeError('Nested candidate includes/modules are unsupported')
+    verify_includes(profile['includes'])
+    verify_files([record for record in profile['immutableFiles'] if record['path']!=service['config']])
+    if len(profile['includes'])!=1:raise RuntimeError('One closed nginx conf.d include is required')
+    pattern,members=next(iter(profile['includes'].items()))
+    if len(members)!=2 or service['config'] not in members:raise RuntimeError('Exactly HTTP and HTTPS fragments are required')
+    main=_read(profile['mainConfig'])[0].decode()
+    includes=re.findall(r'\binclude\s+([^;\s]+)\s*;',re.sub(r'#[^\n]*','',main))
+    known={row['path'] for row in profile['immutableFiles']}
+    if includes.count(pattern)!=1 or any(value!=pattern and value not in known for value in includes):
+        raise RuntimeError('Unregistered nginx include reference')
+    replacements='\n'.join('include '+(str(candidate) if value==service['config'] else value)+';' for value in members)
+    main,count=re.subn(r'\binclude\s+'+re.escape(pattern)+r'\s*;',lambda _:replacements,main)
+    if count!=1:raise RuntimeError('Original nginx include differs')
+    target=candidate.with_name(candidate.name+'.nginx-main.conf')
+    data=main.encode()
+    if target.exists() and _read(target)[0]!=data:raise RuntimeError('Original complete candidate differs')
+    if not target.exists():runtime.private_file(target,data)
+    return target
+
+
+def credential_variant(service,intent,forward):
+    import copy
+    if not forward:return copy.deepcopy(service)
+    selected=copy.deepcopy(service);profile=selected['systemd'];destination=intent['identity']['path']
+    sources={token.partition(':')[0]:token.partition(':')[2] for token in profile['properties']['LoadCredential'].split()}
+    lines=intent['identity']['after'].splitlines()
+    new_sources={line.removeprefix('LoadCredential=').partition(':')[0]:line.partition(':')[2] for line in lines if line.startswith('LoadCredential=') and ':' in line}
+    if set(new_sources)!=set(sources):raise RuntimeError('Credential override set differs')
+    profile['properties']['LoadCredential']=' '.join(k+':'+v for k,v in sorted(new_sources.items()))
+    profile['properties']['DropInPaths']=destination
+    record=dict(intent['metadata'],path=destination,sha256=hashlib.sha256(intent['identity']['after'].encode()).hexdigest())
+    profile['immutableFiles']=[r for r in profile['immutableFiles'] if r['path']!=destination]+[record]
+    return selected
+
+
+def operation_service(root,operation_id,service):
+    """Derive only sealed before/after file variants, never adopt observed bytes."""
+    import copy
+    from . import journal
+    value=journal._read(root,root/'operations'/(operation_id+'-proxy.json'))
+    rows=[r for r in value['services'] if r['service']==service]
+    if len(rows)!=1:raise RuntimeError('Original proxy service binding differs')
+    row=rows[0];selected=copy.deepcopy(service)
+    intent_path=_credential_intent_path(root,operation_id)
+    if service['role']=='caddy' and intent_path.exists():
+        intent=journal._read(root,intent_path)
+        if intent['identity']['service']!=service:raise RuntimeError('Original Caddy source binding differs')
+        destination=Path(intent['identity']['path'])
+        actual=_read(destination)[0].decode() if destination.exists() else None
+        if actual not in (intent['before'],intent['identity']['after']):raise RuntimeError('Credential source override changed')
+        selected=credential_variant(service,intent,actual==intent['identity']['after'])
+    data=read_configuration(service)
+    allowed=[row['before'].encode(),row['after'].encode()]
+    maintenance=root/'operations'/(operation_id+'-issuer-maintenance.json')
+    if service['role']=='nginx' and maintenance.exists():
+        saved=journal._read(root,maintenance)
+        if saved['service']!=service:raise RuntimeError('Original maintenance service differs')
+        allowed.append(saved['configuration'].encode())
+    if data not in allowed:raise RuntimeError('Live proxy configuration conflicts with original operation')
+    for record in selected['systemd']['immutableFiles']:
+        if record['path']==service['config']:record['sha256']=hashlib.sha256(data).hexdigest()
+    return selected
+
+
+def reconcile_manager(root,operation_id):
+    """Recover an interrupted owned drop-in write before ordinary observation."""
+    from . import journal,runtime,tls_proxy
+    path=_credential_intent_path(root,operation_id)
+    if not path.exists():return
+    intent=journal._read(root,path);service=intent['identity']['service']
+    selected=operation_service(root,operation_id,service)
+    verify_files([selected['systemd']['unitFile'],*selected['systemd']['immutableFiles']])
+    destination=Path(intent['identity']['path'])
+    members=sorted(str(p) for p in destination.parent.glob('*.conf'))
+    if members not in ([],[str(destination)]):raise RuntimeError('Unregistered systemd drop-in exists')
+    snapshot=unit_snapshot(service['name'],selected['systemd']['properties'])
+    if snapshot['state']['NeedDaemonReload']=='no' and snapshot['properties']==selected['systemd']['properties']:return
+    before=service['systemd']['properties'];after=credential_variant(service,intent,True)['systemd']['properties']
+    if snapshot['properties'] not in (before,after):raise RuntimeError('Unrecognized loaded unit cannot be reconciled')
+    op=journal.current(root)
+    if op['operationId']!=operation_id or op['phase'] not in {'PROXY_SWITCHING','ACTIVATING','ROLLBACK_SWITCHING','ROLLBACK_ACTIVATING'}:
+        raise RuntimeError('Original credential source reconciliation phase required')
+    proxy=journal._read(root,root/'operations'/(operation_id+'-proxy.json'))
+    outer=next(r['service'] for r in proxy['services'] if r['service']['role']=='nginx')
+    observed=tls_proxy._state(root,operation_id,outer)
+    if observed['running']:
+        from . import tls_maintenance
+        if not tls_maintenance.configured(root,operation_id,outer):raise RuntimeError('Outer proxy must be closed for manager reconciliation')
+        tls_proxy._action(outer,'stop')
+        if tls_proxy._state(root,operation_id,outer)['running']:raise RuntimeError('Outer proxy stop unconfirmed')
+    runtime.run(['systemctl','daemon-reload'])
+    actual=unit_snapshot(service['name'],selected['systemd']['properties'])
+    if actual['state']['NeedDaemonReload']!='no' or actual['properties']!=selected['systemd']['properties']:
+        raise RuntimeError('Owned manager refresh remains unknown')
