@@ -146,7 +146,15 @@ python3 deploy/linux/linux.py --runtime "$RUNTIME" health
 
 `origins` 必须与原实例完全一致。候选必须匹配私钥、覆盖原 SAN、具备服务器用途、链至代码审核准入的根，剩余有效期至少 7 天且到期日晚于当前证书。上传的中间证书不能自动成为根信任。`approvedAnchors` 的内容还须通过仓库准入表校验。
 
-`proxies` 为 `{ "version": 1, "services": [...] }`。每个服务必须完整提供 `role`（nginx 或 caddy）、`transport`（docker 或 systemd）、`name`、`identity`、`image`、`config`、`configSha256`、`tlsPaths`。配置必须已经登记在运行目录的 `proxy/` 下；Docker 服务须原本按原路径挂载运行目录，身份为实际容器 ID 与 image ID。systemd 身份绑定 unit 属性与固定可执行文件哈希。`tlsPaths` 只允许 certificate/privateKey/httpTrust 的现有绝对路径。外层 nginx 必须是获准暂停的独立服务；控制器不会自动改挂载、采用未知服务或安装代理。本轮受限维护仅准入 Docker nginx 的准确 `nginx -c <登记配置> -g "daemon off;"` 启动、无运行目录嵌套挂载、两个原 IPv4 TLS 监听及已登记 Caddy localhost 桥接。systemd 和其他配置形式在维护前拒绝，不应视为已支持。各 transport 的真实验证范围见验收报告。
+`proxies` 的 Docker 登记使用 `{ "version": 1, "services": [...] }`；经过实机资格验证的 systemd 登记必须使用 `{ "version": 2, "qualification": { "mode": "report", "root": "/absolute/private/retained-proof-runtime", "sha256": "EXACT_SEALED_REPORT_FILE_SHA256" }, "services": [...] }`。生产登记不得使用测试专用的 `mode: isolated`。报告必须通过实例签名、当前 implementationDigest、Q01–Q12 全部 PASS、证据文件摘要和实际代理二进制哈希检查。测试单独通过、旧摘要报告或普通 JSON 不能代替资格证明。
+
+每个服务完整提供 `role`（nginx 或 caddy）、`transport`、`name`、`identity`、`image`、`config`、`configSha256`、`tlsPaths`。Docker 配置须已登记在运行目录 `proxy/` 下，原容器须按原路径挂载整个运行目录，身份绑定实际容器 ID 和 image ID。systemd version 2 还须提供完整 `systemd` profile：`unitFile`、`immutableFiles`、`includes`、`mainConfig`、`properties`、`process`、`credentialNames`、`listeners`；绑定实际文件内容及所有权/权限、配置图、manager 属性、固定可执行文件哈希、进程 argv/uid/gid/cgroup、端口归属与已加载凭据。复杂 manager 属性从现有 busctl 类型化读取，Exec 命令为有序 argv 数组。没有自动采用未知代理的注册 CLI；私密登记输入须按实际观测审阅后交给轮换入口。
+
+外层 nginx 必须是获准暂停的独立服务。Docker 维护仅接受准确的 `nginx -c <登记配置> -g "daemon off;"` 启动且不得有运行目录嵌套挂载。systemd 维护仅接受已通过资格门禁的固定配置图、原有 IPv4 HTTPS 监听和严格 TLS Caddy 桥接；保持登记的 HTTP 挑战配置。Caddy LoadCredential 切换由原操作控制 drop-in、daemon-reload 和停止/启动，并证明新进程实际加载了目标凭据，不能用 reload 代替。具体接入、隔离资格及清理边界见 [systemd 资格说明](verification/systemd_qualification/README.md)。
+
+清理资格实例前须私密保留原始报告、`runtime/journal.key` 及报告引用的全部相对路径证据，并核验导出文件的离机摘要。`qualification.root` 指向保持这些相对结构的私密证据目录；不要改写原报告或 instance 标识，也不要只保留报告 JSON。证据目录不是可恢复或可启动的生产 runtime。
+
+首次 legacy 回退从原操作签名记录中的 `probeTargets` 补全旧代次 deployment，再封存进 active selection，并执行完整探测；不从当前配置猜测目标。旧 native 与外部证书可以不同，候选必须晚于两者到期，回退则要求两者仍有效且原文件绑定未漂移。
 
 `probeTargets` 明确登记 bridgeIdentity、bridgeEntry、publicIdentity、publicEntry 四个目标，每项提供 role/connectHost/connectPort/verifyHost；桥接端口可显式增加 `tlsIdentity: "internal"`，仅指原封存的 `certs/server.crt` 与其 localhost 身份。公网及原生端点的 verifyHost 必须保留原 origin 的主机/IP 身份，不能改成 localhost 来通过验证；connectHost 限原主机或本机回环。两个 native 目标取自原身份计划。两段代理 TLS 校验均须保留。
 
