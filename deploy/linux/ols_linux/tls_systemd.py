@@ -134,3 +134,63 @@ def read_process(pid):
         raise RuntimeError('Proxy process observation unavailable') from error
     if first!=second:raise RuntimeError('Proxy process changed during observation')
     return first
+
+
+def observe(service):
+    """Consume a qualified transport observation, never infer it from ActiveState.
+
+    The current systemd transport lacks the complete process/credential proof and
+    therefore remains blocked. Its qualification adapter must supply these facts
+    before this controller can cause any service effect.
+    """
+    from . import tls_proxy
+    value=tls_proxy._service(service)
+    if set(value)!={'running','process','credentials'}:
+        raise RuntimeError('Qualified systemd process and credential observation missing')
+    return value
+
+
+def control(root,operation_id,service,action,expected_credentials):
+    """Original-operation credential load, with crash-safe restart intent.
+
+    A reload is deliberately insufficient for changed LoadCredential bytes. This
+    controller is internal; it does not grant registration or deployment admission.
+    """
+    from . import journal,runtime,tls_proxy
+    if action!='load' or service.get('transport')!='systemd' or service.get('role')!='caddy':
+        raise RuntimeError('Only registered systemd Caddy credential load is supported')
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.@-]*\.service',service.get('name','')):
+        raise RuntimeError('Exact registered unit name required')
+    _credentials(expected_credentials)
+    if sorted(expected_credentials)!=service.get('systemd',{}).get('credentialNames'):
+        raise RuntimeError('Registered credential names differ')
+    with journal.locked(root) as root:
+        op=journal.current(root)
+        if op['operationId']!=operation_id or op['kind']!='rotate-public-tls' or op['phase'] not in {'PROXY_SWITCHING','ROLLBACK_SWITCHING','ACTIVATING','ROLLBACK_ACTIVATING'}:
+            raise RuntimeError('Original proxy switching phase required')
+        registered=journal._read(root,root/'operations'/(operation_id+'-proxy.json'))
+        if sum(row['service']==service for row in registered['services'])!=1:
+            raise RuntimeError('Exact original proxy registration required')
+        direction='rollback' if op['phase'].startswith('ROLLBACK') else 'forward'
+        path=root/'operations'/(operation_id+'-systemd-caddy-'+direction+'.json')
+        identity={'service':service,'expected':expected_credentials,'direction':direction}
+        saved=journal._read(root,path) if path.exists() else None
+        if saved and saved['intent']!=identity:raise RuntimeError('Original credential load intent differs')
+        if not tls_proxy.observe(root,operation_id)['closed']:
+            raise RuntimeError('Outer proxy must be observed closed before credential load')
+        before=observe(service)
+        if saved is None:
+            saved={'intent':identity,'before':before};journal._write(root,path,saved)
+        if before['running'] and before['credentials']==expected_credentials:
+            # On response loss this is the same original intent, not a fresh load.
+            if saved['before']['credentials']!=expected_credentials:verify_restart(saved['before'],before)
+            return before
+        if before['running']:
+            runtime.run(['systemctl','stop',service['name']])
+            if observe(service)['running']:raise RuntimeError('Systemd stop unconfirmed')
+        runtime.run(['systemctl','start',service['name']])
+        after=observe(service)
+        verify_restart(saved['before'],after)
+        if after['credentials']!=expected_credentials:
+            raise RuntimeError('Loaded credentials differ from original intent')
+        return after
