@@ -47,7 +47,7 @@ def admission(inputs):
     before=metrics();time.sleep(5);after=metrics()
     rate=(after['swapPages']-before['swapPages'])*os.sysconf('SC_PAGE_SIZE')/(after['time']-before['time'])
     if after['available']<1024**3 or after['psi']>2 or rate>4*1024**2:raise RuntimeError('Insufficient memory or current memory pressure')
-    if os.statvfs('/').f_bavail*os.statvfs('/').f_frsize<2*1024**3:raise RuntimeError('At least 2GiB disk headroom required')
+    if os.statvfs('/var/lib').f_bavail*os.statvfs('/var/lib').f_frsize<2*1024**3:raise RuntimeError('At least 2GiB disk headroom required')
     health(inputs)
     return {'metrics':after,'production':baseline(inputs)}
 

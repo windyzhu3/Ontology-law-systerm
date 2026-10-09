@@ -77,3 +77,26 @@ class PackageTests(unittest.TestCase):
         with patch.object(runner,'request',side_effect=wrong_ca):
             with self.assertRaisesRegex(RuntimeError,'expiry'):runner.expired_peer(29843)
         with patch.object(runner,'request',side_effect=expired):self.assertEqual(runner.expired_peer(29843)['verifyCode'],10)
+
+    def test_admission_checks_var_lib_disk_not_run_tmpfs(self):
+        import guard
+        from types import SimpleNamespace
+        metrics={'time':1,'available':2*1024**3,'swapPages':0,'psi':0,'load':0}
+        def read(path,*args,**kwargs):
+            if str(path)=='/proc/1/comm':return 'systemd\n'
+            if str(path)=='/sys/fs/cgroup/cgroup.controllers':return 'memory cpu\n'
+            raise AssertionError(str(path))
+        with patch.object(guard.os,'geteuid',return_value=0),patch.object(Path,'read_text',read),patch.object(guard.sd,'_binary_sha',side_effect=[v[1] for v in fixture.BINARIES.values()]),patch.object(guard,'metrics',side_effect=[metrics,dict(metrics,time=6)]),patch.object(guard.time,'sleep'),patch.object(guard.os,'statvfs',return_value=SimpleNamespace(f_bavail=22*1024**3,f_frsize=1)) as statvfs,patch.object(guard,'health'),patch.object(guard,'baseline',return_value={}):
+            guard.admission({})
+        self.assertTrue(statvfs.called)
+        self.assertEqual({call.args[0] for call in statvfs.call_args_list},{'/var/lib'})
+
+    def test_package_builder_is_deterministic_and_excludes_runtime_files(self):
+        import build_package,gzip,hashlib,io,tarfile
+        with tempfile.TemporaryDirectory() as temporary:
+            base=Path(temporary);(base/'ols_linux').mkdir();fixture_dir=base/'verification/systemd_qualification';fixture_dir.mkdir(parents=True)
+            (base/'ols_linux/a.py').write_text('x=1\n');(fixture_dir/'bootstrap.py').write_text('# synthetic\n')
+            (fixture_dir/'private-runtime.json').write_text('must not be packaged')
+            first,manifest=build_package.build(base);second,_=build_package.build(base)
+            self.assertEqual(first,second);self.assertEqual(hashlib.sha256(gzip.decompress(first)).hexdigest(),manifest['uncompressedTarSha256'])
+            with tarfile.open(fileobj=io.BytesIO(first),mode='r:gz') as archive:self.assertEqual(archive.getnames(),['ols_linux/a.py','verification/systemd_qualification/bootstrap.py'])

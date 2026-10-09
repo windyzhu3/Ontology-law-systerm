@@ -41,7 +41,7 @@ def main():
             if int(line.split()[1].split(':')[1],16) in range(29843,29849):raise RuntimeError('Authorized fixture port occupied')
     if 'memory' not in Path('/sys/fs/cgroup/cgroup.controllers').read_text().split():raise RuntimeError('cgroup v2 memory controller required')
     mem=dict(line.split(':',1) for line in Path('/proc/meminfo').read_text().splitlines())
-    if int(mem['MemAvailable'].split()[0])*1024<1024**3 or os.statvfs('/').f_bavail*os.statvfs('/').f_frsize<2*1024**3:raise RuntimeError('Admission headroom insufficient')
+    if int(mem['MemAvailable'].split()[0])*1024<1024**3 or os.statvfs('/var/lib').f_bavail*os.statvfs('/var/lib').f_frsize<2*1024**3:raise RuntimeError('Admission headroom insufficient')
     def pressure():
         vm=dict(line.split() for line in Path('/proc/vmstat').read_text().splitlines())
         psi=next(line for line in Path('/proc/pressure/memory').read_text().splitlines() if line.startswith('full '))

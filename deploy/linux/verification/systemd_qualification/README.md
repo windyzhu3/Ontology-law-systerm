@@ -31,7 +31,7 @@ Verify both the delivered bootstrap source and archive against the separately de
 EXISTING_PYTHON -B -c EXACT_VERIFIED_BOOTSTRAP_SOURCE < PRIVATE_ENVELOPE_STREAM
 ```
 
-Bootstrap rechecks names, directories, loopback ports, current health, cgroup v2, memory pressure, ≥1GiB MemAvailable and ≥2GiB free disk. Any conflict stops rather than inventing another name. Only the exact empty mountpoints and fixed slice are created before entering the capped control scope. Extraction, material generation, service installation and probes then execute inside that scope.
+Bootstrap rechecks names, directories, loopback ports, current health, cgroup v2, memory pressure, ≥1GiB MemAvailable and ≥2GiB free disk on the filesystem containing `/var/lib` (not the `/run` tmpfs). Any conflict stops rather than inventing another name. Only the exact empty mountpoints and fixed slice are created before entering the capped control scope. Extraction, material generation, service installation and probes then execute inside that scope.
 
 The scope shares a slice capped at 512MiB, MemoryHigh256MiB, zero test swap, CPU50%, Tasks128. The tmpfs is255MiB; fixed unit/drop-in files are below1MiB. Ports are loopback29843–29848 only. No users, firewall, sysctl, packages, Docker resources or production certificate changes.
 
