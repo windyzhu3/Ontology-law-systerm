@@ -99,7 +99,7 @@ def ingress_ready(root: Path,descriptor: dict) -> dict:
             value=runtime.owned(root,'container',entry['name'])
             if value['Config']['Labels'].get('ols.launch')!=entry['digest'] or not value['State']['Running']:raise RuntimeError('Current ingress launch failed')
             try:
-                response=identity.http(root,plan['origin']+'/')
+                response=identity.http(root,plan['origin']+'/',public=True)
                 if response['status']==200 and hashlib.sha256(response['body'].encode('utf-8')).hexdigest()==descriptor['spaFiles']['index.html']:
                     return {'status':'PASS','entry':'VERIFIED_TLS_EXACT_SPA','descriptorDigest':descriptor['descriptorDigest']}
             except RuntimeError:pass

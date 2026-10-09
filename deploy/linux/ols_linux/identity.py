@@ -10,7 +10,7 @@ import tarfile
 import time
 import uuid
 from urllib.parse import urlencode,urlsplit
-from . import journal, runtime, database
+from . import journal, runtime, database, tls_generation
 from .config import canonical, digest
 from .bundle import sha
 
@@ -161,7 +161,7 @@ def _start(root, plan):
         if not pod['State']['Running']:runtime.run(['docker','start',plan['pod']])
     ports=runtime.owned(root,'container',plan['pod'])['NetworkSettings'].get('Ports',{})
     if any(ports.get(str(port)+'/tcp')!=[{'HostIp':'127.0.0.1','HostPort':str(port)}] for port in plan['ports'].values()):raise RuntimeError('Published identity/runtime port unavailable')
-    _database_login(root)
+    if not tls_generation.managed(root):_database_login(root)
     existing=runtime.inspect('container',plan['identity'])
     if not existing:
         env={'KC_DB':'postgres','KC_DB_URL':'jdbc:postgresql://'+resources['containers']['identityDb']+':5432/keycloak?sslmode=verify-full&sslrootcert=/opt/keycloak/conf/ca.pem',
@@ -179,12 +179,16 @@ def _start(root, plan):
     actual=runtime.owned(root,'container',plan['identity'])
     if not actual['State']['Running']:
         # Recopy only the original sealed import/secret bytes into the registered stopped container.
-        public=bool(resources.get('publicTlsHashes'))
-        _copy_files(plan['identity'],'/opt/keycloak/conf',{'ca.pem':(root/'certs/ca.pem').read_bytes(),
-            'server.crt':(root/'certs'/('public.crt' if public else 'server.crt')).read_bytes(),
-            'server.key':(root/'certs'/('public.key' if public else 'server.key')).read_bytes(),
-            'db-password':(root/'secrets/identity-app.txt').read_bytes()})
-        _copy_files(plan['identity'],'/opt/keycloak/data/import',{plan['realm']+'-realm.json':(root/'identity/realm.json').read_bytes()})
+        if tls_generation.managed(root):
+            from . import tls_deployment
+            tls_deployment.copy_identity(root,plan['identity'],tls_generation.resolve(root))
+        else:
+            public=bool(resources.get('publicTlsHashes'))
+            _copy_files(plan['identity'],'/opt/keycloak/conf',{'ca.pem':(root/'certs/ca.pem').read_bytes(),
+                'server.crt':(root/'certs'/('public.crt' if public else 'server.crt')).read_bytes(),
+                'server.key':(root/'certs'/('public.key' if public else 'server.key')).read_bytes(),
+                'db-password':(root/'secrets/identity-app.txt').read_bytes()})
+            _copy_files(plan['identity'],'/opt/keycloak/data/import',{plan['realm']+'-realm.json':(root/'identity/realm.json').read_bytes()})
         runtime.run(['docker','start',plan['identity']])
     deadline=time.monotonic()+150
     while True:
@@ -197,7 +201,10 @@ def _start(root, plan):
         time.sleep(.5)
 
 
-def http_helper(root):
+def http_helper(root,*,public=False):
+    if tls_generation.managed(root) and not public:
+        from .tls_generation import resolve
+        return resolve(root)['deployment']['httpHelper']
     path=root/'installed-candidate.json'
     if not path.exists():return '/opt/ols/runtime/https-json.mjs'
     installed=journal._read(root,path);descriptor=installed['descriptor']
@@ -208,7 +215,7 @@ def http_helper(root):
     return str(helper)
 
 
-def http(root, url, *, method='GET', headers=None, body=None, client_certificate=False):
+def http(root, url, *, method='GET', headers=None, body=None, client_certificate=False, public=False):
     plan=journal._read(root,root/'identity/plan.json');runtime.owned(root,'container',plan['pod'])
     allowed=list({urlsplit(plan[name]).scheme+'://'+urlsplit(plan[name]).netloc for name in ('origin','issuer','apiOrigin')})
     parsed=urlsplit(url)
@@ -216,9 +223,16 @@ def http(root, url, *, method='GET', headers=None, body=None, client_certificate
         raise RuntimeError('Only the original registered HTTPS origins are allowed')
     request={'url':url,'method':method,'headers':headers or {},'body':body,'allowedOrigins':allowed,
              'ca':str(root/('certs/http-trust.pem' if runtime.load(root).get('publicTlsHashes') else 'certs/ca.pem'))}
+    if tls_generation.managed(root):
+        from .public_runtime import effective_paths
+        request['ca']=effective_paths(root)['httpTrust']
+        selected=urlsplit(url)
+        identity_origin=urlsplit(plan['issuer'])
+        port=plan['ports']['identity'] if selected.netloc==identity_origin.netloc else plan['ports']['entry'] if selected.netloc==urlsplit(plan['origin']).netloc else plan['ports']['api']
+        if not public:request.update(connectHost='127.0.0.1',connectPort=port)
     if client_certificate:
         request.update(certificate=str(root/'certs/service.crt'),privateKey=str(root/'certs/service.key'))
-    result=runtime.run(['docker','exec','-i',plan['pod'],'node',http_helper(root)],canonical(request),timeout=25)
+    result=runtime.run(['docker','exec','-i',plan['pod'],'node',http_helper(root,public=public)],canonical(request),timeout=25)
     return json.loads(result.stdout)
 
 

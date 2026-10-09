@@ -1,5 +1,5 @@
 import type { SessionContext, SessionController } from "./sessionController";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Info } from "@phosphor-icons/react";
 import {
   SessionProvider,
@@ -98,7 +98,7 @@ function ChoiceForm({
       sequence.current++;
     };
   }, []);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (state.switchConfirmation && !busy) cancelButton.current?.focus();
     else if (
       restoreFocus.current &&

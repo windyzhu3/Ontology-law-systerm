@@ -262,6 +262,10 @@ def _activate(root: Path,operation_id: str,inputs: dict, *, restored=False) -> d
     elif _same_gate(actual,activation['before']):actual=_cas_gate(root,actual,activation['expected'])
     else:raise RuntimeError('Original activation gate conflicts')
     try:
+        if restored:
+            import time
+            from . import tls_restore
+            tls_restore.activate(root,now=int(time.time()))
         runtime.start_internal(root,descriptor)
         try:from .verify import runtime_ready
         except ImportError:raise RuntimeError('Actual Linux runtime verification unavailable')
@@ -270,6 +274,7 @@ def _activate(root: Path,operation_id: str,inputs: dict, *, restored=False) -> d
         journal._write(root,root/'current-release.json',candidate)
         journal.record(root,operation_id,{'phase':'RUNTIME_VERIFIED','descriptorDigest':descriptor['descriptorDigest'],'evidenceDigest':digest(evidence)})
         runtime.open_ingress(root,operation_id)
+        if restored:tls_restore.open_verified(root,now=int(time.time()))
         from .verify import ingress_ready
         ingress_ready(root,descriptor)
         journal.record(root,operation_id,{'phase':'COMPLETE','descriptorDigest':descriptor['descriptorDigest']})
@@ -281,6 +286,9 @@ def _activate(root: Path,operation_id: str,inputs: dict, *, restored=False) -> d
 
 
 def _finish_activation_failure(root,operation_id,descriptor,activation_file,activation):
+    if (root/'operations'/(operation_id+'-restore-tls.json')).exists():
+        from . import tls_restore
+        tls_restore.close(root)
     runtime.stop_writers(root,operation_id,phase='ACTIVATION_FAILING')
     current=database.observe(root)['gate']
     if 'failed' not in activation:
@@ -332,6 +340,9 @@ def restore_checkpoint(root: Path,source_operation_id: str,value: dict) -> dict:
                 if any(runtime.inspect(kind,name) for kind,name in [('container',plan['replacementContainers'][key]),('container',plan['quarantineContainers'][key]),('volume',plan['replacementVolumes'][key])]):
                     raise RuntimeError('Linked restore target names already exist; not adopted')
             journal._write(root,plan_path,plan)
+        from . import tls_restore
+        tls_restore.prepare(root,value)
+        tls_restore.close(root)
         source_gate=plan['before']['gate']
         if source_gate['operating_mode']!='MAINTENANCE' and current['phase'] not in {'RESTORE_REPLACEMENT_READY','RESTORE_SWITCH_UNKNOWN','RESTORE_ASSETS_UNKNOWN','RESTORED_MAINTENANCE'}:
             if 'sourceMaintenanceGate' not in plan:
@@ -392,6 +403,10 @@ def restore_checkpoint(root: Path,source_operation_id: str,value: dict) -> dict:
         journal.record(root,operation_id,{'phase':'RESTORE_ASSETS_UNKNOWN','checkpointDigest':cp_digest})
         _restore_assets(root,directory,operation_id,value)
         _assert_restored(root,value)
+        if (root/'certs/public.crt').exists():
+            import time
+            from . import tls_generation
+            tls_generation.restore_binding(root,value,now=int(time.time()))
         if (root/'launch.json').exists():_restore_runtime_registry(root)
         journal.record(root,operation_id,{'phase':'RESTORED_MAINTENANCE','checkpointDigest':cp_digest,'gate':value['observed']['gate']})
         return {'status':'RESTORED_MAINTENANCE','operationId':operation_id,'schemaVersion':value['observed']['gate']['schema_contract_version']}
@@ -454,12 +469,29 @@ def stop(root: Path) -> dict:
 def start(root: Path) -> dict:
     with journal.locked(root) as root:
         op=journal.current(root);restored=False
-        if (root/'restore-plan.json').exists() and journal._read(root,root/'restore-plan.json')['operationId']==op['operationId'] and op['phase'] in {'RESTORED_MAINTENANCE','ACTIVATION_UNKNOWN','ACTIVATION_FAILING','ACTIVATION_FAILED'}:
+        if (root/'restore-plan.json').exists() and journal._read(root,root/'restore-plan.json')['operationId']==op['operationId'] and op['phase'] in {'RESTORED_MAINTENANCE','ACTIVATION_UNKNOWN','ACTIVATION_FAILING','ACTIVATION_FAILED','RUNTIME_VERIFIED','INGRESS_OPEN'}:
             plan=journal._read(root,root/'restore-plan.json')
             if plan['operationId']!=op['operationId']:raise RuntimeError('Start belongs to another restore')
             value=checkpoint.verified(root,plan['sourceOperationId'])
             if digest(value)!=plan['checkpointDigest']:raise RuntimeError('Linked original restore changed')
             if op['phase']=='RESTORED_MAINTENANCE':_assert_restored(root,value)
+            else:
+                from . import tls_restore
+                tls_restore.reconcile_maintenance(root,value)
+            if (root/'certs/public.crt').exists():
+                import time
+                from . import tls_generation
+                binding=tls_generation.restore_binding(root,value,now=int(time.time()))
+                if not binding['canActivate']:
+                    if op['phase'] in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILING','RUNTIME_VERIFIED','INGRESS_OPEN'}:
+                        current=journal._read(root,root/'current-release.json')
+                        descriptor=current['descriptor']
+                        activation_file=root/'operations'/(op['operationId']+'-restored-activation.json')
+                        activation=journal._read(root,activation_file)
+                        if activation['descriptorDigest']!=descriptor['descriptorDigest']:raise RuntimeError('Original failing activation differs')
+                        journal.record(root,op['operationId'],{'phase':'ACTIVATION_FAILING','descriptorDigest':descriptor['descriptorDigest']})
+                        _finish_activation_failure(root,op['operationId'],descriptor,activation_file,activation)
+                    raise RuntimeError('Restored TLS blocked: '+binding['reasonCode'])
             _restore_runtime_registry(root);restored=True
         elif op['phase'] not in {'COMPLETE','STOP_REQUESTED','WRITERS_STOPPED','STOPPED'} and not(op['kind']=='runtime-control' and op['phase']=='CREATED') and not (
             op['phase'] in {'ACTIVATION_UNKNOWN','ACTIVATION_FAILING','ACTIVATION_FAILED'} and

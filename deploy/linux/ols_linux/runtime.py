@@ -104,6 +104,10 @@ def validate_tls(root: Path):
                 public.load_cert_chain(str(root/'certs/public.crt'),str(root/'certs/public.key'))
             except (ssl.SSLError,OSError) as error:raise RuntimeError('Invalid original public certificate/key pair') from error
 
+    if any((root/name).exists() for name in ['tls/active.json','tls-restored.json','tls-selection.json']):
+        from .tls_generation import resolve
+        resolve(root)
+
 
 def prepare(root: Path, settings: dict) -> dict:
     with journal.locked(root) as root:
@@ -176,7 +180,7 @@ def prepare(root: Path, settings: dict) -> dict:
 
 def stop_writers(root: Path, operation_id: str, *, phase='WRITERS_STOPPED') -> None:
     with journal.locked(root) as root:
-        if phase not in {'WRITERS_STOPPED','ACTIVATION_FAILING'}:raise ValueError('Unsupported stopped-writer phase')
+        if phase not in {'WRITERS_STOPPED','ACTIVATION_FAILING','STOPPING','FAILING','ROLLBACK_STOPPING','ROLLBACK_FAILING'}:raise ValueError('Unsupported stopped-writer phase')
         journal.read(root,operation_id)
         resources=load(root)
         names=([resources['ingress']] if resources.get('ingress') else [])+resources['writers']

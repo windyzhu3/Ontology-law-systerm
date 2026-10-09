@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "anchors": [
+    {
+      "name": "Sectigo Public Server Authentication Root R46",
+      "sha256": "7bb647a62aeeac88bf257aa522d01ffea395e0ab45c73f93f65654ec38f25a06",
+      "status": "VERIFIED",
+      "source": "https://support.sectigo.com/sfc/servlet.shepherd/version/download/068Uj00000aEa28",
+      "sourcePage": "https://www.sectigo.com/knowledge-base/detail/Sectigo-new-Public-Roots-and-Issuing-CAs-Hierarchy",
+      "independentSource": "Debian Mozilla ca-certificates: Sectigo_Public_Server_Authentication_Root_R46.pem",
+      "verifiedAt": "2026-10-08"
+    }
+  ]
+}

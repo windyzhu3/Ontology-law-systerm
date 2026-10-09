@@ -1,0 +1,127 @@
+{
+  "status": "PASS",
+  "scenario": "same-ca",
+  "operationId": "d8af209106bb46858efaff73dcd43511",
+  "generationId": "2eaa500fb9e9da81440a9f467bc4d9c2e469b3bed0e7464a88593efd2e4522c1",
+  "preservation": true,
+  "authenticatedForwarding": {
+    "originalAppointment": true,
+    "path": "/api/v1/session/context",
+    "status": "PASS"
+  },
+  "proof": {
+    "consumers": {
+      "api": "PASS",
+      "identity": "PASS",
+      "javaTrust": "PASS",
+      "nodeTrust": "PASS",
+      "scanner": "PASS",
+      "worker": "PASS"
+    },
+    "generationId": "2eaa500fb9e9da81440a9f467bc4d9c2e469b3bed0e7464a88593efd2e4522c1",
+    "http": {
+      "nativeEntryApi": "VERIFIED_TLS_UNAUTHENTICATED_API_RESPONSE",
+      "publicRoutes": "PASS"
+    },
+    "observedAt": 1791466332,
+    "status": "PASS",
+    "targets": {
+      "bridgeEntry": {
+        "chainVerified": true,
+        "leafDerSha256": "1131618fda52e25b8a15079cfa1a092896e118ca2acdbeace40fa0df0111a250",
+        "notAfter": 1822992746,
+        "status": "PASS"
+      },
+      "bridgeIdentity": {
+        "chainVerified": true,
+        "leafDerSha256": "1131618fda52e25b8a15079cfa1a092896e118ca2acdbeace40fa0df0111a250",
+        "notAfter": 1822992746,
+        "status": "PASS"
+      },
+      "nativeEntry": {
+        "chainVerified": true,
+        "leafDerSha256": "6cabe390ce8e268e4e5333861a88b8edea4f3366015ce9ba81bfa88ebb252941",
+        "notAfter": 1792756089,
+        "status": "PASS"
+      },
+      "nativeIdentity": {
+        "chainVerified": true,
+        "leafDerSha256": "6cabe390ce8e268e4e5333861a88b8edea4f3366015ce9ba81bfa88ebb252941",
+        "notAfter": 1792756089,
+        "status": "PASS"
+      },
+      "publicEntry": {
+        "chainVerified": true,
+        "leafDerSha256": "6cabe390ce8e268e4e5333861a88b8edea4f3366015ce9ba81bfa88ebb252941",
+        "notAfter": 1792756089,
+        "status": "PASS"
+      },
+      "publicIdentity": {
+        "chainVerified": true,
+        "leafDerSha256": "6cabe390ce8e268e4e5333861a88b8edea4f3366015ce9ba81bfa88ebb252941",
+        "notAfter": 1792756089,
+        "status": "PASS"
+      }
+    }
+  },
+  "initializationInventory": {
+    "status": "PASS",
+    "organizations": 7,
+    "humanPrincipals": 17,
+    "humanAppointments": 20,
+    "humanGrants": 280,
+    "passwordUpdatesRequired": 15,
+    "leadAssignment": "PENDING_ADMIN_ASSIGNMENT",
+    "templates": "CANDIDATE_NOT_APPROVED",
+    "businessFacts": 0
+  },
+  "issuerBlocked": {
+    "newOperationCreated": false,
+    "scenario": "issuer-blocked",
+    "status": "PASS",
+    "unchangedContainers": true,
+    "unchangedGate": true,
+    "unchangedOperationFiles": true,
+    "unchangedProxyAndLaunchFiles": true
+  },
+  "unregisteredClient": {
+    "afterSameCaRotation": true,
+    "clientPurposeVerified": true,
+    "registeredServiceReadiness": 204,
+    "scenario": "unregistered-client",
+    "spoofedHeadersDidNotAuthorize": true,
+    "status": "PASS",
+    "strictTls": true,
+    "trustedFixtureRoot": "old-public-ca",
+    "unregisteredClientStatuses": [
+      401,
+      401
+    ]
+  },
+  "cleanup": {
+    "authorizedContainersOnly": true,
+    "dataVolumesDeleted": false,
+    "containers": [
+      {
+        "name": "ols-tls-review-01-api-admin",
+        "id": "48ab6ddf842aff99330c5f017292dd840288bfd07dcbe436096562a61b76484d",
+        "freeBytesIncrease": 1120301056
+      },
+      {
+        "name": "ols-tls-review-01-maintenance-check",
+        "id": "4f0075b570d417eb756d337b68204ba611fa3afa4349a674c470dbe0bcc4a61e",
+        "freeBytesIncrease": 289153024
+      },
+      {
+        "name": "ols-tls-review-01-api-b837dbc9665e",
+        "id": "e38aeb552cc11c8b7a6a2f64333facdd57053c6a4fd51ccbb55aadd55c95a784",
+        "freeBytesIncrease": 1120301056
+      },
+      {
+        "name": "ols-tls-review-01-worker-b837dbc9665e",
+        "id": "bef83780980996da6f93f36bfb1f0b3fee8554b054f1fceec75a7612ac132537",
+        "freeBytesIncrease": 1120296960
+      }
+    ]
+  }
+}

@@ -126,3 +126,75 @@ python3 deploy/linux/linux.py --runtime "$RUNTIME" health
 运行 `python3 -B -m unittest discover -s deploy/linux/tests -v` 检查工具。真实验收入口为 `deploy/linux/verification/acceptance.py --run-id <唯一ID> --scenario all --inputs-file <私密映射>`；映射指向分别登记的空库、真实 v20 升级和独立合成业务实例。缺失阶段及 SKIP 都返回 `INCOMPLETE`，不能当作成功。
 
 合成测试单独授予分配权限、审核明确标记的测试模板，通过真实页面办理四条销售链。它不向初始化库写入测试业务、测试授权或已审核模板。公开结果见仓库 `docs/evidence/linux-v22-initialization/`；令牌、回调、材料正文、证书私钥和数据库备份始终私密。上线验收不等于正式模板已经审核，也不等于已执行腾讯云部署。
+
+## 公开 TLS 轮换与到期检查
+
+此路径保留原初始化、账号、原 `certs/public.*` 和 settingsDigest；新材料进入独立封存代次。实现验收状态以 `docs/evidence/public-ip-tls-rotation/report.md` 为准，单元测试通过不代表生产可部署。不得直接覆盖旧证书或重新初始化账号。未完成 restore 不支持嵌入新证书轮换；恢复出的历史证书过期时，原 restore 保持维护状态，`start` 拒绝开放。恢复前应先核对 checkpoint 中证书有效期。
+
+材料目录必须由执行账户拥有且为 `0700`，材料及输入 JSON 为 `0600`、普通文件、无硬链接或符号链接。私钥只从文件读取，不放命令行、环境变量或日志。人工导入无需 CA API、EAB 或付费服务。输入文件包含 `materials`、`proxies`、`probeTargets` 三项；材料示例：
+
+```json
+{
+  "certificate": "/absolute/private/new/certificate.pem",
+  "privateKey": "/absolute/private/new/private.key",
+  "intermediates": ["/absolute/private/new/intermediate.pem"],
+  "approvedAnchors": ["/absolute/private/new/approved-root.pem"],
+  "origins": ["https://original-application-origin", "https://original-identity-origin"],
+  "provenance": {"kind": "manual"}
+}
+```
+
+`origins` 必须与原实例完全一致。候选必须匹配私钥、覆盖原 SAN、具备服务器用途、链至代码审核准入的根，剩余有效期至少 7 天且到期日晚于当前证书。上传的中间证书不能自动成为根信任。`approvedAnchors` 的内容还须通过仓库准入表校验。
+
+`proxies` 的 Docker 登记使用 `{ "version": 1, "services": [...] }`；经过实机资格验证的 systemd 登记必须使用 `{ "version": 2, "qualification": { "mode": "report", "root": "/absolute/private/retained-proof-runtime", "sha256": "EXACT_SEALED_REPORT_FILE_SHA256" }, "services": [...] }`。生产登记不得使用测试专用的 `mode: isolated`。报告必须通过实例签名、当前 implementationDigest、Q01–Q12 全部 PASS、证据文件摘要和实际代理二进制哈希检查。测试单独通过、旧摘要报告或普通 JSON 不能代替资格证明。
+
+每个服务完整提供 `role`（nginx 或 caddy）、`transport`、`name`、`identity`、`image`、`config`、`configSha256`、`tlsPaths`。Docker 配置须已登记在运行目录 `proxy/` 下，原容器须按原路径挂载整个运行目录，身份绑定实际容器 ID 和 image ID。systemd version 2 还须提供完整 `systemd` profile：`unitFile`、`immutableFiles`、`includes`、`mainConfig`、`properties`、`process`、`credentialNames`、`listeners`；绑定实际文件内容及所有权/权限、配置图、manager 属性、固定可执行文件哈希、进程 argv/uid/gid/cgroup、端口归属与已加载凭据。复杂 manager 属性从现有 busctl 类型化读取，Exec 命令为有序 argv 数组。没有自动采用未知代理的注册 CLI；私密登记输入须按实际观测审阅后交给轮换入口。
+
+外层 nginx 必须是获准暂停的独立服务。Docker 维护仅接受准确的 `nginx -c <登记配置> -g "daemon off;"` 启动且不得有运行目录嵌套挂载。systemd 维护仅接受已通过资格门禁的固定配置图、原有 IPv4 HTTPS 监听和严格 TLS Caddy 桥接；保持登记的 HTTP 挑战配置。Caddy LoadCredential 切换由原操作控制 drop-in、daemon-reload 和停止/启动，并证明新进程实际加载了目标凭据，不能用 reload 代替。具体接入、隔离资格及清理边界见 [systemd 资格说明](verification/systemd_qualification/README.md)。
+
+清理资格实例前须私密保留原始报告、`runtime/journal.key` 及报告引用的全部相对路径证据，并核验导出文件的离机摘要。`qualification.root` 指向保持这些相对结构的私密证据目录；不要改写原报告或 instance 标识，也不要只保留报告 JSON。证据目录不是可恢复或可启动的生产 runtime。
+
+首次 legacy 回退从原操作签名记录中的 `probeTargets` 补全旧代次 deployment，再封存进 active selection，并执行完整探测；不从当前配置猜测目标。旧 native 与外部证书可以不同，候选必须晚于两者到期，回退则要求两者仍有效且原文件绑定未漂移。
+
+`probeTargets` 明确登记 bridgeIdentity、bridgeEntry、publicIdentity、publicEntry 四个目标，每项提供 role/connectHost/connectPort/verifyHost；桥接端口可显式增加 `tlsIdentity: "internal"`，仅指原封存的 `certs/server.crt` 与其 localhost 身份。公网及原生端点的 verifyHost 必须保留原 origin 的主机/IP 身份，不能改成 localhost 来通过验证；connectHost 限原主机或本机回环。两个 native 目标取自原身份计划。两段代理 TLS 校验均须保留。
+
+```sh
+python3 -B deploy/linux/linux.py --runtime /absolute/private/runtime rotate-public-tls --inputs-file /absolute/private/rotation.json
+python3 -B deploy/linux/linux.py --runtime /absolute/private/runtime rotate-public-tls-resume --operation-id ORIGINAL_ID
+python3 -B deploy/linux/linux.py --runtime /absolute/private/runtime rotate-public-tls-rollback --operation-id ORIGINAL_ID
+python3 -B deploy/linux/linux.py --runtime /absolute/private/runtime public-tls-status
+```
+
+轮换使用实例锁与原操作日志，维护先停止外层代理和原生写入者，更新原生身份容器证书及 API/Worker/入口信任配置。激活时复用原监听，只允许本机回环及原 pod 的准确地址访问原 realm 的 GET JWKS 和 POST introspection；其他身份和业务路由均返回 503。两段 TLS 和原客户端认证不变。失败清理仍停止整个外层代理。原生与桥接检查通过后才开放外层，再核对公开入口。发生异常应保留现场并使用返回的原 ID 续跑；不得换输入另开操作。回退仅适用于仍有效且完整的旧代次，结果仍属于原轮换操作。重复完全相同的已部署产物仅在实际探测通过时返回 `UNCHANGED`，保留原 ID；不同代理绑定不会被当作重复成功。
+
+默认到期阈值为 30 天 WARNING、14 天 ACTION_REQUIRED、7 天 CRITICAL；到期或指纹失败为 BLOCKED。退出码：0=OK，2=需关注，1=BLOCKED，4=UNKNOWN。未配置历史检查或超过 26 小时无成功证据时明确返回 UNKNOWN；首次实时探测结果仍单独显示。状态命令不修改运行时，输出的 `checkEvidence` 带实例签名，历史证据须放运行目录之外的私密文件，通过 `--previous-check-file` 传回。未来时间、错误签名及其他实例证据均拒绝。
+
+可在已有宿主每日调度中运行以下 Bash 片段；部署/安装调度不属于仓库修复操作。目录须预先按 `0700` 建好。仅带签名证据的有效结果替换上次检查文件，错误输出单独保留：
+
+```bash
+umask 077
+check_dir=/absolute/private/tls-monitor
+check_tmp=$(mktemp "$check_dir/.check.XXXXXX")
+check_args=()
+if test -f "$check_dir/last.json"; then
+  check_args=(--previous-check-file "$check_dir/last.json")
+fi
+check_rc=0
+python3 -B deploy/linux/linux.py --runtime /absolute/private/runtime public-tls-status "${check_args[@]}" > "$check_tmp" || check_rc=$?
+if python3 -c 'import json,sys; sys.exit(0 if "checkEvidence" in json.load(open(sys.argv[1])) else 1)' "$check_tmp"; then
+  mv "$check_tmp" "$check_dir/last.json"
+else
+  mv "$check_tmp" "$check_dir/last-error.json"
+fi
+exit "$check_rc"
+```
+
+本地日志不等于通知已送达；通知渠道须另行配置并验证，不新增收费告警服务。若上次检查文件损坏，保留错误证据后由操作员显式恢复检查记录，不能伪造一次成功检查。
+
+### 签发 hook 的准入边界
+
+生产签发提供者准入表当前为空，状态固定 `MANUAL_REQUIRED`，不承诺 ZeroSSL IP ACME、免费无限续期或自动挑战。未审核提供者、额度未知/耗尽、签发证明失效或未授权维护均在进入维护前拒绝。签发失败不会为了取证而停止仍有效的服务。
+
+受支持的接入边界是“已成功签发 → 固定私密产物 → 正式轮换入口”，而非原先仅 `nginx -t` 与 reload 的 hook。启用具体自动签发提供者前，必须另行核验并审核其客户端二进制、IP 实际签发证据、准确 lineage/archive、账户额度与有效期限和维护授权；当前不提供生产启用配置。测试专用准入仅用于明确 verification 实例，不得转为生产实例。
+
+已准入适配器只允许登记 lineage 的 cert.pem/privkey.pem/chain.pem 链接，目标须落在准确 archive 的同一编号产物；复制期间变化会拒绝。核心轮换仍只读取无链接的固定私密副本。签发成功和部署成功是两个结果；只有完整轮换与实际 TLS 探测成功才算部署成功。

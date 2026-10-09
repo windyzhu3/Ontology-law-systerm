@@ -1,0 +1,69 @@
+{
+ admin off
+ auto_https off
+ persist_config off
+ log { 
+  output discard
+ }
+ servers {
+  protocols h1 h2
+ }
+}
+https://:29846 {
+ bind 127.0.0.1
+ tls {$CREDENTIALS_DIRECTORY}/server.crt {$CREDENTIALS_DIRECTORY}/server.key
+ @directory_read {
+  method GET
+  path_regexp dirRead ^/admin/realms/qualification/users(?:/[A-Za-z0-9_-]{1,1000}[A-Za-z0-9_-]{0,1000}[A-Za-z0-9_-]{0,48})?$
+ }
+ @directory_any path_regexp dirAny ^/admin/realms/qualification/users(?:/[A-Za-z0-9_-]{1,1000}[A-Za-z0-9_-]{0,1000}[A-Za-z0-9_-]{0,48})?$
+ @identity_public path /realms/qualification /realms/qualification/* /resources/*
+ route {
+  handle @directory_read {
+   reverse_proxy https://127.0.0.1:29843 {
+ header_up Host 127.0.0.1
+ header_up X-Forwarded-Host 127.0.0.1
+ header_up X-Forwarded-Proto https
+ header_up X-Forwarded-Port 29848
+ transport http {
+  tls_server_name 127.0.0.1
+  tls_trust_pool file {$CREDENTIALS_DIRECTORY}/issuer-ca.pem
+ }
+}
+  }
+  handle @directory_any {
+   respond 403
+  }
+  handle @identity_public {
+   reverse_proxy https://127.0.0.1:29843 {
+ header_up Host 127.0.0.1
+ header_up X-Forwarded-Host 127.0.0.1
+ header_up X-Forwarded-Proto https
+ header_up X-Forwarded-Port 29848
+ transport http {
+  tls_server_name 127.0.0.1
+  tls_trust_pool file {$CREDENTIALS_DIRECTORY}/issuer-ca.pem
+ }
+}
+  }
+  respond 404
+ }
+}
+https://:29847 {
+ bind 127.0.0.1
+ tls {$CREDENTIALS_DIRECTORY}/server.crt {$CREDENTIALS_DIRECTORY}/server.key
+ @identity_admin path /admin/realms /admin/realms/* /admin/master /admin/master/*
+ route {
+  respond @identity_admin 404
+  reverse_proxy https://127.0.0.1:29844 {
+ header_up Host 127.0.0.1
+ header_up X-Forwarded-Host 127.0.0.1
+ header_up X-Forwarded-Proto https
+ header_up X-Forwarded-Port 29848
+ transport http {
+  tls_server_name 127.0.0.1
+  tls_trust_pool file {$CREDENTIALS_DIRECTORY}/issuer-ca.pem
+ }
+}
+ }
+}

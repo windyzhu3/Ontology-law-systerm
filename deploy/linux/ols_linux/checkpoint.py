@@ -10,7 +10,7 @@ from .bundle import inventory,sha
 from .config import digest
 
 EXCLUDED={'platform_meta.deployment_state','platform_meta.flyway_schema_history'}
-INSTANCE_CONTROLS={'instance.json','instance.lock','journal.key','resources.json','current-operation.json','operations','checkpoints','quarantine','restore-plan.json'}
+INSTANCE_CONTROLS={'instance.json','instance.lock','journal.key','resources.json','current-operation.json','operations','checkpoints','quarantine','restore-plan.json','tls-pending.json','tls-selection.json'}
 
 
 def role_restore_sql(raw: bytes) -> bytes:
@@ -171,6 +171,9 @@ def capture(root: Path,operation_id: str) -> dict:
             _copy(path,directory/'assets'/path.name)
         value={'version':1,'operationId':operation_id,'instanceId':resources['instanceId'],'observed':observed,'clusterFacts':cluster_facts(root),
                'businessFacts':facts,'identityFacts':identity_facts,'files':inventory(directory),'assetDirectories':asset_directories(directory/'assets')}
+        if (root/'certs/public.crt').exists():
+            from . import tls_generation
+            value['tlsBinding']=tls_generation.checkpoint_binding(root)
         journal._write(root,directory/'checkpoint.json',value)
         journal.record(root,operation_id,{'phase':'CHECKPOINT_CAPTURED','checkpointDigest':digest(value)})
         return value
@@ -262,6 +265,7 @@ def verify_restore(root: Path,operation_id: str) -> dict:
         if 'assetDirectories' in value and asset_directories(target/'restored-assets')!=value['assetDirectories']:
             raise RuntimeError('Restored non-database directories differ')
         proof={'checkpointDigest':digest(value),'targetInstanceId':target_op['instanceId'],'observed':value['observed'],'assetHashes':expected}
+        if 'tlsBinding' in value:proof['tlsBindingDigest']=digest(value['tlsBinding'])
         journal._write(root,directory/'restore-proof.json',proof)
         runtime.cleanup_verification(target)
         journal.record(root,operation_id,{'phase':'CHECKPOINT_VERIFIED','checkpointDigest':digest(value),'restoreProofDigest':digest(proof)})
@@ -272,6 +276,7 @@ def verified(root: Path,operation_id: str) -> dict:
     value=read(root,operation_id);directory=_directory(root,operation_id)
     proof=journal._read(root,directory/'restore-proof.json')
     if proof['checkpointDigest']!=digest(value) or proof['observed']!=value['observed']:raise RuntimeError('Linked restore proof differs')
+    if 'tlsBinding' in value and proof.get('tlsBindingDigest')!=digest(value['tlsBinding']):raise RuntimeError('Linked TLS restore proof differs')
     return value
 
 
