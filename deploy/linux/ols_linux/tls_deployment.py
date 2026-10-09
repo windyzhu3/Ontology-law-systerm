@@ -66,6 +66,53 @@ def copy_identity(root,name,generation):
                                                    'server.key':tls_material.read_private(p['privateKey'])})
 
 
+def _recover_retained_entry(root,operation_id,generation,entry):
+    """Recognize only the original stopped entry lost from resources by rollback."""
+    op=tls_generation.current(root,operation_id)
+    if op['phase']!='SWITCHING' or not any(e.get('recoveryFrom')=='ROLLBACK_BLOCKED' for e in op['events']):
+        raise RuntimeError('Foreign TLS replacement container')
+    saved=journal._read(root,root/'operations'/(operation_id+'-tls.json'))
+    sealed=tls_generation.read(root,saved['generationId'])
+    if sealed!=generation or sealed['operationId']!=operation_id or entry!=sealed['deployment']['launch']['ingress'] or entry['role']!='entry':
+        raise RuntimeError('Original retained entry binding differs')
+    args=entry['args'];options={};labels={};log={};mounts=[];index=3
+    if args[:3]!=['docker','run','-d']:raise RuntimeError('Original entry command differs')
+    single={'--name','--network','--log-driver','--memory','--cpus','--entrypoint'}
+    while index<len(args) and args[index].startswith('--'):
+        flag=args[index]
+        if index+1>=len(args):raise RuntimeError('Original entry option incomplete')
+        value=args[index+1];index+=2
+        if flag in single and flag not in options:options[flag]=value
+        elif flag in {'--label','--log-opt'}:
+            key,sep,item=value.partition('=');target=labels if flag=='--label' else log
+            if not sep or key in target:raise RuntimeError('Original entry option ambiguous')
+            target[key]=item
+        elif flag=='--mount':mounts.append(value)
+        else:raise RuntimeError('Unsupported retained entry option')
+    if set(options)!=single or options['--name']!=entry['name'] or options['--entrypoint']!='node' or options['--memory']!='768m' or options['--cpus']!='2' or options['--log-driver']!='local' or log!={'max-size':'10m','max-file':'2'} or mounts!=[f'type=bind,source={root},target={root},readonly']:
+        raise RuntimeError('Original retained entry profile differs')
+    if index+2>=len(args) or not options['--network'].startswith('container:'):raise RuntimeError('Original entry image/command/network missing')
+    image=args[index];command=args[index+1:]
+    expected_labels={runtime.LABEL:op['instanceId'],'ols.operation':operation_id,'ols.launch':entry['digest']}
+    if labels!=expected_labels:raise RuntimeError('Original entry labels differ')
+    actual=runtime.owned(root,'container',entry['name']);cfg=actual['Config'];host=actual['HostConfig']
+    image_info=runtime.inspect('image',image)
+    if not image_info or actual['Image']!=image_info['Id'] or cfg['Image']!=image:raise RuntimeError('Retained entry image differs')
+    image_config=image_info.get('Config') or {}
+    if actual.get('Name')!='/'+entry['name'] or actual['State']['Running'] or cfg.get('Labels')!=dict(image_config.get('Labels') or {},**expected_labels):raise RuntimeError('Retained entry identity or state differs')
+    if cfg.get('Entrypoint')!=['node'] or cfg.get('Cmd')!=command or actual.get('Path')!='node' or actual.get('Args')!=command or cfg.get('Env',[])!=image_config.get('Env',[]) or cfg.get('User','')!=image_config.get('User','') or cfg.get('WorkingDir','')!=image_config.get('WorkingDir',''):
+        raise RuntimeError('Retained entry effective command differs')
+    pod=runtime.owned(root,'container',options['--network'].removeprefix('container:'))
+    if host.get('NetworkMode') not in {options['--network'],'container:'+pod['Id']} or host.get('PortBindings') or host.get('PublishAllPorts') or actual.get('NetworkSettings',{}).get('Ports'):
+        raise RuntimeError('Retained entry network or ports differ')
+    effective=[{k:m.get(k) for k in ('Type','Source','Destination','RW')} for m in actual.get('Mounts',[])]
+    if effective!=[{'Type':'bind','Source':str(root),'Destination':str(root),'RW':False}]:raise RuntimeError('Retained entry mounts differ')
+    if host.get('Memory')!=805306368 or host.get('NanoCpus')!=2000000000 or host.get('LogConfig')!={'Type':'local','Config':log}:
+        raise RuntimeError('Retained entry resource limits differ')
+    if any(host.get(k) for k in ('Privileged','PublishAllPorts','Binds','VolumesFrom','CapAdd','Devices','DeviceRequests','DeviceCgroupRules','SecurityOpt','ExtraHosts','AutoRemove','PidMode','UTSMode','UsernsMode')) or host.get('IpcMode') not in {None,'','private'} or host.get('RestartPolicy',{}).get('Name','no') not in {'','no'}:
+        raise RuntimeError('Retained entry host privileges differ')
+
+
 def switch(root: Path,operation_id: str,generation: dict) -> None:
     with journal.locked(root) as root:
         op=tls_generation.current(root,operation_id)
@@ -77,7 +124,8 @@ def switch(root: Path,operation_id: str,generation: dict) -> None:
                 raise RuntimeError('TLS switch requires stopped writers')
         for entry in [*launch['containers'],launch['ingress']]:
             name=entry['name'];role=entry['role']
-            if name not in known and runtime.inspect('container',name):raise RuntimeError('Foreign TLS replacement container')
+            if name not in known and runtime.inspect('container',name):
+                _recover_retained_entry(root,operation_id,generation,entry)
             old=resources['containers'].get(role)
             if old and old!=name:resources['containers']['tlsRetained'+role+operation_id]=old
             resources['containers'][role]=name

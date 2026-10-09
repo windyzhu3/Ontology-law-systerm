@@ -184,12 +184,12 @@ def main():
         http_before=record(BASE/'nginx/conf.d/http.conf')
         tls_maintenance.start(ROOT,oid,plan['services'],target,oldpaths)
         receipts=[]
-        for source in ('127.0.0.1','127.0.0.2'):
+        for source in ('127.0.0.1','127.0.0.2','127.0.0.3'):
             for method,path in [('GET','certs'),('POST','token/introspect')]:
-                row=request(path='/realms/qualification/protocol/openid-connect/'+path,method=method,source=source);require(row['status']==200,'Maintenance allowed endpoint failed');receipts.append(row)
-        require(request(path='/realms/qualification/protocol/openid-connect/certs',source='127.0.0.3')['status']==403,'Maintenance source ACL broadened')
-        for path,status in [('/fixture-app',503),('/admin/master',503),('/realms/qualification/%2e/certs',404),('//realms/qualification',404)]:require(request(path=path)['status']==status,'Maintenance path guard failed')
-        require(request(path='/realms/qualification/protocol/openid-connect/certs',method='POST')['status']==405,'Maintenance method guard failed')
+                row=request(path='/realms/qualification/protocol/openid-connect/'+path,method=method,source=source,host='127.0.0.3');require(row['status']==200,'Maintenance allowed endpoint failed');receipts.append(row)
+        require(request(path='/realms/qualification/protocol/openid-connect/certs',source='127.0.0.4',host='127.0.0.3')['status']==403,'Maintenance source ACL broadened')
+        for path,status in [('/fixture-app',503),('/admin/master',503),('/realms/qualification/%2e/certs',404),('//realms/qualification',404)]:require(request(path=path,host='127.0.0.3')['status']==status,'Maintenance path guard failed')
+        require(request(path='/realms/qualification/protocol/openid-connect/certs',method='POST',host='127.0.0.3')['status']==405,'Maintenance method guard failed')
         require(record(BASE/'nginx/conf.d/http.conf')==http_before,'HTTP fragment changed')
         require(request(29845,'/.well-known/acme-challenge/token',tls=False)==challenge,'Challenge changed during maintenance')
         passed('Q03',receipts)

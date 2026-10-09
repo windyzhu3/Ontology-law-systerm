@@ -226,10 +226,18 @@ def http(root, url, *, method='GET', headers=None, body=None, client_certificate
     if tls_generation.managed(root):
         from .public_runtime import effective_paths
         request['ca']=effective_paths(root)['httpTrust']
-        selected=urlsplit(url)
-        identity_origin=urlsplit(plan['issuer'])
-        port=plan['ports']['identity'] if selected.netloc==identity_origin.netloc else plan['ports']['entry'] if selected.netloc==urlsplit(plan['origin']).netloc else plan['ports']['api']
-        if not public:request.update(connectHost='127.0.0.1',connectPort=port)
+        if not public:
+            issuer=urlsplit(plan['issuer']);origin=urlsplit(plan['origin'])
+            role='identity' if parsed.netloc==issuer.netloc else 'entry' if parsed.netloc==origin.netloc else 'api'
+            if parsed.netloc==issuer.netloc==origin.netloc:
+                path=parsed.path
+                if path.startswith('//') or '\\' in path or re.search(r'%2e|%2f|%5c',path,re.I) or any(part in {'.','..'} for part in path.split('/')):
+                    raise RuntimeError('Ambiguous shared-origin native path')
+                realm=issuer.path.rstrip('/')
+                prefixes=[realm,'/admin'+realm,'/resources']
+                identity_path=any(prefix and (path==prefix or path.startswith(prefix+'/')) for prefix in prefixes)
+                role='identity' if identity_path else 'entry'
+            request.update(connectHost='127.0.0.1',connectPort=plan['ports'][role])
     if client_certificate:
         request.update(certificate=str(root/'certs/service.crt'),privateKey=str(root/'certs/service.key'))
     result=runtime.run(['docker','exec','-i',plan['pod'],'node',http_helper(root,public=public)],canonical(request),timeout=25)

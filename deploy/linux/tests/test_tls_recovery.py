@@ -6,6 +6,36 @@ from unittest.mock import patch
 from ols_linux import journal
 
 class RecoveryTests(unittest.TestCase):
+    def test_plain_blocked_forward_retry_accepts_original_rollback_gate_revision(self):
+        """Real journal/gate CAS; Docker/probes substituted, no live acceptance claim."""
+        from contextlib import ExitStack
+        from ols_linux import tls_rotation as m
+        with tempfile.TemporaryDirectory() as directory,ExitStack() as stack:
+            root=Path(directory)/'runtime';op=journal.begin(root,'rotate-public-tls','a'*64);opid=op['operationId']
+            before={'deployment_state_key':'PRIMARY','operating_mode':'ACTIVE','active_release_digest':'a'*64,'active_manifest_hash':'b'*64,'schema_contract_version':'test','revision':29,'changed_at':'2026-10-08T00:00:00+00:00'}
+            data={'before':{'gate':before},'attempt':0,'rollbackAttempt':1,'candidate':{'directory':str(root)},'generationId':'new','release':{'descriptor':{}}}
+            m._save(root,opid,data);observed=[before];revisions=[]
+            def cas(root,prior,expected):
+                self.assertEqual(prior,observed[0]);observed[0]=expected;revisions.append(expected['revision']);return expected
+            stack.enter_context(patch.object(m.database,'observe',side_effect=lambda root:{'gate':observed[0]}))
+            stack.enter_context(patch.object(m.release,'_cas_gate',side_effect=cas))
+            for name,mode in [('maintenance','MAINTENANCE'),('active-0','ACTIVE'),('blocked-0','BLOCKED'),('rollback-maintenance-1','MAINTENANCE'),('rollback-active-1','ACTIVE'),('rollback-blocked-1','BLOCKED')]:
+                m.gate(root,opid,name,mode)
+            # Deliberately model the operator-reported plain BLOCKED state.
+            # This does not claim rollback() itself emits that state.
+            journal.record(root,opid,{'phase':'BLOCKED'})
+            old_intent=(root/'operations'/(opid+'-tls-gate-active-0.json')).read_bytes()
+            generation={'generationId':'new','trust':{}}
+            for obj,name,kwargs in [(m.tls_material,'verify',{}),(m.tls_generation,'read',{'return_value':generation}),(m.tls_generation,'verify_trust',{}),(m.tls_deployment,'switch',{}),(m.tls_deployment,'verify_copies',{}),(m,'_stop',{}),(m,'_start',{}),(m,'_probe',{}),(m.tls_proxy,'apply',{})]:
+                stack.enter_context(patch.object(obj,name,**kwargs))
+            stack.enter_context(patch('ols_linux.verify.ingress_ready'))
+            stack.enter_context(patch.object(m,'rollback',side_effect=AssertionError('Forward retry must not rollback')))
+            result=m.resume(root,opid,now=1)
+            self.assertEqual(result['outcome'],'ROTATED');self.assertEqual(result['operationId'],opid)
+            self.assertEqual(revisions,list(range(30,38)))
+            self.assertEqual(journal._read(root,m._path(root,opid))['attempt'],1)
+            self.assertEqual((root/'operations'/(opid+'-tls-gate-active-0.json')).read_bytes(),old_intent)
+
     def test_gate_commit_response_loss_reuses_exact_intent(self):
         try:m=importlib.import_module('ols_linux.tls_rotation')
         except ImportError:self.fail('TLS gate recovery missing')
