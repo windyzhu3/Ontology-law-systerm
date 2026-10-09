@@ -207,3 +207,22 @@ def start_commands(role,configuration):
         return {'check':['/usr/bin/caddy','validate',*arguments],
                 'start':['/usr/bin/caddy','run',*arguments]}
     raise RuntimeError('Only the reviewed nginx/Caddy command forms are supported')
+
+
+def credential_override(root,generation_id,sources):
+    """Render the fixed Caddy credential set; no credential bytes are accessed.
+
+    Installation/daemon-reload requires a separately sealed before/after unit graph
+    and actual qualification. This renderer neither installs nor grants admission.
+    """
+    names=('server.crt','server.key','internal-ca.pem','issuer-ca.pem')
+    if set(sources)!=set(names) or not re.fullmatch('[a-f0-9]{64}',generation_id):
+        raise RuntimeError('Exact credential sources and sealed generation required')
+    for value in [str(root),*sources.values()]:
+        if not isinstance(value,str) or not re.fullmatch('/[A-Za-z0-9_./-]+',value):
+            raise RuntimeError('Literal credential path required; unit specifiers are forbidden')
+        _path(value)
+    selected=dict(sources)
+    selected['issuer-ca.pem']=str(Path(root)/'tls/generations'/generation_id/'http-trust.pem')
+    # Reset first so an old manager-loaded assignment cannot remain alongside it.
+    return '[Service]\nLoadCredential=\n'+''.join('LoadCredential='+name+':'+selected[name]+'\n' for name in names)

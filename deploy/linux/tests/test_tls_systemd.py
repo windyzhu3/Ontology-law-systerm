@@ -117,3 +117,21 @@ class SystemdTests(unittest.TestCase):
                                'start':['/usr/bin/caddy','run','--config','/fixture/bridge.Caddyfile','--adapter','caddyfile']})
         for role,path in [('wrapper','/fixture/nginx.conf'),('nginx','relative.conf'),('nginx','/fixture/../foreign.conf')]:
             with self.subTest(role=role,path=path),self.assertRaises(RuntimeError):self.m.start_commands(role,path)
+
+    def test_credential_override_changes_only_issuer_source_without_reading_keys(self):
+        from unittest.mock import patch
+        self.assertTrue(callable(getattr(self.m,'credential_override',None)),'Bounded credential override missing')
+        sources={'server.crt':'/fixture/certs/server.crt','server.key':'/fixture/certs/server.key',
+                 'internal-ca.pem':'/fixture/certs/ca.pem','issuer-ca.pem':'/fixture/prior/root.pem'}
+        with patch.object(self.m,'_read',side_effect=AssertionError('Credential material must not be read')):
+            text=self.m.credential_override(Path('/fixture/runtime'),'a'*64,sources)
+        self.assertTrue(text.startswith('[Service]\nLoadCredential=\n'))
+        for name in ('server.crt','server.key','internal-ca.pem'):
+            self.assertIn('LoadCredential='+name+':'+sources[name]+'\n',text)
+        self.assertIn('LoadCredential=issuer-ca.pem:/fixture/runtime/tls/generations/'+'a'*64+'/http-trust.pem\n',text)
+        self.assertNotIn('/fixture/prior/root.pem',text)
+        self.assertEqual(text.count('LoadCredential='),5)
+        for changed in [dict(sources,unknown='/fixture/other'),dict(sources,**{'server.key':'/fixture/%n.key'}),dict(sources,**{'issuer-ca.pem':'/fixture/x\nExecStart=/bad'})]:
+            with self.subTest(changed=changed),self.assertRaises(RuntimeError):
+                self.m.credential_override(Path('/fixture/runtime'),'a'*64,changed)
+        with self.assertRaises(RuntimeError):self.m.credential_override(Path('/fixture/runtime'),'../foreign',sources)
