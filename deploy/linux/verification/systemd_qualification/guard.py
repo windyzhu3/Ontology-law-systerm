@@ -8,11 +8,9 @@ from ols_linux import runtime,tls_systemd as sd
 from fixture import BASE,ROOT,NAMES,SLICE,SCOPE,BINARIES,record,put
 
 
-def metrics():
-    mem=dict(line.split(':',1) for line in Path('/proc/meminfo').read_text().splitlines())
-    vm=dict(line.split() for line in Path('/proc/vmstat').read_text().splitlines())
-    full=next(line for line in Path('/proc/pressure/memory').read_text().splitlines() if line.startswith('full '))
-    return {'time':time.monotonic(),'available':int(mem['MemAvailable'].split()[0])*1024,'swapPages':int(vm['pswpin'])+int(vm['pswpout']),'psi':float(full.split()[1].split('=')[1]),'load':os.getloadavg()[0]}
+from bootstrap import resource_sample,resource_pressure,read_psi
+
+def metrics():return resource_sample()
 
 
 def health(inputs):
@@ -45,8 +43,7 @@ def admission(inputs):
     for binary,expected in BINARIES.values():
         if sd._binary_sha(binary)!=expected:raise RuntimeError('Proxy binary version/hash differs')
     before=metrics();time.sleep(5);after=metrics()
-    rate=(after['swapPages']-before['swapPages'])*os.sysconf('SC_PAGE_SIZE')/(after['time']-before['time'])
-    if after['available']<1024**3 or after['psi']>2 or rate>4*1024**2:raise RuntimeError('Insufficient memory or current memory pressure')
+    if min(before['available'],after['available'])<1024**3 or resource_pressure(before,after):raise RuntimeError('Insufficient memory or current memory pressure')
     if os.statvfs('/var/lib').f_bavail*os.statvfs('/var/lib').f_frsize<2*1024**3:raise RuntimeError('At least 2GiB disk headroom required')
     health(inputs)
     return {'metrics':after,'production':baseline(inputs)}
@@ -63,26 +60,50 @@ def stop_tests():
     if failures:raise RuntimeError('Fixture stop unconfirmed: '+','.join(failures))
 
 
+def cgroup_sample(group):
+    required={'memory.max':536870912,'memory.high':268435456,'memory.swap.max':0,'pids.max':128}
+    for name,expected in required.items():
+        if (group/name).read_text().strip()!=str(expected):raise RuntimeError('Actual test cgroup limit differs: '+name)
+    quota,period=(group/'cpu.max').read_text().split()
+    if not quota.isdigit() or int(quota)*2!=int(period):raise RuntimeError('Actual test CPU cap differs')
+    events={key:int(value) for key,value in (line.split() for line in (group/'memory.events').read_text().splitlines())}
+    if not {'max','high','oom','oom_kill'}<=events.keys() or any(value<0 for value in events.values()):raise RuntimeError('Required cgroup memory events missing')
+    return {'events':events,'psi':read_psi(group/'memory.pressure')}
+
+
+def resource_step(previous,current,events,previous_events,streak,overload,limit,cgroup_psi):
+    if current['available']<512*1024**2:raise RuntimeError('Host memory hard floor breached')
+    if any(events[key] for key in ('max','oom','oom_kill')):raise RuntimeError('Test cgroup cap/OOM event observed')
+    if any(events[key]<previous_events[key] for key in previous_events):raise RuntimeError('Test cgroup counters reset')
+    pressure=resource_pressure(previous,current) or events['high']>previous_events['high'] or cgroup_psi is not None and cgroup_psi>2
+    streak=streak+1 if pressure else 0
+    overload=overload+current['time']-previous['time'] if current['load']>limit else 0
+    if streak>=3:raise RuntimeError('Sustained memory pressure observed')
+    if overload>=60:raise RuntimeError('Sustained host load limit exceeded')
+    return streak,overload
+
+
 class Guard:
     def __init__(self,inputs,initial):
         self.inputs=inputs;self.initial=initial;self.error=None;self.child=None;self.stop=threading.Event();self.thread=threading.Thread(target=self.watch,daemon=True);self.health_thread=threading.Thread(target=self.watch_health,daemon=True)
-    def start(self):self.thread.start();self.health_thread.start()
+    def start(self):
+        group=Path('/sys/fs/cgroup/ols.slice/ols-tls.slice')/SLICE
+        self.initial_group=cgroup_sample(group)
+        if any(self.initial_group['events'][key] for key in ('max','oom','oom_kill')):raise RuntimeError('Test cgroup already hit cap/OOM')
+        put(BASE/'evidence/resource-capabilities.json',json.dumps({'hostPressureMode':self.initial['metrics']['pressureMode'],'hostPsi':self.initial['metrics']['psi'],'cgroupPsi':self.initial_group['psi'],'limitsVerified':True}))
+        self.thread.start();self.health_thread.start()
     def check(self):
         if self.error:raise RuntimeError('Safety guard stopped fixture: '+self.error)
     def watch(self):
-        previous=metrics();bad_mem=bad_pressure=0;overload=0
-        limit=max(os.cpu_count() or 1,self.initial['metrics']['load']+1)
         group=Path('/sys/fs/cgroup/ols.slice/ols-tls.slice')/SLICE
         try:
+            previous=metrics();previous_group=self.initial_group;streak=0;overload=0
+            limit=max(os.cpu_count() or 1,self.initial['metrics']['load']+1)
             while not self.stop.wait(5):
-                current=metrics();seconds=current['time']-previous['time']
-                rate=(current['swapPages']-previous['swapPages'])*os.sysconf('SC_PAGE_SIZE')/seconds
-                bad_mem=bad_mem+1 if current['available']<512*1024**2 else 0
-                bad_pressure=bad_pressure+1 if current['psi']>2 or rate>4*1024**2 else 0
-                overload=overload+seconds if current['load']>limit else 0
-                events=dict(line.split() for line in (group/'memory.events').read_text().splitlines())
-                if bad_mem>=3 or bad_pressure>=3 or overload>=60 or any(int(events[k]) for k in ('max','oom','oom_kill')):raise RuntimeError('Resource threshold exceeded')
-                previous=current
+                current=metrics();current_group=cgroup_sample(group)
+                if (current_group['psi'] is None)!=(previous_group['psi'] is None):raise RuntimeError('Test cgroup pressure capability changed')
+                streak,overload=resource_step(previous,current,current_group['events'],previous_group['events'],streak,overload,limit,current_group['psi'])
+                previous=current;previous_group=current_group
         except Exception as error:self.fail(error)
     def watch_health(self):
         try:

@@ -35,6 +35,20 @@ Bootstrap rechecks names, directories, loopback ports, current health, cgroup v2
 
 The scope shares a slice capped at 512MiB, MemoryHigh256MiB, zero test swap, CPU50%, Tasks128. The tmpfs is255MiB; fixed unit/drop-in files are below1MiB. Ports are loopback29843–29848 only. No users, firewall, sysctl, packages, Docker resources or production certificate changes.
 
+## Read-only capability check and pressure fallback
+
+Before another execution attempt, the operator may stream the same verified bootstrap and envelope with `--check-only`. This runs all read-only admission checks and returns before any fixture directory, mount, certificate or unit file is created:
+
+```text
+EXISTING_PYTHON -B -c EXACT_VERIFIED_BOOTSTRAP_SOURCE --check-only < PRIVATE_ENVELOPE_STREAM
+```
+
+The checks cover existing commands/accounts, exact binaries, systemd247+ credential support, Python/OpenSSL TLS1.3, root mount/process-inspection capabilities, cgroup v2 memory/cpu/pids controllers, kernel socket tables, names/paths/ports, original health, disk and memory. Existing SELinux enforcement requires a separate read-only review of policy for these exact test paths/ports; the runner refuses to guess or alter policy. After the capped scope is created, actual kernel memory/high/swap/CPU/tasks limits and required memory event counters are verified before generating certificates or starting test services.
+
+A missing host PSI node is explicitly recorded as `psi: null`, `pressureMode: vmstat-fallback`; it is never treated as zero pressure. Fallback requires both direct-reclaim and allocation-stall counters. Admission requires at least1GiB MemAvailable at both ends of the five-second sample and **no increase** in swap pages, direct reclaim or allocation stalls. Missing/malformed/unreadable required counters, counter reset, or a changed observation capability rejects admission or stops tests.
+
+During execution, MemAvailable below512MiB stops tests on the next five-second sample. Any test cgroup cap/OOM event stops tests. Three consecutive pressure samples stop tests: in fallback mode **any** swap/direct-reclaim/allocation-stall growth qualifies; cgroup high events and PSI above2%, when actually available, also qualify. With host PSI available, the original2%/4MiB-per-second swap gates apply. The production-health thread remains separate from uninterrupted resource sampling; production drift, sustained load, or observation failure stops only test resources. This is a conservative counter-based safety gate, not a fabricated PSI measurement or a claim that the metrics are identical.
+
 ## Outcomes and interruption
 
 Each genuine completed case prints its ID, PASS and original operation ID. The final sealed report is `/run/ols-tls-qualification/runtime/verification/systemd-proxy-qualification.json`. Per-case evidence and original intents remain under this synthetic runtime. Absence of the final report, a failed check, or a process error means NOT PASSED. Resource/health guard failures stop only the test services.

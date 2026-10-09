@@ -81,7 +81,7 @@ class PackageTests(unittest.TestCase):
     def test_admission_checks_var_lib_disk_not_run_tmpfs(self):
         import guard
         from types import SimpleNamespace
-        metrics={'time':1,'available':2*1024**3,'swapPages':0,'psi':0,'load':0}
+        metrics={'time':1,'available':2*1024**3,'swapPages':0,'psi':0,'load':0,'pressureMode':'psi','directReclaim':0,'allocationStalls':0}
         def read(path,*args,**kwargs):
             if str(path)=='/proc/1/comm':return 'systemd\n'
             if str(path)=='/sys/fs/cgroup/cgroup.controllers':return 'memory cpu\n'
