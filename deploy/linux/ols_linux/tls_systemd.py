@@ -194,3 +194,16 @@ def control(root,operation_id,service,action,expected_credentials):
         if after['credentials']!=expected_credentials:
             raise RuntimeError('Loaded credentials differ from original intent')
         return after
+
+
+def start_commands(role,configuration):
+    """Fixed observed command forms; this alone does not qualify a complete unit."""
+    configuration=str(_path(configuration))
+    if role=='nginx':
+        return {'check':['/usr/sbin/nginx','-t','-c',configuration],
+                'start':['/usr/sbin/nginx','-c',configuration,'-g','daemon off;']}
+    if role=='caddy':
+        arguments=['--config',configuration,'--adapter','caddyfile']
+        return {'check':['/usr/bin/caddy','validate',*arguments],
+                'start':['/usr/bin/caddy','run',*arguments]}
+    raise RuntimeError('Only the reviewed nginx/Caddy command forms are supported')

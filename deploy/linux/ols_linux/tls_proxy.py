@@ -69,14 +69,19 @@ def _check(service,candidate):
     if service['transport']=='docker':
         runtime.run(['docker','run','--rm','--network','none','--volumes-from',service['name'],
                      '--entrypoint',arguments[0],service['image'],*arguments[1:]])
-    else:runtime.run([('/usr/sbin/nginx' if service['role']=='nginx' else '/usr/bin/caddy'),*arguments[1:]])
+    else:
+        from . import tls_systemd
+        runtime.run(tls_systemd.start_commands(service['role'],str(candidate))['check'])
 
 
 def _action(service,action):
     if service['transport']=='docker':
         if action in {'start','stop'}:runtime.run(['docker',action,service['name']])
         else:runtime.run(['docker','exec',service['name'],'caddy','reload','--config',service['config'],'--adapter','caddyfile'])
-    else:runtime.run(['systemctl',action,service['name']])
+    else:
+        if service['role']=='caddy' and action=='reload':
+            raise RuntimeError('Systemd Caddy requires original-operation credential control, not reload')
+        runtime.run(['systemctl',action,service['name']])
 
 
 def observe(root: Path,operation_id: str) -> dict:

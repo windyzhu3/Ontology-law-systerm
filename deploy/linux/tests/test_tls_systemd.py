@@ -106,3 +106,14 @@ class SystemdTests(unittest.TestCase):
         (credentials/'server.crt').write_bytes(b'old certificate')
         with self.assertRaises(RuntimeError):self.m.verify_credentials(credentials,expected)
         with self.assertRaises(RuntimeError):self.m.verify_credentials(credentials,{'../proxy.conf':self.record['sha256']})
+
+    def test_fixed_start_commands_match_observed_simple_nginx_and_caddy(self):
+        self.assertTrue(callable(getattr(self.m,'start_commands',None)),'Fixed startup profile missing')
+        nginx=self.m.start_commands('nginx','/fixture/nginx.conf')
+        self.assertEqual(nginx,{'check':['/usr/sbin/nginx','-t','-c','/fixture/nginx.conf'],
+                               'start':['/usr/sbin/nginx','-c','/fixture/nginx.conf','-g','daemon off;']})
+        caddy=self.m.start_commands('caddy','/fixture/bridge.Caddyfile')
+        self.assertEqual(caddy,{'check':['/usr/bin/caddy','validate','--config','/fixture/bridge.Caddyfile','--adapter','caddyfile'],
+                               'start':['/usr/bin/caddy','run','--config','/fixture/bridge.Caddyfile','--adapter','caddyfile']})
+        for role,path in [('wrapper','/fixture/nginx.conf'),('nginx','relative.conf'),('nginx','/fixture/../foreign.conf')]:
+            with self.subTest(role=role,path=path),self.assertRaises(RuntimeError):self.m.start_commands(role,path)

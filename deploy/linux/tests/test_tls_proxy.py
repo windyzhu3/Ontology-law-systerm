@@ -62,3 +62,10 @@ class ProxyTests(unittest.TestCase):
         for state in [b'ActiveState=failed\nSubState=failed\nMainPID=0\n',b'ActiveState=deactivating\nSubState=stop-sigterm\nMainPID=123\n']:
             with self.subTest(state=state),patch.object(self.m,'sha',return_value='a'*64),patch.object(runtime,'run',side_effect=[SimpleNamespace(stdout=b'unit',returncode=0),SimpleNamespace(stdout=state,returncode=3)]):
                 with self.assertRaisesRegex(RuntimeError,'unknown'):self.m._service(service)
+
+    def test_systemd_caddy_reload_is_rejected_before_systemctl(self):
+        service={'transport':'systemd','role':'caddy','name':'isolated-bridge.service'}
+        with patch.object(runtime,'run') as run:
+            with self.assertRaisesRegex(RuntimeError,'credential control'):
+                self.m._action(service,'reload')
+            run.assert_not_called()
