@@ -6,6 +6,7 @@ No function here adopts a service, executes supplied argv, or changes a unit.
 """
 import glob
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -246,24 +247,70 @@ UNIT_PROPERTIES=('FragmentPath','DropInPaths','Type','User','Group','ExecStart',
 STATE_PROPERTIES=('ActiveState','SubState','MainPID','ControlPID','ControlGroup','NeedDaemonReload')
 
 
+EXEC_PROPERTIES=tuple(key for key in UNIT_PROPERTIES if key.startswith('Exec'))
+STRUCTURED_PROPERTIES=(*EXEC_PROPERTIES,'LoadCredential','EnvironmentFiles','BindPaths','BindReadOnlyPaths')
+
+
+def _structured_property(key,value):
+    signature=('a(sasbttttuii)' if key in EXEC_PROPERTIES else
+               {'LoadCredential':'a(ss)','EnvironmentFiles':'a(sb)','BindPaths':'a(ssbt)','BindReadOnlyPaths':'a(ssbt)'}[key])
+    if not isinstance(value,dict) or set(value)!={'type','data'} or value['type']!=signature or not isinstance(value['data'],list):
+        raise RuntimeError('Unsupported typed systemd property: '+key)
+    rows=value['data']
+    def string(item):return isinstance(item,str) and not any(ord(c)<32 for c in item) and item!='[unprintable]'
+    if key in EXEC_PROPERTIES:
+        commands=[]
+        for row in rows:
+            if not isinstance(row,list) or len(row)!=10:raise RuntimeError('Invalid typed executable record')
+            path,argv,ignored,*status=row
+            if not string(path) or not path.startswith('/') or not isinstance(argv,list) or not argv or not all(string(arg) for arg in argv) or argv[0]!=path or ignored is not False or not all(type(n) is int for n in status):
+                raise RuntimeError('Ignored or indirect systemd executable is unsupported')
+            commands.append(argv)
+        return commands  # Preserve both command order and every argv boundary.
+    if key=='LoadCredential':
+        sources={}
+        for row in rows:
+            if not isinstance(row,list) or len(row)!=2 or not all(string(item) for item in row):raise RuntimeError('Invalid typed credential source')
+            name,path=row
+            if not re.fullmatch(r'[A-Za-z0-9_.-]+',name) or name in sources or not path.startswith('/') or any(c.isspace() for c in path) or ':' in path:
+                raise RuntimeError('Ambiguous credential source binding')
+            _path(path);sources[name]=path
+        return ' '.join(name+':'+path for name,path in sorted(sources.items()))
+    for row in rows:
+        if not isinstance(row,list):raise RuntimeError('Invalid typed systemd array')
+        valid=(len(row)==2 and string(row[0]) and type(row[1]) is bool) if key=='EnvironmentFiles' else (len(row)==4 and string(row[0]) and string(row[1]) and type(row[2]) is bool and type(row[3]) is int and row[3]>=0)
+        if not valid:raise RuntimeError('Invalid typed systemd array')
+    return rows
+
+
 def unit_snapshot(name,properties):
     from . import runtime
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.@-]*\.service',name) or set(properties)!=set(UNIT_PROPERTIES):
         raise RuntimeError('Exact unit and complete loaded-property binding required')
-    result=runtime.run(['systemctl','show',name,'--property='+','.join((*UNIT_PROPERTIES,*STATE_PROPERTIES))])
+    scalar=tuple(key for key in (*UNIT_PROPERTIES,*STATE_PROPERTIES) if key not in STRUCTURED_PROPERTIES)
+    result=runtime.run(['systemctl','show',name,'--all','--no-pager','--property='+','.join(scalar)])
     rows={}
     for line in result.stdout.decode().splitlines():
         key,separator,value=line.partition('=')
-        if not separator or key in rows:raise RuntimeError('Ambiguous systemd property response')
-        if key.startswith('Exec'):
-            commands=re.findall(r'\{ path=([^;]+) ; argv\[\]=(.+?) ; ignore_errors=(yes|no) ;',value)
-            if value and not commands:raise RuntimeError('Unsupported systemd executable property format')
-            if any(ignored!='no' or not argv.startswith(path.strip()+' ') for path,argv,ignored in commands):
-                raise RuntimeError('Ignored or indirect systemd executable is unsupported')
-            value='\n'.join(argv for _,argv,_ in commands)
-        if key=='LoadCredential':value=' '.join(sorted(value.split()))
+        if not separator or key in rows or key not in scalar or '[unprintable]' in value:raise RuntimeError('Ambiguous systemd property response')
         rows[key]=value
-    if set(rows)!=set(UNIT_PROPERTIES)|set(STATE_PROPERTIES):raise RuntimeError('Incomplete systemd property response')
+    if set(rows)!=set(scalar):raise RuntimeError('Incomplete systemd property response')
+    # systemctl's human renderer repeats Exec* keys, omits empty struct arrays,
+    # and prints LoadCredential as [unprintable] on systemd 252. Read those exact
+    # properties from D-Bus instead; no credential contents or GetAll request.
+    object_path='/org/freedesktop/systemd1/unit/'+''.join(c if c.isascii() and c.isalnum() else '_'+format(ord(c),'02x') for c in name)
+    result=runtime.run(['busctl','--system','--no-pager','--json=short','get-property','org.freedesktop.systemd1',object_path,'org.freedesktop.systemd1.Service',*STRUCTURED_PROPERTIES])
+    def unique(pairs):
+        value={}
+        for key,item in pairs:
+            if key in value:raise RuntimeError('Duplicate typed systemd JSON field')
+            value[key]=item
+        return value
+    try:
+        lines=result.stdout.decode().splitlines()
+        if len(lines)!=len(STRUCTURED_PROPERTIES):raise RuntimeError('Incomplete typed systemd property response')
+        for key,line in zip(STRUCTURED_PROPERTIES,lines):rows[key]=_structured_property(key,json.loads(line,object_pairs_hook=unique))
+    except (ValueError,UnicodeError) as error:raise RuntimeError('Malformed typed systemd property response') from error
     return {'properties':{k:rows[k] for k in UNIT_PROPERTIES},'state':{k:rows[k] for k in STATE_PROPERTIES}}
 
 
@@ -390,7 +437,7 @@ def observe_service(service):
     verify_files([profile['unitFile'],*profile['immutableFiles']]);verify_includes(profile['includes'])
     verify_configuration_graph(service)
     process_profile=profile['process'];commands=start_commands(service['role'],profile['mainConfig'])
-    if profile['properties']['ExecStart']!=' '.join(commands['start']) or profile['properties']['ExecStartPre']!=' '.join(commands['check']):
+    if profile['properties']['ExecStart']!=[commands['start']] or profile['properties']['ExecStartPre']!=[commands['check']]:
         raise RuntimeError('Registered startup does not use the fixed proxy commands')
     if profile['properties']['FragmentPath']!=profile['unitFile']['path']:
         raise RuntimeError('Manager unit fragment is not the registered file')

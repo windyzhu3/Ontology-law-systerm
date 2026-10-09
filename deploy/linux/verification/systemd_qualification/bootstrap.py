@@ -115,7 +115,7 @@ def main():
     if hashlib.sha256(archive).hexdigest()!=value['archiveSha256']:raise RuntimeError('Operator package digest mismatch')
     if os.geteuid()!=0 or Path('/proc/1/comm').read_text().strip()!='systemd' or sys.version_info<(3,10):raise RuntimeError('Existing root/systemd/Python3.10+ required')
     for account in ('nginx','caddy'):pwd.getpwnam(account)
-    for executable in ('systemctl','systemd-run','mount','umount','openssl'):
+    for executable in ('systemctl','systemd-run','busctl','mount','umount','openssl'):
         if not shutil.which(executable):raise RuntimeError('Required existing executable missing: '+executable)
     capabilities=host_capabilities()
     for binary,expected in [('/usr/sbin/nginx','9cf471abeb2d00b07ab215264fdd87100f5b5e52ccc5f6045acb469929dfb576'),('/usr/bin/caddy','33cd4c300c46fef824abe017fb3c5698698c41cd7eaf9cf097126d5ac6e4cf4a')]:

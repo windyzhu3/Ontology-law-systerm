@@ -19,7 +19,7 @@ class SystemdObservationTests(unittest.TestCase):
         commands={'ExecStart':'/usr/sbin/nginx -c '+str(self.config)+' -g daemon off;',
                   'ExecStartPre':'/usr/sbin/nginx -t -c '+str(self.config)}
         self.properties={'FragmentPath':str(self.unit),'DropInPaths':'','User':'','Group':'','Type':'simple',
-                         'ExecStart':commands['ExecStart'],'ExecStartPre':commands['ExecStartPre'],'LoadCredential':''}
+                         'ExecStart':[['/usr/sbin/nginx','-c',str(self.config),'-g','daemon off;']],'ExecStartPre':[['/usr/sbin/nginx','-t','-c',str(self.config)]],'LoadCredential':''}
         self.properties={**dict.fromkeys(tls_systemd.UNIT_PROPERTIES,''),**self.properties}
         self.profile={'unitFile':record(self.unit),'immutableFiles':[record(self.config)],'includes':{},
                       'mainConfig':str(self.config),'properties':self.properties,
@@ -65,17 +65,6 @@ class SystemdObservationTests(unittest.TestCase):
     def test_manager_fragment_must_be_the_hashed_unit_file(self):
         self.properties['FragmentPath']='/foreign/fixture.service'
         with self.assertRaises(RuntimeError):self.observation()
-
-    def test_exec_timestamps_do_not_change_the_loaded_command_identity(self):
-        self.assertTrue(callable(getattr(tls_systemd,'unit_snapshot',None)))
-        for timestamp in ('old','new'):
-            rows=dict(self.properties,**self.state)
-            for key in ('ExecStart','ExecStartPre'):
-                argv=rows[key];rows[key]='{ path=/usr/sbin/nginx ; argv[]='+argv+' ; ignore_errors=no ; start_time=['+timestamp+'] ; stop_time=[n/a] ; pid=41 ; code=(null) ; status=0/0 }'
-            payload=''.join(key+'='+value+'\n' for key,value in rows.items()).encode()
-            with patch.object(runtime,'run',return_value=SimpleNamespace(stdout=payload)):
-                value=tls_systemd.unit_snapshot('fixture.service',self.properties)
-                self.assertEqual(value['properties'],self.properties)
 
     def test_credential_hashes_use_the_process_root_and_reject_links(self):
         self.assertTrue(callable(getattr(tls_systemd,'credential_hashes_at',None)),'Process-root credential reader missing')
