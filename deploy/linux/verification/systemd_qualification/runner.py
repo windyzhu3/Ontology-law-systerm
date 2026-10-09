@@ -40,6 +40,14 @@ def expect_failure(action):
     raise AssertionError('Required negative control unexpectedly succeeded')
 
 
+def expired_peer(port):
+    try:request(port,ca='old')
+    except ssl.SSLCertVerificationError as error:
+        if error.verify_code!=10:raise RuntimeError('TLS failure was not certificate expiry') from error
+        return {'port':port,'error':'SSLCertVerificationError','verifyCode':10}
+    raise RuntimeError('Expired peer unexpectedly verified')
+
+
 def require(value,message):
     if not value:raise AssertionError(message)
 
@@ -227,7 +235,7 @@ def main():
         close();deadline=old['originalPublicTargets']['nativeEntry']['notAfter']
         while time.time()<=deadline:guard.check();time.sleep(min(5,max(.1,deadline-time.time()+.1)))
         refusal=expect_failure(lambda:tls_original.validate(old,now=int(time.time())))
-        expired_peers=[expect_failure(lambda port=port:request(port,ca='old')) for port in (29843,29844)]
+        expired_peers=[expired_peer(port) for port in (29843,29844)]
         require(tls_proxy.observe(ROOT,oid)['closed'],'Expired rollback reopened outer')
         passed('Q10',{'refusal':refusal,'oldNotAfter':deadline,'observedAt':time.time(),'outerClosed':True,'strictExpiredPeerFailures':expired_peers})
         require(baseline(inputs)==initial['production'],'Production changed');final_health=health(inputs)

@@ -65,3 +65,15 @@ class PackageTests(unittest.TestCase):
             with patch.object(runner,'stop_tests',side_effect=RuntimeError('stop unknown') if failure=='stop' else None),patch.object(runner.journal,'_write') as write:
                 with self.assertRaises(RuntimeError):runner.finalize({'status':'PASS'},watch)
                 write.assert_not_called()
+
+    def test_expiry_proof_rejects_unavailable_peers_and_other_tls_errors(self):
+        import runner,ssl
+        self.assertTrue(callable(getattr(runner,'expired_peer',None)))
+        for error in [ConnectionRefusedError('offline'),ssl.SSLError('handshake failure')]:
+            with patch.object(runner,'request',side_effect=error):
+                with self.assertRaises(type(error)):runner.expired_peer(29843)
+        expired=ssl.SSLCertVerificationError(1,'expired');expired.verify_code=10
+        wrong_ca=ssl.SSLCertVerificationError(1,'unknown CA');wrong_ca.verify_code=20
+        with patch.object(runner,'request',side_effect=wrong_ca):
+            with self.assertRaisesRegex(RuntimeError,'expiry'):runner.expired_peer(29843)
+        with patch.object(runner,'request',side_effect=expired):self.assertEqual(runner.expired_peer(29843)['verifyCode'],10)
