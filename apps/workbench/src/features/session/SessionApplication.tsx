@@ -268,7 +268,12 @@ function SessionRoutes({
     if(target && target!==stage) confirmed(context);
   },[path]);
   const leaveSession=(action:()=>void)=>stage==='admin'||stage==='intake'?guardedLeave(action):action();
-  const sessionActions=context?<SessionActions context={context} onSwitch={()=>leaveSession(()=>selectStage('choosing'))} onLogout={()=>leaveSession(()=>{
+  const sessionActions=context?<SessionActions context={context} onSwitch={()=>leaveSession(()=>{
+    // Switching appointments leaves the previous administrative destination;
+    // the newly selected appointment must choose its own authorized entry.
+    selectStage('choosing');
+    if (adminIntent) navigate('/workbench');
+  })} onLogout={()=>leaveSession(()=>{
     explicitLogout.current = true;
     loginDestination.current = null;
     clearLoginDestination();
