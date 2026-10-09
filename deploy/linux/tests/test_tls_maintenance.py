@@ -3,6 +3,17 @@ import importlib
 import unittest
 
 class MaintenanceTests(unittest.TestCase):
+    def test_systemd_hairpin_source_is_only_the_sealed_issuer_ipv4(self):
+        m=self.module()
+        sources=m.sources('172.22.0.4','https://203.0.113.10/realms/fixture',systemd=True)
+        self.assertEqual(set(sources),{'127.0.0.1','172.22.0.4','203.0.113.10'})
+        text=m.render(**dict(self.args(),sources=sources))
+        self.assertEqual(text.count('allow 203.0.113.10;'),2)
+        self.assertIn('deny all;',text)
+        self.assertNotIn('203.0.113.0/',text)
+        self.assertEqual(set(m.sources('172.22.0.4','https://203.0.113.10/realms/fixture',systemd=False)),{'127.0.0.1','172.22.0.4'})
+        for issuer in ['https://example.test/realms/x','https://[::1]/realms/x']:
+            with self.assertRaises(ValueError):m.sources('172.22.0.4',issuer,systemd=True)
     def module(self):
         try:return importlib.import_module('ols_linux.tls_maintenance')
         except ImportError:self.fail('Restricted issuer maintenance implementation missing')

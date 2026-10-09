@@ -49,6 +49,16 @@ class GenerationTests(unittest.TestCase):
         Path(g['paths']['certificate']).write_bytes(b'changed')
         journal.record(self.root,op['operationId'],{'phase':'SWITCHING'})
         with self.assertRaises(RuntimeError):self.m.select(self.root,op['operationId'],old['generationId'],g['generationId'])
+    def test_original_candidate_can_be_reselected_after_previous_generation_selected(self):
+        old,op,g=self.prepare();opid=op['operationId']
+        journal.record(self.root,opid,{'phase':'SWITCHING'})
+        self.m.select(self.root,opid,old['generationId'],g['generationId'])
+        # Reproduce the exact legacy selection shape written by rollback.
+        journal._write(self.root,self.root/'tls-selection.json',{'generationId':old['generationId'],'operationId':opid})
+        journal._write(self.root,self.root/'tls/active.json',{'legacy':old,'operationId':opid})
+        self.assertEqual(self.m.resolve(self.root)['generationId'],old['generationId'])
+        self.m.select(self.root,opid,g['parentGenerationId'],g['generationId'])
+        self.assertEqual(self.m.resolve(self.root)['generationId'],g['generationId'])
     def test_selection_intent_response_loss_recovers_without_legacy_fallback(self):
         from unittest.mock import patch
         old,op,g=self.prepare();journal.record(self.root,op['operationId'],{'phase':'SWITCHING'})

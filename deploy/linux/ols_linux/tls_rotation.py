@@ -177,11 +177,56 @@ def _probe(root,opid,generation,scope,now):
     return evidence
 
 
+def forward_resume(root: Path,operation_id: str,*,now: int,qualification=None) -> dict:
+    """Explicitly abandon a failed rollback, preserving the original candidate/ID."""
+    from . import tls_systemd_qualification
+    with journal.locked(root) as root:
+        op=journal.current(root)
+        if op['operationId']!=operation_id or op['kind']!='rotate-public-tls':raise RuntimeError('Explicit current TLS operation required')
+        recovery=[e for e in op['events'] if e.get('recoveryFrom')=='ROLLBACK_BLOCKED']
+        if recovery:
+            if op['phase'].startswith('ROLLBACK'):raise RuntimeError('A subsequent rollback cannot reuse forward recovery admission')
+            if qualification is not None:
+                amendment=journal._read(root,root/'operations'/(operation_id+'-systemd-qualification-amendment.json'))
+                if amendment['proof']!=qualification:raise RuntimeError('Forward recovery qualification differs')
+            return resume(root,operation_id,now=now)
+        if op['phase']!='ROLLBACK_BLOCKED':raise RuntimeError('Explicit forward recovery requires blocked rollback')
+        data=journal._read(root,_path(root,operation_id))
+        tls_material.verify(Path(data['candidate']['directory']),data['candidate'],now=now)
+        generation=tls_generation.read(root,data['generationId'])
+        if generation['operationId']!=operation_id or generation['parentGenerationId']!=data['previousGeneration']['generationId']:
+            raise RuntimeError('Original forward generation binding differs')
+        if tls_generation.resolve(root)['generationId'] not in {generation['generationId'],generation['parentGenerationId']}:
+            raise RuntimeError('Selected generation is outside original operation')
+        tls_generation.verify_trust(root,generation['trust'])
+        expected=journal._read(root,root/'operations'/(operation_id+'-tls-gate-rollback-blocked-'+str(data['rollbackAttempt'])+'.json'))['expected']
+        actual=database.observe(root)['gate']
+        if expected['operating_mode']!='BLOCKED' or not release._same_gate(actual,expected):raise RuntimeError('Original blocked rollback gate differs')
+        if not tls_proxy.observe(root,operation_id)['closed']:raise RuntimeError('Forward recovery requires closed public ingress')
+        resources=runtime.load(root)
+        for name in set(resources['writers'])|({resources['ingress']} if resources.get('ingress') else set()):
+            if runtime.inspect('container',name) is not None and runtime.owned(root,'container',name)['State']['Running']:
+                raise RuntimeError('Forward recovery requires stopped writers')
+        registration=journal._read(root,root/'operations'/(operation_id+'-proxy.json'))['registration']
+        if registration.get('version')==2:
+            if qualification is not None:tls_systemd_qualification.amend(root,operation_id,registration,qualification)
+            tls_systemd_qualification.require(root,registration)
+        elif qualification is not None:raise RuntimeError('Qualification amendment only applies to registered systemd')
+        # This event is the immutable transition intent. resume persists/reuses its
+        # attempt before any gate effect, including after a lost response here.
+        _phase(root,operation_id,'RETRYING',retryAttempt=data.get('attempt',0)+1,recoveryFrom='ROLLBACK_BLOCKED',generationId=generation['generationId'],blockedGateDigest=digest(actual))
+        return resume(root,operation_id,now=now)
+
+
 def resume(root: Path,operation_id: str,*,now: int) -> dict:
     with journal.locked(root) as root:
         reconcile_pending(root);op=journal.current(root)
         if op['operationId']!=operation_id or op['kind']!='rotate-public-tls':raise RuntimeError('Explicit current TLS operation required')
         data=journal._read(root,_path(root,operation_id));opid=operation_id
+        if any(e.get('recoveryFrom')=='ROLLBACK_BLOCKED' for e in op['events']):
+            from . import tls_systemd_qualification
+            registration=journal._read(root,root/'operations'/(opid+'-proxy.json'))['registration']
+            if registration.get('version')==2:tls_systemd_qualification.require(root,registration)
         if op['phase']=='COMPLETE':return {'operationId':opid,'kind':op['kind'],'phase':'COMPLETE','outcome':op['events'][-1]['outcome'],'generationId':tls_generation.resolve(root)['generationId']}
         if op['phase'].startswith('ROLLBACK'):return rollback(root,opid,now=now)
         phase=op['phase']

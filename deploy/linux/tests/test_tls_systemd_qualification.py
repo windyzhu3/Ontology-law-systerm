@@ -1,8 +1,33 @@
 import importlib
 from pathlib import Path
 import unittest
+import tempfile
+from ols_linux import journal
+from ols_linux.bundle import sha
 
 class QualificationTests(unittest.TestCase):
+    def test_new_report_amendment_is_bound_to_original_registration_and_operation(self):
+        m=self.module()
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)/'production';op=journal.begin(root,'rotate-public-tls','a'*64)
+            journal.record(root,op['operationId'],{'phase':'ROLLBACK_BLOCKED'})
+            proofroot=Path(directory)/'proof';journal.begin(proofroot,'rotate-public-tls','b'*64)
+            evidence=proofroot/'verification/Q.json';journal._write(proofroot,evidence,{'syntheticUnitTest':True})
+            report=proofroot/'verification/systemd-proxy-qualification.json'
+            journal._write(proofroot,report,{'status':'PASS','implementationDigest':m.implementation_digest(),'manager':{'comm':'systemd','pid':1},'cases':{name:{'status':'PASS'} for name in m.CASES},'evidence':{'verification/Q.json':sha(evidence)},'binaries':{'nginx':'binary'}})
+            proof={'mode':'report','root':str(proofroot),'sha256':sha(report)}
+            registration={'qualification':dict(proof,sha256='0'*64),'services':[{'role':'nginx','image':'binary'}]}
+            with self.assertRaises(RuntimeError):m.require(root,registration)
+            m.amend(root,op['operationId'],registration,proof)
+            m.require(root,registration)
+            with self.assertRaises(RuntimeError):m.require(root,dict(registration,services=[{'role':'nginx','image':'other'}]))
+            receipt=root/'operations'/(op['operationId']+'-systemd-qualification-amendment.json')
+            saved=receipt.read_bytes();m.amend(root,op['operationId'],registration,proof)
+            self.assertEqual(receipt.read_bytes(),saved)
+            journal.record(root,op['operationId'],{'phase':'COMPLETE'})
+            m.require(root,dict(registration,qualification=proof))
+            evidence.write_bytes(b'changed')
+            with self.assertRaises(RuntimeError):m.require(root,registration)
     def module(self):
         try:return importlib.import_module('ols_linux.tls_systemd_qualification')
         except ImportError:self.fail('Systemd qualification admission missing')

@@ -36,6 +36,7 @@ def parser():
     rotate=commands.add_parser('rotate-public-tls');rotate.add_argument('--inputs-file',type=Path,required=True)
     for name in ('rotate-public-tls-resume','rotate-public-tls-rollback'):
         command=commands.add_parser(name);command.add_argument('--operation-id',required=True)
+    forward=commands.add_parser('rotate-public-tls-forward-resume');forward.add_argument('--operation-id',required=True);forward.add_argument('--qualification-file',type=Path)
     return p
 
 
@@ -83,6 +84,7 @@ def dispatch(args):
     if name=='public-tls-status':return tls_status.status(root,now=int(time.time()),previous_check=args.previous_check_file)
     if name=='rotate-public-tls':return tls_rotation.begin(root,json.loads(tls_material.read_private(args.inputs_file)),now=int(time.time()))
     if name=='rotate-public-tls-resume':return tls_rotation.resume(root,args.operation_id,now=int(time.time()))
+    if name=='rotate-public-tls-forward-resume':return tls_rotation.forward_resume(root,args.operation_id,now=int(time.time()),qualification=private_json(args.qualification_file) if args.qualification_file else None)
     if name=='rotate-public-tls-rollback':return tls_rotation.rollback(root,args.operation_id,now=int(time.time()))
     if name=='release-status':return release.status(root)
     if name=='health':return release.health(root)

@@ -8,7 +8,7 @@ from ols_linux import runtime,tls_systemd as sd
 from fixture import BASE,ROOT,NAMES,SLICE,SCOPE,BINARIES,record,put
 
 
-from bootstrap import resource_sample,resource_pressure,read_psi
+from bootstrap import resource_sample,resource_pressure,read_psi,production_health
 
 def metrics():return resource_sample()
 
@@ -18,6 +18,7 @@ def health(inputs):
     cli=Path(inputs['healthCli']);python=Path(inputs['healthPython']);root=Path(inputs['healthRuntime'])
     if not all(p.is_absolute() for p in (cli,python,root)) or cli.name!='linux.py':raise RuntimeError('Exact original health entrypoint required')
     if record(cli)['sha256']!=inputs['healthCliSha256']:raise RuntimeError('Original health CLI changed')
+    if 'maintenanceBaseline' in inputs:return production_health(inputs)
     result=runtime.run([str(python),'-B',str(cli),'--runtime',str(root),'health'],timeout=60)
     value=json.loads(result.stdout)
     if value.get('status')!='PASS':raise RuntimeError('Original production health is not PASS')

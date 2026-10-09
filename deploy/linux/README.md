@@ -148,6 +148,10 @@ python3 deploy/linux/linux.py --runtime "$RUNTIME" health
 
 `proxies` 的 Docker 登记使用 `{ "version": 1, "services": [...] }`；经过实机资格验证的 systemd 登记必须使用 `{ "version": 2, "qualification": { "mode": "report", "root": "/absolute/private/retained-proof-runtime", "sha256": "EXACT_SEALED_REPORT_FILE_SHA256" }, "services": [...] }`。生产登记不得使用测试专用的 `mode: isolated`。报告必须通过实例签名、当前 implementationDigest、Q01–Q12 全部 PASS、证据文件摘要和实际代理二进制哈希检查。测试单独通过、旧摘要报告或普通 JSON 不能代替资格证明。
 
+systemd 维护链的来源白名单只包含原 pod IPv4、主机 loopback 和封存 issuer 的单个 IPv4，后者用于公网回环 SNAT。这个地址可能代表同一 NAT 出口，不能声称唯一标识 pod；仅原 JWKS GET 和认证 introspection POST 可以通过，其他业务路径继续关闭，不能扩为网段。
+
+若原操作处于 `ROLLBACK_BLOCKED` 且操作员明确选择只向前完成，使用 `rotate-public-tls-forward-resume --operation-id ORIGINAL_ID --qualification-file /absolute/private/new-proof.json`。证明文件只含新的 `{ "mode": "report", "root": "…", "sha256": "…" }`。入口核验原候选、代际、精确 BLOCKED gate、入口关闭和写入者停止，追加绑定原登记的新资格记录及前向恢复意图；不覆盖原登记、报告或候选，不新建操作。中断后同命令续跑同一意图；后续普通 resume 也必须先重验新资格。未明确转向前时，普通 resume 对 `ROLLBACK*` 阶段仍恢复原回退路径，不能将其当作前向命令。
+
 每个服务完整提供 `role`（nginx 或 caddy）、`transport`、`name`、`identity`、`image`、`config`、`configSha256`、`tlsPaths`。Docker 配置须已登记在运行目录 `proxy/` 下，原容器须按原路径挂载整个运行目录，身份绑定实际容器 ID 和 image ID。systemd version 2 还须提供完整 `systemd` profile：`unitFile`、`immutableFiles`、`includes`、`mainConfig`、`properties`、`process`、`credentialNames`、`listeners`；绑定实际文件内容及所有权/权限、配置图、manager 属性、固定可执行文件哈希、进程 argv/uid/gid/cgroup、端口归属与已加载凭据。复杂 manager 属性从现有 busctl 类型化读取，Exec 命令为有序 argv 数组。没有自动采用未知代理的注册 CLI；私密登记输入须按实际观测审阅后交给轮换入口。
 
 外层 nginx 必须是获准暂停的独立服务。Docker 维护仅接受准确的 `nginx -c <登记配置> -g "daemon off;"` 启动且不得有运行目录嵌套挂载。systemd 维护仅接受已通过资格门禁的固定配置图、原有 IPv4 HTTPS 监听和严格 TLS Caddy 桥接；保持登记的 HTTP 挑战配置。Caddy LoadCredential 切换由原操作控制 drop-in、daemon-reload 和停止/启动，并证明新进程实际加载了目标凭据，不能用 reload 代替。具体接入、隔离资格及清理边界见 [systemd 资格说明](verification/systemd_qualification/README.md)。

@@ -4,6 +4,16 @@ This package exercises the systemd transport of the existing TLS rotation helper
 
 All certificates, credentials, operation records and account fixtures are newly synthetic. The public and native original certificates deliberately differ; native expires after six minutes and external after fifteen. No clock changes. Expected run time is about six minutes after material generation; if earlier tests consume the old validity window, rollback fails closed and retains the original operation, never silently regenerating it.
 
+Q03 also uses a sealed synthetic issuer of `127.0.0.3`, distinct from the synthetic pod source `127.0.0.2` and ordinary loopback source `127.0.0.1`. The two health routes must accept all three exact sources and reject adjacent `127.0.0.4`, wrong methods and other paths. This tests the self-address ACL used after public hairpin SNAT without altering host NAT, firewall or routes.
+
+## Explicit blocked-maintenance admission
+
+Only when the operator has separately authorized qualification while the original application is blocked, add `maintenanceBaseline` to the private inputs with exactly `operationId` and `snapshotSha256`. Obtain that hash using the delivered, verified bootstrap module's read-only `maintenance_snapshot(inputs, ORIGINAL_OPERATION_ID)` before starting bootstrap. Import or execute it with `__name__` other than `__main__`; do not call `main()` to obtain the snapshot. The output contains only the operation ID, status and snapshot digest.
+
+This mode requires the original `ROLLBACK_BLOCKED` operation, its exact sealed rollback BLOCKED gate, previous-generation selection, all application/retained containers stopped, original infrastructure containers running, both databases answering a read-only query, and closed public ingress. The digest binds the original source files, operation/selection/launch/resource records, observed database schema/gate, container IDs/activity and proxy state. Every admission and continuous production check must match the operator-pinned digest. The separate configuration/unit baseline and all resource guards remain enabled. Any drift or unavailable observation stops only fixture resources. This returns `MAINTENANCE_UNCHANGED`, never application health `PASS`.
+
+Keep the original controller used by `healthCli` unchanged throughout qualification. After all Q01–Q12 pass, privately retain the new sealed report and referenced evidence with its journal key before cleanup. Only then install the reviewed repair separately and supply the new report binding to the explicit original-operation forward recovery command. Changing gate, starting production writers or replacing the monitored source during qualification invalidates the maintenance baseline.
+
 ## Inputs and delivery
 
 The private JSON envelope sent to `bootstrap.py` contains:

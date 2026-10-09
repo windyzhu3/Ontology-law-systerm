@@ -47,6 +47,35 @@ def require(root,registration):
         if resources.get('verification') is not True or resources.get('fixtureKind')!='systemd-proxy-qualification':
             raise RuntimeError('Original isolated qualification fixture required')
         return
+    if (root/'current-operation.json').exists():
+        op=journal.current(root)
+        path=root/'operations'/(op['operationId']+'-systemd-qualification-amendment.json')
+        if path.exists():
+            amendment=journal._read(root,path)
+            if op['phase']=='COMPLETE' and amendment['registrationDigest']!=digest(registration):
+                return _report(registration,proof)
+            if amendment['operationId']!=op['operationId'] or amendment['registrationDigest']!=digest(registration) or amendment['previousProof']!=proof or amendment['implementationDigest']!=implementation_digest():
+                raise RuntimeError('Qualification amendment binding differs')
+            proof=amendment['proof']
+    _report(registration,proof)
+
+
+def amend(root,operation_id,registration,proof):
+    """Append explicit new qualification admission without rewriting registration."""
+    with journal.locked(root):
+        op=journal.current(root)
+        if op['operationId']!=operation_id or op['kind']!='rotate-public-tls' or op['phase']!='ROLLBACK_BLOCKED':
+            raise RuntimeError('Qualification amendment requires original blocked rollback')
+        if registration.get('qualification',{}).get('mode')!='report':raise RuntimeError('Original production report binding required')
+        _report(registration,proof)
+        value={'operationId':operation_id,'registrationDigest':digest(registration),'previousProof':registration['qualification'],'proof':proof,'implementationDigest':implementation_digest()}
+        path=root/'operations'/(operation_id+'-systemd-qualification-amendment.json')
+        if path.exists():
+            if journal._read(root,path)!=value:raise RuntimeError('Original qualification amendment differs')
+        else:journal._write(root,path,value)
+
+
+def _report(registration,proof):
     if set(proof)!={'mode','root','sha256'} or proof['mode']!='report':raise RuntimeError('Sealed real-systemd qualification report required')
     report_root=Path(proof['root']);path=report_root/'verification/systemd-proxy-qualification.json'
     if sha(path)!=proof['sha256']:raise RuntimeError('Qualification report digest differs')

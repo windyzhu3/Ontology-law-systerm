@@ -1,6 +1,7 @@
 """Restricted issuer health access on the existing nginx listeners.
 
-Only the owned pod's exact IPv4 address and host loopback may use the two
+Only the owned pod's exact IPv4 address, host loopback and the sealed systemd
+issuer's single IPv4 address (public hairpin SNAT) may use the two
 already-public issuer health paths. Authentication and strict upstream TLS stay
 unchanged. All other paths return 503, including identity administration.
 """
@@ -9,6 +10,12 @@ import re
 from pathlib import Path
 from urllib.parse import urlsplit
 from . import journal,runtime,tls_material
+
+
+def sources(pod_address,issuer,*,systemd):
+    addresses={'127.0.0.1',str(ipaddress.IPv4Address(pod_address))}
+    if systemd:addresses.add(str(ipaddress.IPv4Address(urlsplit(issuer).hostname)))
+    return sorted(addresses)
 
 
 def render(*,listeners,identity_port,realm,sources,upstream_port,certificate,private_key,trust,fragment=False,default_server=False,public_host=None):
@@ -115,7 +122,7 @@ def prepare(root,opid,rows,targets,paths):
     bridge=[t for t in targets if t['role']=='bridgeIdentity']
     if len(bridge)!=1 or bridge[0].get('tlsIdentity')!='internal' or bridge[0]['verifyHost']!='localhost' or bridge[0]['connectHost']!='127.0.0.1':raise RuntimeError('Original verified Caddy identity bridge required')
     if not any(r['service']['role']=='caddy' for r in rows):raise RuntimeError('Registered Caddy required')
-    text=render(listeners=listeners,identity_port=issuer.port or 443,realm=issuer.path.removeprefix('/realms/'),sources=sorted(set(['127.0.0.1',source])),upstream_port=bridge[0]['connectPort'],certificate=paths['certificate'],private_key=paths['privateKey'],trust=str(root/'certs/ca.pem'),fragment=outer['service']['transport']=='systemd',default_server=outer['service']['transport']=='systemd' and 'default_server' in original,public_host=issuer.hostname if outer['service']['transport']=='systemd' else None)
+    text=render(listeners=listeners,identity_port=issuer.port or 443,realm=issuer.path.removeprefix('/realms/'),sources=sources(source,plan['issuer'],systemd=outer['service']['transport']=='systemd'),upstream_port=bridge[0]['connectPort'],certificate=paths['certificate'],private_key=paths['privateKey'],trust=str(root/'certs/ca.pem'),fragment=outer['service']['transport']=='systemd',default_server=outer['service']['transport']=='systemd' and 'default_server' in original,public_host=issuer.hostname if outer['service']['transport']=='systemd' else None)
     value={'podId':pod['Id'],'podAddress':source,'configuration':text,'service':outer['service']}
     if qualification:value['sourceKind']='isolated-loopback-probe-not-a-container'
     # Forward/rollback may select different bytes; retain each exact version.

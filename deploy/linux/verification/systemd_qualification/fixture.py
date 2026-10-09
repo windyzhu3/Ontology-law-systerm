@@ -58,7 +58,7 @@ def materials():
         put(database/'index','');put(database/'serial','1000\n')
         put(directory/(ca+'.cnf'),f'[ca]\ndefault_ca=fixture\n[fixture]\ndatabase={database}/index\nnew_certs_dir={database}\nserial={database}/serial\ncertificate={cert}\nprivate_key={key}\ndefault_md=sha256\ndefault_days=2\npolicy=policy\ncopy_extensions=copy\nx509_extensions=leaf\n[policy]\ncommonName=supplied\n[leaf]\nbasicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n')
     # Same native leaf for both upstreams; deliberately different external leaf.
-    definitions=[('old-native','old','IP:127.0.0.1',360),('old-public','old','IP:127.0.0.1',900),('new-public','new','IP:127.0.0.1',172800),('bridge','internal','DNS:localhost',172800)]
+    definitions=[('old-native','old','IP:127.0.0.1',360),('old-public','old','IP:127.0.0.1,IP:127.0.0.3',900),('new-public','new','IP:127.0.0.1,IP:127.0.0.3',172800),('bridge','internal','DNS:localhost',172800)]
     for prefix,ca,san in [('native','old','IP:127.0.0.1'),('bridge','internal','DNS:localhost')]:
         definitions.extend([(prefix+'-wrong-ca','wrong',san,172800),(prefix+'-wrong-san',ca,'DNS:wrong.invalid',172800),(prefix+'-expired',ca,san,-60)])
     for name,ca,san,end in definitions:
@@ -83,7 +83,7 @@ def prepare():
     materials()
     op=journal.begin(ROOT,'rotate-public-tls','a'*64)
     runtime.save(ROOT,{'verification':True,'fixtureKind':'systemd-proxy-qualification'})
-    journal._write(ROOT,ROOT/'identity/plan.json',{'issuer':'https://127.0.0.1:29848/realms/qualification','origin':'https://127.0.0.1:29848','pod':'none-synthetic-loopback'})
+    journal._write(ROOT,ROOT/'identity/plan.json',{'issuer':'https://127.0.0.3:29848/realms/qualification','origin':'https://127.0.0.3:29848','pod':'none-synthetic-loopback'})
     put(ROOT/'certs/ca.pem',(BASE/'materials/internal-ca.pem').read_bytes())
     templates=Path(__file__).parent/'templates'
     for name,target in [('nginx.conf',BASE/'nginx/nginx.conf'),('http.conf',BASE/'nginx/conf.d/http.conf'),('https.conf',BASE/'nginx/conf.d/https.conf'),('bridge.Caddyfile',BASE/'caddy/bridge.Caddyfile')]:put(target,(templates/name).read_bytes(),0o644)

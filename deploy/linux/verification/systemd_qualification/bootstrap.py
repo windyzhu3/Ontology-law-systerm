@@ -23,6 +23,72 @@ SLICE_TEXT='[Slice]\nMemoryMax=512M\nMemoryHigh=256M\nMemorySwapMax=0\nCPUQuota=
 def command(args,**kw):return subprocess.run(args,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=70,**kw)
 
 
+MAINTENANCE_PROBE=r'''
+import sys,json,hashlib
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+from ols_linux import journal,runtime,database,release,tls_generation,tls_proxy
+from ols_linux.config import digest
+r=Path(sys.argv[2]);oid=sys.argv[3]
+with journal.locked(r):
+    op=journal.current(r)
+    if op['operationId']!=oid or op['kind']!='rotate-public-tls' or op['phase']!='ROLLBACK_BLOCKED':raise RuntimeError('Original blocked rollback required')
+    data=journal._read(r,r/'operations'/(oid+'-tls.json'))
+    expected=journal._read(r,r/'operations'/(oid+'-tls-gate-rollback-blocked-'+str(data['rollbackAttempt'])+'.json'))['expected']
+    observed=database.observe(r)
+    if expected['operating_mode']!='BLOCKED' or not release._same_gate(observed['gate'],expected):raise RuntimeError('Exact blocked gate differs')
+    selected=tls_generation.resolve(r)
+    if selected['generationId']!=data['previousGeneration']['generationId']:raise RuntimeError('Blocked previous selection differs')
+    resources=runtime.load(r);containers={}
+    databases={resources['containers'][role] for role in ('businessDb','identityDb')}
+    pods={resources['containers']['pod']} if resources['containers'].get('pod') else set()
+    names=set(resources['containers'].values())|set(resources['writers'])|({resources['ingress']} if resources.get('ingress') else set())
+    for name in sorted(names):
+        actual=runtime.inspect('container',name)
+        if actual is None:
+            if name in databases|pods:raise RuntimeError('Required infrastructure missing')
+            containers[name]=None;continue
+        actual=runtime.owned(r,'container',name)
+        running=actual['State']['Running']
+        if running!=(name in databases|pods):raise RuntimeError('Blocked container activity differs')
+        containers[name]={'id':actual['Id'],'running':running}
+    for identity in (False,True):
+        if database.sql(r,'SELECT 1',identity=identity)!='1':raise RuntimeError('Database observation unavailable')
+    proxies=tls_proxy.observe(r,oid)
+    if not proxies['closed']:raise RuntimeError('Public ingress is not closed')
+    paths=['current-operation.json','operations/'+oid+'.json','operations/'+oid+'-tls.json','resources.json','launch.json','tls-selection.json','tls/active.json']
+    files={name:hashlib.sha256((r/name).read_bytes()).hexdigest() for name in paths}
+    source={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((Path(sys.argv[1])/'ols_linux').glob('*.py'))}
+    snapshot={'operationId':oid,'files':files,'source':source,'observed':observed,'containers':containers,'proxies':proxies,'generationId':selected['generationId']}
+    print(json.dumps({'status':'MAINTENANCE_OBSERVED','operationId':oid,'snapshotSha256':digest(snapshot)}))
+'''
+
+
+def maintenance_snapshot(inputs,operation_id):
+    import re
+    cli=Path(inputs['healthCli']);python=Path(inputs['healthPython']);root=Path(inputs['healthRuntime'])
+    if not all(p.is_absolute() for p in (cli,python,root)) or cli.name!='linux.py' or not re.fullmatch('[a-f0-9]{32}',operation_id):raise RuntimeError('Exact original maintenance entrypoint and operation required')
+    if hashlib.sha256(cli.read_bytes()).hexdigest()!=inputs['healthCliSha256']:raise RuntimeError('Original health CLI changed')
+    result=command([str(python),'-B','-c',MAINTENANCE_PROBE,str(cli.parent),str(root),operation_id])
+    value=json.loads(result.stdout)
+    if set(value)!={'status','operationId','snapshotSha256'} or value['status']!='MAINTENANCE_OBSERVED' or value['operationId']!=operation_id or not re.fullmatch('[a-f0-9]{64}',value['snapshotSha256']):raise RuntimeError('Maintenance observation malformed')
+    return value
+
+
+def production_health(inputs):
+    if 'maintenanceBaseline' in inputs:
+        expected=inputs['maintenanceBaseline']
+        if not isinstance(expected,dict) or set(expected)!={'operationId','snapshotSha256'}:raise RuntimeError('Exact maintenance baseline required')
+        value=maintenance_snapshot(inputs,expected['operationId'])
+        if value['snapshotSha256']!=expected['snapshotSha256']:raise RuntimeError('Pinned maintenance baseline changed')
+        return dict(value,status='MAINTENANCE_UNCHANGED')
+    cli=Path(inputs['healthCli'])
+    if cli.name!='linux.py' or not cli.is_absolute() or hashlib.sha256(cli.read_bytes()).hexdigest()!=inputs['healthCliSha256']:raise RuntimeError('Exact reviewed original health CLI required')
+    value=json.loads(command([inputs['healthPython'],'-B',str(cli),'--runtime',inputs['healthRuntime'],'health']).stdout)
+    if value.get('status')!='PASS':raise RuntimeError('Original production health failed')
+    return value
+
+
 def admit_unit_state(name,state,*,cgroup_exists):
     # Merely querying a slice may synthesize an inactive, fileless systemd unit.
     # This exception is only for our exact slice, never service/scope/parent units.
@@ -141,10 +207,7 @@ def main():
     if int(mem['MemAvailable'].split()[0])*1024<1024**3 or os.statvfs('/var/lib').f_bavail*os.statvfs('/var/lib').f_frsize<2*1024**3:raise RuntimeError('Admission headroom insufficient')
     before=resource_sample();time.sleep(5);after=resource_sample()
     if min(before['available'],after['available'])<1024**3 or resource_pressure(before,after):raise RuntimeError('Current memory pressure exceeds admission limit')
-    cli=Path(inputs['healthCli'])
-    if cli.name!='linux.py' or not cli.is_absolute() or hashlib.sha256(cli.read_bytes()).hexdigest()!=inputs['healthCliSha256']:raise RuntimeError('Exact reviewed original health CLI required')
-    health=json.loads(command([inputs['healthPython'],'-B',str(cli),'--runtime',inputs['healthRuntime'],'health']).stdout)
-    if health.get('status')!='PASS':raise RuntimeError('Original production health failed')
+    production_health(inputs)
     # Validate the complete archive before creating any resource, no links/devices.
     stream=tarfile.open(fileobj=io.BytesIO(archive),mode='r:gz');members=stream.getmembers()
     if len(members)>500 or sum(m.size for m in members)>4*1024*1024:raise RuntimeError('Package exceeds fixed bound')
