@@ -5,7 +5,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { useLayoutEffect } from "react";
+import { Profiler, useLayoutEffect } from "react";
 import { expect, it } from "vitest";
 import { AppointmentChooser } from "./AppointmentChooser";
 import {
@@ -572,4 +572,31 @@ it("refuses noncandidate values even if an option is injected into a native cont
   expect(delegateSelect).toHaveValue("");
   expect(confirm()).toBeDisabled();
   expect(f.requests).toHaveLength(1);
+});
+
+
+it("restores confirmation focus in the first enabled commit after cancelling an identity switch", async () => {
+  const marker = pendingMarker();
+  const f = fixture();
+  const enabledCommitFocus: (Element | null)[] = [];
+  let cancelling = false;
+  render(
+    <Profiler id="identity-choice" onRender={() => {
+      if (cancelling && !(confirm() as HTMLButtonElement).disabled)
+        enabledCommitFocus.push(document.activeElement);
+    }}>
+      <AppointmentChooser controller={f.controller} />
+    </Profiler>,
+  );
+  await screen.findByLabelText("本人任职");
+  fireEvent.click(confirm());
+  const cancel = await screen.findByRole("button", { name: "取消切换" });
+  await waitFor(() => expect(cancel).toHaveFocus());
+  cancelling = true;
+  fireEvent.click(cancel);
+  await waitFor(() => expect(confirm()).toBeEnabled());
+  expect(enabledCommitFocus.length).toBeGreaterThan(0);
+  expect(enabledCommitFocus[0]).toBe(confirm());
+  expect(confirm()).toHaveFocus();
+  expect(f.controller.recovery.read()).toEqual(marker);
 });
