@@ -13,7 +13,7 @@ from . import journal,runtime,tls_material
 
 def render(*,listeners,identity_port,realm,sources,upstream_port,certificate,private_key,trust):
     if not re.fullmatch('[A-Za-z0-9_-]+',realm):raise ValueError('Exact realm required')
-    if len(listeners)!=2 or len(set(listeners))!=2:raise ValueError('Two original listeners required')
+    if not 1<=len(listeners)<=2 or len(set(listeners))!=len(listeners):raise ValueError('One or two distinct original listeners required')
     for token in listeners:
         if not re.fullmatch(r'(?:[0-9.]+:)?[0-9]+',token):raise ValueError('Explicit IPv4 listener required')
         if ':' in token:ipaddress.IPv4Address(token.rsplit(':',1)[0])
@@ -60,6 +60,19 @@ def validate_start(service,actual,root):
         raise RuntimeError('Actual nginx startup configuration differs')
 
 
+def original_listeners(configuration,identity_port,origin_port):
+    # The two logical consumers may share a single HTTPS socket. Extra listeners
+    # or HTTP configuration need a separately registered fragment, never guessing.
+    text=re.sub(r'#[^\n]*','',configuration)
+    rows=re.findall(r'\blisten\s+([^;]+);',text)
+    if any(not re.fullmatch(r'(?:[0-9.]+:)?[0-9]+\s+ssl',row.strip()) for row in rows):
+        raise RuntimeError('Unsupported original maintenance listener profile')
+    listeners=[row.split()[0] for row in rows]
+    if len(set(listeners))!=len(listeners) or sorted(int(x.rsplit(':',1)[-1]) for x in listeners)!=sorted({identity_port,origin_port}):
+        raise RuntimeError('Original public listeners differ')
+    return listeners
+
+
 def prepare(root,opid,rows,targets,paths):
     """Bind the exact owned pod and original listeners before any maintenance effect."""
     from . import tls_proxy
@@ -73,14 +86,8 @@ def prepare(root,opid,rows,targets,paths):
     observed=tls_proxy._service(outer['service'])
     validate_start(outer['service'],observed.get('actual',{}),root)
     original=outer.get('before',outer.get('configuration'))
-    # This bounded profile supports the existing IPv4 two-listener Caddy topology.
-    # Unsupported syntax is refused rather than rewritten heuristically.
-    original=re.sub(r'#[^\n]*','',original)
-    listeners=re.findall(r'\blisten\s+([^;]+);',original)
-    if any(not re.fullmatch(r'(?:[0-9.]+:)?[0-9]+\s+ssl',x.strip()) for x in listeners):raise RuntimeError('Unsupported original maintenance listener profile')
-    listeners=[x.split()[0] for x in listeners]
     issuer=urlsplit(plan['issuer']);origin=urlsplit(plan['origin'])
-    if sorted(int(x.rsplit(':',1)[-1]) for x in listeners)!=sorted([issuer.port or 443,origin.port or 443]):raise RuntimeError('Original public listeners differ')
+    listeners=original_listeners(original,issuer.port or 443,origin.port or 443)
     bridge=[t for t in targets if t['role']=='bridgeIdentity']
     if len(bridge)!=1 or bridge[0].get('tlsIdentity')!='internal' or bridge[0]['verifyHost']!='localhost' or bridge[0]['connectHost']!='127.0.0.1':raise RuntimeError('Original verified Caddy identity bridge required')
     if not any(r['service']['role']=='caddy' for r in rows):raise RuntimeError('Registered Caddy required')

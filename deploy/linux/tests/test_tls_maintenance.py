@@ -17,6 +17,22 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn('allow 172.18.0.4;',text);self.assertIn('deny all;',text)
         self.assertIn('proxy_ssl_verify on;',text);self.assertIn('proxy_ssl_name localhost;',text)
         self.assertEqual(text.count('listen '),2)
+    def test_shared_https_listener_has_one_server_and_restricted_identity_routes(self):
+        text=self.module().render(**dict(self.args(),listeners=['443'],identity_port=443))
+        self.assertEqual(text.count('listen 443 ssl;'),1)
+        self.assertEqual(text.count('proxy_pass '),2)
+        self.assertIn('location / { return 503; }',text)
+        self.assertIn('deny all;',text)
+        self.assertIn('proxy_ssl_verify on;',text)
+    def test_duplicate_listener_input_is_refused_instead_of_creating_duplicate_servers(self):
+        with self.assertRaises(ValueError):
+            self.module().render(**dict(self.args(),listeners=['443','443'],identity_port=443))
+    def test_shared_origin_and_issuer_require_one_original_listening_port(self):
+        self.assertEqual(self.module().original_listeners('listen 443 ssl;',443,443),['443'])
+        self.assertEqual(self.module().original_listeners('listen 25443 ssl; listen 25444 ssl;',25443,25444),['25443','25444'])
+        for config in ['listen 443 ssl; listen 443 ssl;','listen 444 ssl;','listen 443 ssl; listen 80;']:
+            with self.subTest(config=config),self.assertRaises(RuntimeError):
+                self.module().original_listeners(config,443,443)
     def test_network_ranges_and_injection_are_refused(self):
         for key,value in [('sources',['172.18.0.0/16']),('realm','x; allow all'),('listeners',['0.0.0.0:25443;']),('trust','/x;bad')]:
             with self.subTest(key=key),self.assertRaises(ValueError):self.module().render(**dict(self.args(),**{key:value}))
