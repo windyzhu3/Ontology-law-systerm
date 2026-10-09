@@ -20,6 +20,17 @@ SLICE_TEXT='[Slice]\nMemoryMax=512M\nMemoryHigh=256M\nMemorySwapMax=0\nCPUQuota=
 def command(args,**kw):return subprocess.run(args,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=70,**kw)
 
 
+def admit_unit_state(name,state,*,cgroup_exists):
+    # Merely querying a slice may synthesize an inactive, fileless systemd unit.
+    # This exception is only for our exact slice, never service/scope/parent units.
+    if name not in [*NAMES,SLICE,SCOPE]:raise RuntimeError('Unregistered fixture unit name')
+    expected={'LoadState':'not-found','ActiveState':'inactive','SubState':'dead',
+              'FragmentPath':'','SourcePath':'','DropInPaths':'','ControlGroup':'','Transient':'no'}
+    implicit=dict(expected,LoadState='loaded')
+    if cgroup_exists or not (state==expected or name==SLICE and state==implicit):
+        raise RuntimeError('Fixture unit has existing configuration, activity or cgroup')
+
+
 def main():
     os.umask(0o077)
     raw=sys.stdin.buffer.read(8*1024*1024+1)
@@ -33,9 +44,16 @@ def main():
     paths=[BASE,STATE,Path('/etc/systemd/system')/(NAMES[1]+'.d'),*[Path('/etc/systemd/system')/name for name in [*NAMES,SLICE]]]
     if any(p.exists() or p.is_symlink() for p in paths):raise RuntimeError('Fixture path collision; no replacement names or deletion permitted')
     for name in [*NAMES,SLICE,SCOPE]:
-        result=subprocess.run(['systemctl','show',name,'--property=LoadState','--value'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
-        state=result.stdout.strip()
-        if state!=b'not-found':raise RuntimeError('Fixture unit name already exists')
+        properties='LoadState,ActiveState,SubState,FragmentPath,SourcePath,DropInPaths,ControlGroup,Transient'
+        result=subprocess.run(['systemctl','show',name,'--property='+properties],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=10)
+        state={}
+        for line in result.stdout.decode().splitlines():
+            key,separator,entry=line.partition('=')
+            if not separator or key in state:raise RuntimeError('Ambiguous fixture unit observation')
+            state[key]=entry
+        group=Path('/sys/fs/cgroup/ols.slice/ols-tls.slice')/SLICE
+        if name!=SLICE:group=group/name
+        admit_unit_state(name,state,cgroup_exists=group.exists())
     for kind in ('tcp','tcp6','udp','udp6'):
         for line in Path('/proc/net',kind).read_text().splitlines()[1:]:
             if int(line.split()[1].split(':')[1],16) in range(29843,29849):raise RuntimeError('Authorized fixture port occupied')

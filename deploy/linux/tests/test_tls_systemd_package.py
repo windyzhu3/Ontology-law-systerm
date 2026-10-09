@@ -100,3 +100,16 @@ class PackageTests(unittest.TestCase):
             first,manifest=build_package.build(base);second,_=build_package.build(base)
             self.assertEqual(first,second);self.assertEqual(hashlib.sha256(gzip.decompress(first)).hexdigest(),manifest['uncompressedTarSha256'])
             with tarfile.open(fileobj=io.BytesIO(first),mode='r:gz') as archive:self.assertEqual(archive.getnames(),['ols_linux/a.py','verification/systemd_qualification/bootstrap.py'])
+
+    def test_bootstrap_admits_only_empty_implicit_fixture_slice(self):
+        import bootstrap
+        self.assertTrue(callable(getattr(bootstrap,'admit_unit_state',None)))
+        empty={'LoadState':'loaded','ActiveState':'inactive','SubState':'dead','FragmentPath':'','SourcePath':'','DropInPaths':'','ControlGroup':'','Transient':'no'}
+        name='ols-tls-qualification.slice'
+        bootstrap.admit_unit_state(name,empty,cgroup_exists=False)
+        for key,value in [('ActiveState','active'),('SubState','running'),('FragmentPath','/etc/systemd/system/foreign.slice'),('SourcePath','/run/generator/foreign'),('DropInPaths','/etc/systemd/system/foreign.conf'),('ControlGroup','/foreign'),('Transient','yes'),('LoadState','masked')]:
+            with self.subTest(key=key),self.assertRaises(RuntimeError):bootstrap.admit_unit_state(name,dict(empty,**{key:value}),cgroup_exists=False)
+        with self.assertRaises(RuntimeError):bootstrap.admit_unit_state(name,empty,cgroup_exists=True)
+        for other in ['ols-tls-qualification-nginx.service','ols-tls-qualification-control.scope','ols.slice']:
+            with self.subTest(name=other),self.assertRaises(RuntimeError):bootstrap.admit_unit_state(other,empty,cgroup_exists=False)
+        bootstrap.admit_unit_state('ols-tls-qualification-nginx.service',dict(empty,LoadState='not-found'),cgroup_exists=False)
